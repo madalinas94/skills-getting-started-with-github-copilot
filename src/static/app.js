@@ -134,6 +134,7 @@ function renderCharts(topBy, valueColumn) {
 
     const card = document.createElement("div");
     card.className = "chart-card";
+    card.style.setProperty("--accent", color);
     const title = document.createElement("h3");
     title.textContent = `Top ${col} după ${valueColumn || "valoare"}`;
     card.appendChild(title);
@@ -144,10 +145,12 @@ function renderCharts(topBy, valueColumn) {
       const pct = max > 0 ? Math.max((entry.value / max) * 100, 2) : 0;
       row.innerHTML = `
         <span class="bar-label" title="${entry.key}">${entry.key}</span>
-        <span class="bar-track"><span class="bar-fill" style="width:${pct}%; --bar-color:${color}"></span></span>
+        <span class="bar-track"><span class="bar-fill" style="--bar-color:${color}"></span></span>
         <span class="bar-value">${formatNumber(entry.value)}</span>
       `;
       card.appendChild(row);
+      const fill = row.querySelector(".bar-fill");
+      requestAnimationFrame(() => requestAnimationFrame(() => (fill.style.width = `${pct}%`)));
     });
 
     container.appendChild(card);
