@@ -1,0 +1,17 @@
+produs,data,cantitate,pret,regiune,vanzator
+Laptop Dell,2025-01-05,3,4500,Nord,Popescu Ion
+Mouse Logitech,2025-01-05,10,120,Nord,Popescu Ion
+Tastatura Genius,2025-01-06,5,"250 lei",Sud,ION POPESCU
+,,,,,
+Monitor LG,2025-01-07,2,1800,Vest,I. Popescu
+Laptop Dell,2025-01-08,1,"4.500,00 lei",Sud,Georgescu Maria
+TOTAL,,,10650,,
+Casti JBL,2025-01-09,7,350,Est,Georgescu M.
+Mouse Logitech,2025-01-10,,120,Nord,Ionescu Vasile
+Webcam Logitech,2025-01-11,4,220,Vest,Ionescu V.
+,,,,,
+Imprimanta HP,2025-01-12,1,1200,Sud,Vasile Ionescu
+Laptop Dell,2025-01-13,2,"9000",Est,Marin Andrei
+SUBTOTAL,,,10920,,
+Router TP-Link,2025-01-14,6,180,Nord,Andrei Marin
+Monitor LG,2025-01-15,3,2700,Sud,Marin A.
