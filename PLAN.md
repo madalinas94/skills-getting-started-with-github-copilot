@@ -49,6 +49,19 @@ modelul explică. Niciodată invers.
 - **Cache pe hash**: reîncarci același CSV → răspuns instant, fără reprocesare.
 - **Garanție de corectitudine**: toate cifrele afișate vin din pasul 6 (cod determinist, testat); modelul nu are voie să producă numere, doar interpretare în limbaj natural.
 
+## Pași de urmat
+
+1. **Setup proiect** — instalează dependențele (`fastapi`, `uvicorn`, `pandas`, `rapidfuzz`) și creează structura de foldere (`src/app.py`, `src/static/`).
+2. **Endpoint upload** — `POST /upload`: primește CSV-ul, calculează hash SHA-1, salvează fișierul temporar.
+3. **Parsing tolerant** — citește CSV-ul cu `pandas.read_csv` (auto-detect delimitator + fallback encoding utf-8/latin-1).
+4. **Curățare date** — elimină rânduri goale, convertește sumele scrise ca text în numere, scoate rândurile de total intercalate.
+5. **Deduplicare nume** — aplică `rapidfuzz` pentru a unifica variantele aceluiași nume (≥90% similaritate).
+6. **Detectare coloane + agregări** — identifică automat coloanele (produs, dată, preț etc.) și calculează sumă/medie/min/max/top-N în cod Python (nu în model).
+7. **Detectare anomalii** — marchează valorile outlier (IQR/z-score) pe coloanele numerice.
+8. **Frontend (tabel + grafice)** — construiește `app.js`: tabel din datele curățate + grafice Chart.js din agregate.
+9. **Endpoint /ask** — trimite întrebarea + rezumatul numeric (nu tot CSV-ul) către model, pentru răspunsuri în română fără cifre halucinate.
+10. **Testare & deploy** — scrie teste `pytest` cu CSV-uri murdare, apoi publică aplicația pe un link public (funcțional și pe telefon).
+
 ## Date exemplu
 
 `vânzări.csv` — produs, dată, cantitate, preț, regiune — cu rânduri goale, sume ca
