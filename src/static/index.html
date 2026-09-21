@@ -1,50 +1,67 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mergington High School Activities</title>
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <header>
-      <h1>Mergington High School</h1>
-      <h2>Extracurricular Activities</h2>
-    </header>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard vânzări din CSV</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="page-header">
+    <h1>Dashboard vânzări din CSV</h1>
+    <p class="subtitle">Urcă orice CSV de vânzări — curat sau murdar — și primești tabel curățat, cifre-cheie, grafice și răspunsuri în română.</p>
+  </header>
 
-    <main>
-      <section id="activities-container">
-        <h3>Available Activities</h3>
-        <div id="activities-list">
-          <!-- Activities will be loaded here -->
-          <p>Loading activities...</p>
-        </div>
+  <main>
+    <section class="panel upload-panel" aria-label="Încărcare CSV">
+      <label class="dropzone" id="dropzone" for="file-input">
+        <span class="dropzone-title" id="dropzone-title">Trage un fișier CSV aici sau apasă ca să alegi</span>
+        <span class="dropzone-hint">Funcționează cu orice CSV de vânzări, inclusiv date murdare.</span>
+        <input type="file" id="file-input" accept=".csv,text/csv" hidden />
+      </label>
+      <div id="upload-status" class="upload-status" role="status" aria-live="polite"></div>
+    </section>
+
+    <section id="results" class="results hidden">
+      <section class="panel" id="report-panel" aria-label="Raport curățare">
+        <h2>Ce am curățat</h2>
+        <p id="report-text" class="report-text"></p>
       </section>
 
-      <section id="signup-container">
-        <h3>Sign Up for an Activity</h3>
-        <form id="signup-form">
-          <div class="form-group">
-            <label for="email">Student Email:</label>
-            <input type="email" id="email" required placeholder="your-email@mergington.edu" />
-          </div>
-          <div class="form-group">
-            <label for="activity">Select Activity:</label>
-            <select id="activity" required>
-              <option value="">-- Select an activity --</option>
-              <!-- Activity options will be loaded here -->
-            </select>
-          </div>
-          <button type="submit">Sign Up</button>
+      <section class="panel" id="stats-panel" aria-label="Cifre cheie">
+        <h2>Cifre cheie</h2>
+        <div id="stat-tiles" class="stat-tiles"></div>
+      </section>
+
+      <section class="panel" id="anomalies-panel" aria-label="Anomalii">
+        <h2>Valori neobișnuite</h2>
+        <div id="anomalies-list" class="anomalies-list"></div>
+      </section>
+
+      <section class="panel" id="charts-panel" aria-label="Grafice">
+        <h2>Grafice</h2>
+        <div id="charts" class="charts-grid"></div>
+      </section>
+
+      <section class="panel" id="ask-panel" aria-label="Întreabă despre date">
+        <h2>Întreabă despre date</h2>
+        <form id="ask-form" class="ask-form">
+          <input type="text" id="ask-input" placeholder="Ex: Cine e cel mai bun client?" autocomplete="off" />
+          <button type="submit">Întreabă</button>
         </form>
-        <div id="message" class="hidden"></div>
+        <p id="ask-answer" class="ask-answer" aria-live="polite"></p>
       </section>
-    </main>
 
-    <footer>
-      <p>&copy; 2023 Mergington High School</p>
-    </footer>
+      <section class="panel" id="table-panel" aria-label="Tabel date curățate">
+        <h2>Tabel</h2>
+        <div class="table-scroll">
+          <table id="data-table"></table>
+        </div>
+        <p id="table-note" class="table-note"></p>
+      </section>
+    </section>
+  </main>
 
-    <script src="app.js"></script>
-  </body>
+  <script src="app.js"></script>
+</body>
 </html>

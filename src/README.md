@@ -1,50 +1,54 @@
-# Mergington High School Activities API
+# CSV Sales Dashboard API
 
-A super simple FastAPI application that allows students to view and sign up for extracurricular activities.
-
-## Features
-
-- View all available extracurricular activities
-- Sign up for activities
+Upload any sales CSV — clean or messy — and get back a cleaned table,
+aggregates, anomalies, and Romanian answers to questions about the data.
+The model never computes a number: `data_pipeline.py` does the arithmetic,
+`qa.py` only explains it.
 
 ## Getting Started
 
 1. Install the dependencies:
 
    ```
-   pip install fastapi uvicorn
+   pip install -r ../requirements.txt
    ```
 
 2. Run the application:
 
    ```
-   python app.py
+   python -m uvicorn app:app --reload
    ```
 
 3. Open your browser and go to:
-   - API documentation: http://localhost:8000/docs
-   - Alternative documentation: http://localhost:8000/redoc
+   - Dashboard: http://localhost:8000/
+   - API docs: http://localhost:8000/docs
 
 ## API Endpoints
 
-| Method | Endpoint                                                          | Description                                                         |
-| ------ | ----------------------------------------------------------------- | ------------------------------------------------------------------- |
-| GET    | `/activities`                                                     | Get all activities with their details and current participant count |
-| POST   | `/activities/{activity_name}/signup?email=student@mergington.edu` | Sign up for an activity                                             |
+| Method | Endpoint            | Description                                                        |
+| ------ | -------------------- | ------------------------------------------------------------------- |
+| POST   | `/upload`            | Upload a CSV (multipart `file`); returns hash, cleaned columns, roles, cleaning report, aggregates, anomalies |
+| GET    | `/data/{file_hash}`  | Full cleaned table + aggregates for a previously uploaded CSV        |
+| POST   | `/ask`                | `{"hash": ..., "question": "..."}` → Romanian answer grounded in precomputed aggregates |
 
-## Data Model
+## Pipeline (`data_pipeline.py`)
 
-The application uses a simple data model with meaningful identifiers:
+1. **Parsing** — auto-detects the delimiter (`,`/`;`/tab/`|`) and skips any
+   metadata lines before the real header row.
+2. **Cleaning** — drops blank rows, parses Romanian-formatted numbers
+   (`1.841,86` → `1841.86`), strips `TOTAL`/`SUBTOTAL` rows, removes exact
+   duplicate rows, and unifies inconsistent casing (plus fuzzy name matching
+   for client/vânzător-like columns).
+3. **Column detection** — classifies each column as date/numeric/categorical
+   by name, then by content.
+4. **Aggregation** — sum/mean/min/max per numeric column, top-N breakdowns
+   per categorical column (identifier-like columns are excluded).
+5. **Anomaly detection** — IQR-based outlier flagging.
 
-1. **Activities** - Uses activity name as identifier:
+Sample dirty CSVs for manual testing live in `../sample_data/`.
 
-   - Description
-   - Schedule
-   - Maximum number of participants allowed
-   - List of student emails who are signed up
+## Tests
 
-2. **Students** - Uses email as identifier:
-   - Name
-   - Grade level
-
-All data is stored in memory, which means data will be reset when the server restarts.
+```
+pytest
+```

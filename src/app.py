@@ -1,45 +1,33 @@
 """
-High School Management System API
+CSV Sales Dashboard API
 
-A super simple FastAPI application that allows students to view and sign up
-for extracurricular activities at Mergington High School.
+Upload any sales CSV — clean or messy — and get back a cleaned table,
+aggregates, and anomalies within seconds. The model never computes a
+number: pandas does the arithmetic, the model (in /ask) only explains it.
 """
 
-from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+import hashlib
 import os
 from pathlib import Path
 
-app = FastAPI(title="Mergington High School API",
-              description="API for viewing and signing up for extracurricular activities")
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
-# Mount the static files directory
+from data_pipeline import PipelineResult, run_pipeline
+from qa import answer_question
+
+app = FastAPI(
+    title="CSV Sales Dashboard",
+    description="Urci un CSV de vânzări și primești tabel curățat, agregate, grafice și răspunsuri în română.",
+)
+
 current_dir = Path(__file__).parent
-app.mount("/static", StaticFiles(directory=os.path.join(Path(__file__).parent,
-          "static")), name="static")
+app.mount("/static", StaticFiles(directory=os.path.join(current_dir, "static")), name="static")
 
-# In-memory activity database
-activities = {
-    "Chess Club": {
-        "description": "Learn strategies and compete in chess tournaments",
-        "schedule": "Fridays, 3:30 PM - 5:00 PM",
-        "max_participants": 12,
-        "participants": ["michael@mergington.edu", "daniel@mergington.edu"]
-    },
-    "Programming Class": {
-        "description": "Learn programming fundamentals and build software projects",
-        "schedule": "Tuesdays and Thursdays, 3:30 PM - 4:30 PM",
-        "max_participants": 20,
-        "participants": ["emma@mergington.edu", "sophia@mergington.edu"]
-    },
-    "Gym Class": {
-        "description": "Physical education and sports activities",
-        "schedule": "Mondays, Wednesdays, Fridays, 2:00 PM - 3:00 PM",
-        "max_participants": 30,
-        "participants": ["john@mergington.edu", "olivia@mergington.edu"]
-    }
-}
+# In-memory cache keyed by file content hash — re-uploading the same CSV is instant.
+_cache: dict[str, PipelineResult] = {}
 
 
 @app.get("/")
@@ -47,21 +35,42 @@ def root():
     return RedirectResponse(url="/static/index.html")
 
 
-@app.get("/activities")
-def get_activities():
-    return activities
+@app.post("/upload")
+async def upload_csv(file: UploadFile = File(...)):
+    """Accept a CSV, clean it, and return the hash used to fetch its data/ask questions."""
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Fișierul e gol")
+
+    file_hash = hashlib.sha1(raw).hexdigest()
+    if file_hash not in _cache:
+        try:
+            _cache[file_hash] = run_pipeline(raw)
+        except Exception as exc:  # noqa: BLE001 - surface any parsing failure to the caller
+            raise HTTPException(status_code=400, detail=f"Nu am putut citi CSV-ul: {exc}") from exc
+
+    result = _cache[file_hash]
+    return {"hash": file_hash, **result.as_dict()}
 
 
-@app.post("/activities/{activity_name}/signup")
-def signup_for_activity(activity_name: str, email: str):
-    """Sign up a student for an activity"""
-    # Validate activity exists
-    if activity_name not in activities:
-        raise HTTPException(status_code=404, detail="Activity not found")
+@app.get("/data/{file_hash}")
+def get_data(file_hash: str):
+    """Return the cleaned table + aggregates for a previously uploaded CSV."""
+    result = _cache.get(file_hash)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Fișier necunoscut — reîncarcă CSV-ul")
+    return {"hash": file_hash, "table": result.table, **result.as_dict()}
 
-    # Get the specific activity
-    activity = activities[activity_name]
 
-    # Add student
-    activity["participants"].append(email)
-    return {"message": f"Signed up {email} for {activity_name}"}
+class AskRequest(BaseModel):
+    hash: str
+    question: str
+
+
+@app.post("/ask")
+def ask(payload: AskRequest):
+    """Answer a Romanian question grounded in the aggregates already computed for this file."""
+    result = _cache.get(payload.hash)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Fișier necunoscut — reîncarcă CSV-ul")
+    return {"answer": answer_question(payload.question, result)}
