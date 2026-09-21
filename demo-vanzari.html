@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Demo — Dashboard vânzări din CSV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface-1: #fcfcfb;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --gridline: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.08);
+  --shadow-color: 220 20% 45%;
+
+  --series-1: #2a78d6; /* blue */
+  --series-2: #eb6834; /* orange */
+  --series-3: #1baf7a; /* aqua */
+  --series-4: #eda100; /* yellow */
+
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+
+  --radius-card: 16px;
+  --radius-bar: 4px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface-1: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --gridline: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --shadow-color: 0 0% 0%;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface-1: #1a1a19;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --gridline: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --shadow-color: 0 0% 0%;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text-primary);
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Hero header */
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #14213d 0%, #1c3a7a 45%, var(--series-1) 100%);
+  padding-bottom: 8px;
+}
+
+.hero-glow {
+  position: absolute;
+  inset: -40% -10% auto -10%;
+  height: 260px;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.25), transparent 70%);
+  pointer-events: none;
+}
+
+.page-header {
+  position: relative;
+  padding: 44px 16px 36px;
+  max-width: 960px;
+  margin: 0 auto;
+  color: #ffffff;
+}
+
+.brand-mark {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  margin-bottom: 14px;
+  backdrop-filter: blur(4px);
+}
+
+.page-header h1 {
+  margin: 0 0 8px;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  color: rgba(255, 255, 255, 0.82);
+  margin: 0;
+  max-width: 56ch;
+  font-size: 15px;
+}
+
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.panel {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 22px;
+  box-shadow: 0 1px 2px hsl(var(--shadow-color) / 0.06), 0 8px 24px -12px hsl(var(--shadow-color) / 0.18);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.panel:hover {
+  box-shadow: 0 2px 4px hsl(var(--shadow-color) / 0.08), 0 14px 32px -14px hsl(var(--shadow-color) / 0.24);
+}
+
+.panel h2 {
+  margin: 0 0 14px;
+  font-size: 15px;
+  color: var(--text-primary);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.hidden {
+  display: none;
+}
+
+/* Reveal animation */
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.results:not(.hidden) .panel {
+  animation: reveal 0.45s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.results:not(.hidden) .panel:nth-of-type(1) { animation-delay: 0.02s; }
+.results:not(.hidden) .panel:nth-of-type(2) { animation-delay: 0.08s; }
+.results:not(.hidden) .panel:nth-of-type(3) { animation-delay: 0.14s; }
+.results:not(.hidden) .panel:nth-of-type(4) { animation-delay: 0.20s; }
+.results:not(.hidden) .panel:nth-of-type(5) { animation-delay: 0.26s; }
+.results:not(.hidden) .panel:nth-of-type(6) { animation-delay: 0.32s; }
+
+/* Section icons (mask-based, theme-safe) */
+
+.section-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  flex: none;
+  display: inline-block;
+  position: relative;
+}
+
+.section-icon::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  background: #ffffff;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.icon-clean { background: var(--series-3); }
+.icon-clean::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6L9 17l-5-5'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6L9 17l-5-5'/%3E%3C/svg%3E");
+}
+
+.icon-stats { background: var(--series-1); }
+.icon-stats::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20V12M12 20V4M20 20v-7'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20V12M12 20V4M20 20v-7'/%3E%3C/svg%3E");
+}
+
+.icon-warn { background: var(--status-serious); }
+.icon-warn::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 9v4m0 4h.01M10.3 3.86L2.7 18.14A1.5 1.5 0 004 20.5h16a1.5 1.5 0 001.3-2.36L13.7 3.86a1.5 1.5 0 00-2.6 0z'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 9v4m0 4h.01M10.3 3.86L2.7 18.14A1.5 1.5 0 004 20.5h16a1.5 1.5 0 001.3-2.36L13.7 3.86a1.5 1.5 0 00-2.6 0z'/%3E%3C/svg%3E");
+}
+
+.icon-chart { background: var(--series-2); }
+.icon-chart::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 17l6-6 4 4 8-8M21 7v6M21 7h-6'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 17l6-6 4 4 8-8M21 7v6M21 7h-6'/%3E%3C/svg%3E");
+}
+
+.icon-ask { background: var(--series-4); }
+.icon-ask::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z'/%3E%3C/svg%3E");
+}
+
+.icon-table { background: var(--series-3); }
+.icon-table::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Cpath d='M3 9h18M3 15h18M9 3v18'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Cpath d='M3 9h18M3 15h18M9 3v18'/%3E%3C/svg%3E");
+}
+
+/* Upload */
+
+.upload-panel {
+  padding: 12px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  border: 1.5px dashed var(--baseline);
+  border-radius: var(--radius-card);
+  padding: 40px 16px;
+  cursor: pointer;
+  background: var(--surface-1);
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.dropzone-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--series-1);
+  background: color-mix(in srgb, var(--series-1) 12%, transparent);
+  margin-bottom: 6px;
+  transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.dropzone:hover,
+.dropzone:focus-visible {
+  border-color: var(--series-1);
+  box-shadow: 0 10px 30px -16px hsl(var(--shadow-color) / 0.35);
+  outline: none;
+}
+
+.dropzone:hover .dropzone-icon {
+  transform: translateY(-2px);
+}
+
+.dropzone.drag-over {
+  border-color: var(--series-1);
+  background: color-mix(in srgb, var(--series-1) 8%, var(--surface-1));
+  transform: scale(1.01);
+}
+
+.dropzone.drag-over .dropzone-icon {
+  background: var(--series-1);
+  color: #ffffff;
+}
+
+.dropzone-title {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.dropzone-hint {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.upload-status {
+  margin-top: 12px;
+  padding: 0 4px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  min-height: 1.2em;
+}
+
+.upload-status.error {
+  color: var(--status-critical);
+}
+
+/* Stat tiles */
+
+.stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.stat-tile {
+  position: relative;
+  overflow: hidden;
+  background: var(--page);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.stat-tile::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--series-1);
+}
+
+.stat-tile:nth-of-type(4n+2)::before { background: var(--series-2); }
+.stat-tile:nth-of-type(4n+3)::before { background: var(--series-3); }
+.stat-tile:nth-of-type(4n+4)::before { background: var(--series-4); }
+
+.stat-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px -14px hsl(var(--shadow-color) / 0.3);
+}
+
+.stat-tile .label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.stat-tile .value {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  font-variant-numeric: proportional-nums;
+}
+
+/* Charts (horizontal bar lists) */
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px 28px;
+}
+
+.chart-card h3 {
+  font-size: 13px;
+  margin: 0 0 12px;
+  color: var(--text-primary);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-card h3::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent, var(--series-1));
+  flex: none;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.bar-row .bar-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-track {
+  background: var(--gridline);
+  border-radius: var(--radius-bar);
+  height: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: var(--radius-bar);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--bar-color, var(--series-1)) 78%, white), var(--bar-color, var(--series-1)));
+  width: 0%;
+  transition: width 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bar-row .bar-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  min-width: 74px;
+  text-align: right;
+}
+
+/* Anomalies */
+
+.anomalies-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.anomalies-empty {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.anomaly-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--status-serious) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-serious) 20%, transparent);
+}
+
+.anomaly-item .icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--status-serious);
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Ask */
+
+.ask-form {
+  display: flex;
+  gap: 10px;
+}
+
+.ask-form input {
+  flex: 1;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--page);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ask-form input:focus-visible {
+  outline: none;
+  border-color: var(--series-1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--series-1) 20%, transparent);
+}
+
+.ask-form button {
+  padding: 12px 20px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, var(--series-1), #1c5cab);
+  color: white;
+  font-weight: 700;
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--series-1) 70%, transparent);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ask-form button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px -10px color-mix(in srgb, var(--series-1) 70%, transparent);
+}
+
+.ask-form button:active {
+  transform: translateY(0);
+}
+
+.ask-answer {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--page);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 14px;
+  min-height: 1.2em;
+}
+
+.ask-answer:empty {
+  display: none;
+}
+
+/* Table */
+
+.table-scroll {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+
+th, td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--gridline);
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  position: sticky;
+  top: 0;
+  background: var(--surface-1);
+}
+
+td {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--gridline) 35%, transparent);
+}
+
+tbody tr:hover {
+  background: color-mix(in srgb, var(--series-1) 7%, transparent);
+}
+
+tr.anomaly-row td {
+  background: color-mix(in srgb, var(--status-serious) 12%, transparent);
+}
+
+.table-note {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin: 12px 0 0;
+}
+
+.report-text {
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.6;
+}
+
+@media (max-width: 520px) {
+  .page-header h1 {
+    font-size: 26px;
+  }
+  .bar-row {
+    grid-template-columns: 80px 1fr auto;
+  }
+}
+
+.demo-banner {
+  background: color-mix(in srgb, var(--series-4) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--series-4) 35%, transparent);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.demo-banner strong { color: var(--text-primary); }
+</style>
+</head>
+<body>
+  <div class="hero">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <header class="page-header">
+      <div class="brand-mark" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M4 19V10M12 19V5M20 19V13" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h1>Dashboard vânzări din CSV</h1>
+      <p class="subtitle">Demo static — urcă orice CSV de vânzări (curat sau murdar) și primești tabel curățat, cifre-cheie, grafice și răspunsuri în română.</p>
+    </header>
+  </div>
+
+  <main>
+    <p class="demo-banner"><strong>Demo static, offline.</strong> Datele de mai jos sunt deja procesate dintr-un export real de vânzări (murdar intenționat). Caseta „Întreabă despre date” funcționează live, pe aceste date. Versiunea completă acceptă upload de orice CSV.</p>
+
+    <section id="results" class="results">
+      <section class="panel" id="report-panel" aria-label="Raport curățare">
+        <h2><span class="section-icon icon-clean" aria-hidden="true"></span>Ce am curățat</h2>
+        <p id="report-text" class="report-text"></p>
+      </section>
+
+      <section class="panel" id="stats-panel" aria-label="Cifre cheie">
+        <h2><span class="section-icon icon-stats" aria-hidden="true"></span>Cifre cheie</h2>
+        <div id="stat-tiles" class="stat-tiles"></div>
+      </section>
+
+      <section class="panel" id="anomalies-panel" aria-label="Anomalii">
+        <h2><span class="section-icon icon-warn" aria-hidden="true"></span>Valori neobișnuite</h2>
+        <div id="anomalies-list" class="anomalies-list"></div>
+      </section>
+
+      <section class="panel" id="charts-panel" aria-label="Grafice">
+        <h2><span class="section-icon icon-chart" aria-hidden="true"></span>Grafice</h2>
+        <div id="charts" class="charts-grid"></div>
+      </section>
+
+      <section class="panel" id="ask-panel" aria-label="Întreabă despre date">
+        <h2><span class="section-icon icon-ask" aria-hidden="true"></span>Întreabă despre date</h2>
+        <form id="ask-form" class="ask-form">
+          <input type="text" id="ask-input" placeholder="Ex: Cine e cel mai bun client?" autocomplete="off" />
+          <button type="submit">Întreabă</button>
+        </form>
+        <p id="ask-answer" class="ask-answer" aria-live="polite"></p>
+      </section>
+
+      <section class="panel" id="table-panel" aria-label="Tabel date curățate">
+        <h2><span class="section-icon icon-table" aria-hidden="true"></span>Tabel</h2>
+        <div class="table-scroll">
+          <table id="data-table"></table>
+        </div>
+        <p id="table-note" class="table-note"></p>
+      </section>
+    </section>
+  </main>
+
+  <script id="embedded-data" type="application/json">{"hash": "demo", "columns": ["Nr comanda", "Data", "Client", "Produs", "Cantitate", "Pret unitar", "Valuta", "Status", "Valoare"], "roles": {"Nr comanda": "categorical", "Data": "date", "Client": "categorical", "Produs": "categorical", "Cantitate": "numeric", "Pret unitar": "numeric", "Valuta": "categorical", "Status": "categorical", "Valoare": "numeric"}, "aggregates": {"stats": {"Cantitate": {"sum": 103.0, "mean": 2.71, "min": 1.0, "max": 10.0, "count": 38}, "Pret unitar": {"sum": 36149.17, "mean": 951.29, "min": 29.76, "max": 3768.7, "count": 38}, "Valoare": {"sum": 102585.84, "mean": 2699.63, "min": 29.76, "max": 23618.4, "count": 38}}, "value_column": "Valoare", "top_by": {"Client": [{"key": "Farmacia Vita", "value": 23777.64}, {"key": "Aurora Retail SRL", "value": 15096.84}, {"key": "Electra Mobil", "value": 14827.46}, {"key": "Carpat Distribution", "value": 10324.43}, {"key": "Delta Foods SA", "value": 10249.68}, {"key": "Jupiter Media", "value": 7702.81}, {"key": "Meridian Auto", "value": 5426.58}, {"key": "Hermes Logistics", "value": 5172.23}, {"key": "Nova Print", "value": 3477.89}, {"key": "Kappa Textile", "value": 2353.1}], "Produs": [{"key": "Implementare", "value": 35332.78}, {"key": "Audit securitate", "value": 23618.4}, {"key": "Licenta Desktop", "value": 20509.03}, {"key": "Suport Premium", "value": 7436.18}, {"key": "Training on-site", "value": 5087.08}, {"key": "Modul Raportare", "value": 5074.69}, {"key": "Abonament Cloud P", "value": 3967.37}, {"key": "Abonament Cloud B", "value": 1560.31}], "Valuta": [{"key": "RON", "value": 96071.72}, {"key": "EUR", "value": 6514.12}], "Status": [{"key": "Livrata", "value": 97070.95}, {"key": "Anulata", "value": 3998.99}, {"key": "IN CURS", "value": 908.6}, {"key": "Retur", "value": 607.3}]}}, "anomalies": [{"row": 18, "column": "Valoare", "value": 8390.3, "bounds": [-4096.05, 7593.2]}, {"row": 32, "column": "Valoare", "value": 23618.4, "bounds": [-4096.05, 7593.2]}], "report": {"rows_in": 44, "rows_out": 38, "blank_rows_removed": 0, "total_rows_removed": 4, "duplicate_rows_removed": 2, "name_variants_merged": {"Client": {"Delta Foods SA": ["DELTA FOODS SA", "delta foods sa"], "Hermes Logistics": ["hermes logistics"]}, "Status": {"Livrata": ["LIVRATA", "livrata"], "IN CURS": ["in curs"]}}}, "row_count": 38, "table": [{"Nr comanda": "CMD-100043", "Data": "2026-04-27", "Client": "Electra Mobil", "Produs": "Training on-site", "Cantitate": 2.0, "Pret unitar": 1841.86, "Valuta": "RON", "Status": "Livrata", "Valoare": 3683.72}, {"Nr comanda": "CMD-100013", "Data": "2026-01-19", "Client": "Delta Foods SA", "Produs": "Implementare", "Cantitate": 4.0, "Pret unitar": 701.99, "Valuta": "EUR", "Status": "Livrata", "Valoare": 2807.96}, {"Nr comanda": "CMD-100037", "Data": "2026-03-11", "Client": "Hermes Logistics", "Produs": "Suport Premium", "Cantitate": 5.0, "Pret unitar": 121.46, "Valuta": "EUR", "Status": "Retur", "Valoare": 607.3}, {"Nr comanda": "CMD-100105", "Data": "2026-07-13", "Client": "Jupiter Media", "Produs": "Implementare", "Cantitate": 2.0, "Pret unitar": 3756.73, "Valuta": "RON", "Status": "Livrata", "Valoare": 7513.46}, {"Nr comanda": "CMD-100124", "Data": "2026-08-20", "Client": "Carpat Distribution", "Produs": "Licenta Desktop", "Cantitate": 1.0, "Pret unitar": 895.14, "Valuta": "RON", "Status": "Livrata", "Valoare": 895.14}, {"Nr comanda": "CMD-100014", "Data": "2026-01-12", "Client": "Delta Foods SA", "Produs": "Licenta Desktop", "Cantitate": 4.0, "Pret unitar": 933.14, "Valuta": "RON", "Status": "Livrata", "Valoare": 3732.56}, {"Nr comanda": "CMD-100036", "Data": "2026-03-11", "Client": "Aurora Retail SRL", "Produs": "Implementare", "Cantitate": 2.0, "Pret unitar": 3353.27, "Valuta": "RON", "Status": "Livrata", "Valoare": 6706.54}, {"Nr comanda": "CMD-100064", "Data": "2026-05-06", "Client": "Farmacia Vita", "Produs": "Abonament Cloud B", "Cantitate": 1.0, "Pret unitar": 159.24, "Valuta": "RON", "Status": "Livrata", "Valoare": 159.24}, {"Nr comanda": "CMD-100011", "Data": "2026-01-17", "Client": "Grand Hotel Olt", "Produs": "Abonament Cloud P", "Cantitate": 2.0, "Pret unitar": 95.9, "Valuta": "EUR", "Status": "Livrata", "Valoare": 191.8}, {"Nr comanda": "CMD-100125", "Data": "2026-08-14", "Client": "Lumina Energy", "Produs": "Abonament Cloud B", "Cantitate": 2.0, "Pret unitar": 138.78, "Valuta": "RON", "Status": "Livrata", "Valoare": 277.56}, {"Nr comanda": "CMD-100040", "Data": "2026-03-05", "Client": "Jupiter Media", "Produs": "Licenta Desktop", "Cantitate": 1.0, "Pret unitar": 189.35, "Valuta": "EUR", "Status": "Livrata", "Valoare": 189.35}, {"Nr comanda": "CMD-100123", "Data": "2026-08-20", "Client": "Hermes Logistics", "Produs": "Suport Premium", "Cantitate": 1.0, "Pret unitar": 125.25, "Valuta": "EUR", "Status": "Livrata", "Valoare": 125.25}, {"Nr comanda": "CMD-100015", "Data": "2026-01-13", "Client": "Kappa Textile", "Produs": "Abonament Cloud P", "Cantitate": 5.0, "Pret unitar": 470.62, "Valuta": "RON", "Status": "Livrata", "Valoare": 2353.1}, {"Nr comanda": "CMD-100087", "Data": "2026-06-13", "Client": "Lumina Energy", "Produs": "Suport Premium", "Cantitate": 2.0, "Pret unitar": 642.85, "Valuta": "RON", "Status": "Anulata", "Valoare": 1285.7}, {"Nr comanda": "CMD-100006", "Data": "2026-01-10", "Client": "Meridian Auto", "Produs": "Licenta Desktop", "Cantitate": 3.0, "Pret unitar": 904.43, "Valuta": "RON", "Status": "Livrata", "Valoare": 2713.29}, {"Nr comanda": "CMD-100076", "Data": "2026-05-20", "Client": "Lumina Energy", "Produs": "Abonament Cloud P", "Cantitate": 1.0, "Pret unitar": 83.26, "Valuta": "EUR", "Status": "Livrata", "Valoare": 83.26}, {"Nr comanda": "CMD-100034", "Data": "2026-03-09", "Client": "Delta Foods SA", "Produs": "Training on-site", "Cantitate": 4.0, "Pret unitar": 350.84, "Valuta": "EUR", "Status": "Livrata", "Valoare": 1403.36}, {"Nr comanda": "CMD-100033", "Data": "2026-03-15", "Client": "Bistro Central", "Produs": "Abonament Cloud B", "Cantitate": 1.0, "Pret unitar": 29.76, "Valuta": "EUR", "Status": "Livrata", "Valoare": 29.76}, {"Nr comanda": "CMD-100003", "Data": "2026-01-04", "Client": "Aurora Retail SRL", "Produs": "Licenta Desktop", "Cantitate": 10.0, "Pret unitar": 839.03, "Valuta": "RON", "Status": "Livrata", "Valoare": 8390.3}, {"Nr comanda": "CMD-100024", "Data": "2026-02-17", "Client": "Grand Hotel Olt", "Produs": "Abonament Cloud B", "Cantitate": 2.0, "Pret unitar": 158.49, "Valuta": "RON", "Status": "Livrata", "Valoare": 316.98}, {"Nr comanda": "CMD-100090", "Data": "2026-06-20", "Client": "Electra Mobil", "Produs": "Implementare", "Cantitate": 2.0, "Pret unitar": 3768.7, "Valuta": "RON", "Status": "Livrata", "Valoare": 7537.4}, {"Nr comanda": "CMD-100033", "Data": "2026-03-15", "Client": "Electra Mobil", "Produs": "Abonament Cloud P", "Cantitate": 1.0, "Pret unitar": 457.49, "Valuta": "RON", "Status": "Livrata", "Valoare": 457.49}, {"Nr comanda": "CMD-100121", "Data": "2026-08-23", "Client": "Hermes Logistics", "Produs": "Abonament Cloud B", "Cantitate": 4.0, "Pret unitar": 159.8, "Valuta": "RON", "Status": "Livrata", "Valoare": 639.2}, {"Nr comanda": "CMD-100100", "Data": "2026-06-01", "Client": "Bistro Central", "Produs": "Modul Raportare", "Cantitate": 1.0, "Pret unitar": 1163.91, "Valuta": "RON", "Status": "Livrata", "Valoare": 1163.91}, {"Nr comanda": "CMD-100127", "Data": "2026-08-03", "Client": "Ideal Construct", "Produs": "Abonament Cloud P", "Cantitate": 4.0, "Pret unitar": 89.64, "Valuta": "EUR", "Status": "Livrata", "Valoare": 358.56}, {"Nr comanda": "CMD-100095", "Data": "2026-06-09", "Client": "Electra Mobil", "Produs": "Suport Premium", "Cantitate": 5.0, "Pret unitar": 629.77, "Valuta": "RON", "Status": "Livrata", "Valoare": 3148.85}, {"Nr comanda": "CMD-100086", "Data": "2026-06-22", "Client": "Carpat Distribution", "Produs": "Implementare", "Cantitate": 2.0, "Pret unitar": 3768.7, "Valuta": "RON", "Status": "Livrata", "Valoare": 7537.4}, {"Nr comanda": "CMD-100006", "Data": "2026-01-10", "Client": "Meridian Auto", "Produs": "Licenta Desktop", "Cantitate": 3.0, "Pret unitar": 904.43, "Valuta": "RON", "Status": "Anulata", "Valoare": 2713.29}, {"Nr comanda": "CMD-100014", "Data": "2026-02-14", "Client": "Delta Foods SA", "Produs": "Licenta Desktop", "Cantitate": 2.0, "Pret unitar": 937.55, "Valuta": "RON", "Status": "Livrata", "Valoare": 1875.1}, {"Nr comanda": "CMD-100017", "Data": "2026-07-17", "Client": "Delta Foods SA", "Produs": "Abonament Cloud P", "Cantitate": 1.0, "Pret unitar": 430.7, "Valuta": "RON", "Status": "IN CURS", "Valoare": 430.7}, {"Nr comanda": "CMD-100011B", "Data": "2026-02-11", "Client": "Bistro Central", "Produs": "Abonament Cloud P", "Cantitate": 1.0, "Pret unitar": 92.46, "Valuta": "EUR", "Status": "IN CURS", "Valoare": 92.46}, {"Nr comanda": "CMD-100086", "Data": "2026-01-11", "Client": "Carpat Distribution", "Produs": "Suport Premium", "Cantitate": 3.0, "Pret unitar": 630.63, "Valuta": "RON", "Status": "Livrata", "Valoare": 1891.89}, {"Nr comanda": "CMD-100002", "Data": "2026-02-02", "Client": "Farmacia Vita", "Produs": "Audit securitate", "Cantitate": 10.0, "Pret unitar": 2361.84, "Valuta": "RON", "Status": "Livrata", "Valoare": 23618.4}, {"Nr comanda": "CMD-100031", "Data": "2026-02-06", "Client": "Nova Print", "Produs": "Implementare", "Cantitate": 1.0, "Pret unitar": 3230.02, "Valuta": "RON", "Status": "Livrata", "Valoare": 3230.02}, {"Nr comanda": "CMD-100053", "Data": "2026-05-09", "Client": "Nova Print", "Produs": "Modul Raportare", "Cantitate": 1.0, "Pret unitar": 247.87, "Valuta": "EUR", "Status": "IN CURS", "Valoare": 247.87}, {"Nr comanda": "CMD-100039", "Data": "2026-07-05", "Client": "Hermes Logistics", "Produs": "Modul Raportare", "Cantitate": 3.0, "Pret unitar": 1220.97, "Valuta": "RON", "Status": "Livrata", "Valoare": 3662.91}, {"Nr comanda": "CMD-100073", "Data": "2026-06-25", "Client": "Hermes Logistics", "Produs": "Abonament Cloud B", "Cantitate": 1.0, "Pret unitar": 137.57, "Valuta": "RON", "Status": "IN CURS", "Valoare": 137.57}, {"Nr comanda": "CMD-100109", "Data": "2026-08-04", "Client": "Ideal Construct", "Produs": "Suport Premium", "Cantitate": 3.0, "Pret unitar": 125.73, "Valuta": "EUR", "Status": "Livrata", "Valoare": 377.19}]}</script>
+  <script>
+const DATA = JSON.parse(document.getElementById("embedded-data").textContent);
+const CHART_COLORS = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"];
+
+function formatNumber(value) {
+  return Number(value).toLocaleString("ro-RO", { maximumFractionDigits: 2 });
+}
+
+function renderReport(report) {
+  const parts = [
+    `din ${report.rows_in} rânduri am păstrat ${report.rows_out}`,
+    `${report.blank_rows_removed} goale eliminate`,
+    `${report.total_rows_removed} rânduri de total eliminate`,
+    `${report.duplicate_rows_removed} duplicate eliminate`,
+  ];
+  const variantCols = Object.keys(report.name_variants_merged || {});
+  if (variantCols.length) {
+    const count = variantCols.reduce(
+      (sum, col) => sum + Object.values(report.name_variants_merged[col]).flat().length,
+      0
+    );
+    parts.push(`${count} variante de scriere unificate (${variantCols.join(", ")})`);
+  }
+  document.getElementById("report-text").textContent = parts.join(" · ") + ".";
+}
+
+function renderStats(aggregates, rowCount) {
+  const container = document.getElementById("stat-tiles");
+  container.innerHTML = "";
+  const tile = (label, value) => {
+    const el = document.createElement("div");
+    el.className = "stat-tile";
+    el.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+    return el;
+  };
+  container.appendChild(tile("Rânduri curate", formatNumber(rowCount)));
+  const valueCol = aggregates.value_column;
+  if (valueCol && aggregates.stats[valueCol]) {
+    const s = aggregates.stats[valueCol];
+    container.appendChild(tile(`Total ${valueCol}`, formatNumber(s.sum)));
+    container.appendChild(tile(`Medie ${valueCol}`, formatNumber(s.mean)));
+    container.appendChild(tile(`Maxim ${valueCol}`, formatNumber(s.max)));
+  }
+}
+
+function renderAnomaliesSummary(anomalies) {
+  const container = document.getElementById("anomalies-list");
+  container.innerHTML = "";
+  if (!anomalies || anomalies.length === 0) {
+    container.innerHTML = '<p class="anomalies-empty">Nicio valoare neobișnuită găsită.</p>';
+    return;
+  }
+  anomalies.slice(0, 8).forEach((a) => {
+    const el = document.createElement("div");
+    el.className = "anomaly-item";
+    el.innerHTML = `<span class="icon">!</span><span>Rând ${a.row + 1}: <strong>${a.column}</strong> = ${formatNumber(
+      a.value
+    )} (interval așteptat ${formatNumber(a.bounds[0])} – ${formatNumber(a.bounds[1])})</span>`;
+    container.appendChild(el);
+  });
+  if (anomalies.length > 8) {
+    const more = document.createElement("p");
+    more.className = "anomalies-empty";
+    more.textContent = `+ încă ${anomalies.length - 8} valori neobișnuite.`;
+    container.appendChild(more);
+  }
+}
+
+function renderCharts(topBy, valueColumn) {
+  const container = document.getElementById("charts");
+  container.innerHTML = "";
+  if (!topBy) return;
+  const columns = Object.keys(topBy).filter((col) => topBy[col] && topBy[col].length > 0);
+  columns.forEach((col, i) => {
+    const entries = topBy[col].slice(0, 8);
+    const max = Math.max(...entries.map((e) => e.value));
+    const color = CHART_COLORS[i % CHART_COLORS.length];
+    const card = document.createElement("div");
+    card.className = "chart-card";
+    card.style.setProperty("--accent", color);
+    const title = document.createElement("h3");
+    title.textContent = `Top ${col} după ${valueColumn || "valoare"}`;
+    card.appendChild(title);
+    entries.forEach((entry) => {
+      const row = document.createElement("div");
+      row.className = "bar-row";
+      const pct = max > 0 ? Math.max((entry.value / max) * 100, 2) : 0;
+      row.innerHTML = `
+        <span class="bar-label" title="${entry.key}">${entry.key}</span>
+        <span class="bar-track"><span class="bar-fill" style="--bar-color:${color}"></span></span>
+        <span class="bar-value">${formatNumber(entry.value)}</span>
+      `;
+      card.appendChild(row);
+      const fill = row.querySelector(".bar-fill");
+      requestAnimationFrame(() => requestAnimationFrame(() => (fill.style.width = `${pct}%`)));
+    });
+    container.appendChild(card);
+  });
+}
+
+function renderTable(table, columns, anomalies) {
+  const el = document.getElementById("data-table");
+  const note = document.getElementById("table-note");
+  el.innerHTML = "";
+  const anomalyRows = new Set((anomalies || []).map((a) => a.row));
+  const LIMIT = 200;
+  const rows = table.slice(0, LIMIT);
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  columns.forEach((col) => {
+    const th = document.createElement("th");
+    th.textContent = col;
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  el.appendChild(thead);
+  const tbody = document.createElement("tbody");
+  rows.forEach((row, idx) => {
+    const tr = document.createElement("tr");
+    if (anomalyRows.has(idx)) tr.classList.add("anomaly-row");
+    columns.forEach((col) => {
+      const td = document.createElement("td");
+      const value = row[col];
+      td.textContent = value === null || value === undefined ? "" : value;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  el.appendChild(tbody);
+  note.textContent =
+    table.length > LIMIT ? `Se arată primele ${LIMIT} din ${table.length} rânduri.` : `${table.length} rânduri.`;
+}
+
+function fallbackAnswer(question, data) {
+  const q = question.toLowerCase();
+  const aggregates = data.aggregates;
+  const valueCol = aggregates.value_column;
+  const stats = aggregates.stats || {};
+  const topBy = aggregates.top_by || {};
+
+  if (["cine", "client", "cel mai bun", "top"].some((k) => q.includes(k)) && Object.keys(topBy).length) {
+    const col = Object.keys(topBy).find((c) => q.includes(c.toLowerCase())) || Object.keys(topBy)[0];
+    const leader = topBy[col] && topBy[col][0];
+    if (leader) {
+      return `Primul loc la „${col}” este „${leader.key}” cu ${formatNumber(leader.value)} pe coloana ${valueCol}.`;
+    }
+  }
+  if (["cat", "cât", "total", "suma", "sumă"].some((k) => q.includes(k)) && valueCol && stats[valueCol]) {
+    const s = stats[valueCol];
+    return `Totalul pe „${valueCol}” este ${formatNumber(s.sum)} (medie ${formatNumber(s.mean)}, pe ${s.count} rânduri, min ${formatNumber(s.min)}, max ${formatNumber(s.max)}).`;
+  }
+  if (["anomalie", "ciudat", "outlier", "neobisnuit", "neobișnuit"].some((k) => q.includes(k))) {
+    const anomalies = data.anomalies || [];
+    if (anomalies.length) {
+      const a = anomalies[0];
+      return `Am găsit ${anomalies.length} valori neobișnuite — cea mai mare pe „${a.column}” este ${formatNumber(a.value)}.`;
+    }
+    return "Nu am găsit valori neobișnuite în date.";
+  }
+  if (["curat", "rand", "rând", "murdar"].some((k) => q.includes(k))) {
+    const r = data.report;
+    return `Din ${r.rows_in} rânduri am păstrat ${r.rows_out}: ${r.blank_rows_removed} goale, ${r.total_rows_removed} de total, ${r.duplicate_rows_removed} duplicate eliminate.`;
+  }
+  if (valueCol && stats[valueCol]) {
+    const s = stats[valueCol];
+    return `Nu sunt sigur exact ce întrebi, dar iată un rezumat: ${data.row_count} rânduri, total „${valueCol}” = ${formatNumber(s.sum)}.`;
+  }
+  return "Nu am suficiente date numerice ca să răspund la asta.";
+}
+
+renderReport(DATA.report);
+renderStats(DATA.aggregates, DATA.row_count);
+renderAnomaliesSummary(DATA.anomalies);
+renderCharts(DATA.aggregates.top_by, DATA.aggregates.value_column);
+renderTable(DATA.table, DATA.columns, DATA.anomalies);
+
+document.getElementById("ask-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const input = document.getElementById("ask-input");
+  const question = input.value.trim();
+  if (!question) return;
+  document.getElementById("ask-answer").textContent = fallbackAnswer(question, DATA);
+});
+</script>
+</body>
+</html>
