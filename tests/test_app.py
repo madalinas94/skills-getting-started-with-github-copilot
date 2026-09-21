@@ -63,3 +63,50 @@ def test_reuploading_same_file_hits_cache():
     first = _upload("vanzari.csv").json()
     second = _upload("vanzari.csv").json()
     assert first["hash"] == second["hash"]
+
+
+def test_upload_oversized_file_is_rejected():
+    import app as app_module
+
+    too_big = b"a" * (app_module.MAX_UPLOAD_BYTES + 1)
+    res = client.post("/upload", files={"file": ("huge.csv", too_big, "text/csv")})
+    assert res.status_code == 400
+    assert "mare" in res.json()["detail"]
+
+
+def test_upload_includes_recommendations():
+    body = _upload("vanzari_2026.csv").json()
+    assert "recommendations" in body
+    assert "market_context" in body["recommendations"]
+
+
+def test_export_csv_downloads_cleaned_table():
+    upload = _upload("vanzari_2026.csv").json()
+    res = client.get(f"/data/{upload['hash']}/export.csv")
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("text/csv")
+    lines = res.text.strip().splitlines()
+    assert len(lines) == upload["row_count"] + 1  # header + rows
+
+
+def test_export_csv_unknown_hash_is_404():
+    res = client.get("/data/does-not-exist/export.csv")
+    assert res.status_code == 404
+
+
+def test_cache_evicts_oldest_entry_past_cap():
+    import app as app_module
+
+    original_cap = app_module.MAX_CACHED_FILES
+    app_module.MAX_CACHED_FILES = 1
+    try:
+        # Fresh, never-before-uploaded content so this test doesn't hit the
+        # cache another test already populated.
+        first = client.post(
+            "/upload", files={"file": ("evict-a.csv", b"produs,cantitate\nA,1\n", "text/csv")}
+        ).json()
+        client.post("/upload", files={"file": ("evict-b.csv", b"produs,cantitate\nB,2\n", "text/csv")})
+        res = client.get(f"/data/{first['hash']}")
+        assert res.status_code == 404
+    finally:
+        app_module.MAX_CACHED_FILES = original_cap

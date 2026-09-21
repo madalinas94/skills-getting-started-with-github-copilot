@@ -3,6 +3,7 @@ const fileInput = document.getElementById("file-input");
 const dropzoneTitle = document.getElementById("dropzone-title");
 const uploadStatus = document.getElementById("upload-status");
 const results = document.getElementById("results");
+const downloadLink = document.getElementById("download-clean-csv");
 
 const CHART_COLORS = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"];
 
@@ -10,6 +11,18 @@ const state = { hash: null };
 
 function formatNumber(value) {
   return Number(value).toLocaleString("ro-RO", { maximumFractionDigits: 2 });
+}
+
+// CSV cells (client names, column names, …) are untrusted user input — never
+// interpolate them into innerHTML without escaping, or a crafted CSV could
+// inject a <script>/onerror payload that runs in the browser.
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function setStatus(message, isError = false) {
@@ -57,6 +70,7 @@ function render(data) {
   renderAnomaliesSummary(data.anomalies);
   renderCharts(data.aggregates.top_by, data.aggregates.value_column);
   renderRecommendations(data.recommendations);
+  if (downloadLink) downloadLink.href = `/data/${data.hash}/export.csv`;
 }
 
 function renderRecommendations(recommendations) {
@@ -68,12 +82,13 @@ function renderRecommendations(recommendations) {
 
   const dataDriven = recommendations.data_driven || [];
   if (dataDriven.length === 0) {
-    dataEl.innerHTML = '<p class="anomalies-empty">Nu am găsit tipare suficient de clare în aceste date pentru recomandări automate.</p>';
+    dataEl.innerHTML =
+      '<p class="anomalies-empty">Nu am găsit tipare suficient de clare în aceste date pentru recomandări automate.</p>';
   } else {
     dataDriven.forEach((rec) => {
       const el = document.createElement("div");
       el.className = "recommendation-item";
-      el.innerHTML = `<div class="rec-title">${rec.title}</div><div class="rec-detail">${rec.detail}</div>`;
+      el.innerHTML = `<div class="rec-title">${escapeHtml(rec.title)}</div><div class="rec-detail">${escapeHtml(rec.detail)}</div>`;
       dataEl.appendChild(el);
     });
   }
@@ -82,9 +97,9 @@ function renderRecommendations(recommendations) {
     const el = document.createElement("div");
     el.className = "recommendation-item context";
     const source = rec.source
-      ? `<a class="rec-source" href="${rec.source}" target="_blank" rel="noopener">Sursă</a>`
+      ? `<a class="rec-source" href="${escapeHtml(rec.source)}" target="_blank" rel="noopener">Sursă</a>`
       : "";
-    el.innerHTML = `<div class="rec-title">${rec.title}</div><div class="rec-detail">${rec.detail}</div>${source}`;
+    el.innerHTML = `<div class="rec-title">${escapeHtml(rec.title)}</div><div class="rec-detail">${escapeHtml(rec.detail)}</div>${source}`;
     marketEl.appendChild(el);
   });
 }
@@ -114,7 +129,7 @@ function renderStats(aggregates, rowCount) {
   const tile = (label, value) => {
     const el = document.createElement("div");
     el.className = "stat-tile";
-    el.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+    el.innerHTML = `<div class="label">${escapeHtml(label)}</div><div class="value">${escapeHtml(value)}</div>`;
     return el;
   };
 
@@ -139,9 +154,11 @@ function renderAnomaliesSummary(anomalies) {
   anomalies.slice(0, 8).forEach((a) => {
     const el = document.createElement("div");
     el.className = "anomaly-item";
-    el.innerHTML = `<span class="icon">!</span><span>Rând ${a.row + 1}: <strong>${a.column}</strong> = ${formatNumber(
-      a.value
-    )} (interval așteptat ${formatNumber(a.bounds[0])} – ${formatNumber(a.bounds[1])})</span>`;
+    el.innerHTML = `<span class="icon">!</span><span>Rând ${a.row + 1}: <strong>${escapeHtml(
+      a.column
+    )}</strong> = ${formatNumber(a.value)} (interval așteptat ${formatNumber(a.bounds[0])} – ${formatNumber(
+      a.bounds[1]
+    )})</span>`;
     container.appendChild(el);
   });
   if (anomalies.length > 8) {
@@ -174,8 +191,9 @@ function renderCharts(topBy, valueColumn) {
       const row = document.createElement("div");
       row.className = "bar-row";
       const pct = max > 0 ? Math.max((entry.value / max) * 100, 2) : 0;
+      const label = escapeHtml(entry.key);
       row.innerHTML = `
-        <span class="bar-label" title="${entry.key}">${entry.key}</span>
+        <span class="bar-label" title="${label}">${label}</span>
         <span class="bar-track"><span class="bar-fill" style="--bar-color:${color}"></span></span>
         <span class="bar-value">${formatNumber(entry.value)}</span>
       `;
@@ -227,22 +245,30 @@ function renderTable(table, columns, anomalies) {
 
 async function askQuestion(question) {
   const answerEl = document.getElementById("ask-answer");
+  const button = document.querySelector("#ask-form button");
   if (!state.hash) {
     answerEl.textContent = "Încarcă întâi un CSV.";
     return;
   }
   answerEl.textContent = "Se gândește...";
-  const res = await fetch("/ask", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ hash: state.hash, question }),
-  });
-  if (!res.ok) {
-    answerEl.textContent = "Nu am putut răspunde — încearcă din nou.";
-    return;
+  button.disabled = true;
+  try {
+    const res = await fetch("/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hash: state.hash, question }),
+    });
+    if (!res.ok) {
+      answerEl.textContent = "Nu am putut răspunde — încearcă din nou.";
+      return;
+    }
+    const data = await res.json();
+    answerEl.textContent = data.answer;
+  } catch (err) {
+    answerEl.textContent = "Eroare de rețea — încearcă din nou.";
+  } finally {
+    button.disabled = false;
   }
-  const data = await res.json();
-  answerEl.textContent = data.answer;
 }
 
 dropzone.addEventListener("click", () => fileInput.click());

@@ -169,8 +169,14 @@ def _canonicalize_case(series: pd.Series) -> tuple[pd.Series, dict[str, list[str
     return pd.Series(result, index=series.index), merged
 
 
+_FUZZY_MAX_UNIQUE_VALUES = 2000  # matching is O(n^2); skip it past this to avoid hanging on huge columns
+
+
 def _fuzzy_canonicalize(values: list[str], threshold: int = 90) -> dict[str, str]:
     """Cluster near-duplicate free-text values (e.g. name variants) to one canonical form."""
+    if len(values) > _FUZZY_MAX_UNIQUE_VALUES:
+        return {v: v for v in values}
+
     canonical: list[str] = []
     mapping: dict[str, str] = {}
     for v in values:

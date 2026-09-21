@@ -139,3 +139,28 @@ def test_run_pipeline_output_is_json_safe():
         result = run_pipeline(raw)
         json.dumps(result.as_dict())
         json.dumps(result.table)
+
+
+def test_run_pipeline_does_not_crash_when_everything_is_filtered_out():
+    raw = ("produs,cantitate\n" ",\n" "TOTAL,\n" ",\n").encode("utf-8")
+    result = run_pipeline(raw)
+    assert result.table == []
+    assert result.aggregates["stats"] == {}
+    assert result.anomalies == []
+    for entries in result.aggregates["top_by"].values():
+        assert entries == []
+
+
+def test_run_pipeline_does_not_crash_on_single_column_csv():
+    raw = ("nume\n" "Ana\n" "Bogdan\n" "Ana\n").encode("utf-8")
+    result = run_pipeline(raw)
+    assert result.aggregates["value_column"] is None
+    assert len(result.table) <= 3
+
+
+def test_fuzzy_canonicalize_skips_matching_past_cardinality_cap():
+    from data_pipeline import _FUZZY_MAX_UNIQUE_VALUES, _fuzzy_canonicalize
+
+    values = [f"Client {i}" for i in range(_FUZZY_MAX_UNIQUE_VALUES + 1)]
+    mapping = _fuzzy_canonicalize(values)
+    assert mapping == {v: v for v in values}

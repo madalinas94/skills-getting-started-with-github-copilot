@@ -670,11 +670,59 @@ tr.anomaly-row td {
   line-height: 1.6;
 }
 
+.panel-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.panel-header-row h2 {
+  margin: 0;
+}
+
+.download-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--series-1);
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--series-1) 35%, transparent);
+  margin-bottom: 14px;
+}
+
+.download-link:hover {
+  background: color-mix(in srgb, var(--series-1) 8%, transparent);
+}
+
 @media (max-width: 520px) {
   .page-header h1 {
     font-size: 26px;
   }
   .bar-row {
     grid-template-columns: 80px 1fr auto;
+  }
+}
+
+@media print {
+  .upload-panel,
+  #ask-panel,
+  .download-link {
+    display: none !important;
+  }
+  .hero {
+    background: none !important;
+    color: var(--text-primary);
+  }
+  .page-header,
+  .subtitle,
+  .brand-mark {
+    color: var(--text-primary) !important;
+  }
+  .panel {
+    box-shadow: none;
+    break-inside: avoid;
   }
 }

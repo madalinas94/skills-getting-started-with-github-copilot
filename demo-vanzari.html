@@ -680,12 +680,60 @@ tr.anomaly-row td {
   line-height: 1.6;
 }
 
+.panel-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.panel-header-row h2 {
+  margin: 0;
+}
+
+.download-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--series-1);
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--series-1) 35%, transparent);
+  margin-bottom: 14px;
+}
+
+.download-link:hover {
+  background: color-mix(in srgb, var(--series-1) 8%, transparent);
+}
+
 @media (max-width: 520px) {
   .page-header h1 {
     font-size: 26px;
   }
   .bar-row {
     grid-template-columns: 80px 1fr auto;
+  }
+}
+
+@media print {
+  .upload-panel,
+  #ask-panel,
+  .download-link {
+    display: none !important;
+  }
+  .hero {
+    background: none !important;
+    color: var(--text-primary);
+  }
+  .page-header,
+  .subtitle,
+  .brand-mark {
+    color: var(--text-primary) !important;
+  }
+  .panel {
+    box-shadow: none;
+    break-inside: avoid;
   }
 }
 
@@ -756,7 +804,10 @@ tr.anomaly-row td {
       </section>
 
       <section class="panel" id="table-panel" aria-label="Tabel date curățate">
-        <h2><span class="section-icon icon-table" aria-hidden="true"></span>Tabel</h2>
+        <div class="panel-header-row">
+          <h2><span class="section-icon icon-table" aria-hidden="true"></span>Tabel</h2>
+          <a id="download-clean-csv" class="download-link" href="#" download>Descarcă CSV curățat</a>
+        </div>
         <div class="table-scroll">
           <table id="data-table"></table>
         </div>
@@ -772,6 +823,15 @@ const CHART_COLORS = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "
 
 function formatNumber(value) {
   return Number(value).toLocaleString("ro-RO", { maximumFractionDigits: 2 });
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function renderReport(report) {
@@ -798,7 +858,7 @@ function renderStats(aggregates, rowCount) {
   const tile = (label, value) => {
     const el = document.createElement("div");
     el.className = "stat-tile";
-    el.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+    el.innerHTML = `<div class="label">${escapeHtml(label)}</div><div class="value">${escapeHtml(value)}</div>`;
     return el;
   };
   container.appendChild(tile("Rânduri curate", formatNumber(rowCount)));
@@ -821,9 +881,11 @@ function renderAnomaliesSummary(anomalies) {
   anomalies.slice(0, 8).forEach((a) => {
     const el = document.createElement("div");
     el.className = "anomaly-item";
-    el.innerHTML = `<span class="icon">!</span><span>Rând ${a.row + 1}: <strong>${a.column}</strong> = ${formatNumber(
-      a.value
-    )} (interval așteptat ${formatNumber(a.bounds[0])} – ${formatNumber(a.bounds[1])})</span>`;
+    el.innerHTML = `<span class="icon">!</span><span>Rând ${a.row + 1}: <strong>${escapeHtml(
+      a.column
+    )}</strong> = ${formatNumber(a.value)} (interval așteptat ${formatNumber(a.bounds[0])} – ${formatNumber(
+      a.bounds[1]
+    )})</span>`;
     container.appendChild(el);
   });
   if (anomalies.length > 8) {
@@ -853,8 +915,9 @@ function renderCharts(topBy, valueColumn) {
       const row = document.createElement("div");
       row.className = "bar-row";
       const pct = max > 0 ? Math.max((entry.value / max) * 100, 2) : 0;
+      const label = escapeHtml(entry.key);
       row.innerHTML = `
-        <span class="bar-label" title="${entry.key}">${entry.key}</span>
+        <span class="bar-label" title="${label}">${label}</span>
         <span class="bar-track"><span class="bar-fill" style="--bar-color:${color}"></span></span>
         <span class="bar-value">${formatNumber(entry.value)}</span>
       `;
@@ -874,12 +937,13 @@ function renderRecommendations(recommendations) {
   if (!recommendations) return;
   const dataDriven = recommendations.data_driven || [];
   if (dataDriven.length === 0) {
-    dataEl.innerHTML = '<p class="anomalies-empty">Nu am găsit tipare suficient de clare în aceste date pentru recomandări automate.</p>';
+    dataEl.innerHTML =
+      '<p class="anomalies-empty">Nu am găsit tipare suficient de clare în aceste date pentru recomandări automate.</p>';
   } else {
     dataDriven.forEach((rec) => {
       const el = document.createElement("div");
       el.className = "recommendation-item";
-      el.innerHTML = `<div class="rec-title">${rec.title}</div><div class="rec-detail">${rec.detail}</div>`;
+      el.innerHTML = `<div class="rec-title">${escapeHtml(rec.title)}</div><div class="rec-detail">${escapeHtml(rec.detail)}</div>`;
       dataEl.appendChild(el);
     });
   }
@@ -887,9 +951,9 @@ function renderRecommendations(recommendations) {
     const el = document.createElement("div");
     el.className = "recommendation-item context";
     const source = rec.source
-      ? `<a class="rec-source" href="${rec.source}" target="_blank" rel="noopener">Sursă</a>`
+      ? `<a class="rec-source" href="${escapeHtml(rec.source)}" target="_blank" rel="noopener">Sursă</a>`
       : "";
-    el.innerHTML = `<div class="rec-title">${rec.title}</div><div class="rec-detail">${rec.detail}</div>${source}`;
+    el.innerHTML = `<div class="rec-title">${escapeHtml(rec.title)}</div><div class="rec-detail">${escapeHtml(rec.detail)}</div>${source}`;
     marketEl.appendChild(el);
   });
 }
@@ -964,12 +1028,37 @@ function fallbackAnswer(question, data) {
   return "Nu am suficiente date numerice ca să răspund la asta.";
 }
 
+function downloadCleanCsv() {
+  const columns = DATA.columns;
+  const escapeCsv = (v) => {
+    if (v === null || v === undefined) return "";
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+  };
+  const lines = [columns.map(escapeCsv).join(",")];
+  DATA.table.forEach((row) => {
+    lines.push(columns.map((c) => escapeCsv(row[c])).join(","));
+  });
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "curatat-demo.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 renderReport(DATA.report);
 renderStats(DATA.aggregates, DATA.row_count);
 renderAnomaliesSummary(DATA.anomalies);
 renderCharts(DATA.aggregates.top_by, DATA.aggregates.value_column);
 renderRecommendations(DATA.recommendations);
 renderTable(DATA.table, DATA.columns, DATA.anomalies);
+
+document.getElementById("download-clean-csv").addEventListener("click", (e) => {
+  e.preventDefault();
+  downloadCleanCsv();
+});
 
 document.getElementById("ask-form").addEventListener("submit", (e) => {
   e.preventDefault();
