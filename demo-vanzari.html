@@ -195,6 +195,7 @@ main {
 .results:not(.hidden) .panel:nth-of-type(4) { animation-delay: 0.20s; }
 .results:not(.hidden) .panel:nth-of-type(5) { animation-delay: 0.26s; }
 .results:not(.hidden) .panel:nth-of-type(6) { animation-delay: 0.32s; }
+.results:not(.hidden) .panel:nth-of-type(7) { animation-delay: 0.38s; }
 
 /* Section icons (mask-based, theme-safe) */
 
@@ -254,6 +255,12 @@ main {
 .icon-table::before {
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Cpath d='M3 9h18M3 15h18M9 3v18'/%3E%3C/svg%3E");
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Cpath d='M3 9h18M3 15h18M9 3v18'/%3E%3C/svg%3E");
+}
+
+.icon-idea { background: var(--series-2); }
+.icon-idea::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18h6M10 22h4M12 2a7 7 0 00-4 12.74V17a1 1 0 001 1h6a1 1 0 001-1v-2.26A7 7 0 0012 2z'/%3E%3C/svg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18h6M10 22h4M12 2a7 7 0 00-4 12.74V17a1 1 0 001 1h6a1 1 0 001-1v-2.26A7 7 0 0012 2z'/%3E%3C/svg%3E");
 }
 
 /* Upload */
@@ -495,6 +502,60 @@ main {
   justify-content: center;
 }
 
+/* Recommendations */
+
+.recommendation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.recommendations-subhead {
+  margin: 18px 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.recommendation-item {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--page);
+  border: 1px solid var(--border);
+}
+
+.recommendation-item .rec-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.recommendation-item .rec-detail {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.recommendation-item .rec-source {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--series-1);
+  text-decoration: none;
+}
+
+.recommendation-item .rec-source:hover {
+  text-decoration: underline;
+}
+
+.recommendation-item.context {
+  background: color-mix(in srgb, var(--series-2) 6%, var(--page));
+  border-color: color-mix(in srgb, var(--series-2) 22%, transparent);
+}
+
 /* Ask */
 
 .ask-form {
@@ -650,7 +711,7 @@ tr.anomaly-row td {
         </svg>
       </div>
       <h1>Dashboard vânzări din CSV</h1>
-      <p class="subtitle">Demo static — urcă orice CSV de vânzări (curat sau murdar) și primești tabel curățat, cifre-cheie, grafice și răspunsuri în română.</p>
+      <p class="subtitle">Demo static — urcă orice CSV de vânzări (curat sau murdar) și primești tabel curățat, cifre-cheie, grafice, recomandări și răspunsuri în română.</p>
     </header>
   </div>
 
@@ -678,6 +739,13 @@ tr.anomaly-row td {
         <div id="charts" class="charts-grid"></div>
       </section>
 
+      <section class="panel" id="recommendations-panel" aria-label="Recomandări">
+        <h2><span class="section-icon icon-idea" aria-hidden="true"></span>Recomandări</h2>
+        <div id="recommendations-data" class="recommendation-list"></div>
+        <h3 class="recommendations-subhead">Context de piață (România, sept. 2026)</h3>
+        <div id="recommendations-market" class="recommendation-list"></div>
+      </section>
+
       <section class="panel" id="ask-panel" aria-label="Întreabă despre date">
         <h2><span class="section-icon icon-ask" aria-hidden="true"></span>Întreabă despre date</h2>
         <form id="ask-form" class="ask-form">
@@ -697,7 +765,7 @@ tr.anomaly-row td {
     </section>
   </main>
 
-  <script id="embedded-data" type="application/json">{"hash": "demo", "columns": ["Nr comanda", "Data", "Client", "Produs", "Cantitate", "Pret unitar", "Valuta", "Status", "Valoare"], "roles": {"Nr comanda": "categorical", "Data": "date", "Client": "categorical", "Produs": "categorical", "Cantitate": "numeric", "Pret unitar": "numeric", "Valuta": "categorical", "Status": "categorical", "Valoare": "numeric"}, "aggregates": {"stats": {"Cantitate": {"sum": 103.0, "mean": 2.71, "min": 1.0, "max": 10.0, "count": 38}, "Pret unitar": {"sum": 36149.17, "mean": 951.29, "min": 29.76, "max": 3768.7, "count": 38}, "Valoare": {"sum": 102585.84, "mean": 2699.63, "min": 29.76, "max": 23618.4, "count": 38}}, "value_column": "Valoare", "top_by": {"Client": [{"key": "Farmacia Vita", "value": 23777.64}, {"key": "Aurora Retail SRL", "value": 15096.84}, {"key": "Electra Mobil", "value": 14827.46}, {"key": "Carpat Distribution", "value": 10324.43}, {"key": "Delta Foods SA", "value": 10249.68}, {"key": "Jupiter Media", "value": 7702.81}, {"key": "Meridian Auto", "value": 5426.58}, {"key": "Hermes Logistics", "value": 5172.23}, {"key": "Nova Print", "value": 3477.89}, {"key": "Kappa Textile", "value": 2353.1}], "Produs": [{"key": "Implementare", "value": 35332.78}, {"key": "Audit securitate", "value": 23618.4}, {"key": "Licenta Desktop", "value": 20509.03}, {"key": "Suport Premium", "value": 7436.18}, {"key": "Training on-site", "value": 5087.08}, {"key": "Modul Raportare", "value": 5074.69}, {"key": "Abonament Cloud P", "value": 3967.37}, {"key": "Abonament Cloud B", "value": 1560.31}], "Valuta": [{"key": "RON", "value": 96071.72}, {"key": "EUR", "value": 6514.12}], "Status": [{"key": "Livrata", "value": 97070.95}, {"key": "Anulata", "value": 3998.99}, {"key": "IN CURS", "value": 908.6}, {"key": "Retur", "value": 607.3}]}}, "anomalies": [{"row": 18, "column": "Valoare", "value": 8390.3, "bounds": [-4096.05, 7593.2]}, {"row": 32, "column": "Valoare", "value": 23618.4, "bounds": [-4096.05, 7593.2]}], "report": {"rows_in": 44, "rows_out": 38, "blank_rows_removed": 0, "total_rows_removed": 4, "duplicate_rows_removed": 2, "name_variants_merged": {"Client": {"Delta Foods SA": ["DELTA FOODS SA", "delta foods sa"], "Hermes Logistics": ["hermes logistics"]}, "Status": {"Livrata": ["LIVRATA", "livrata"], "IN CURS": ["in curs"]}}}, "row_count": 38, "table": [{"Nr comanda": "CMD-100043", "Data": "2026-04-27", "Client": "Electra Mobil", "Produs": "Training on-site", "Cantitate": 2.0, "Pret unitar": 1841.86, "Valuta": "RON", "Status": "Livrata", "Valoare": 3683.72}, {"Nr comanda": "CMD-100013", "Data": "2026-01-19", "Client": "Delta Foods SA", "Produs": "Implementare", "Cantitate": 4.0, "Pret unitar": 701.99, "Valuta": "EUR", "Status": "Livrata", "Valoare": 2807.96}, {"Nr comanda": "CMD-100037", "Data": "2026-03-11", "Client": "Hermes Logistics", "Produs": "Suport Premium", "Cantitate": 5.0, "Pret unitar": 121.46, "Valuta": "EUR", "Status": "Retur", "Valoare": 607.3}, {"Nr comanda": "CMD-100105", "Data": "2026-07-13", "Client": "Jupiter Media", "Produs": "Implementare", "Cantitate": 2.0, "Pret unitar": 3756.73, "Valuta": "RON", "Status": "Livrata", "Valoare": 7513.46}, {"Nr comanda": "CMD-100124", "Data": "2026-08-20", "Client": "Carpat Distribution", "Produs": "Licenta Desktop", "Cantitate": 1.0, "Pret unitar": 895.14, "Valuta": "RON", "Status": "Livrata", "Valoare": 895.14}, {"Nr comanda": "CMD-100014", "Data": "2026-01-12", "Client": "Delta Foods SA", "Produs": "Licenta Desktop", "Cantitate": 4.0, "Pret unitar": 933.14, "Valuta": "RON", "Status": "Livrata", "Valoare": 3732.56}, {"Nr comanda": "CMD-100036", "Data": "2026-03-11", "Client": "Aurora Retail SRL", "Produs": "Implementare", "Cantitate": 2.0, "Pret unitar": 3353.27, "Valuta": "RON", "Status": "Livrata", "Valoare": 6706.54}, {"Nr comanda": "CMD-100064", "Data": "2026-05-06", "Client": "Farmacia Vita", "Produs": "Abonament Cloud B", "Cantitate": 1.0, "Pret unitar": 159.24, "Valuta": "RON", "Status": "Livrata", "Valoare": 159.24}, {"Nr comanda": "CMD-100011", "Data": "2026-01-17", "Client": "Grand Hotel Olt", "Produs": "Abonament Cloud P", "Cantitate": 2.0, "Pret unitar": 95.9, "Valuta": "EUR", "Status": "Livrata", "Valoare": 191.8}, {"Nr comanda": "CMD-100125", "Data": "2026-08-14", "Client": "Lumina Energy", "Produs": "Abonament Cloud B", "Cantitate": 2.0, "Pret unitar": 138.78, "Valuta": "RON", "Status": "Livrata", "Valoare": 277.56}, {"Nr comanda": "CMD-100040", "Data": "2026-03-05", "Client": "Jupiter Media", "Produs": "Licenta Desktop", "Cantitate": 1.0, "Pret unitar": 189.35, "Valuta": "EUR", "Status": "Livrata", "Valoare": 189.35}, {"Nr comanda": "CMD-100123", "Data": "2026-08-20", "Client": "Hermes Logistics", "Produs": "Suport Premium", "Cantitate": 1.0, "Pret unitar": 125.25, "Valuta": "EUR", "Status": "Livrata", "Valoare": 125.25}, {"Nr comanda": "CMD-100015", "Data": "2026-01-13", "Client": "Kappa Textile", "Produs": "Abonament Cloud P", "Cantitate": 5.0, "Pret unitar": 470.62, "Valuta": "RON", "Status": "Livrata", "Valoare": 2353.1}, {"Nr comanda": "CMD-100087", "Data": "2026-06-13", "Client": "Lumina Energy", "Produs": "Suport Premium", "Cantitate": 2.0, "Pret unitar": 642.85, "Valuta": "RON", "Status": "Anulata", "Valoare": 1285.7}, {"Nr comanda": "CMD-100006", "Data": "2026-01-10", "Client": "Meridian Auto", "Produs": "Licenta Desktop", "Cantitate": 3.0, "Pret unitar": 904.43, "Valuta": "RON", "Status": "Livrata", "Valoare": 2713.29}, {"Nr comanda": "CMD-100076", "Data": "2026-05-20", "Client": "Lumina Energy", "Produs": "Abonament Cloud P", "Cantitate": 1.0, "Pret unitar": 83.26, "Valuta": "EUR", "Status": "Livrata", "Valoare": 83.26}, {"Nr comanda": "CMD-100034", "Data": "2026-03-09", "Client": "Delta Foods SA", "Produs": "Training on-site", "Cantitate": 4.0, "Pret unitar": 350.84, "Valuta": "EUR", "Status": "Livrata", "Valoare": 1403.36}, {"Nr comanda": "CMD-100033", "Data": "2026-03-15", "Client": "Bistro Central", "Produs": "Abonament Cloud B", "Cantitate": 1.0, "Pret unitar": 29.76, "Valuta": "EUR", "Status": "Livrata", "Valoare": 29.76}, {"Nr comanda": "CMD-100003", "Data": "2026-01-04", "Client": "Aurora Retail SRL", "Produs": "Licenta Desktop", "Cantitate": 10.0, "Pret unitar": 839.03, "Valuta": "RON", "Status": "Livrata", "Valoare": 8390.3}, {"Nr comanda": "CMD-100024", "Data": "2026-02-17", "Client": "Grand Hotel Olt", "Produs": "Abonament Cloud B", "Cantitate": 2.0, "Pret unitar": 158.49, "Valuta": "RON", "Status": "Livrata", "Valoare": 316.98}, {"Nr comanda": "CMD-100090", "Data": "2026-06-20", "Client": "Electra Mobil", "Produs": "Implementare", "Cantitate": 2.0, "Pret unitar": 3768.7, "Valuta": "RON", "Status": "Livrata", "Valoare": 7537.4}, {"Nr comanda": "CMD-100033", "Data": "2026-03-15", "Client": "Electra Mobil", "Produs": "Abonament Cloud P", "Cantitate": 1.0, "Pret unitar": 457.49, "Valuta": "RON", "Status": "Livrata", "Valoare": 457.49}, {"Nr comanda": "CMD-100121", "Data": "2026-08-23", "Client": "Hermes Logistics", "Produs": "Abonament Cloud B", "Cantitate": 4.0, "Pret unitar": 159.8, "Valuta": "RON", "Status": "Livrata", "Valoare": 639.2}, {"Nr comanda": "CMD-100100", "Data": "2026-06-01", "Client": "Bistro Central", "Produs": "Modul Raportare", "Cantitate": 1.0, "Pret unitar": 1163.91, "Valuta": "RON", "Status": "Livrata", "Valoare": 1163.91}, {"Nr comanda": "CMD-100127", "Data": "2026-08-03", "Client": "Ideal Construct", "Produs": "Abonament Cloud P", "Cantitate": 4.0, "Pret unitar": 89.64, "Valuta": "EUR", "Status": "Livrata", "Valoare": 358.56}, {"Nr comanda": "CMD-100095", "Data": "2026-06-09", "Client": "Electra Mobil", "Produs": "Suport Premium", "Cantitate": 5.0, "Pret unitar": 629.77, "Valuta": "RON", "Status": "Livrata", "Valoare": 3148.85}, {"Nr comanda": "CMD-100086", "Data": "2026-06-22", "Client": "Carpat Distribution", "Produs": "Implementare", "Cantitate": 2.0, "Pret unitar": 3768.7, "Valuta": "RON", "Status": "Livrata", "Valoare": 7537.4}, {"Nr comanda": "CMD-100006", "Data": "2026-01-10", "Client": "Meridian Auto", "Produs": "Licenta Desktop", "Cantitate": 3.0, "Pret unitar": 904.43, "Valuta": "RON", "Status": "Anulata", "Valoare": 2713.29}, {"Nr comanda": "CMD-100014", "Data": "2026-02-14", "Client": "Delta Foods SA", "Produs": "Licenta Desktop", "Cantitate": 2.0, "Pret unitar": 937.55, "Valuta": "RON", "Status": "Livrata", "Valoare": 1875.1}, {"Nr comanda": "CMD-100017", "Data": "2026-07-17", "Client": "Delta Foods SA", "Produs": "Abonament Cloud P", "Cantitate": 1.0, "Pret unitar": 430.7, "Valuta": "RON", "Status": "IN CURS", "Valoare": 430.7}, {"Nr comanda": "CMD-100011B", "Data": "2026-02-11", "Client": "Bistro Central", "Produs": "Abonament Cloud P", "Cantitate": 1.0, "Pret unitar": 92.46, "Valuta": "EUR", "Status": "IN CURS", "Valoare": 92.46}, {"Nr comanda": "CMD-100086", "Data": "2026-01-11", "Client": "Carpat Distribution", "Produs": "Suport Premium", "Cantitate": 3.0, "Pret unitar": 630.63, "Valuta": "RON", "Status": "Livrata", "Valoare": 1891.89}, {"Nr comanda": "CMD-100002", "Data": "2026-02-02", "Client": "Farmacia Vita", "Produs": "Audit securitate", "Cantitate": 10.0, "Pret unitar": 2361.84, "Valuta": "RON", "Status": "Livrata", "Valoare": 23618.4}, {"Nr comanda": "CMD-100031", "Data": "2026-02-06", "Client": "Nova Print", "Produs": "Implementare", "Cantitate": 1.0, "Pret unitar": 3230.02, "Valuta": "RON", "Status": "Livrata", "Valoare": 3230.02}, {"Nr comanda": "CMD-100053", "Data": "2026-05-09", "Client": "Nova Print", "Produs": "Modul Raportare", "Cantitate": 1.0, "Pret unitar": 247.87, "Valuta": "EUR", "Status": "IN CURS", "Valoare": 247.87}, {"Nr comanda": "CMD-100039", "Data": "2026-07-05", "Client": "Hermes Logistics", "Produs": "Modul Raportare", "Cantitate": 3.0, "Pret unitar": 1220.97, "Valuta": "RON", "Status": "Livrata", "Valoare": 3662.91}, {"Nr comanda": "CMD-100073", "Data": "2026-06-25", "Client": "Hermes Logistics", "Produs": "Abonament Cloud B", "Cantitate": 1.0, "Pret unitar": 137.57, "Valuta": "RON", "Status": "IN CURS", "Valoare": 137.57}, {"Nr comanda": "CMD-100109", "Data": "2026-08-04", "Client": "Ideal Construct", "Produs": "Suport Premium", "Cantitate": 3.0, "Pret unitar": 125.73, "Valuta": "EUR", "Status": "Livrata", "Valoare": 377.19}]}</script>
+  <script id="embedded-data" type="application/json">{"hash": "demo", "columns": ["Nr comanda", "Data", "Client", "Produs", "Cantitate", "Pret unitar", "Valuta", "Status", "Valoare"], "roles": {"Nr comanda": "categorical", "Data": "date", "Client": "categorical", "Produs": "categorical", "Cantitate": "numeric", "Pret unitar": "numeric", "Valuta": "categorical", "Status": "categorical", "Valoare": "numeric"}, "aggregates": {"stats": {"Cantitate": {"sum": 103.0, "mean": 2.71, "min": 1.0, "max": 10.0, "count": 38}, "Pret unitar": {"sum": 36149.17, "mean": 951.29, "min": 29.76, "max": 3768.7, "count": 38}, "Valoare": {"sum": 102585.84, "mean": 2699.63, "min": 29.76, "max": 23618.4, "count": 38}}, "value_column": "Valoare", "top_by": {"Client": [{"key": "Farmacia Vita", "value": 23777.64}, {"key": "Aurora Retail SRL", "value": 15096.84}, {"key": "Electra Mobil", "value": 14827.46}, {"key": "Carpat Distribution", "value": 10324.43}, {"key": "Delta Foods SA", "value": 10249.68}, {"key": "Jupiter Media", "value": 7702.81}, {"key": "Meridian Auto", "value": 5426.58}, {"key": "Hermes Logistics", "value": 5172.23}, {"key": "Nova Print", "value": 3477.89}, {"key": "Kappa Textile", "value": 2353.1}], "Produs": [{"key": "Implementare", "value": 35332.78}, {"key": "Audit securitate", "value": 23618.4}, {"key": "Licenta Desktop", "value": 20509.03}, {"key": "Suport Premium", "value": 7436.18}, {"key": "Training on-site", "value": 5087.08}, {"key": "Modul Raportare", "value": 5074.69}, {"key": "Abonament Cloud P", "value": 3967.37}, {"key": "Abonament Cloud B", "value": 1560.31}], "Valuta": [{"key": "RON", "value": 96071.72}, {"key": "EUR", "value": 6514.12}], "Status": [{"key": "Livrata", "value": 97070.95}, {"key": "Anulata", "value": 3998.99}, {"key": "IN CURS", "value": 908.6}, {"key": "Retur", "value": 607.3}]}}, "anomalies": [{"row": 18, "column": "Valoare", "value": 8390.3, "bounds": [-4096.05, 7593.2]}, {"row": 32, "column": "Valoare", "value": 23618.4, "bounds": [-4096.05, 7593.2]}], "report": {"rows_in": 44, "rows_out": 38, "blank_rows_removed": 0, "total_rows_removed": 4, "duplicate_rows_removed": 2, "name_variants_merged": {"Client": {"Delta Foods SA": ["DELTA FOODS SA", "delta foods sa"], "Hermes Logistics": ["hermes logistics"]}, "Status": {"Livrata": ["LIVRATA", "livrata"], "IN CURS": ["in curs"]}}}, "row_count": 38, "table": [{"Nr comanda": "CMD-100043", "Data": "2026-04-27", "Client": "Electra Mobil", "Produs": "Training on-site", "Cantitate": 2.0, "Pret unitar": 1841.86, "Valuta": "RON", "Status": "Livrata", "Valoare": 3683.72}, {"Nr comanda": "CMD-100013", "Data": "2026-01-19", "Client": "Delta Foods SA", "Produs": "Implementare", "Cantitate": 4.0, "Pret unitar": 701.99, "Valuta": "EUR", "Status": "Livrata", "Valoare": 2807.96}, {"Nr comanda": "CMD-100037", "Data": "2026-03-11", "Client": "Hermes Logistics", "Produs": "Suport Premium", "Cantitate": 5.0, "Pret unitar": 121.46, "Valuta": "EUR", "Status": "Retur", "Valoare": 607.3}, {"Nr comanda": "CMD-100105", "Data": "2026-07-13", "Client": "Jupiter Media", "Produs": "Implementare", "Cantitate": 2.0, "Pret unitar": 3756.73, "Valuta": "RON", "Status": "Livrata", "Valoare": 7513.46}, {"Nr comanda": "CMD-100124", "Data": "2026-08-20", "Client": "Carpat Distribution", "Produs": "Licenta Desktop", "Cantitate": 1.0, "Pret unitar": 895.14, "Valuta": "RON", "Status": "Livrata", "Valoare": 895.14}, {"Nr comanda": "CMD-100014", "Data": "2026-01-12", "Client": "Delta Foods SA", "Produs": "Licenta Desktop", "Cantitate": 4.0, "Pret unitar": 933.14, "Valuta": "RON", "Status": "Livrata", "Valoare": 3732.56}, {"Nr comanda": "CMD-100036", "Data": "2026-03-11", "Client": "Aurora Retail SRL", "Produs": "Implementare", "Cantitate": 2.0, "Pret unitar": 3353.27, "Valuta": "RON", "Status": "Livrata", "Valoare": 6706.54}, {"Nr comanda": "CMD-100064", "Data": "2026-05-06", "Client": "Farmacia Vita", "Produs": "Abonament Cloud B", "Cantitate": 1.0, "Pret unitar": 159.24, "Valuta": "RON", "Status": "Livrata", "Valoare": 159.24}, {"Nr comanda": "CMD-100011", "Data": "2026-01-17", "Client": "Grand Hotel Olt", "Produs": "Abonament Cloud P", "Cantitate": 2.0, "Pret unitar": 95.9, "Valuta": "EUR", "Status": "Livrata", "Valoare": 191.8}, {"Nr comanda": "CMD-100125", "Data": "2026-08-14", "Client": "Lumina Energy", "Produs": "Abonament Cloud B", "Cantitate": 2.0, "Pret unitar": 138.78, "Valuta": "RON", "Status": "Livrata", "Valoare": 277.56}, {"Nr comanda": "CMD-100040", "Data": "2026-03-05", "Client": "Jupiter Media", "Produs": "Licenta Desktop", "Cantitate": 1.0, "Pret unitar": 189.35, "Valuta": "EUR", "Status": "Livrata", "Valoare": 189.35}, {"Nr comanda": "CMD-100123", "Data": "2026-08-20", "Client": "Hermes Logistics", "Produs": "Suport Premium", "Cantitate": 1.0, "Pret unitar": 125.25, "Valuta": "EUR", "Status": "Livrata", "Valoare": 125.25}, {"Nr comanda": "CMD-100015", "Data": "2026-01-13", "Client": "Kappa Textile", "Produs": "Abonament Cloud P", "Cantitate": 5.0, "Pret unitar": 470.62, "Valuta": "RON", "Status": "Livrata", "Valoare": 2353.1}, {"Nr comanda": "CMD-100087", "Data": "2026-06-13", "Client": "Lumina Energy", "Produs": "Suport Premium", "Cantitate": 2.0, "Pret unitar": 642.85, "Valuta": "RON", "Status": "Anulata", "Valoare": 1285.7}, {"Nr comanda": "CMD-100006", "Data": "2026-01-10", "Client": "Meridian Auto", "Produs": "Licenta Desktop", "Cantitate": 3.0, "Pret unitar": 904.43, "Valuta": "RON", "Status": "Livrata", "Valoare": 2713.29}, {"Nr comanda": "CMD-100076", "Data": "2026-05-20", "Client": "Lumina Energy", "Produs": "Abonament Cloud P", "Cantitate": 1.0, "Pret unitar": 83.26, "Valuta": "EUR", "Status": "Livrata", "Valoare": 83.26}, {"Nr comanda": "CMD-100034", "Data": "2026-03-09", "Client": "Delta Foods SA", "Produs": "Training on-site", "Cantitate": 4.0, "Pret unitar": 350.84, "Valuta": "EUR", "Status": "Livrata", "Valoare": 1403.36}, {"Nr comanda": "CMD-100033", "Data": "2026-03-15", "Client": "Bistro Central", "Produs": "Abonament Cloud B", "Cantitate": 1.0, "Pret unitar": 29.76, "Valuta": "EUR", "Status": "Livrata", "Valoare": 29.76}, {"Nr comanda": "CMD-100003", "Data": "2026-01-04", "Client": "Aurora Retail SRL", "Produs": "Licenta Desktop", "Cantitate": 10.0, "Pret unitar": 839.03, "Valuta": "RON", "Status": "Livrata", "Valoare": 8390.3}, {"Nr comanda": "CMD-100024", "Data": "2026-02-17", "Client": "Grand Hotel Olt", "Produs": "Abonament Cloud B", "Cantitate": 2.0, "Pret unitar": 158.49, "Valuta": "RON", "Status": "Livrata", "Valoare": 316.98}, {"Nr comanda": "CMD-100090", "Data": "2026-06-20", "Client": "Electra Mobil", "Produs": "Implementare", "Cantitate": 2.0, "Pret unitar": 3768.7, "Valuta": "RON", "Status": "Livrata", "Valoare": 7537.4}, {"Nr comanda": "CMD-100033", "Data": "2026-03-15", "Client": "Electra Mobil", "Produs": "Abonament Cloud P", "Cantitate": 1.0, "Pret unitar": 457.49, "Valuta": "RON", "Status": "Livrata", "Valoare": 457.49}, {"Nr comanda": "CMD-100121", "Data": "2026-08-23", "Client": "Hermes Logistics", "Produs": "Abonament Cloud B", "Cantitate": 4.0, "Pret unitar": 159.8, "Valuta": "RON", "Status": "Livrata", "Valoare": 639.2}, {"Nr comanda": "CMD-100100", "Data": "2026-06-01", "Client": "Bistro Central", "Produs": "Modul Raportare", "Cantitate": 1.0, "Pret unitar": 1163.91, "Valuta": "RON", "Status": "Livrata", "Valoare": 1163.91}, {"Nr comanda": "CMD-100127", "Data": "2026-08-03", "Client": "Ideal Construct", "Produs": "Abonament Cloud P", "Cantitate": 4.0, "Pret unitar": 89.64, "Valuta": "EUR", "Status": "Livrata", "Valoare": 358.56}, {"Nr comanda": "CMD-100095", "Data": "2026-06-09", "Client": "Electra Mobil", "Produs": "Suport Premium", "Cantitate": 5.0, "Pret unitar": 629.77, "Valuta": "RON", "Status": "Livrata", "Valoare": 3148.85}, {"Nr comanda": "CMD-100086", "Data": "2026-06-22", "Client": "Carpat Distribution", "Produs": "Implementare", "Cantitate": 2.0, "Pret unitar": 3768.7, "Valuta": "RON", "Status": "Livrata", "Valoare": 7537.4}, {"Nr comanda": "CMD-100006", "Data": "2026-01-10", "Client": "Meridian Auto", "Produs": "Licenta Desktop", "Cantitate": 3.0, "Pret unitar": 904.43, "Valuta": "RON", "Status": "Anulata", "Valoare": 2713.29}, {"Nr comanda": "CMD-100014", "Data": "2026-02-14", "Client": "Delta Foods SA", "Produs": "Licenta Desktop", "Cantitate": 2.0, "Pret unitar": 937.55, "Valuta": "RON", "Status": "Livrata", "Valoare": 1875.1}, {"Nr comanda": "CMD-100017", "Data": "2026-07-17", "Client": "Delta Foods SA", "Produs": "Abonament Cloud P", "Cantitate": 1.0, "Pret unitar": 430.7, "Valuta": "RON", "Status": "IN CURS", "Valoare": 430.7}, {"Nr comanda": "CMD-100011B", "Data": "2026-02-11", "Client": "Bistro Central", "Produs": "Abonament Cloud P", "Cantitate": 1.0, "Pret unitar": 92.46, "Valuta": "EUR", "Status": "IN CURS", "Valoare": 92.46}, {"Nr comanda": "CMD-100086", "Data": "2026-01-11", "Client": "Carpat Distribution", "Produs": "Suport Premium", "Cantitate": 3.0, "Pret unitar": 630.63, "Valuta": "RON", "Status": "Livrata", "Valoare": 1891.89}, {"Nr comanda": "CMD-100002", "Data": "2026-02-02", "Client": "Farmacia Vita", "Produs": "Audit securitate", "Cantitate": 10.0, "Pret unitar": 2361.84, "Valuta": "RON", "Status": "Livrata", "Valoare": 23618.4}, {"Nr comanda": "CMD-100031", "Data": "2026-02-06", "Client": "Nova Print", "Produs": "Implementare", "Cantitate": 1.0, "Pret unitar": 3230.02, "Valuta": "RON", "Status": "Livrata", "Valoare": 3230.02}, {"Nr comanda": "CMD-100053", "Data": "2026-05-09", "Client": "Nova Print", "Produs": "Modul Raportare", "Cantitate": 1.0, "Pret unitar": 247.87, "Valuta": "EUR", "Status": "IN CURS", "Valoare": 247.87}, {"Nr comanda": "CMD-100039", "Data": "2026-07-05", "Client": "Hermes Logistics", "Produs": "Modul Raportare", "Cantitate": 3.0, "Pret unitar": 1220.97, "Valuta": "RON", "Status": "Livrata", "Valoare": 3662.91}, {"Nr comanda": "CMD-100073", "Data": "2026-06-25", "Client": "Hermes Logistics", "Produs": "Abonament Cloud B", "Cantitate": 1.0, "Pret unitar": 137.57, "Valuta": "RON", "Status": "IN CURS", "Valoare": 137.57}, {"Nr comanda": "CMD-100109", "Data": "2026-08-04", "Client": "Ideal Construct", "Produs": "Suport Premium", "Cantitate": 3.0, "Pret unitar": 125.73, "Valuta": "EUR", "Status": "Livrata", "Valoare": 377.19}], "recommendations": {"data_driven": [{"title": "Concentrare mare pe „Farmacia Vita”", "detail": "„Farmacia Vita” reprezintă 24% din „Valoare” din top Client — cu 58% peste locul 2 (Aurora Retail SRL). Dacă acest client pleacă sau reduce comenzile, pierzi o parte semnificativă din venit. Diversifică activ în restul din top 5."}, {"title": "Venit concentrat în RON (94%)", "detail": "Aproape tot venitul e într-o singură monedă (RON), fără hedging. Cu inflația locală ridicată, ia în calcul facturarea în altă monedă pentru contractele noi/mari, ca diversificare parțială a riscului valutar."}, {"title": "Minim de vânzări în 2026-05", "detail": "„Valoare” a fost cel mai mic în 2026-05 (490.37) și cel mai mare în 2026-02 (29,132.96). Dacă tiparul se repetă, programează campanii/renewals înainte de luna slabă, nu reactiv."}, {"title": "2 valori neobișnuite de verificat", "detail": "Cea mai mare e pe „Valoare” = 23,618.40 (rând 33). Verifică dacă e o eroare de date sau o oportunitate reală de vânzare mare — dacă e reală, poate deveni caz de succes de replicat."}], "market_context": [{"title": "Inflație 6,2% — cea mai mare din UE", "detail": "Rata anuală a inflației a scăzut la 6,17–6,2% în august 2026, dar România rămâne pe primul loc în UE. Contracte cu preț fix pierd valoare reală lună de lună — merită o clauză de recalculare anuală legată de IPC.", "source": "https://agerpres.ro/economic/2026/09/11/rata-anuala-a-inflatiei-a-scazut-la-6-17-in-luna-august--1592562"}, {"title": "Dobânda BNR la 6,50% — credit scump", "detail": "Rata de politică monetară a rămas la 6,50% pe tot parcursul lui 2026. Clienții amână investițiile finanțate prin credit — produsele cu plată eșalonată/mică lunar sunt mai ușor de aprobat decât proiectele mari, one-off.", "source": "https://www.digi24.ro/stiri/actualitate/bnr-mentine-dobanda-cheie-la-650-in-prima-sedinta-de-politica-monetara-din-2026-3591757"}, {"title": "Încredere IMM în scădere", "detail": "Indexul antreprenorial a scăzut la 43,25 puncte; doar 6% dintre antreprenori se așteaptă la o evoluție economică pozitivă. Ciclurile de vânzare se pot lungi — urmărește proactiv clienții cu semnale de ezitare.", "source": "https://www.bursa.ro/sondaj-imm-romania-10-procente-dintre-antreprenori-iau-in-calcul-inchiderea-firmei-01451955"}, {"title": "Piața IT crește 12%, dar doar 5% folosesc AI", "detail": "Industria de servicii IT din România crește ~12% anual, dar adopția AI e sub 5%. E un gol de piață clar pentru orice ofertă care ajută clienții să adopte AI, nu doar să crească volumul.", "source": "https://news24.ro/piata-it-din-romania-in-2026-doar-5-dintre-companii-folosesc-ai/"}]}}</script>
   <script>
 const DATA = JSON.parse(document.getElementById("embedded-data").textContent);
 const CHART_COLORS = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)"];
@@ -798,6 +866,34 @@ function renderCharts(topBy, valueColumn) {
   });
 }
 
+function renderRecommendations(recommendations) {
+  const dataEl = document.getElementById("recommendations-data");
+  const marketEl = document.getElementById("recommendations-market");
+  dataEl.innerHTML = "";
+  marketEl.innerHTML = "";
+  if (!recommendations) return;
+  const dataDriven = recommendations.data_driven || [];
+  if (dataDriven.length === 0) {
+    dataEl.innerHTML = '<p class="anomalies-empty">Nu am găsit tipare suficient de clare în aceste date pentru recomandări automate.</p>';
+  } else {
+    dataDriven.forEach((rec) => {
+      const el = document.createElement("div");
+      el.className = "recommendation-item";
+      el.innerHTML = `<div class="rec-title">${rec.title}</div><div class="rec-detail">${rec.detail}</div>`;
+      dataEl.appendChild(el);
+    });
+  }
+  (recommendations.market_context || []).forEach((rec) => {
+    const el = document.createElement("div");
+    el.className = "recommendation-item context";
+    const source = rec.source
+      ? `<a class="rec-source" href="${rec.source}" target="_blank" rel="noopener">Sursă</a>`
+      : "";
+    el.innerHTML = `<div class="rec-title">${rec.title}</div><div class="rec-detail">${rec.detail}</div>${source}`;
+    marketEl.appendChild(el);
+  });
+}
+
 function renderTable(table, columns, anomalies) {
   const el = document.getElementById("data-table");
   const note = document.getElementById("table-note");
@@ -872,6 +968,7 @@ renderReport(DATA.report);
 renderStats(DATA.aggregates, DATA.row_count);
 renderAnomaliesSummary(DATA.anomalies);
 renderCharts(DATA.aggregates.top_by, DATA.aggregates.value_column);
+renderRecommendations(DATA.recommendations);
 renderTable(DATA.table, DATA.columns, DATA.anomalies);
 
 document.getElementById("ask-form").addEventListener("submit", (e) => {

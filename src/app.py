@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from data_pipeline import PipelineResult, run_pipeline
 from qa import answer_question
+from recommendations import generate_recommendations
 
 app = FastAPI(
     title="CSV Sales Dashboard",
@@ -50,7 +51,7 @@ async def upload_csv(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail=f"Nu am putut citi CSV-ul: {exc}") from exc
 
     result = _cache[file_hash]
-    return {"hash": file_hash, **result.as_dict()}
+    return {"hash": file_hash, "recommendations": generate_recommendations(result), **result.as_dict()}
 
 
 @app.get("/data/{file_hash}")
@@ -59,7 +60,12 @@ def get_data(file_hash: str):
     result = _cache.get(file_hash)
     if result is None:
         raise HTTPException(status_code=404, detail="Fișier necunoscut — reîncarcă CSV-ul")
-    return {"hash": file_hash, "table": result.table, **result.as_dict()}
+    return {
+        "hash": file_hash,
+        "table": result.table,
+        "recommendations": generate_recommendations(result),
+        **result.as_dict(),
+    }
 
 
 class AskRequest(BaseModel):

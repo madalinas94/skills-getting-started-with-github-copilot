@@ -56,6 +56,37 @@ function render(data) {
   renderStats(data.aggregates, data.row_count);
   renderAnomaliesSummary(data.anomalies);
   renderCharts(data.aggregates.top_by, data.aggregates.value_column);
+  renderRecommendations(data.recommendations);
+}
+
+function renderRecommendations(recommendations) {
+  const dataEl = document.getElementById("recommendations-data");
+  const marketEl = document.getElementById("recommendations-market");
+  dataEl.innerHTML = "";
+  marketEl.innerHTML = "";
+  if (!recommendations) return;
+
+  const dataDriven = recommendations.data_driven || [];
+  if (dataDriven.length === 0) {
+    dataEl.innerHTML = '<p class="anomalies-empty">Nu am găsit tipare suficient de clare în aceste date pentru recomandări automate.</p>';
+  } else {
+    dataDriven.forEach((rec) => {
+      const el = document.createElement("div");
+      el.className = "recommendation-item";
+      el.innerHTML = `<div class="rec-title">${rec.title}</div><div class="rec-detail">${rec.detail}</div>`;
+      dataEl.appendChild(el);
+    });
+  }
+
+  (recommendations.market_context || []).forEach((rec) => {
+    const el = document.createElement("div");
+    el.className = "recommendation-item context";
+    const source = rec.source
+      ? `<a class="rec-source" href="${rec.source}" target="_blank" rel="noopener">Sursă</a>`
+      : "";
+    el.innerHTML = `<div class="rec-title">${rec.title}</div><div class="rec-detail">${rec.detail}</div>${source}`;
+    marketEl.appendChild(el);
+  });
 }
 
 function renderReport(report) {
