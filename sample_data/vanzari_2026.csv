@@ -1,0 +1,28 @@
+EXPORT VANZARI - sistem intern
+Perioada: 01.01.2026 - 31.08.2026
+Generat automat la 15.09.2026 08:41. NU MODIFICATI ACEST FISIER.
+
+Nr comanda;Data;Client;Produs;Cantitate;Pret unitar;Valuta;Status
+CMD-100043;27.04.2026;Electra Mobil;Training on-site;2;1.841,86;RON;Livrata
+CMD-100013;19.01.2026;Delta Foods SA;Implementare;4;701,99;EUR;Livrata
+CMD-100037;11.03.2026;Hermes Logistics;Suport Premium;5;121,46;EUR;Retur
+CMD-100105;13.07.2026;Jupiter Media;Implementare;2;3.756,73;RON;Livrata
+CMD-100124;20.08.2026;Carpat Distribution;Licenta Desktop;1;895,14;RON;Livrata
+CMD-100014;12.01.2026;Delta Foods SA;Licenta Desktop;4;933,14;RON;Livrata
+CMD-100036;11.03.2026;Aurora Retail SRL;Implementare;2;3.353,27;RON;Livrata
+CMD-100064;06.05.2026;Farmacia Vita;Abonament Cloud B;1;159,24;RON;LIVRATA
+CMD-100011;17.01.2026;Grand Hotel Olt;Abonament Cloud P;2;95,90;EUR;Livrata
+CMD-100125;14.08.2026;Lumina Energy;Abonament Cloud B;2;138,78;RON;Livrata
+TOTAL PARTIAL;;;;;12038,29;RON;
+CMD-100040;05.03.2026;Jupiter Media;Licenta Desktop;1;189,35;EUR;LIVRATA
+CMD-100123;20.08.2026;Hermes Logistics;Suport Premium;1;125,25;EUR;LIVRATA
+CMD-100015;13.01.2026;Kappa Textile;Abonament Cloud P;5;470,62;RON;livrata
+CMD-100087;13.06.2026;Lumina Energy;Suport Premium;2;642,85;RON;Anulata
+CMD-100006;10.01.2026;Meridian Auto;Licenta Desktop;3;904,43;RON;livrata
+CMD-100076;20.05.2026;Lumina Energy;Abonament Cloud P;1;83,26;EUR;LIVRATA
+TOTAL PARTIAL;;;;;51770,73;RON;
+CMD-100034;09.03.2026;DELTA FOODS SA;Training on-site;4;350,84;EUR;livrata
+CMD-100033;15.03.2026;Bistro Central;Abonament Cloud B;1;29,76;EUR;LIVRATA
+CMD-100003;04.01.2026;Aurora Retail SRL;Licenta Desktop;10;839,03;RON;Livrata
+CMD-100024;17.02.2026;Grand Hotel Olt;Abonament Cloud B;2;158,49;RON;Livrata
+CMD-100033;15.03.2026;Bistro Central;Abonament Cloud B;1;29,76;EUR;Livrata
