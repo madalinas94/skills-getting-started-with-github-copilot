@@ -17,6 +17,18 @@ contextBridge.exposeInMainWorld('buddy', {
     onState: on('buddy:state'),
     onTalking: on('buddy:talking')
   },
+  sticky: {
+    id: () => new URLSearchParams(location.search).get('id'),
+    get: id => ipcRenderer.invoke('sticky:get', id),
+    pin: id => ipcRenderer.invoke('sticky:pin', id),
+    create: () => ipcRenderer.invoke('sticky:new'),
+    unpin: id => ipcRenderer.send('sticky:unpin', id),
+    remove: id => ipcRenderer.invoke('sticky:delete', id),
+    style: (id, patch) => ipcRenderer.invoke('sticky:style', id, patch),
+    resize: (id, w, h) => ipcRenderer.send('sticky:resize', id, w, h),
+    resized: id => ipcRenderer.send('sticky:resized', id),
+    collapse: (id, c) => ipcRenderer.invoke('sticky:collapse', id, c)
+  },
   bubble: {
     onShow: on('bubble:show'),
     onSide: on('bubble:side'),

@@ -18,6 +18,10 @@ const TIMER_H = 66;
 const BUBBLE_W = 280;
 const QUICK_W = 620;
 const QUICK_H = 460;
+const STICKY_W = 270;
+const STICKY_H = 290;
+const STICKY_COLORS = ['ivory', 'blush', 'sage', 'champagne', 'powder', 'noir'];
+const STICKY_DECOS = ['tape', 'pin', 'clip', 'none'];
 
 let buddyWin = null;
 let panelWin = null;
@@ -29,6 +33,7 @@ let bubbleTab = null;
 let bubbleHeight = 90;
 let quickWin = null;
 let lastSessionId = null;
+const stickyWins = new Map(); // id notiță → fereastră
 let tray = null;
 let clipboardTimer = null;
 let lastClipboardText = '';
@@ -251,6 +256,111 @@ function hideBubble() {
   broadcast('buddy:talking', false);
 }
 
+// ---------- Sticky notes (notițe lipite pe desktop) ----------
+
+function findNote(id) {
+  return store.get().notes.find(n => n.id === id);
+}
+
+function defaultStickyBounds() {
+  const area = screen.getPrimaryDisplay().workArea;
+  const k = stickyWins.size % 6;
+  return {
+    x: Math.round(area.x + area.width - STICKY_W - 260 - k * 34),
+    y: Math.round(area.y + 70 + k * 34),
+    w: STICKY_W,
+    h: STICKY_H
+  };
+}
+
+function createStickyWindow(note) {
+  const st = note.sticky;
+  const pos = isOnScreen(st.x, st.y, st.w, st.h) ? st : { ...st, ...defaultStickyBounds() };
+  const w = new BrowserWindow({
+    width: pos.w, height: pos.h, x: pos.x, y: pos.y,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false, // redimensionare proprie (colțul din dreapta-jos), ca fereastra să rămână transparentă
+    hasShadow: false,
+    skipTaskbar: true,
+    alwaysOnTop: !!st.onTop,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    backgroundColor: '#00000000',
+    webPreferences: { preload: path.join(__dirname, 'preload.js') }
+  });
+  w.loadFile(path.join(__dirname, 'renderer', 'sticky.html'), { query: { id: note.id } });
+  w.once('ready-to-show', () => w.showInactive());
+  let t;
+  w.on('move', () => {
+    clearTimeout(t);
+    t = setTimeout(() => saveStickyBounds(note.id), 400);
+  });
+  w.on('closed', () => stickyWins.delete(note.id));
+  stickyWins.set(note.id, w);
+  return w;
+}
+
+function saveStickyBounds(id) {
+  const n = findNote(id);
+  const w = stickyWins.get(id);
+  if (!n || !n.sticky || !w || w.isDestroyed()) return;
+  const b = w.getBounds();
+  if (!n.sticky.collapsed) Object.assign(n.sticky, { x: b.x, y: b.y, w: b.width, h: b.height });
+  else Object.assign(n.sticky, { x: b.x, y: b.y });
+  store.save();
+}
+
+function pinNote(id, opts = {}) {
+  const n = findNote(id);
+  if (!n) return null;
+  if (!n.sticky) {
+    // revine cu aspectul și locul de dinainte, dacă a mai fost pe desktop
+    n.sticky = n.lastSticky
+      ? { ...n.lastSticky, collapsed: false }
+      : { ...defaultStickyBounds(), color: opts.color || 'ivory', deco: opts.deco || 'tape', onTop: false, collapsed: false };
+    store.save();
+  }
+  const w = stickyWins.get(id);
+  if (w && !w.isDestroyed()) w.show();
+  else createStickyWindow(n);
+  broadcast('notes:updated', store.get().notes);
+  return n;
+}
+
+function unpinNote(id) {
+  const n = findNote(id);
+  if (n) {
+    // o notiță lipită goală nu merită păstrată
+    if (!n.title.trim() && !n.body.trim()) store.get().notes = store.get().notes.filter(x => x.id !== id);
+    else {
+      if (n.sticky) n.lastSticky = { ...n.sticky, collapsed: false };
+      n.sticky = null;
+    }
+    store.save();
+  }
+  const w = stickyWins.get(id);
+  if (w && !w.isDestroyed()) w.close();
+  broadcast('notes:updated', store.get().notes);
+}
+
+function newSticky() {
+  const n = saveNote({ title: '', body: '' });
+  pinNote(n.id);
+  return n;
+}
+
+function showAllStickies() {
+  for (const n of store.get().notes) if (n.sticky) pinNote(n.id);
+  for (const w of stickyWins.values()) { w.showInactive(); w.moveTop(); }
+}
+
+function restoreStickies() {
+  for (const n of store.get().notes) if (n.sticky) createStickyWindow(n);
+}
+
 // ---------- Fereastra rapidă (scurtătura globală) ----------
 
 function createQuickWindow() {
@@ -334,6 +444,8 @@ function createTray() {
     { label: 'Arată roboțelul', click: showBuddy },
     { label: 'Ascunde roboțelul', click: () => buddyWin && buddyWin.hide() },
     { label: `Întreab-o pe Mady (${hotkeyLabel(settings().quickHotkey)})`, click: () => openQuick() },
+    { label: 'Notiță nouă pe desktop', click: newSticky },
+    { label: 'Arată notițele lipite', click: showAllStickies },
     { label: 'Timer și statistici', click: () => togglePanel('timer') },
     { label: 'Arată timerul', click: showTimer },
     { label: 'Inbox', click: () => togglePanel('inbox') },
@@ -391,7 +503,7 @@ function trimClipboard() {
 }
 
 function broadcast(channel, payload) {
-  for (const w of [buddyWin, panelWin, timerWin, bubbleWin, quickWin]) if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
+  for (const w of [buddyWin, panelWin, timerWin, bubbleWin, quickWin, ...stickyWins.values()]) if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
 }
 
 // ---------- Setări ----------
@@ -438,6 +550,7 @@ function registerIpc() {
     Menu.buildFromTemplate([
       { label: 'Deschide panoul', click: () => togglePanel('clipboard') },
       { label: 'Notițe', click: () => togglePanel('notes') },
+      { label: 'Notiță nouă pe desktop', click: newSticky },
       { label: `Întreab-o pe Mady (${hotkeyLabel(settings().quickHotkey)})`, click: () => openQuick() },
       { label: 'Asistent AI', click: () => togglePanel('ai') },
       { label: 'Timer și statistici', click: () => togglePanel('timer') },
@@ -525,6 +638,8 @@ function registerIpc() {
   ipcMain.handle('notes:list', () => store.get().notes);
   ipcMain.handle('notes:save', (_e, note) => saveNote(note));
   ipcMain.handle('notes:delete', (_e, id) => {
+    const sw = stickyWins.get(id);
+    if (sw && !sw.isDestroyed()) sw.close();
     const d = store.get();
     d.notes = d.notes.filter(n => n.id !== id);
     store.save();
@@ -609,6 +724,56 @@ function registerIpc() {
     } catch (err) {
       return { ok: false, error: err.message };
     }
+  });
+
+  // sticky notes
+  ipcMain.handle('sticky:get', (_e, id) => findNote(id) || null);
+  ipcMain.handle('sticky:pin', (_e, id) => pinNote(id));
+  ipcMain.handle('sticky:new', () => newSticky());
+  ipcMain.on('sticky:unpin', (_e, id) => unpinNote(id));
+  ipcMain.handle('sticky:delete', (_e, id) => {
+    store.get().notes = store.get().notes.filter(n => n.id !== id);
+    store.save();
+    const w = stickyWins.get(id);
+    if (w && !w.isDestroyed()) w.close();
+    broadcast('notes:updated', store.get().notes);
+    return true;
+  });
+  ipcMain.handle('sticky:style', (_e, id, patch) => {
+    const n = findNote(id);
+    if (!n || !n.sticky) return null;
+    if (STICKY_COLORS.includes(patch.color)) n.sticky.color = patch.color;
+    if (STICKY_DECOS.includes(patch.deco)) n.sticky.deco = patch.deco;
+    if ('onTop' in patch) {
+      n.sticky.onTop = !!patch.onTop;
+      const w = stickyWins.get(id);
+      if (w) w.setAlwaysOnTop(n.sticky.onTop, 'floating');
+    }
+    store.save();
+    broadcast('notes:updated', store.get().notes);
+    return n;
+  });
+  ipcMain.on('sticky:resize', (e, id, width, height) => {
+    const w = stickyWins.get(id);
+    if (!w) return;
+    const b = w.getBounds();
+    w.setBounds({ x: b.x, y: b.y, width: Math.max(200, Math.min(700, Math.round(width))), height: Math.max(170, Math.min(800, Math.round(height))) });
+  });
+  ipcMain.on('sticky:resized', (_e, id) => saveStickyBounds(id));
+  ipcMain.handle('sticky:collapse', (_e, id, collapsed) => {
+    const n = findNote(id);
+    const w = stickyWins.get(id);
+    if (!n || !n.sticky || !w) return null;
+    const b = w.getBounds();
+    if (collapsed && !n.sticky.collapsed) {
+      Object.assign(n.sticky, { w: b.width, h: b.height });
+      w.setBounds({ x: b.x, y: b.y, width: b.width, height: 76 });
+    } else if (!collapsed) {
+      w.setBounds({ x: b.x, y: b.y, width: n.sticky.w, height: n.sticky.h });
+    }
+    n.sticky.collapsed = !!collapsed;
+    store.save();
+    return n;
   });
 
   // bula
@@ -815,6 +980,7 @@ if (!app.requestSingleInstanceLock()) {
     initMailScan();
     initMood();
     registerHotkey(settings().quickHotkey);
+    restoreStickies();
     // la pornire: briefingul zilei (dacă n-a fost încă) sau un salut
     setTimeout(async () => {
       if (briefing.due()) await runBriefing();

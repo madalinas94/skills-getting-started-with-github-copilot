@@ -116,8 +116,13 @@ function renderNotes() {
   const list = $('#noteList');
   list.replaceChildren();
   for (const n of items) {
+    const title = el('div', { className: 'title', textContent: n.title || 'Fără titlu' });
+    if (n.sticky) {
+      const tag = el('span', { className: 'sticky-tag', title: 'Lipită pe desktop' }, [icon('sticky')]);
+      title.append(tag);
+    }
     list.append(el('li', { className: 'item', onclick: () => openNote(n.id) }, [
-      el('div', { className: 'title', textContent: n.title || 'Fără titlu' }),
+      title,
       el('div', { className: 'text muted', textContent: n.body.slice(0, 200) || '…' }),
       el('div', { className: 'meta' }, [el('span', { className: 'muted', textContent: timeAgo(n.updatedAt) })])
     ]));
@@ -131,6 +136,7 @@ function openNote(id) {
   $('#noteTitle').value = n ? n.title : '';
   $('#noteBody').value = n ? n.body : '';
   $('#noteStatus').textContent = '';
+  renderPinButton();
   $('#notesListView').classList.add('hidden');
   $('#noteEditView').classList.remove('hidden');
   $(n ? '#noteBody' : '#noteTitle').focus();
@@ -162,6 +168,33 @@ async function flushNote() {
 }
 
 $('#noteNew').addEventListener('click', () => openNote(null));
+$('#noteNewSticky').addEventListener('click', async () => {
+  await api.sticky.create();
+  toast('Notiță nouă pe desktop');
+});
+
+function renderPinButton() {
+  const n = notes.find(x => x.id === currentNoteId);
+  const pinned = !!n?.sticky;
+  $('#notePin span').textContent = pinned ? 'Dezlipește' : 'Pe desktop';
+  $('#notePin').title = pinned ? 'Scoate notița de pe desktop' : 'Lipește notița pe desktop';
+}
+
+$('#notePin').addEventListener('click', async () => {
+  await flushNote();
+  if (!currentNoteId) {
+    const saved = await api.notes.save({ title: $('#noteTitle').value, body: $('#noteBody').value });
+    currentNoteId = saved.id;
+  }
+  const n = notes.find(x => x.id === currentNoteId);
+  if (n?.sticky) {
+    api.sticky.unpin(currentNoteId);
+    toast('Notița a fost scoasă de pe desktop');
+  } else {
+    await api.sticky.pin(currentNoteId);
+    toast('Notița e acum pe desktop');
+  }
+});
 $('#noteBack').addEventListener('click', closeNote);
 $('#noteTitle').addEventListener('input', scheduleNoteSave);
 $('#noteBody').addEventListener('input', scheduleNoteSave);
@@ -176,7 +209,26 @@ $('#noteDelete').addEventListener('click', async () => {
   $('#noteBody').value = '';
   closeNote();
 });
-api.notes.onUpdate(list => { notes = list; if (!currentNoteId) renderNotes(); });
+api.notes.onUpdate(list => {
+  notes = list;
+  if (!currentNoteId) renderNotes();
+  else {
+    renderPinButton();
+    // editată între timp pe desktop: actualizăm câmpurile care nu sunt în lucru
+    const n = list.find(x => x.id === currentNoteId);
+    if (!n) {
+      // ștearsă de pe desktop: golim editorul ca să nu o recreăm la închidere
+      clearTimeout(noteTimer);
+      currentNoteId = null;
+      $('#noteTitle').value = '';
+      $('#noteBody').value = '';
+      closeNote();
+      return;
+    }
+    if (document.activeElement !== $('#noteTitle')) $('#noteTitle').value = n.title;
+    if (document.activeElement !== $('#noteBody')) $('#noteBody').value = n.body;
+  }
+});
 
 // ---------- asistent AI ----------
 

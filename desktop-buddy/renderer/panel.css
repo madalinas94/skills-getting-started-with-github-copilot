@@ -570,3 +570,6 @@ textarea { resize: none; }
 .msg.brief .who::after { content: " · briefing"; font-style: normal; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; opacity: .8; }
 
 .settings label > .muted { text-transform: none; letter-spacing: normal; font-style: italic; }
+
+.sticky-tag { display: inline-flex; vertical-align: -2px; margin-left: 6px; color: var(--gold); }
+.sticky-tag .ic { width: 14px; height: 14px; }

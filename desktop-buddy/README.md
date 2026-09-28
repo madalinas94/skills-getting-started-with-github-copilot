@@ -17,6 +17,18 @@ iar când dai click pe ea se deschide un panou mic (ca un tray) cu:
 - **⚙️ Setări** – provider AI, model, API key (salvată criptat), system prompt, numele și mărimea
   roboțelului, „mereu deasupra”, pornire cu Windows, clipboard, temă.
 
+## Sticky notes
+
+Orice notiță poate fi lipită pe desktop (butonul **Pe desktop** din editor, butonul cu notiță din
+tab-ul Notițe, sau din meniul lui Mady / tray: **Notiță nouă pe desktop**).
+
+- **Hârtie:** ivory, blush, sage, champagne, powder blue, noir; **decor:** bandă washi, pioneză aurie,
+  agrafă sau simplu; titlu serif italic și rânduri fine, ca pe o foaie de jurnal.
+- Le muți trăgând de marginea de sus/jos, le redimensionezi din colțul din dreapta-jos, le restrângi
+  la titlu, le ții mereu deasupra sau le dezlipești (notița rămâne în panou și revine cu același aspect).
+- Textul se sincronizează în ambele sensuri cu tab-ul Notițe. Poziția, mărimea și stilul rămân
+  după repornire. „Arată notițele lipite” din tray le aduce pe toate în față.
+
 ## Mady e vie
 
 - **Stări:** e concentrată (ochi îngustați) cât rulează o sesiune, adoarme (zzz) după 5 minute fără
@@ -128,6 +140,7 @@ desktop-buddy/
 ├── src/mailscan.js    # scanarea automată orară + notificarea
 ├── src/mood.js        # stările lui Mady și replicile ei
 ├── src/briefing.js    # briefingul de dimineață
+├── renderer/sticky.*  # notițele lipite pe desktop
 ├── renderer/          # HTML/CSS/JS pentru roboțel și panou
 ├── assets/            # buddy.svg, icon.svg, icon.png, icon.ico
 └── scripts/make-ico.js# regenerează icon.ico din assets/icons/*.png

@@ -30,6 +30,7 @@
       <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z"/></symbol>
       <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1"/></symbol>
       <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/></symbol>
+      <symbol id="i-sticky" viewBox="0 0 24 24"><path d="M5 4.5h14v10l-5 5H5z"/><path d="M14 19.5v-5h5"/><path d="M9 3v3.5M15 3v3.5" /></symbol>
       <symbol id="i-new" viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M13.5 7.5l3 3"/></symbol>
     </defs>
   </svg>
@@ -68,6 +69,7 @@
       <div id="notesListView">
         <div class="toolbar">
           <input type="search" id="noteSearch" placeholder="Caută notițe…">
+          <button class="btn ghost square" id="noteNewSticky" title="Notiță nouă lipită pe desktop"><svg class="ic"><use href="#i-sticky"/></svg></button>
           <button class="btn" id="noteNew"><svg class="ic"><use href="#i-plus"/></svg>Nouă</button>
         </div>
         <ul id="noteList" class="list"></ul>
@@ -77,6 +79,7 @@
         <div class="toolbar">
           <button class="btn ghost" id="noteBack"><svg class="ic"><use href="#i-back"/></svg>Înapoi</button>
           <span class="muted" id="noteStatus"></span>
+          <button class="btn ghost" id="notePin" title="Lipește notița pe desktop"><svg class="ic"><use href="#i-sticky"/></svg><span>Pe desktop</span></button>
           <button class="btn ghost square danger" id="noteDelete" title="Șterge notița"><svg class="ic"><use href="#i-trash"/></svg></button>
         </div>
         <input id="noteTitle" placeholder="Titlu">
