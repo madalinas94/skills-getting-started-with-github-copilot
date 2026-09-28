@@ -21,9 +21,20 @@ function fmt(ms) {
 
 function render() {
   if (!state) return;
-  $('#title').textContent = state.title;
-  $('#time').textContent = fmt(elapsedMs());
-  const paused = !!state.pausedAt;
+  const p = state.pomo;
+  if (p) {
+    const now = Date.now() + offset;
+    const left = p.phaseEndsAt ? Math.max(0, p.phaseEndsAt - now) : (p.remainingMs ?? 0);
+    const m = Math.floor(left / 60000), sec = Math.floor((left % 60000) / 1000);
+    $('#title').textContent = p.phase === 'focus' ? `Focus · runda ${p.count + 1} · ${state.title}` : `Pauză · ${state.title}`;
+    $('#time').textContent = `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    $('#pill').classList.toggle('break', p.phase === 'break');
+  } else {
+    $('#title').textContent = state.title;
+    $('#time').textContent = fmt(elapsedMs());
+    $('#pill').classList.remove('break');
+  }
+  const paused = !!state.pausedAt && !(p && p.phase === 'break');
   $('#pill').classList.toggle('paused', paused);
   $('#toggleIcon').setAttribute('href', paused ? '#i-play' : '#i-pause');
   $('#toggle').title = paused ? 'Continuă' : 'Pauză';

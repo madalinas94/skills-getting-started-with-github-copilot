@@ -42,6 +42,24 @@ function toast(text) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 1500);
 }
 
+// Confirmare în interiorul panoului (un dialog de sistem ar lua focusul și ar închide panoul).
+function askConfirm(text, ok = 'Da, șterge') {
+  return new Promise(resolve => {
+    const box = $('#confirm');
+    $('#confirmText').textContent = text;
+    $('#confirmOk').textContent = ok;
+    box.classList.remove('hidden');
+    const done = v => {
+      box.classList.add('hidden');
+      $('#confirmOk').onclick = $('#confirmCancel').onclick = null;
+      resolve(v);
+    };
+    $('#confirmOk').onclick = () => done(true);
+    $('#confirmCancel').onclick = () => done(false);
+    $('#confirmOk').focus();
+  });
+}
+
 // ---------- tab-uri ----------
 
 function showTab(name) {
@@ -49,6 +67,7 @@ function showTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.id === `tab-${name}`));
   if (name === 'ai') setTimeout(() => $('#chatInput').focus(), 50);
   if (name === 'timer') loadHistory();
+  if (name === 'today') loadToday();
   if (name === 'inbox') api.mail.scanState().then(renderScan);
   if (name === 'inbox' && !mails.length) refreshMail();
 }
@@ -102,7 +121,7 @@ function renderClipboard() {
 
 $('#clipSearch').addEventListener('input', renderClipboard);
 $('#clipClear').addEventListener('click', async () => {
-  if (!confirm('Ștergi tot istoricul clipboard (cu excepția celor fixate)?')) return;
+  if (!await askConfirm('Ștergi tot istoricul clipboard (cu excepția celor fixate)?')) return;
   clipItems = await api.clipboard.clear();
   renderClipboard();
 });
@@ -201,7 +220,7 @@ $('#noteBody').addEventListener('input', scheduleNoteSave);
 $('#noteSearch').addEventListener('input', renderNotes);
 $('#noteDelete').addEventListener('click', async () => {
   if (currentNoteId) {
-    if (!confirm('Ștergi această notiță?')) return;
+    if (!await askConfirm('Ștergi această notiță?')) return;
     notes = await api.notes.remove(currentNoteId);
   }
   currentNoteId = null;
@@ -363,7 +382,25 @@ function setTimerVisible(v) {
   $('#sessTimerVis span').textContent = v ? 'Ascunde timerul' : 'Arată timerul';
 }
 
+function renderPomo() {
+  const p = session?.pomo;
+  $('#pomoBox').classList.toggle('hidden', !p);
+  if (!p) return;
+  const now = Date.now() + sessOffset;
+  const total = (p.phase === 'focus' ? p.focusMin : (p.count % 4 === 0 ? p.longBreakMin : p.breakMin)) * 60000;
+  const left = p.phaseEndsAt ? Math.max(0, p.phaseEndsAt - now) : (p.remainingMs ?? total);
+  const m = Math.floor(left / 60000), sec = Math.floor((left % 60000) / 1000);
+  $('#pomoTime').textContent = `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  $('#pomoPhase').textContent = p.phase === 'focus' ? (p.phaseEndsAt ? 'Focus' : 'În pauză') : 'Pauză';
+  $('#pomoBox').classList.toggle('break', p.phase === 'break');
+  $('#pomoFill').style.strokeDashoffset = (326.7 * (1 - left / total)).toFixed(1);
+  const rounds = Math.max(4, Math.ceil((p.count + 1) / 4) * 4);
+  $('#pomoDots').replaceChildren(...[...Array(rounds)].map((_, i) => el('i', { className: i < p.count ? 'on' : '' })));
+  $('#pomoNext').textContent = `${p.label} · ${p.focusMin}/${p.breakMin} min · ${p.count} ${p.count === 1 ? 'rundă' : 'runde'}`;
+}
+
 function tickSession() {
+  renderPomo();
   if (!session) return;
   $('#sessElapsed').textContent = fmtClock(sessElapsed());
   $('#sessMeta').textContent = (session.pausedAt ? 'În pauză · ' : 'Început la ') +
@@ -516,8 +553,15 @@ function renderDay(key) {
   );
 }
 
+let focusMode = '';
+$('#sessModes').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  focusMode = b.dataset.mode;
+  $('#sessModes').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+});
 $('#sessStart').addEventListener('click', async () => {
-  setSession(await api.session.start($('#sessTitle').value));
+  setSession(await api.session.start($('#sessTitle').value, focusMode || undefined));
   $('#sessTitle').value = '';
   renderReport(null);
 });
@@ -529,6 +573,7 @@ $('#sessStop').addEventListener('click', () => api.session.stop());
 $('#sessTimerVis').addEventListener('click', () => (session?.timerVisible ? api.timer.hide() : api.timer.show()));
 api.session.onChange(setSession);
 api.session.onEnded(rep => { renderReport(rep); loadHistory(); showTab('timer'); $('#tab-timer .scroll').scrollTop = 0; });
+api.session.onPhase(({ phase }) => toast(phase === 'break' ? 'Pauză! Ridică-te și respiră.' : 'Înapoi la focus'));
 api.session.onHour(({ hours }) => toast(hours === 1 ? '1 Hour has passed' : `${hours} Hours have passed`));
 api.timer.onVisible(setTimerVisible);
 setInterval(tickSession, 500);
@@ -657,6 +702,291 @@ $('#mailBrief').addEventListener('click', async () => {
   $('#mailBrief').disabled = false;
 });
 
+// ---------- Azi (planner) ----------
+
+const MOODS = [['radiant', 'Radiantă'], ['bine', 'Bine'], ['ok', 'Ok'], ['obosit', 'Obosită'], ['stresat', 'Stresată']];
+const WEEK_LETTERS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+let td = null;
+let tdSaveTimer = null;
+
+function greetingLine() {
+  const h = new Date().getHours();
+  const g = h < 12 ? 'Bună dimineața' : h < 18 ? 'Bună ziua' : 'Bună seara';
+  return settings.userName ? `${g}, ${settings.userName}.` : `${g}.`;
+}
+
+function renderToday() {
+  if (!td) return;
+  const day = td.day;
+  $('#tdDate').textContent = new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' });
+  $('#tdHello').textContent = greetingLine();
+  if (document.activeElement !== $('#tdIntention')) $('#tdIntention').value = day.intention;
+  if (document.activeElement !== $('#tdGratitude')) $('#tdGratitude').value = day.gratitude;
+
+  // Top 3
+  const box = $('#tdTop3');
+  if (!box.children.length) {
+    for (let i = 0; i < 3; i++) {
+      const chk = el('button', { className: 'check-round', title: 'Bifează' });
+      const inp = el('input', { type: 'text', placeholder: ['Cel mai important lucru de azi', 'A doua prioritate', 'A treia prioritate'][i], maxLength: 80 });
+      chk.onclick = () => {
+        const top3 = td.day.top3.map((t, j) => (j === i ? { ...t, done: !t.done } : t));
+        saveToday({ top3 }, true);
+      };
+      inp.oninput = () => {
+        td.day.top3[i].text = inp.value;
+        saveToday({ top3: td.day.top3 });
+      };
+      box.append(el('div', { className: 't' }, [el('span', { className: 'num', textContent: i + 1 }), chk, inp]));
+    }
+  }
+  [...box.children].forEach((row, i) => {
+    const t = day.top3[i];
+    row.classList.toggle('done', t.done);
+    row.children[1].classList.toggle('on', t.done);
+    const inp = row.children[2];
+    if (document.activeElement !== inp) inp.value = t.text;
+  });
+
+  // ritualuri
+  const todayIdx = (new Date().getDay() + 6) % 7;
+  $('#tdDays').replaceChildren(...WEEK_LETTERS.map((l, i) => el('span', { className: i === todayIdx ? 'today' : '', textContent: l })));
+  $('#tdHabits').replaceChildren(...td.habits.map(hb => el('div', { className: 'habit' }, [
+    el('span', { className: 'name', textContent: hb.name, title: hb.name }),
+    el('span', { className: 'dots' }, hb.week.map((on, i) => el('button', {
+      className: (on ? 'on' : '') + (i === todayIdx ? ' today' : '') + (i > todayIdx ? ' future' : ''),
+      title: WEEK_LETTERS[i],
+      disabled: i > todayIdx,
+      onclick: async () => { td = await api.today.toggleHabit(hb.id, td.weekKeys[i]); renderToday(); }
+    }))),
+    el('span', { className: 'meta' }, [
+      hb.streak > 1 ? `${hb.streak} zile` : '',
+      el('button', { className: 'del', textContent: '×', title: 'Șterge ritualul', onclick: async () => {
+        if (!await askConfirm(`Ștergi ritualul „${hb.name}”?`)) return;
+        td = await api.today.removeHabit(hb.id);
+        renderToday();
+      } })
+    ])
+  ])));
+
+  // apă
+  $('#tdWater').replaceChildren(...[...Array(8)].map((_, i) => el('button', {
+    className: i < day.water ? 'on' : '',
+    title: `${i + 1} ${i ? 'pahare' : 'pahar'}`,
+    onclick: () => saveToday({ water: day.water === i + 1 ? i : i + 1 }, true)
+  })));
+  $('#tdWaterText').textContent = `${day.water}/8 pahare`;
+
+  // stare
+  $('#tdMoods').replaceChildren(...MOODS.map(([k, label]) => el('button', {
+    className: day.mood === k ? 'on' : '',
+    textContent: label,
+    onclick: () => saveToday({ mood: day.mood === k ? '' : k }, true)
+  })));
+
+  $('#tdQuote').replaceChildren(`„${td.quote.text}”`, el('span', { textContent: td.quote.author }));
+}
+
+async function saveToday(patch, now = false) {
+  Object.assign(td.day, patch);
+  if (now) renderToday();
+  clearTimeout(tdSaveTimer);
+  const run = async () => {
+    const res = await api.today.update(patch.top3 ? { ...patch, top3: td.day.top3 } : patch);
+    td = { ...res, day: { ...res.day, ...pendingText() } };
+    renderToday();
+  };
+  if (now) run();
+  else tdSaveTimer = setTimeout(run, 500);
+}
+
+// păstrăm ce se scrie în timp ce salvarea e pe drum
+function pendingText() {
+  const out = {};
+  if (document.activeElement === $('#tdIntention')) out.intention = $('#tdIntention').value;
+  if (document.activeElement === $('#tdGratitude')) out.gratitude = $('#tdGratitude').value;
+  return out;
+}
+
+async function loadToday() {
+  td = await api.today.state();
+  renderToday();
+}
+
+$('#tdIntention').addEventListener('input', e => saveToday({ intention: e.target.value }));
+$('#tdGratitude').addEventListener('input', e => saveToday({ gratitude: e.target.value }));
+$('#tdHabitForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('#tdHabitName').value.trim();
+  if (!name) return;
+  td = await api.today.addHabit(name);
+  $('#tdHabitName').value = '';
+  renderToday();
+});
+
+// carduri
+function segValue(id) { return $(`#${id} button.on`).dataset.v; }
+document.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+}));
+$('#cardMake').addEventListener('click', async () => {
+  $('#cardMake').disabled = true;
+  $('#cardMake').lastChild.textContent = 'Se creează…';
+  const res = await api.card.make(segValue('cardKind'), segValue('cardFormat'));
+  $('#cardMake').disabled = false;
+  $('#cardMake').lastChild.textContent = 'Creează cardul';
+  if (!res.ok) return toast('⚠ ' + res.error);
+  $('#cardPreview').classList.remove('hidden');
+  $('#cardImg').src = res.dataUrl;
+  $('#cardPath').textContent = res.file;
+  toast('Cardul e gata');
+});
+$('#cardCopy').addEventListener('click', async () => { if (await api.card.copy()) toast('Imaginea e în clipboard. Lipește-o în Instagram sau WhatsApp.'); });
+$('#cardShow').addEventListener('click', () => api.card.show());
+
+// ---------- sunete de focus (generate, fără fișiere audio) ----------
+
+const sound = { ctx: null, master: null, nodes: [], current: '' };
+
+function noiseBuffer(ctx, kind, seconds = 4) {
+  const len = ctx.sampleRate * seconds;
+  const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    let last = 0, b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (let i = 0; i < len; i++) {
+      const w = Math.random() * 2 - 1;
+      if (kind === 'brown') {
+        last = (last + 0.02 * w) / 1.02;
+        d[i] = last * 3.5;
+      } else if (kind === 'pink') {
+        b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
+        b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
+        d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
+        b6 = w * 0.115926;
+      } else if (kind === 'crackle') {
+        d[i] = Math.random() < 0.0004 ? (Math.random() * 2 - 1) * 0.9 : d[i - 1] * 0.86 || 0;
+      }
+    }
+  }
+  return buf;
+}
+
+function loop(buf) {
+  const src = sound.ctx.createBufferSource();
+  src.buffer = buf;
+  src.loop = true;
+  src.start();
+  sound.nodes.push(src);
+  return src;
+}
+
+function filter(type, freq, q = 0.7) {
+  const f = sound.ctx.createBiquadFilter();
+  f.type = type;
+  f.frequency.value = freq;
+  f.Q.value = q;
+  return f;
+}
+
+function stopSound() {
+  sound.nodes.forEach(n => { try { n.stop ? n.stop() : n.disconnect(); } catch {} });
+  sound.nodes = [];
+  sound.current = '';
+}
+
+function playSound(kind) {
+  if (!sound.ctx) {
+    sound.ctx = new AudioContext();
+    sound.master = sound.ctx.createGain();
+    sound.master.connect(sound.ctx.destination);
+  }
+  stopSound();
+  const ctx = sound.ctx;
+  sound.master.gain.value = Number($('#soundVol').value);
+  const out = ctx.createGain();
+  out.connect(sound.master);
+  sound.nodes.push(out);
+  if (kind === 'rain') {
+    const hp = filter('highpass', 400), lp = filter('lowpass', 6500);
+    loop(noiseBuffer(ctx, 'pink')).connect(hp); hp.connect(lp); lp.connect(out);
+    const g = ctx.createGain(); g.gain.value = 0.35;
+    const drops = filter('bandpass', 2500, 1.2);
+    loop(noiseBuffer(ctx, 'crackle', 3)).connect(drops); drops.connect(g); g.connect(out);
+    out.gain.value = 0.9;
+  } else if (kind === 'brown') {
+    const lp = filter('lowpass', 900);
+    loop(noiseBuffer(ctx, 'brown')).connect(lp); lp.connect(out);
+    out.gain.value = 0.9;
+  } else if (kind === 'ocean') {
+    const lp = filter('lowpass', 650);
+    const waveGain = ctx.createGain(); waveGain.gain.value = 0.55;
+    loop(noiseBuffer(ctx, 'brown', 6)).connect(lp); lp.connect(waveGain); waveGain.connect(out);
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.09;
+    const depth = ctx.createGain(); depth.gain.value = 0.45;
+    lfo.connect(depth); depth.connect(waveGain.gain); lfo.start();
+    sound.nodes.push(lfo);
+    out.gain.value = 1;
+  } else if (kind === 'fire') {
+    const lp = filter('lowpass', 500);
+    const base = ctx.createGain(); base.gain.value = 0.5;
+    loop(noiseBuffer(ctx, 'brown')).connect(lp); lp.connect(base); base.connect(out);
+    const crack = filter('highpass', 1200);
+    const cg = ctx.createGain(); cg.gain.value = 0.8;
+    loop(noiseBuffer(ctx, 'crackle', 5)).connect(crack); crack.connect(cg); cg.connect(out);
+    out.gain.value = 0.9;
+  }
+  sound.current = kind;
+}
+
+$('#soundList').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  const kind = b.dataset.sound;
+  if (sound.current === kind) stopSound();
+  else playSound(kind);
+  document.querySelectorAll('#soundList button').forEach(x => x.classList.toggle('on', x.dataset.sound === sound.current));
+});
+$('#soundVol').addEventListener('input', e => { if (sound.master) sound.master.gain.value = Number(e.target.value); });
+
+// ---------- ghid de bun venit ----------
+
+let obStep = 0;
+function showOnboarding() {
+  obStep = 0;
+  $('#obName').value = settings.userName || '';
+  $('#obGoal').value = settings.weeklyGoalHours ?? 40;
+  $('#obBrief').checked = settings.morningBrief;
+  $('#obSpeech').checked = settings.buddySpeech;
+  renderOb();
+  $('#onboard').classList.remove('hidden');
+  setTimeout(() => $('#obName').focus(), 100);
+}
+function renderOb() {
+  document.querySelectorAll('.ob-step').forEach(s => s.classList.toggle('hidden', Number(s.dataset.step) !== obStep));
+  document.querySelectorAll('#obDots i').forEach((d, i) => d.classList.toggle('on', i === obStep));
+  $('#obNext').textContent = obStep === 2 ? 'Începem' : 'Continuă';
+}
+async function finishOnboarding() {
+  settings = await api.onboarding.done({
+    userName: $('#obName').value.trim(),
+    weeklyGoalHours: Math.max(0, Math.min(100, Number($('#obGoal').value) || 0)),
+    morningBrief: $('#obBrief').checked,
+    buddySpeech: $('#obSpeech').checked
+  });
+  $('#onboard').classList.add('hidden');
+  renderSettings();
+  renderToday();
+}
+$('#obNext').addEventListener('click', () => {
+  if (obStep < 2) { obStep++; renderOb(); } else finishOnboarding();
+});
+$('#obSkip').addEventListener('click', finishOnboarding);
+$('#obName').addEventListener('keydown', e => { if (e.key === 'Enter') $('#obNext').click(); });
+api.onboarding.onShow(showOnboarding);
+
 // ---------- setări ----------
 
 function fillProviderSelect() {
@@ -689,6 +1019,7 @@ function renderSettings() {
   $('#sSystemPrompt').value = settings.aiSystemPrompt;
   $('#sMaxTokens').value = settings.aiMaxTokens;
   $('#sName').value = settings.buddyName;
+  if (document.activeElement !== $('#sUserName')) $('#sUserName').value = settings.userName || '';
   $('#sScale').value = settings.buddyScale;
   $('#sScaleVal').textContent = `${Math.round(settings.buddyScale * 100)}%`;
   $('#sOnTop').checked = settings.alwaysOnTop;
@@ -759,12 +1090,14 @@ $('#sApiKeySave').addEventListener('click', async () => {
   toast('Cheia API a fost salvată');
 });
 $('#sApiKeyDelete').addEventListener('click', async () => {
-  if (!confirm('Ștergi cheia API salvată?')) return;
+  if (!await askConfirm('Ștergi cheia API salvată?')) return;
   settings = await api.settings.setApiKey('');
   renderSettings();
   toast('Cheia API a fost ștearsă');
 });
 
+$('#sUserName').addEventListener('change', e => update({ userName: e.target.value.trim() }).then(renderToday));
+$('#sGuide').addEventListener('click', showOnboarding);
 $('#sName').addEventListener('change', e => update({ buddyName: e.target.value.trim() || 'Mady' }));
 $('#sScale').addEventListener('input', e => { $('#sScaleVal').textContent = `${Math.round(e.target.value * 100)}%`; });
 $('#sScale').addEventListener('change', e => update({ buddyScale: Number(e.target.value) }));
@@ -775,7 +1108,7 @@ $('#sClipLimit').addEventListener('change', e => update({ clipboardLimit: Number
 $('#sTheme').addEventListener('change', e => update({ theme: e.target.value }));
 $('#sHideOnBlur').addEventListener('change', e => update({ hidePanelOnBlur: e.target.checked }));
 $('#sReset').addEventListener('click', async () => {
-  if (!confirm('Resetezi toate setările la valorile implicite? (cheia API rămâne)')) return;
+  if (!await askConfirm('Resetezi toate setările la valorile implicite? (cheia API rămâne)', 'Da, resetează')) return;
   settings = await api.settings.reset();
   renderSettings();
   toast('Setări resetate');
@@ -810,7 +1143,7 @@ $('#sMailPassSave').addEventListener('click', async () => {
   toast('Parola de aplicație a fost salvată');
 });
 $('#sMailPassDelete').addEventListener('click', async () => {
-  if (!confirm('Ștergi parola de aplicație salvată?')) return;
+  if (!await askConfirm('Ștergi parola de aplicație salvată?')) return;
   settings = await api.mail.setPassword('');
   renderSettings();
   toast('Parola a fost ștearsă');
@@ -835,5 +1168,6 @@ api.settings.onUpdate(s => { settings = s; renderSettings(); });
   renderChat(await api.ai.history());
   setSession(await api.session.current());
   loadHistory();
+  loadToday();
   setInterval(renderClipboard, 60000);
 })();

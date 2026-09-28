@@ -17,6 +17,31 @@ iar când dai click pe ea se deschide un panou mic (ca un tray) cu:
 - **⚙️ Setări** – provider AI, model, API key (salvată criptat), system prompt, numele și mărimea
   roboțelului, „mereu deasupra”, pornire cu Windows, clipboard, temă.
 
+## Azi: planner-ul zilei
+
+Primul tab din panou, inspirat din planner-ele „aesthetic” de productivitate:
+
+- **Salut personalizat** și **intenția zilei** („calm, clar, curajos”).
+- **Top 3 priorități** cu bife rotunde. Când le termini pe toate, Mady sărbătorește.
+- **Ritualuri (habit tracker):** săptămâna ca puncte aurii, cu serii („3 zile”); ritualurile se adaugă și se șterg liber.
+- **Apă** (8 pahare), **stare** (radiantă / bine / ok / obosită / stresată) și **recunoștință**.
+- **Citatul zilei** (Seneca, da Vinci, Buffett, Audrey Hepburn…).
+- **Împărtășește:** cardul **„Ziua mea”** sau **„Săptămâna mea”**, în format **Post 4:5** (1080×1350) sau
+  **Story 9:16** (1080×1920), salvat în `Imagini\Desktop Buddy` și copiat cu un click, gata de pus pe Instagram.
+
+## Focus mode
+
+- La pornirea unei sesiuni alegi **Liber**, **Pomodoro 25/5**, **Deep work 50/10** sau **Flow 90/20**.
+- Inel de progres, runde marcate cu puncte aurii; la final de rundă, pauza pornește singură (sesiunea se
+  oprește, deci statisticile numără doar focusul), cu pauză lungă după 4 runde. Mady te anunță la fiecare
+  trecere; timerul plutitor arată „Focus · runda 2” sau „Pauză” și timpul rămas.
+- **Sunete de focus:** ploaie, zgomot maro, ocean, șemineu. Sunt generate în aplicație (fără fișiere audio), cu volum.
+
+## Prima pornire
+
+Un ghid de bun venit în 3 pași: cum să-ți spună Mady, obiectivul săptămânal și trucurile de bază.
+Se poate relua din Setări → **Ghid de bun venit**.
+
 ## Sticky notes
 
 Orice notiță poate fi lipită pe desktop (butonul **Pe desktop** din editor, butonul cu notiță din
@@ -140,6 +165,8 @@ desktop-buddy/
 ├── src/mailscan.js    # scanarea automată orară + notificarea
 ├── src/mood.js        # stările lui Mady și replicile ei
 ├── src/briefing.js    # briefingul de dimineață
+├── src/today.js       # planner-ul zilei: Top 3, ritualuri, apă, stare, citate
+├── src/cards.js       # cardurile de Instagram (randate offscreen în PNG)
 ├── renderer/sticky.*  # notițele lipite pe desktop
 ├── renderer/          # HTML/CSS/JS pentru roboțel și panou
 ├── assets/            # buddy.svg, icon.svg, icon.png, icon.ico

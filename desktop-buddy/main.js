@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, clipboard, screen, Tray, Menu, nativeImage, shell, Notification, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, clipboard, ClipboardItem, screen, Tray, Menu, nativeImage, shell, Notification, globalShortcut } = require('electron');
 const path = require('path');
 const crypto = require('crypto');
 const store = require('./src/store');
@@ -8,11 +8,13 @@ const mail = require('./src/mail');
 const mailscan = require('./src/mailscan');
 const mood = require('./src/mood');
 const briefing = require('./src/briefing');
+const today = require('./src/today');
+const cards = require('./src/cards');
 
 const BUDDY_W = 170;
 const BUDDY_H = 210;
-const PANEL_W = 440;
-const PANEL_H = 620;
+const PANEL_W = 480;
+const PANEL_H = 640;
 const TIMER_W = 310;
 const TIMER_H = 66;
 const BUBBLE_W = 280;
@@ -33,6 +35,7 @@ let bubbleTab = null;
 let bubbleHeight = 90;
 let quickWin = null;
 let lastSessionId = null;
+let lastCard = null;
 const stickyWins = new Map(); // id notiță → fereastră
 let tray = null;
 let clipboardTimer = null;
@@ -444,6 +447,7 @@ function createTray() {
     { label: 'Arată roboțelul', click: showBuddy },
     { label: 'Ascunde roboțelul', click: () => buddyWin && buddyWin.hide() },
     { label: `Întreab-o pe Mady (${hotkeyLabel(settings().quickHotkey)})`, click: () => openQuick() },
+    { label: 'Azi (planner)', click: () => togglePanel('today') },
     { label: 'Notiță nouă pe desktop', click: newSticky },
     { label: 'Arată notițele lipite', click: showAllStickies },
     { label: 'Timer și statistici', click: () => togglePanel('timer') },
@@ -648,7 +652,8 @@ function registerIpc() {
 
   // sesiuni / timer
   ipcMain.handle('session:current', () => currentSessionState());
-  ipcMain.handle('session:start', (_e, title) => { sessions.start(title); return currentSessionState(); });
+  ipcMain.handle('session:start', (_e, title, mode) => { sessions.start(title, mode); return currentSessionState(); });
+  ipcMain.handle('session:modes', () => sessions.FOCUS_MODES);
   ipcMain.handle('session:pause', () => { sessions.pause(); return currentSessionState(); });
   ipcMain.handle('session:resume', () => { sessions.resume(); return currentSessionState(); });
   ipcMain.handle('session:stop', () => sessions.stop());
@@ -724,6 +729,60 @@ function registerIpc() {
     } catch (err) {
       return { ok: false, error: err.message };
     }
+  });
+
+  // planner-ul zilei
+  ipcMain.handle('today:state', () => today.state());
+  ipcMain.handle('today:update', (_e, patch) => {
+    const before = today.getDay();
+    const day = today.updateDay(patch || {});
+    const filled = day.top3.filter(t => t.text.trim());
+    const wasAll = before.top3.filter(t => t.text.trim()).every(t => t.done);
+    if (filled.length === 3 && filled.every(t => t.done) && !(wasAll && before.top3.filter(t => t.text.trim()).length === 3)) {
+      say(mood.line('top3Done'), { state: 'celebrate', ms: 10000 });
+    }
+    if (patch && 'water' in patch && day.water === 8 && before.water < 8) say(mood.line('waterDone'), { state: 'happy', ms: 7000 });
+    return today.state();
+  });
+  ipcMain.handle('habit:toggle', (_e, id, k) => {
+    const res = today.toggleHabit(id, k);
+    const h = res.find(x => x.id === id);
+    if (h && h.streak >= 3 && (!k || k === today.key()) && h.week[(new Date().getDay() + 6) % 7]) {
+      say(mood.line('streak', { n: h.streak, name: h.name }), { state: 'happy', ms: 7000 });
+    }
+    return today.state();
+  });
+  ipcMain.handle('habit:add', (_e, name) => { today.addHabit(name); return today.state(); });
+  ipcMain.handle('habit:remove', (_e, id) => { today.removeHabit(id); return today.state(); });
+
+  // carduri de împărtășit
+  ipcMain.handle('card:make', async (_e, kind, format) => {
+    try {
+      lastCard = await cards.render(kind, format);
+      return { ok: true, file: lastCard.file, dataUrl: lastCard.dataUrl };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+  ipcMain.handle('card:copy', async () => {
+    if (!lastCard) return false;
+    // Electron 44: clipboard-ul primește imaginea ca ClipboardItem (PNG)
+    const png = lastCard.image.toPNG();
+    await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
+    return true;
+  });
+  ipcMain.on('card:show', () => { if (lastCard) shell.showItemInFolder(lastCard.file); });
+
+  // ghidul de bun venit
+  ipcMain.handle('onboarding:done', (_e, patch) => {
+    const allowed = ['userName', 'weeklyGoalHours', 'morningBrief', 'buddySpeech'];
+    for (const k of allowed) if (patch && k in patch) settings()[k] = patch[k];
+    store.get().onboarded = true;
+    store.save();
+    broadcast('settings:updated', publicSettings());
+    const n = settings().userName;
+    say(`${n ? `Încântată, ${n}.` : 'Încântată.'} De acum mă ocup eu de ordine, tu de strălucire.`, { state: 'celebrate', ms: 9000 });
+    return publicSettings();
   });
 
   // sticky notes
@@ -856,7 +915,8 @@ function currentSessionState() {
   if (!s) return null;
   return {
     id: s.id, title: s.title, start: s.start, pausedMs: s.pausedMs, pausedAt: s.pausedAt,
-    activeSec: s.activeSec, now: Date.now(), timerVisible: !!timerWin && !timerHidden
+    activeSec: s.activeSec, now: Date.now(), timerVisible: !!timerWin && !timerHidden,
+    pomo: s.pomo ? { ...s.pomo } : null
   };
 }
 
@@ -874,7 +934,21 @@ function initSessions() {
       const text = hours === 1 ? '1 Hour has passed' : `${hours} Hours have passed`;
       notify(text, `„${s.title}” – ${hours === 1 ? 'o oră' : hours + ' ore'} de lucru. Ia o pauză scurtă și continuă.`);
       broadcast('session:hour', { hours, title: s.title });
+      if (s.pomo) return; // în modul Pomodoro pauzele vin oricum la timp
       say(mood.line('hour'), { state: 'happy', ms: 9000 });
+    },
+    onPhase(phase, s) {
+      const p = s.pomo;
+      if (phase === 'break') {
+        const long = p.count % 4 === 0;
+        const min = long ? p.longBreakMin : p.breakMin;
+        notify(`Pauză${long ? ' lungă' : ''}: ${min} minute`, `Runda ${p.count} de focus e gata. Ridică-te, respiră, bea apă.`);
+        say(mood.line(long ? 'longBreak' : 'breakStart', { min, n: p.count }), { state: 'celebrate', ms: 12000 });
+      } else {
+        notify('Înapoi la focus', `Runda ${p.count + 1}: ${p.focusMin} minute pentru „${s.title}”.`);
+        say(mood.line('focusBack', { min: p.focusMin }), { ms: 8000 });
+      }
+      broadcast('session:phase', { phase, pomo: { ...p } });
     },
     onEnd(rep) {
       notify('Sesiune încheiată', `„${rep.title}”: ${sessions.fmt(rep.durationSec)} total, ${sessions.fmt(rep.activeSec)} activ.`);
@@ -983,6 +1057,12 @@ if (!app.requestSingleInstanceLock()) {
     restoreStickies();
     // la pornire: briefingul zilei (dacă n-a fost încă) sau un salut
     setTimeout(async () => {
+      if (!store.get().onboarded) {
+        togglePanel('today');
+        panelWin.webContents.send('onboarding:show');
+        say('Bună! Sunt Mady, noua ta asistentă. Hai să ne cunoaștem.', { state: 'happy', ms: 9000 });
+        return;
+      }
       if (briefing.due()) await runBriefing();
       else say(mood.line('welcome'), { state: 'happy', ms: 7000 });
     }, 4000);

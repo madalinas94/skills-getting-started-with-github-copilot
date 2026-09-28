@@ -36,6 +36,31 @@ const LINES = {
     'Pauza a fost binemeritată. Acum, înapoi la treabă.',
     'Te așteptam. Continuăm?'
   ],
+  breakStart: [
+    'Runda {n} gata. {min} minute de pauză: ridică-te, respiră, bea apă.',
+    'Excelent. Pauză de {min} minute, fără telefon dacă poți.',
+    'Focus bifat. Acum {min} minute doar pentru tine.'
+  ],
+  longBreak: [
+    'Patru runde! Meriți o pauză lungă de {min} minute. O cafea ca lumea?',
+    'Impresionant. {min} minute de pauză lungă. Plimbă-te puțin.'
+  ],
+  focusBack: [
+    'Pauza s-a terminat. Încă {min} minute de focus, elegant și concentrat.',
+    'Înapoi la treabă. Următoarele {min} minute sunt ale obiectivului tău.'
+  ],
+  top3Done: [
+    'Toate cele trei priorități bifate. Asta e o zi de manual.',
+    'Top 3 complet. Restul zilei e bonus. Sunt mândră de tine.'
+  ],
+  waterDone: [
+    'Opt pahare. Hidratată și strălucitoare.',
+    'Obiectivul de apă atins. Pielea ta îți mulțumește.'
+  ],
+  streak: [
+    '{n} zile la rând: „{name}”. Așa se construiește un stil de viață.',
+    'Seria continuă: {n} zile de „{name}”. Nu o rupe.'
+  ],
   spontaneous: [
     'Monet spunea că pictează așa cum cântă o pasăre. Tu lucrezi la fel de natural azi?',
     'Randamentul compus e a opta minune a lumii. Valabil și pentru obiceiuri.',

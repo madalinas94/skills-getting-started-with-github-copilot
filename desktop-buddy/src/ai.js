@@ -95,7 +95,7 @@ async function chat(messages, settings, apiKey, systemOverride) {
   const opts = {
     apiKey,
     model: settings.aiModel,
-    system: systemOverride || settings.aiSystemPrompt,
+    system: systemOverride || (settings.aiSystemPrompt + (settings.userName ? `\n\nUtilizatorul se numește ${settings.userName}.` : '')),
     messages: normalize(messages),
     maxTokens: Number(settings.aiMaxTokens) || 1024,
     baseUrl: settings.aiBaseUrl

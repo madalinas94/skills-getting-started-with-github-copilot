@@ -33,12 +33,14 @@ const DEFAULT_DATA = {
     morningBrief: true,
     briefVoice: false,
     weeklyGoalHours: 40,
-    quickHotkey: 'CommandOrControl+Shift+Space'
+    quickHotkey: 'CommandOrControl+Shift+Space',
+    userName: ''
   },
   apiKeyEncrypted: '',
   mailPasswordEncrypted: '',
   mailLastScan: null,
   lastBriefDate: '',
+  onboarded: false,
   buddyPosition: null,
   timerPosition: null,
   timerOpacity: 1,

@@ -31,6 +31,12 @@
       <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1"/></symbol>
       <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/></symbol>
       <symbol id="i-sticky" viewBox="0 0 24 24"><path d="M5 4.5h14v10l-5 5H5z"/><path d="M14 19.5v-5h5"/><path d="M9 3v3.5M15 3v3.5" /></symbol>
+      <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3.5s6 6.4 6 10.5a6 6 0 0 1-12 0c0-4.1 6-10.5 6-10.5z"/></symbol>
+      <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 12v7.5h14V12"/></symbol>
+      <symbol id="i-rain" viewBox="0 0 24 24"><path d="M7 14a4 4 0 0 1 .5-8 5.5 5.5 0 0 1 10.3 1.8A3.2 3.2 0 0 1 17.5 14z"/><path d="M8.5 17l-1 2.5M12.5 17l-1 2.5M16.5 17l-1 2.5"/></symbol>
+      <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 10c2.5-2.5 4.5-2.5 7 0s4.5 2.5 7 0 3.5-1.5 4-1M3 15c2.5-2.5 4.5-2.5 7 0s4.5 2.5 7 0 3.5-1.5 4-1"/></symbol>
+      <symbol id="i-fire" viewBox="0 0 24 24"><path d="M12 20.5a6 6 0 0 0 6-6c0-4-3.5-6-3.5-10-2 1-5.5 4-5.5 8-1-1-1.5-2-1.5-3C6 11 6 13 6 14.5a6 6 0 0 0 6 6z"/></symbol>
+      <symbol id="i-noise" viewBox="0 0 24 24"><path d="M3 12h2l2-5 3 10 3-12 3 12 2-5h3"/></symbol>
       <symbol id="i-new" viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M13.5 7.5l3 3"/></symbol>
     </defs>
   </svg>
@@ -46,7 +52,8 @@
     </header>
 
     <nav class="tabs">
-      <button data-tab="clipboard" class="active"><svg class="ic"><use href="#i-clip"/></svg><span>Clipboard</span></button>
+      <button data-tab="today" class="active"><svg class="ic"><use href="#i-sun"/></svg><span>Azi</span></button>
+      <button data-tab="clipboard"><svg class="ic"><use href="#i-clip"/></svg><span>Clipboard</span></button>
       <button data-tab="notes"><svg class="ic"><use href="#i-quill"/></svg><span>Notițe</span></button>
       <button data-tab="ai"><svg class="ic"><use href="#i-spark"/></svg><span>Asistent</span></button>
       <button data-tab="timer"><svg class="ic"><use href="#i-clock"/></svg><span>Timer</span></button>
@@ -54,8 +61,63 @@
       <button data-tab="settings"><svg class="ic"><use href="#i-sliders"/></svg><span>Setări</span></button>
     </nav>
 
+    <!-- AZI (planner) -->
+    <section id="tab-today" class="tab active">
+      <div class="scroll today">
+        <div class="hero">
+          <div class="kicker" id="tdDate"></div>
+          <div class="hello" id="tdHello"></div>
+          <input id="tdIntention" class="intention" placeholder="Intenția zilei: calm, clar, curajos…" maxlength="90">
+        </div>
+
+        <h3>Top 3 priorități</h3>
+        <div class="top3" id="tdTop3"></div>
+
+        <h3>Ritualuri</h3>
+        <div class="habits">
+          <div class="habit-head"><span></span><span class="days" id="tdDays"></span><span></span></div>
+          <div id="tdHabits"></div>
+          <form class="habit-add" id="tdHabitForm"><input id="tdHabitName" placeholder="+ Adaugă un ritual (ex: Meditație 10 min)" maxlength="40"></form>
+        </div>
+
+        <div class="duo">
+          <div>
+            <h3>Apă</h3>
+            <div class="water" id="tdWater"></div>
+            <div class="muted" id="tdWaterText"></div>
+          </div>
+          <div>
+            <h3>Stare</h3>
+            <div class="moods" id="tdMoods"></div>
+          </div>
+        </div>
+
+        <h3>Recunoștință</h3>
+        <input id="tdGratitude" class="intention" placeholder="Azi sunt recunoscătoare pentru…" maxlength="140">
+
+        <div class="quote-card" id="tdQuote"></div>
+
+        <h3>Împărtășește</h3>
+        <div class="card share">
+          <div class="row wrap">
+            <div class="seg" id="cardKind"><button data-v="day" class="on">Ziua mea</button><button data-v="week">Săptămâna mea</button></div>
+            <div class="seg" id="cardFormat"><button data-v="post" class="on">Post 4:5</button><button data-v="story">Story 9:16</button></div>
+          </div>
+          <button class="btn" id="cardMake"><svg class="ic"><use href="#i-share"/></svg>Creează cardul</button>
+          <div class="card-preview hidden" id="cardPreview">
+            <img id="cardImg" alt="Card">
+            <div class="row wrap">
+              <button class="btn small" id="cardCopy">Copiază imaginea</button>
+              <button class="btn small ghost" id="cardShow">Arată în folder</button>
+            </div>
+            <span class="muted" id="cardPath"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- CLIPBOARD -->
-    <section id="tab-clipboard" class="tab active">
+    <section id="tab-clipboard" class="tab">
       <div class="toolbar">
         <input type="search" id="clipSearch" placeholder="Caută în clipboard…">
         <button class="btn ghost square" id="clipClear" title="Șterge tot (fără cele fixate)"><svg class="ic"><use href="#i-trash"/></svg></button>
@@ -106,6 +168,12 @@
       <div class="scroll">
         <div id="sessIdle" class="card">
           <div class="kicker">Sesiune nouă</div>
+          <div class="modes" id="sessModes">
+            <button data-mode="" class="on"><b>Liber</b><span>fără limită</span></button>
+            <button data-mode="pomodoro"><b>Pomodoro</b><span>25 · 5</span></button>
+            <button data-mode="deep"><b>Deep work</b><span>50 · 10</span></button>
+            <button data-mode="flow"><b>Flow</b><span>90 · 20</span></button>
+          </div>
           <div class="row">
             <input id="sessTitle" placeholder="Titlul sesiunii (ex: Raport Q3)" maxlength="80">
             <button class="btn" id="sessStart"><svg class="ic"><use href="#i-play"/></svg>Începe</button>
@@ -115,6 +183,17 @@
         <div id="sessActive" class="card hidden">
           <div class="kicker">În desfășurare</div>
           <div class="sess-title" id="sessActiveTitle"></div>
+          <div class="pomo hidden" id="pomoBox">
+            <div class="pomo-ring">
+              <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" class="track"/><circle cx="60" cy="60" r="52" class="fill" id="pomoFill"/></svg>
+              <div class="pomo-center"><b id="pomoTime">25:00</b><span id="pomoPhase">Focus</span></div>
+            </div>
+            <div class="pomo-side">
+              <div class="kicker">Runde</div>
+              <div class="pomo-dots" id="pomoDots"></div>
+              <div class="muted" id="pomoNext"></div>
+            </div>
+          </div>
           <div class="big-time" id="sessElapsed">00:00:00</div>
           <div class="muted" id="sessMeta"></div>
           <div class="row wrap">
@@ -125,6 +204,16 @@
         </div>
 
         <div id="sessReport" class="card report hidden"></div>
+
+        <div class="card sounds">
+          <div class="row"><div class="kicker">Sunete de focus</div><input type="range" id="soundVol" min="0" max="1" step="0.05" value="0.5" title="Volum"></div>
+          <div class="sound-list" id="soundList">
+            <button data-sound="rain"><svg class="ic"><use href="#i-rain"/></svg>Ploaie</button>
+            <button data-sound="brown"><svg class="ic"><use href="#i-noise"/></svg>Zgomot maro</button>
+            <button data-sound="ocean"><svg class="ic"><use href="#i-wave"/></svg>Ocean</button>
+            <button data-sound="fire"><svg class="ic"><use href="#i-fire"/></svg>Șemineu</button>
+          </div>
+        </div>
 
         <h3>Săptămâna aceasta</h3>
         <div class="week">
@@ -248,7 +337,10 @@
         <label class="check"><input type="checkbox" id="sMailNotifyEmpty"> Notifică și când nu am emailuri noi</label>
 
         <h3>Mady</h3>
-        <label>Nume
+        <label>Numele tău (cum te salută Mady)
+          <input id="sUserName" maxlength="30" placeholder="ex: Mădălina">
+        </label>
+        <label>Numele asistentei
           <input id="sName" maxlength="24">
         </label>
         <label>Mărime <span class="muted" id="sScaleVal"></span>
@@ -286,11 +378,54 @@
         <label class="check"><input type="checkbox" id="sHideOnBlur"> Ascunde panoul când dau click în altă parte</label>
 
         <div class="row end">
+          <button class="btn ghost" id="sGuide" type="button">Ghid de bun venit</button>
           <button class="btn ghost" id="sReset" type="button">Resetează setările</button>
           <button class="btn ghost danger" id="sQuit" type="button">Ieșire</button>
         </div>
       </div>
     </section>
+
+    <div class="onboard hidden" id="onboard">
+      <div class="ob-card">
+        <div class="ob-step" data-step="0">
+          <div class="monogram big">M</div>
+          <h2>Bună, eu sunt Mady.</h2>
+          <p>Asistenta ta personală: îți țin focusul, notițele, inboxul și ziua în ordine, cu stil.</p>
+          <label>Cum să-ți spun?<input id="obName" placeholder="Numele tău" maxlength="30"></label>
+        </div>
+        <div class="ob-step hidden" data-step="1">
+          <h2>Ritmul tău</h2>
+          <label>Câte ore de focus vrei pe săptămână?<input id="obGoal" type="number" min="0" max="100" value="40"></label>
+          <label class="check"><input type="checkbox" id="obBrief" checked> Briefing de dimineață</label>
+          <label class="check"><input type="checkbox" id="obSpeech" checked> Mady vorbește (bule de dialog)</label>
+        </div>
+        <div class="ob-step hidden" data-step="2">
+          <h2>Trucuri rapide</h2>
+          <ul class="tips">
+            <li><b>Click pe Mady</b> deschide panoul; trage-o oriunde pe ecran.</li>
+            <li><b>Click dreapta</b> pe Mady: meniu rapid.</li>
+            <li><b>Ctrl+Shift+Space</b>, din orice aplicație: corectează, traduce, rezumă.</li>
+            <li><b>Azi</b>: Top 3, ritualuri, apă, stare; la final, cardul zilei pentru Instagram.</li>
+            <li><b>Timer</b>: Pomodoro cu sunete de ploaie sau ocean.</li>
+          </ul>
+        </div>
+        <div class="ob-nav">
+          <div class="ob-dots" id="obDots"><i class="on"></i><i></i><i></i></div>
+          <button class="btn ghost" id="obSkip">Mai târziu</button>
+          <button class="btn" id="obNext">Continuă</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="confirm hidden" id="confirm">
+      <div class="confirm-card">
+        <p id="confirmText"></p>
+        <div class="row end">
+          <button class="btn ghost" id="confirmCancel">Renunță</button>
+          <button class="btn" id="confirmOk">Da</button>
+        </div>
+      </div>
+    </div>
 
     <div id="toast" class="toast"></div>
   </div>

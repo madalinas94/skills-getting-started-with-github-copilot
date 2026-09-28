@@ -17,6 +17,22 @@ contextBridge.exposeInMainWorld('buddy', {
     onState: on('buddy:state'),
     onTalking: on('buddy:talking')
   },
+  today: {
+    state: () => ipcRenderer.invoke('today:state'),
+    update: patch => ipcRenderer.invoke('today:update', patch),
+    toggleHabit: (id, k) => ipcRenderer.invoke('habit:toggle', id, k),
+    addHabit: name => ipcRenderer.invoke('habit:add', name),
+    removeHabit: id => ipcRenderer.invoke('habit:remove', id)
+  },
+  card: {
+    make: (kind, format) => ipcRenderer.invoke('card:make', kind, format),
+    copy: () => ipcRenderer.invoke('card:copy'),
+    show: () => ipcRenderer.send('card:show')
+  },
+  onboarding: {
+    onShow: on('onboarding:show'),
+    done: patch => ipcRenderer.invoke('onboarding:done', patch)
+  },
   sticky: {
     id: () => new URLSearchParams(location.search).get('id'),
     get: id => ipcRenderer.invoke('sticky:get', id),
@@ -84,7 +100,9 @@ contextBridge.exposeInMainWorld('buddy', {
   },
   session: {
     current: () => ipcRenderer.invoke('session:current'),
-    start: title => ipcRenderer.invoke('session:start', title),
+    start: (title, mode) => ipcRenderer.invoke('session:start', title, mode),
+    modes: () => ipcRenderer.invoke('session:modes'),
+    onPhase: on('session:phase'),
     pause: () => ipcRenderer.invoke('session:pause'),
     resume: () => ipcRenderer.invoke('session:resume'),
     stop: () => ipcRenderer.invoke('session:stop'),

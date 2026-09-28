@@ -10,7 +10,14 @@ const IDLE_LIMIT_SEC = 5 * 60; // după 5 minute fără mouse/tastatură nu mai 
 
 let tracker = null;
 let tickTimer = null;
-let hooks = { onChange() {}, onHour() {}, onEnd() {} };
+let hooks = { onChange() {}, onHour() {}, onEnd() {}, onPhase() {} };
+
+// Moduri de focus (Pomodoro): minute de lucru / pauză / pauză lungă (după 4 runde)
+const FOCUS_MODES = {
+  pomodoro: { label: 'Pomodoro', focusMin: 25, breakMin: 5, longBreakMin: 15 },
+  deep: { label: 'Deep work', focusMin: 50, breakMin: 10, longBreakMin: 20 },
+  flow: { label: 'Flow', focusMin: 90, breakMin: 20, longBreakMin: 30 }
+};
 
 function elapsedMs(s, now = Date.now()) {
   const end = s.end || now;
@@ -51,9 +58,38 @@ function stopTracking() {
   if (tracker) tracker.stop();
 }
 
+// Trecerea automată focus → pauză → focus. În pauză sesiunea e oprită, ca statisticile să numere doar focusul.
+function tickPomodoro(s) {
+  const p = s.pomo;
+  if (!p || !p.phaseEndsAt || Date.now() < p.phaseEndsAt) return;
+  const now = Date.now();
+  if (p.phase === 'focus') {
+    p.count += 1;
+    p.phase = 'break';
+    p.phaseEndsAt = now + (p.count % 4 === 0 ? p.longBreakMin : p.breakMin) * 60000;
+    if (!s.pausedAt) s.pausedAt = now;
+    stopTracking();
+    store.save();
+    hooks.onPhase('break', s);
+  } else {
+    p.phase = 'focus';
+    p.phaseEndsAt = now + p.focusMin * 60000;
+    if (s.pausedAt) {
+      s.pausedMs += now - s.pausedAt;
+      s.pausedAt = null;
+    }
+    store.save();
+    startTracking();
+    hooks.onPhase('focus', s);
+  }
+  hooks.onChange(s);
+}
+
 function tick() {
   const s = current();
-  if (!s || s.pausedAt) return;
+  if (!s) return;
+  tickPomodoro(s);
+  if (s.pausedAt) return;
   const hours = Math.floor(elapsedMs(s) / 3600000);
   if (hours > s.hoursNotified) {
     s.hoursNotified = hours;
@@ -74,8 +110,9 @@ function init(h) {
   tickTimer = setInterval(tick, 1000);
 }
 
-function start(title) {
+function start(title, mode) {
   if (current()) return current();
+  const m = FOCUS_MODES[mode];
   const s = {
     id: crypto.randomUUID(),
     title: String(title || '').trim() || 'Sesiune de lucru',
@@ -87,7 +124,8 @@ function start(title) {
     idleSec: 0,
     apps: {},
     hoursNotified: 0,
-    feedback: ''
+    feedback: '',
+    pomo: m ? { mode, ...m, phase: 'focus', phaseEndsAt: Date.now() + m.focusMin * 60000, remainingMs: null, count: 0 } : null
   };
   store.get().currentSession = s;
   store.save();
@@ -100,6 +138,10 @@ function pause() {
   const s = current();
   if (!s || s.pausedAt) return s;
   s.pausedAt = Date.now();
+  if (s.pomo && s.pomo.phase === 'focus' && s.pomo.phaseEndsAt) {
+    s.pomo.remainingMs = Math.max(0, s.pomo.phaseEndsAt - Date.now());
+    s.pomo.phaseEndsAt = null;
+  }
   stopTracking();
   store.save();
   hooks.onChange(s);
@@ -111,6 +153,16 @@ function resume() {
   if (!s || !s.pausedAt) return s;
   s.pausedMs += Date.now() - s.pausedAt;
   s.pausedAt = null;
+  if (s.pomo) {
+    if (s.pomo.phase === 'break') {
+      // „Continuă” în pauză = sari peste pauză
+      s.pomo.phase = 'focus';
+      s.pomo.phaseEndsAt = Date.now() + s.pomo.focusMin * 60000;
+    } else if (s.pomo.remainingMs != null) {
+      s.pomo.phaseEndsAt = Date.now() + s.pomo.remainingMs;
+      s.pomo.remainingMs = null;
+    }
+  }
   store.save();
   startTracking();
   hooks.onChange(s);
@@ -156,6 +208,8 @@ function report(s) {
     activeSec: s.activeSec,
     idleSec: s.idleSec,
     apps: topApps(s.apps),
+    pomodoros: s.pomo ? s.pomo.count : 0,
+    mode: s.pomo ? s.pomo.label : '',
     feedback: s.feedback || ''
   };
 }
@@ -171,8 +225,9 @@ function history() {
   const days = {};
   for (const s of store.get().sessions) {
     const k = dayKey(s.start);
-    const day = days[k] || (days[k] = { date: k, totalSec: 0, activeSec: 0, sessions: [], apps: {} });
+    const day = days[k] || (days[k] = { date: k, totalSec: 0, activeSec: 0, pomodoros: 0, sessions: [], apps: {} });
     day.totalSec += s.durationSec || 0;
+    day.pomodoros += s.pomo ? s.pomo.count : 0;
     day.activeSec += s.activeSec || 0;
     day.sessions.push({ id: s.id, title: s.title, start: s.start, end: s.end, durationSec: s.durationSec || 0 });
     for (const [app, sec] of Object.entries(s.apps || {})) day.apps[app] = (day.apps[app] || 0) + sec;
@@ -224,6 +279,7 @@ function shutdown() {
 }
 
 module.exports = {
+  FOCUS_MODES,
   init, start, pause, resume, stop, current, history, report, getSession,
   setFeedback, feedbackPrompt, elapsedMs, fmt, shutdown, startTracking, stopTracking
 };
