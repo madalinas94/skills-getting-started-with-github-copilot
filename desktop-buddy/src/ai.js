@@ -104,4 +104,14 @@ async function chat(messages, settings, apiKey) {
   throw new Error(`Provider necunoscut: ${provider}`);
 }
 
-module.exports = { PROVIDERS, chat };
+// O singură cerere (rezumat email, brief, feedback sesiune) cu personalitatea din Setări.
+async function complete(prompt, settings, apiKey, demoText) {
+  if ((settings.aiProvider || 'demo') === 'demo') {
+    await new Promise(r => setTimeout(r, 400));
+    return (demoText || 'Rezultat demo.') +
+      '\n\n(Mod demo: conectează un model din Setări → Asistent AI pentru analiza reală.)';
+  }
+  return chat([{ role: 'user', content: prompt }], settings, apiKey);
+}
+
+module.exports = { PROVIDERS, chat, complete };

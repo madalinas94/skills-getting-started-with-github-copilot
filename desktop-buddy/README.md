@@ -7,6 +7,13 @@ iar când dai click pe ea se deschide un panou mic (ca un tray) cu:
   Poți fixa (📍), salva ca notiță (📝), șterge și căuta.
 - **📝 Notițe** – notițe cu salvare automată și căutare.
 - **🤖 Asistent AI** – chat cu un agent AI. Providerul, modelul și cheia API se aleg din Setări.
+- **⏱ Timer** – sesiuni de lucru cu titlu. Un timer mic, mereu deasupra, pe care îl muți oriunde,
+  cu pauză, stop, opacitate și ascundere. La fiecare oră primești „1 Hour has passed”, iar la final
+  un raport cu timpul total, timpul activ și aplicațiile folosite (plus feedback de la Mady).
+  Secțiunea **Workdays** arată ultimele 30 de zile ca un calendar (ore lucrate, sesiuni, top aplicații),
+  iar graficul săptămânal compară cu săptămâna trecută.
+- **✉ Inbox** – citește ultimele emailuri din Gmail prin IMAP (fără să le marcheze ca citite),
+  cu **Rezumat** pentru fiecare email și **Quick brief** pentru tot inboxul, făcute de modelul AI din Setări.
 - **⚙️ Setări** – provider AI, model, API key (salvată criptat), system prompt, numele și mărimea
   roboțelului, „mereu deasupra”, pornire cu Windows, clipboard, temă.
 
@@ -50,6 +57,23 @@ npm run dist
 automat ambele fișiere la fiecare push pe `desktop-buddy/`. Le descarci din tab-ul **Actions** →
 ultimul run → secțiunea **Artifacts** → `DesktopBuddy-windows`.
 
+## Inbox (Gmail)
+
+1. Activează **2-Step Verification** pe contul Google.
+2. Creează o **parolă de aplicație** la https://myaccount.google.com/apppasswords.
+3. În Gmail → Setări → *Forwarding and POP/IMAP*, verifică să fie activ **IMAP**.
+4. În Desktop Buddy → Setări → Inbox: adresa de email + parola de aplicație (server `imap.gmail.com`, port `993`).
+
+Parola se păstrează criptat. Emailurile sunt ținute doar în memorie. Pentru rezumate, textul
+emailurilor e trimis providerului AI ales în Setări (în modul Demo nu pleacă nicăieri).
+
+## Timer: cum se detectează aplicațiile
+
+Pe Windows, în timpul unei sesiuni, aplicația citește la 5 secunde numele programului din
+prim-plan (printr-un proces PowerShell ascuns, fără module native). Timpul în care nu atingi
+mouse-ul/tastatura peste 5 minute e numărat ca „inactiv”. Se poate opri din Setări → Timer.
+Istoricul se păstrează 30 de zile.
+
 ## Agentul AI (placeholder)
 
 Implicit e activ providerul **Demo** – răspunde fără internet, doar ca să vezi cum arată.
@@ -76,6 +100,9 @@ desktop-buddy/
 ├── preload.js         # API-ul sigur expus către HTML (window.buddy)
 ├── src/store.js       # salvare date în JSON + criptarea cheii API
 ├── src/ai.js          # providerii AI (demo / Anthropic / OpenAI / custom)
+├── src/sessions.js    # sesiuni, reminder orar, rapoarte, istoric 30 zile
+├── src/activity.js    # detectarea aplicației din prim-plan
+├── src/mail.js        # citire inbox prin IMAP + prompturi pentru rezumat/brief
 ├── renderer/          # HTML/CSS/JS pentru roboțel și panou
 ├── assets/            # buddy.svg, icon.svg, icon.png, icon.ico
 └── scripts/make-ico.js# regenerează icon.ico din assets/icons/*.png

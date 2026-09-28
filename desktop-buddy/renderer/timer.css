@@ -1,0 +1,57 @@
+:root, :root[data-theme="ivory"] {
+  --bg: #1f3a2e; --text: #f3ead7; --muted: #cbbf9f; --gold: #c9a96e; --hover: rgba(255, 255, 255, .1);
+  --display: "Cormorant Garamond", Georgia, serif; --text-font: "EB Garamond", Georgia, serif; --radius: 4px;
+}
+:root[data-theme="evening"] { --bg: #0f1813; }
+:root[data-theme="light"], :root[data-theme="dark"] {
+  --bg: #f56fa1; --text: #fff; --muted: #ffe3ef; --gold: #fff; --hover: rgba(255, 255, 255, .2);
+  --display: "Segoe UI", system-ui, sans-serif; --text-font: "Segoe UI", system-ui, sans-serif; --radius: 16px;
+}
+:root[data-theme="dark"] { --bg: #3c3244; --gold: #ff7fb0; }
+
+html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; }
+.pill {
+  position: absolute;
+  inset: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 0 14px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--gold);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .3);
+  -webkit-app-region: drag;
+  cursor: move;
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex: none; animation: pulse 2s infinite; }
+.paused .dot { animation: none; opacity: .35; }
+@keyframes pulse { 50% { opacity: .35; } }
+.info { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.05; }
+.title {
+  font: 10px var(--text-font);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.time { font: 600 24px var(--display); letter-spacing: .04em; font-variant-numeric: lining-nums tabular-nums; }
+.paused .time { opacity: .6; font-style: italic; }
+.actions { display: flex; gap: 1px; -webkit-app-region: no-drag; }
+.actions button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  opacity: .8;
+}
+.actions button:hover { background: var(--hover); opacity: 1; }
+.ic { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }

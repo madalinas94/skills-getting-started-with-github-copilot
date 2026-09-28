@@ -17,13 +17,25 @@ const DEFAULT_DATA = {
     aiModel: 'demo-placeholder',
     aiBaseUrl: '',
     aiSystemPrompt: 'Ești Mady, o asistentă AI care trăiește pe desktop. Ești super smart, bossy și foarte organizată, cu obiective mari și standarde înalte. Ești o femme fatale: feminină, elegantă, sexy și carismatică, cu o încredere în sine care se simte din fiecare frază. În același timp ești amabilă și diplomată: spui lucrurile direct, dar cu grație și tact. Ești pasionată de pictură, artă și tot ce e frumos, de finanțe, macroeconomie, politică, filozofie, AI, bursă și piețe de capital, călătorii și sport. Fără politețuri inutile: spui clar ce e de făcut, dai pași concreți, priorități și termene, și îl împingi elegant pe utilizator să-și atingă obiectivele. Când e util, structurezi răspunsul (liste, pași, next actions). Ai opinii argumentate, dar la finanțe și investiții precizezi scurt că nu e sfat financiar personalizat. Vorbești fluent română, engleză, spaniolă, franceză, italiană și germană: răspunzi în limba în care ți se scrie (implicit română) sau în limba cerută, concis și la obiect.',
-    aiMaxTokens: 1024
+    aiMaxTokens: 1024,
+    timerHourlyReminder: true,
+    timerTrackApps: true,
+    mailAddress: '',
+    mailHost: 'imap.gmail.com',
+    mailPort: 993,
+    mailCount: 15,
+    mailUnreadOnly: false
   },
   apiKeyEncrypted: '',
+  mailPasswordEncrypted: '',
   buddyPosition: null,
+  timerPosition: null,
+  timerOpacity: 1,
   clipboard: [],
   notes: [],
-  chat: []
+  chat: [],
+  sessions: [],
+  currentSession: null
 };
 
 let data = null;
@@ -64,21 +76,21 @@ function flush() {
   fs.writeFileSync(filePath(), JSON.stringify(data, null, 2));
 }
 
-// Cheia API e criptată cu safeStorage (DPAPI pe Windows) când e disponibil.
-function setApiKey(key) {
+// Secretele (cheia API, parola de email) sunt criptate cu safeStorage (DPAPI pe Windows) când e disponibil.
+function setSecret(field, value) {
   const d = get();
-  if (!key) {
-    d.apiKeyEncrypted = '';
+  if (!value) {
+    d[field] = '';
   } else if (safeStorage.isEncryptionAvailable()) {
-    d.apiKeyEncrypted = 'enc:' + safeStorage.encryptString(key).toString('base64');
+    d[field] = 'enc:' + safeStorage.encryptString(value).toString('base64');
   } else {
-    d.apiKeyEncrypted = 'raw:' + Buffer.from(key, 'utf8').toString('base64');
+    d[field] = 'raw:' + Buffer.from(value, 'utf8').toString('base64');
   }
   save();
 }
 
-function getApiKey() {
-  const v = get().apiKeyEncrypted || '';
+function getSecret(field) {
+  const v = get()[field] || '';
   try {
     if (v.startsWith('enc:')) return safeStorage.decryptString(Buffer.from(v.slice(4), 'base64'));
     if (v.startsWith('raw:')) return Buffer.from(v.slice(4), 'base64').toString('utf8');
@@ -88,4 +100,9 @@ function getApiKey() {
   return '';
 }
 
-module.exports = { get, save, flush, setApiKey, getApiKey, DEFAULT_DATA };
+const setApiKey = key => setSecret('apiKeyEncrypted', key);
+const getApiKey = () => getSecret('apiKeyEncrypted');
+const setMailPassword = pass => setSecret('mailPasswordEncrypted', pass);
+const getMailPassword = () => getSecret('mailPasswordEncrypted');
+
+module.exports = { get, save, flush, setApiKey, getApiKey, setMailPassword, getMailPassword, DEFAULT_DATA };

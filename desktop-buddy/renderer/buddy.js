@@ -39,11 +39,11 @@ el.addEventListener('contextmenu', e => {
 });
 
 let toastTimer;
-function toast(text) {
+function toast(text, ms = 1600) {
   toastEl.textContent = text;
   toastEl.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1600);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms);
 }
 
 window.buddy.clipboard.onUpdate(() => toast('Salvat'));
@@ -54,3 +54,5 @@ window.buddy.settings.onUpdate(s => { el.title = `${s.buddyName} — click pentr
 function applyTheme(s) { document.documentElement.dataset.theme = s.theme; }
 window.buddy.settings.get().then(applyTheme);
 window.buddy.settings.onUpdate(applyTheme);
+
+window.buddy.session.onHour(({ hours }) => toast(hours === 1 ? '1 Hour has passed' : `${hours} Hours have passed`, 8000));

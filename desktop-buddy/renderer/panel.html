@@ -23,6 +23,12 @@
       <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
       <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 12H5M11 6l-6 6 6 6"/></symbol>
       <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2M10 3h4"/></symbol>
+      <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="1.2"/><path d="M4 6.5l8 6 8-6"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z"/></symbol>
+      <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1"/></symbol>
       <symbol id="i-new" viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M13.5 7.5l3 3"/></symbol>
     </defs>
   </svg>
@@ -41,6 +47,8 @@
       <button data-tab="clipboard" class="active"><svg class="ic"><use href="#i-clip"/></svg><span>Clipboard</span></button>
       <button data-tab="notes"><svg class="ic"><use href="#i-quill"/></svg><span>Notițe</span></button>
       <button data-tab="ai"><svg class="ic"><use href="#i-spark"/></svg><span>Asistent</span></button>
+      <button data-tab="timer"><svg class="ic"><use href="#i-clock"/></svg><span>Timer</span></button>
+      <button data-tab="inbox"><svg class="ic"><use href="#i-mail"/></svg><span>Inbox</span></button>
       <button data-tab="settings"><svg class="ic"><use href="#i-sliders"/></svg><span>Setări</span></button>
     </nav>
 
@@ -88,6 +96,63 @@
       </form>
     </section>
 
+    <!-- TIMER -->
+    <section id="tab-timer" class="tab">
+      <div class="scroll">
+        <div id="sessIdle" class="card">
+          <div class="kicker">Sesiune nouă</div>
+          <div class="row">
+            <input id="sessTitle" placeholder="Titlul sesiunii (ex: Raport Q3)" maxlength="80">
+            <button class="btn" id="sessStart"><svg class="ic"><use href="#i-play"/></svg>Începe</button>
+          </div>
+        </div>
+
+        <div id="sessActive" class="card hidden">
+          <div class="kicker">În desfășurare</div>
+          <div class="sess-title" id="sessActiveTitle"></div>
+          <div class="big-time" id="sessElapsed">00:00:00</div>
+          <div class="muted" id="sessMeta"></div>
+          <div class="row wrap">
+            <button class="btn ghost" id="sessToggle"><svg class="ic"><use id="sessToggleIcon" href="#i-pause"/></svg><span>Pauză</span></button>
+            <button class="btn" id="sessStop"><svg class="ic"><use href="#i-stop"/></svg>Încheie</button>
+            <button class="btn ghost" id="sessTimerVis"><svg class="ic"><use href="#i-clock"/></svg><span>Ascunde timerul</span></button>
+          </div>
+        </div>
+
+        <div id="sessReport" class="card report hidden"></div>
+
+        <h3>Săptămâna aceasta</h3>
+        <div class="week">
+          <div class="week-sum" id="weekSum"></div>
+          <div class="bars" id="weekBars"></div>
+        </div>
+
+        <h3>Workdays · 30 de zile</h3>
+        <div class="cal-head"><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
+        <div class="calendar" id="calendar"></div>
+        <div id="dayDetail" class="card hidden"></div>
+      </div>
+    </section>
+
+    <!-- INBOX -->
+    <section id="tab-inbox" class="tab">
+      <div class="toolbar">
+        <span class="chip" id="mailStatus">Inbox</span>
+        <button class="btn ghost square" id="mailRefresh" title="Actualizează"><svg class="ic"><use href="#i-refresh"/></svg></button>
+        <button class="btn" id="mailBrief"><svg class="ic"><use href="#i-spark"/></svg>Quick brief</button>
+      </div>
+      <div class="scroll">
+        <div id="mailSetup" class="card hidden">
+          <div class="kicker">Conectează Gmail</div>
+          <p>Adaugă adresa ta și o <em>parolă de aplicație</em> în Setări → Inbox. Mady citește emailurile fără să le marcheze ca citite.</p>
+          <button class="btn" id="mailGoSettings">Mergi la setări</button>
+        </div>
+        <div id="briefBox" class="card brief hidden"></div>
+        <ul id="mailList" class="list plain"></ul>
+        <p class="empty hidden" id="mailEmpty">Niciun email de afișat.</p>
+      </div>
+    </section>
+
     <!-- SETĂRI -->
     <section id="tab-settings" class="tab">
       <div class="settings">
@@ -119,6 +184,40 @@
         <label>Lungime maximă răspuns (tokeni)
           <input id="sMaxTokens" type="number" min="64" max="32000" step="64">
         </label>
+
+        <h3>Timer</h3>
+        <label class="check"><input type="checkbox" id="sHourly"> Reminder la fiecare oră („1 Hour has passed”)</label>
+        <label class="check"><input type="checkbox" id="sTrackApps"> Urmărește aplicațiile folosite în sesiune</label>
+
+        <h3>Inbox</h3>
+        <label>Adresă de email
+          <input id="sMailAddress" type="email" placeholder="nume@gmail.com">
+        </label>
+        <label>Parolă de aplicație
+          <div class="row">
+            <input id="sMailPass" type="password" placeholder="xxxx xxxx xxxx xxxx" autocomplete="off">
+            <button class="btn ghost square" id="sMailPassToggle" type="button" title="Arată/ascunde"><svg class="ic"><use href="#i-eye"/></svg></button>
+          </div>
+          <div class="row">
+            <span class="muted" id="sMailPassStatus"></span>
+            <button class="btn small" id="sMailPassSave" type="button">Salvează</button>
+            <button class="btn small ghost danger" id="sMailPassDelete" type="button">Șterge</button>
+          </div>
+        </label>
+        <p class="hint">Gmail: activează <em>2-Step Verification</em>, apoi creează o parolă de aplicație la
+          <a href="#" id="appPassLink">myaccount.google.com/apppasswords</a>. IMAP trebuie să fie activ în setările Gmail.</p>
+        <div class="row two">
+          <label>Server IMAP
+            <input id="sMailHost" placeholder="imap.gmail.com">
+          </label>
+          <label>Port
+            <input id="sMailPort" type="number" min="1" max="65535">
+          </label>
+        </div>
+        <label>Câte emailuri citesc (max 50)
+          <input id="sMailCount" type="number" min="1" max="50">
+        </label>
+        <label class="check"><input type="checkbox" id="sMailUnread"> Doar emailurile necitite</label>
 
         <h3>Mady</h3>
         <label>Nume

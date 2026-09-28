@@ -45,6 +45,34 @@ contextBridge.exposeInMainWorld('buddy', {
     remove: id => ipcRenderer.invoke('notes:delete', id),
     onUpdate: on('notes:updated')
   },
+  session: {
+    current: () => ipcRenderer.invoke('session:current'),
+    start: title => ipcRenderer.invoke('session:start', title),
+    pause: () => ipcRenderer.invoke('session:pause'),
+    resume: () => ipcRenderer.invoke('session:resume'),
+    stop: () => ipcRenderer.invoke('session:stop'),
+    history: () => ipcRenderer.invoke('session:history'),
+    report: id => ipcRenderer.invoke('session:report', id),
+    feedback: id => ipcRenderer.invoke('session:feedback', id),
+    onChange: on('session:changed'),
+    onHour: on('session:hour'),
+    onEnded: on('session:ended')
+  },
+  timer: {
+    show: () => ipcRenderer.send('timer:show'),
+    hide: () => ipcRenderer.send('timer:hide'),
+    setOpacity: v => ipcRenderer.invoke('timer:opacity', v),
+    getOpacity: () => ipcRenderer.invoke('timer:getOpacity'),
+    openPanel: () => ipcRenderer.send('timer:openPanel'),
+    onVisible: on('timer:visible')
+  },
+  mail: {
+    setPassword: pass => ipcRenderer.invoke('mail:setPassword', pass),
+    fetch: () => ipcRenderer.invoke('mail:fetch'),
+    list: () => ipcRenderer.invoke('mail:list'),
+    summary: uid => ipcRenderer.invoke('mail:summary', uid),
+    brief: () => ipcRenderer.invoke('mail:brief')
+  },
   ai: {
     history: () => ipcRenderer.invoke('ai:history'),
     send: text => ipcRenderer.invoke('ai:send', text),

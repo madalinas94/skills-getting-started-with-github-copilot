@@ -1,16 +1,22 @@
-const { app, BrowserWindow, ipcMain, clipboard, screen, Tray, Menu, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, clipboard, screen, Tray, Menu, nativeImage, shell, Notification } = require('electron');
 const path = require('path');
 const crypto = require('crypto');
 const store = require('./src/store');
 const ai = require('./src/ai');
+const sessions = require('./src/sessions');
+const mail = require('./src/mail');
 
 const BUDDY_W = 170;
 const BUDDY_H = 210;
-const PANEL_W = 400;
-const PANEL_H = 560;
+const PANEL_W = 440;
+const PANEL_H = 620;
+const TIMER_W = 310;
+const TIMER_H = 66;
 
 let buddyWin = null;
 let panelWin = null;
+let timerWin = null;
+let timerHidden = false; // ascuns explicit de utilizator
 let tray = null;
 let clipboardTimer = null;
 let lastClipboardText = '';
@@ -108,6 +114,67 @@ function showBuddy() {
   buddyWin.show();
 }
 
+// ---------- Timer (fereastră mică, mereu deasupra, mutabilă) ----------
+
+function createTimerWindow() {
+  const area = screen.getPrimaryDisplay().workArea;
+  const saved = store.get().timerPosition;
+  const pos = saved && isOnScreen(saved.x, saved.y, TIMER_W, TIMER_H)
+    ? saved
+    : { x: Math.round(area.x + (area.width - TIMER_W) / 2), y: area.y + 16 };
+  timerWin = new BrowserWindow({
+    width: TIMER_W, height: TIMER_H, x: pos.x, y: pos.y,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    hasShadow: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    focusable: true,
+    backgroundColor: '#00000000',
+    webPreferences: { preload: path.join(__dirname, 'preload.js') }
+  });
+  timerWin.setAlwaysOnTop(true, 'screen-saver');
+  timerWin.setVisibleOnAllWorkspaces(true);
+  timerWin.setOpacity(Number(store.get().timerOpacity) || 1);
+  timerWin.loadFile(path.join(__dirname, 'renderer', 'timer.html'));
+  // afișat fără să ia focusul, ca să nu se închidă panoul
+  timerWin.once('ready-to-show', () => timerWin && !timerHidden && timerWin.showInactive());
+  let moveTimer;
+  timerWin.on('move', () => {
+    clearTimeout(moveTimer);
+    moveTimer = setTimeout(() => {
+      if (!timerWin) return;
+      const { x, y } = timerWin.getBounds();
+      store.get().timerPosition = { x, y };
+      store.save();
+    }, 400);
+  });
+  timerWin.on('closed', () => { timerWin = null; });
+}
+
+function showTimer() {
+  if (!sessions.current()) return;
+  timerHidden = false;
+  if (!timerWin) createTimerWindow();
+  else timerWin.showInactive();
+  broadcast('timer:visible', true);
+}
+
+function hideTimer() {
+  timerHidden = true;
+  if (timerWin) timerWin.hide();
+  broadcast('timer:visible', false);
+}
+
+function notify(title, body) {
+  if (Notification.isSupported()) new Notification({ title, body, icon: path.join(__dirname, 'assets', 'icon.png') }).show();
+}
+
 // ---------- Tray ----------
 
 function createTray() {
@@ -118,6 +185,9 @@ function createTray() {
     { label: 'Deschide panoul', click: () => togglePanel('clipboard') },
     { label: 'Arată roboțelul', click: showBuddy },
     { label: 'Ascunde roboțelul', click: () => buddyWin && buddyWin.hide() },
+    { label: 'Timer și statistici', click: () => togglePanel('timer') },
+    { label: 'Arată timerul', click: showTimer },
+    { label: 'Inbox', click: () => togglePanel('inbox') },
     { label: 'Setări', click: () => togglePanel('settings') },
     { type: 'separator' },
     { label: 'Ieșire', click: () => app.quit() }
@@ -172,7 +242,7 @@ function trimClipboard() {
 }
 
 function broadcast(channel, payload) {
-  for (const w of [buddyWin, panelWin]) if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
+  for (const w of [buddyWin, panelWin, timerWin]) if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
 }
 
 // ---------- Setări ----------
@@ -190,7 +260,7 @@ function applySettings() {
 }
 
 function publicSettings() {
-  return { ...settings(), hasApiKey: !!store.getApiKey() };
+  return { ...settings(), hasApiKey: !!store.getApiKey(), hasMailPassword: !!store.getMailPassword() };
 }
 
 // ---------- IPC ----------
@@ -216,6 +286,8 @@ function registerIpc() {
       { label: 'Deschide panoul', click: () => togglePanel('clipboard') },
       { label: 'Notițe', click: () => togglePanel('notes') },
       { label: 'Asistent AI', click: () => togglePanel('ai') },
+      { label: 'Timer și statistici', click: () => togglePanel('timer') },
+      { label: 'Inbox', click: () => togglePanel('inbox') },
       { label: 'Setări', click: () => togglePanel('settings') },
       { type: 'separator' },
       { label: 'Ascunde roboțelul', click: () => buddyWin && buddyWin.hide() },
@@ -238,6 +310,7 @@ function registerIpc() {
     store.save();
     applySettings();
     if ('clipboardLimit' in patch) { trimClipboard(); broadcast('clipboard:updated', store.get().clipboard); }
+    if ('timerTrackApps' in patch) patch.timerTrackApps ? sessions.startTracking() : sessions.stopTracking();
     return publicSettings();
   });
   ipcMain.handle('settings:setApiKey', (_e, key) => {
@@ -296,6 +369,80 @@ function registerIpc() {
     return d.notes;
   });
 
+  // sesiuni / timer
+  ipcMain.handle('session:current', () => currentSessionState());
+  ipcMain.handle('session:start', (_e, title) => { sessions.start(title); return currentSessionState(); });
+  ipcMain.handle('session:pause', () => { sessions.pause(); return currentSessionState(); });
+  ipcMain.handle('session:resume', () => { sessions.resume(); return currentSessionState(); });
+  ipcMain.handle('session:stop', () => sessions.stop());
+  ipcMain.handle('session:history', () => sessions.history());
+  ipcMain.handle('session:report', (_e, id) => {
+    const s = sessions.getSession(id);
+    return s ? sessions.report(s) : null;
+  });
+  ipcMain.handle('session:feedback', async (_e, id) => {
+    const prompt = sessions.feedbackPrompt(id);
+    if (!prompt) return { ok: false, error: 'Sesiunea nu mai există.' };
+    const r = sessions.report(sessions.getSession(id));
+    try {
+      const text = await ai.complete(prompt, settings(), store.getApiKey(),
+        `Sesiunea „${r.title}”: ${sessions.fmt(r.durationSec)}, din care activ ${sessions.fmt(r.activeSec)}. ` +
+        `Aplicația principală: ${r.apps[0]?.name || 'nedetectată'}. Continuă așa și pune-ți un obiectiv clar pentru mâine.`);
+      sessions.setFeedback(id, text);
+      return { ok: true, text };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+  ipcMain.on('timer:show', showTimer);
+  ipcMain.on('timer:hide', hideTimer);
+  ipcMain.handle('timer:opacity', (_e, value) => {
+    const v = Math.min(1, Math.max(0.2, Number(value) || 1));
+    store.get().timerOpacity = v;
+    store.save();
+    if (timerWin) timerWin.setOpacity(v);
+    return v;
+  });
+  ipcMain.handle('timer:getOpacity', () => Number(store.get().timerOpacity) || 1);
+  ipcMain.on('timer:openPanel', () => togglePanel('timer'));
+
+  // inbox
+  ipcMain.handle('mail:setPassword', (_e, pass) => {
+    store.setMailPassword(String(pass || '').replace(/\s+/g, ''));
+    broadcast('settings:updated', publicSettings());
+    return publicSettings();
+  });
+  ipcMain.handle('mail:fetch', async () => {
+    const s = settings();
+    try {
+      await mail.fetchInbox({
+        host: s.mailHost, port: s.mailPort, user: s.mailAddress, pass: store.getMailPassword(),
+        count: s.mailCount, unreadOnly: s.mailUnreadOnly
+      });
+      return { ok: true, messages: mail.list() };
+    } catch (err) {
+      return { ok: false, error: err.message, messages: mail.list() };
+    }
+  });
+  ipcMain.handle('mail:list', () => mail.list());
+  ipcMain.handle('mail:summary', async (_e, uid) => {
+    const m = mail.get(uid);
+    if (!m) return { ok: false, error: 'Emailul nu mai e în listă. Apasă Actualizează.' };
+    try {
+      return { ok: true, text: await ai.complete(mail.summaryPrompt(m), settings(), store.getApiKey(), mail.demoSummary(m)) };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+  ipcMain.handle('mail:brief', async () => {
+    if (!mail.list().length) return { ok: false, error: 'Nu am emailuri încărcate. Apasă Actualizează.' };
+    try {
+      return { ok: true, text: await ai.complete(mail.briefPrompt(), settings(), store.getApiKey(), mail.demoBrief()) };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+
   // AI
   ipcMain.handle('ai:history', () => store.get().chat);
   ipcMain.handle('ai:clear', () => {
@@ -317,6 +464,36 @@ function registerIpc() {
       return { ok: false, error: err.message, chat: d.chat };
     }
   });
+}
+
+function currentSessionState() {
+  const s = sessions.current();
+  if (!s) return null;
+  return {
+    id: s.id, title: s.title, start: s.start, pausedMs: s.pausedMs, pausedAt: s.pausedAt,
+    activeSec: s.activeSec, now: Date.now(), timerVisible: !!timerWin && !timerHidden
+  };
+}
+
+function initSessions() {
+  sessions.init({
+    onChange(s) {
+      if (s && !timerWin) { timerHidden = false; createTimerWindow(); }
+      if (!s && timerWin) timerWin.close();
+      broadcast('session:changed', currentSessionState());
+    },
+    onHour(hours, s) {
+      const text = hours === 1 ? '1 Hour has passed' : `${hours} Hours have passed`;
+      notify(text, `„${s.title}” – ${hours === 1 ? 'o oră' : hours + ' ore'} de lucru. Ia o pauză scurtă și continuă.`);
+      broadcast('session:hour', { hours, title: s.title });
+    },
+    onEnd(rep) {
+      notify('Sesiune încheiată', `„${rep.title}”: ${sessions.fmt(rep.durationSec)} total, ${sessions.fmt(rep.activeSec)} activ.`);
+      togglePanel('timer');
+      broadcast('session:ended', rep);
+    }
+  });
+  if (sessions.current()) createTimerWindow();
 }
 
 function saveNote(note) {
@@ -350,8 +527,9 @@ if (!app.requestSingleInstanceLock()) {
     createPanelWindow();
     createTray();
     startClipboardWatcher();
+    initSessions();
   });
 
   app.on('window-all-closed', e => e.preventDefault());
-  app.on('before-quit', () => store.flush());
+  app.on('before-quit', () => { sessions.shutdown(); store.flush(); });
 }

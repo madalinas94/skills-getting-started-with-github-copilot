@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ro" data-theme="ivory">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; font-src 'self'; style-src 'self' 'unsafe-inline'">
+  <title>Timer</title>
+  <link rel="stylesheet" href="fonts/fonts.css">
+  <link rel="stylesheet" href="timer.css">
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z"/></symbol>
+      <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1"/></symbol>
+      <symbol id="i-opacity" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></symbol>
+      <symbol id="i-hide" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+    </defs>
+  </svg>
+  <div class="pill" id="pill">
+    <span class="dot" id="dot"></span>
+    <div class="info">
+      <span class="title" id="title">Sesiune</span>
+      <span class="time" id="time">00:00:00</span>
+    </div>
+    <div class="actions">
+      <button id="toggle" title="Pauză"><svg class="ic"><use id="toggleIcon" href="#i-pause"/></svg></button>
+      <button id="stop" title="Încheie sesiunea"><svg class="ic"><use href="#i-stop"/></svg></button>
+      <button id="opacity" title="Opacitate"><svg class="ic"><use href="#i-opacity"/></svg></button>
+      <button id="hide" title="Ascunde timerul"><svg class="ic"><use href="#i-hide"/></svg></button>
+    </div>
+  </div>
+  <script src="timer.js"></script>
+</body>
+</html>

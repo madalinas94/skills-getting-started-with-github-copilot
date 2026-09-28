@@ -48,6 +48,8 @@ function showTab(name) {
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.id === `tab-${name}`));
   if (name === 'ai') setTimeout(() => $('#chatInput').focus(), 50);
+  if (name === 'timer') loadHistory();
+  if (name === 'inbox' && !mails.length) refreshMail();
 }
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
 api.panel.onTab(showTab);
@@ -212,8 +214,8 @@ $('#chatForm').addEventListener('submit', async e => {
   if (!text) return;
   input.value = '';
   $('#chatSend').disabled = true;
-  const history = await api.ai.history();
-  renderChat([...history, { role: 'user', content: text }], { typing: true });
+  const workHistory = await api.ai.history();
+  renderChat([...workHistory, { role: 'user', content: text }], { typing: true });
   const res = await api.ai.send(text);
   renderChat(res.chat, { error: res.ok ? null : res.error });
   $('#chatSend').disabled = false;
@@ -227,6 +229,311 @@ $('#chatInput').addEventListener('keydown', e => {
 });
 $('#aiClear').addEventListener('click', async () => renderChat(await api.ai.clear()));
 $('#aiModelChip').addEventListener('click', () => showTab('settings'));
+
+// ---------- timer & sesiuni ----------
+
+const DAY_NAMES = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+let session = null;
+let sessOffset = 0;
+let workHistory = {};
+let selectedDay = null;
+let currentReport = null;
+
+function fmtDur(sec) {
+  sec = Math.round(sec || 0);
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (h) return `${h}h ${String(m).padStart(2, '0')}m`;
+  return `${m}m`;
+}
+
+function fmtClock(ms) {
+  const t = Math.floor(ms / 1000);
+  return [Math.floor(t / 3600), Math.floor((t % 3600) / 60), t % 60].map(n => String(n).padStart(2, '0')).join(':');
+}
+
+function sessElapsed() {
+  if (!session) return 0;
+  const now = Date.now() + sessOffset;
+  const pausedNow = session.pausedAt ? now - session.pausedAt : 0;
+  return Math.max(0, now - session.start - session.pausedMs - pausedNow);
+}
+
+function dayKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function setSession(s) {
+  session = s;
+  if (s) sessOffset = s.now - Date.now();
+  $('#sessIdle').classList.toggle('hidden', !!s);
+  $('#sessActive').classList.toggle('hidden', !s);
+  if (s) {
+    $('#sessActiveTitle').textContent = s.title;
+    $('#sessToggleIcon').setAttribute('href', s.pausedAt ? '#i-play' : '#i-pause');
+    $('#sessToggle span').textContent = s.pausedAt ? 'Continuă' : 'Pauză';
+    $('#sessActive').classList.toggle('paused', !!s.pausedAt);
+    setTimerVisible(s.timerVisible);
+  }
+  tickSession();
+}
+
+function setTimerVisible(v) {
+  if (session) session.timerVisible = v;
+  $('#sessTimerVis span').textContent = v ? 'Ascunde timerul' : 'Arată timerul';
+}
+
+function tickSession() {
+  if (!session) return;
+  $('#sessElapsed').textContent = fmtClock(sessElapsed());
+  $('#sessMeta').textContent = (session.pausedAt ? 'În pauză · ' : 'Început la ') +
+    new Date(session.start).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderReport(rep) {
+  currentReport = rep;
+  const box = $('#sessReport');
+  box.classList.toggle('hidden', !rep);
+  if (!rep) return;
+  const apps = rep.apps.length
+    ? rep.apps.map(a => el('div', { className: 'app-row' }, [
+        el('span', { textContent: a.name }),
+        el('span', { className: 'muted', textContent: `${fmtDur(a.sec)} · ${a.pct}%` }),
+        el('div', { className: 'bar' }, [el('i', { style: `width:${a.pct}%` })])
+      ]))
+    : [el('p', { className: 'muted', textContent: 'Nu am detectat aplicații (sesiune scurtă sau urmărirea e oprită).' })];
+  const fb = el('div', { className: 'feedback' + (rep.feedback ? '' : ' hidden'), textContent: rep.feedback });
+  const fbBtn = el('button', { className: 'btn', textContent: rep.feedback ? 'Feedback nou' : `Feedback de la ${settings.buddyName}` });
+  fbBtn.prepend(icon('spark'));
+  fbBtn.onclick = async () => {
+    fbBtn.disabled = true;
+    fb.classList.remove('hidden');
+    fb.textContent = `${settings.buddyName} analizează…`;
+    const res = await api.session.feedback(rep.id);
+    fb.textContent = res.ok ? res.text : '⚠ ' + res.error;
+    if (res.ok) rep.feedback = res.text;
+    fbBtn.disabled = false;
+  };
+  box.replaceChildren(
+    el('div', { className: 'kicker', textContent: 'Raport sesiune' }),
+    el('div', { className: 'sess-title', textContent: rep.title }),
+    el('div', { className: 'muted', textContent: `${new Date(rep.start).toLocaleString('ro-RO', { dateStyle: 'medium', timeStyle: 'short' })} – ${new Date(rep.end).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}` }),
+    el('div', { className: 'stats' }, [
+      el('div', { className: 'stat' }, [el('b', { textContent: fmtDur(rep.durationSec) }), el('span', { textContent: 'Total' })]),
+      el('div', { className: 'stat' }, [el('b', { textContent: fmtDur(rep.activeSec) }), el('span', { textContent: 'Activ' })]),
+      el('div', { className: 'stat' }, [el('b', { textContent: fmtDur(rep.idleSec) }), el('span', { textContent: 'Inactiv' })])
+    ]),
+    el('div', { className: 'kicker', textContent: 'Aplicații folosite' }),
+    el('div', { className: 'apps' }, apps),
+    fb,
+    el('div', { className: 'row' }, [
+      fbBtn,
+      el('button', { className: 'btn ghost', textContent: 'Închide', onclick: () => renderReport(null) })
+    ])
+  );
+}
+
+async function loadHistory() {
+  workHistory = await api.session.history();
+  renderWeek();
+  renderCalendar();
+  if (selectedDay) renderDay(selectedDay);
+}
+
+function renderWeek() {
+  const today = new Date();
+  const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - ((today.getDay() + 6) % 7));
+  const days = [...Array(7)].map((_, i) => new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i));
+  const secs = days.map(d => workHistory[dayKey(d)]?.totalSec || 0);
+  const lastWeek = [...Array(7)].reduce((sum, _, i) =>
+    sum + (workHistory[dayKey(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 7 + i))]?.totalSec || 0), 0);
+  const total = secs.reduce((a, b) => a + b, 0);
+  const max = Math.max(4 * 3600, ...secs);
+  const delta = total - lastWeek;
+  $('#weekSum').replaceChildren(
+    el('b', { textContent: fmtDur(total) }),
+    ` săptămâna aceasta · ${fmtDur(lastWeek)} săptămâna trecută` +
+      (lastWeek ? ` (${delta >= 0 ? '+' : '−'}${fmtDur(Math.abs(delta))})` : '')
+  );
+  $('#weekBars').replaceChildren(...days.map((d, i) => el('div', {
+    className: 'b' + (dayKey(d) === dayKey(today) ? ' today' : ''),
+    title: `${d.toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'short' })}: ${fmtDur(secs[i])}`
+  }, [
+    el('em', { textContent: secs[i] ? (secs[i] / 3600).toFixed(1) : '' }),
+    el('i', { style: `height:${Math.round((secs[i] / max) * 70)}%` }),
+    el('span', { textContent: DAY_NAMES[d.getDay()] })
+  ])));
+}
+
+function renderCalendar() {
+  const today = new Date();
+  const first = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29);
+  const cells = [];
+  for (let i = 0; i < (first.getDay() + 6) % 7; i++) cells.push(el('div', { className: 'day blank' }));
+  const max = Math.max(6 * 3600, ...Object.values(workHistory).map(d => d.totalSec));
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(first.getFullYear(), first.getMonth(), first.getDate() + i);
+    const key = dayKey(d);
+    const info = workHistory[key];
+    const lvl = info ? Math.min(1, info.totalSec / max) : 0;
+    const cell = el('div', {
+      className: 'day' + (key === dayKey(today) ? ' today' : '') + (key === selectedDay ? ' sel' : '') + (lvl > 0.55 ? ' dark' : ''),
+      title: d.toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' }) + (info ? ` · ${fmtDur(info.totalSec)}` : ''),
+      onclick: () => renderDay(key)
+    }, [
+      el('span', { textContent: d.getDate() }),
+      el('small', { textContent: info ? (info.totalSec / 3600).toFixed(1) + 'h' : '' })
+    ]);
+    cell.style.setProperty('--lvl', lvl.toFixed(2));
+    cells.push(cell);
+  }
+  $('#calendar').replaceChildren(...cells);
+}
+
+function renderDay(key) {
+  selectedDay = key;
+  document.querySelectorAll('.day').forEach(c => c.classList.remove('sel'));
+  renderCalendar();
+  const info = workHistory[key];
+  const [y, m, d] = key.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const box = $('#dayDetail');
+  box.classList.remove('hidden');
+  const head = [
+    el('div', { className: 'kicker', textContent: date.toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' }) })
+  ];
+  if (!info) {
+    box.replaceChildren(...head, el('p', { className: 'muted', textContent: 'Nicio sesiune în această zi.' }));
+    return;
+  }
+  box.replaceChildren(
+    ...head,
+    el('div', { className: 'stats' }, [
+      el('div', { className: 'stat' }, [el('b', { textContent: fmtDur(info.totalSec) }), el('span', { textContent: 'Lucru' })]),
+      el('div', { className: 'stat' }, [el('b', { textContent: fmtDur(info.activeSec) }), el('span', { textContent: 'Activ' })]),
+      el('div', { className: 'stat' }, [el('b', { textContent: info.sessions.length }), el('span', { textContent: 'Sesiuni' })])
+    ]),
+    el('div', { className: 'kicker', textContent: 'Sesiuni' }),
+    el('div', { className: 'sess-list' }, info.sessions.map(s => el('button', {
+      onclick: async () => { renderReport(await api.session.report(s.id)); $('#tab-timer .scroll').scrollTop = 0; }
+    }, [
+      el('span', { textContent: `${new Date(s.start).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })} · ${s.title}` }),
+      el('span', { className: 'muted', textContent: fmtDur(s.durationSec) })
+    ]))),
+    el('div', { className: 'kicker', textContent: 'Cele mai folosite aplicații' }),
+    el('div', { className: 'apps' }, info.topApps.length ? info.topApps.map(a => el('div', { className: 'app-row' }, [
+      el('span', { textContent: a.name }),
+      el('span', { className: 'muted', textContent: `${fmtDur(a.sec)} · ${a.pct}%` }),
+      el('div', { className: 'bar' }, [el('i', { style: `width:${a.pct}%` })])
+    ])) : [el('p', { className: 'muted', textContent: '—' })])
+  );
+}
+
+$('#sessStart').addEventListener('click', async () => {
+  setSession(await api.session.start($('#sessTitle').value));
+  $('#sessTitle').value = '';
+  renderReport(null);
+});
+$('#sessTitle').addEventListener('keydown', e => { if (e.key === 'Enter') $('#sessStart').click(); });
+$('#sessToggle').addEventListener('click', async () => {
+  setSession(session?.pausedAt ? await api.session.resume() : await api.session.pause());
+});
+$('#sessStop').addEventListener('click', () => api.session.stop());
+$('#sessTimerVis').addEventListener('click', () => (session?.timerVisible ? api.timer.hide() : api.timer.show()));
+api.session.onChange(setSession);
+api.session.onEnded(rep => { renderReport(rep); loadHistory(); showTab('timer'); $('#tab-timer .scroll').scrollTop = 0; });
+api.session.onHour(({ hours }) => toast(hours === 1 ? '1 Hour has passed' : `${hours} Hours have passed`));
+api.timer.onVisible(setTimerVisible);
+setInterval(tickSession, 500);
+
+// ---------- inbox ----------
+
+let mails = [];
+
+function mailConfigured() {
+  return !!(settings.mailAddress && settings.hasMailPassword);
+}
+
+function renderMailSetup() {
+  $('#mailSetup').classList.toggle('hidden', mailConfigured());
+  if (!mailConfigured()) $('#mailStatus').textContent = 'Inbox neconfigurat';
+}
+
+function fmtMailDate(ts) {
+  const d = new Date(ts);
+  const today = new Date();
+  return dayKey(d) === dayKey(today)
+    ? d.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' });
+}
+
+function renderMails() {
+  const list = $('#mailList');
+  list.replaceChildren(...mails.map(m => {
+    const summary = el('div', { className: 'summary hidden' });
+    const btn = el('button', { className: 'btn small ghost', textContent: 'Rezumat' });
+    btn.prepend(icon('spark'));
+    btn.onclick = async e => {
+      e.stopPropagation();
+      btn.disabled = true;
+      summary.className = 'summary loading';
+      summary.textContent = `${settings.buddyName} citește…`;
+      const res = await api.mail.summary(m.uid);
+      summary.className = 'summary' + (res.ok ? '' : ' error');
+      summary.textContent = res.ok ? res.text : res.error;
+      btn.disabled = false;
+    };
+    return el('li', { className: 'item mail' + (m.unread ? ' unread' : '') }, [
+      el('div', { className: 'top' }, [
+        el('span', { className: 'from', textContent: m.from, title: m.fromAddress }),
+        el('span', { className: 'date', textContent: fmtMailDate(m.date) })
+      ]),
+      el('div', { className: 'subj', textContent: m.subject }),
+      el('div', { className: 'snippet', textContent: m.snippet }),
+      summary,
+      el('div', { className: 'meta row' }, [btn])
+    ]);
+  }));
+  $('#mailEmpty').classList.toggle('hidden', mails.length > 0 || !mailConfigured());
+}
+
+async function refreshMail() {
+  renderMailSetup();
+  if (!mailConfigured()) return;
+  $('#mailRefresh').disabled = true;
+  $('#mailStatus').textContent = 'Se încarcă emailurile…';
+  const res = await api.mail.fetch();
+  mails = res.messages;
+  const unread = mails.filter(m => m.unread).length;
+  $('#mailStatus').textContent = res.ok
+    ? `${mails.length} emailuri · ${unread} necitite · ${new Date().toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}`
+    : '⚠ ' + res.error;
+  $('#mailStatus').title = $('#mailStatus').textContent;
+  renderMails();
+  $('#mailRefresh').disabled = false;
+}
+
+$('#mailRefresh').addEventListener('click', refreshMail);
+$('#mailGoSettings').addEventListener('click', () => {
+  showTab('settings');
+  $('#sMailAddress').scrollIntoView({ block: 'center' });
+});
+$('#mailBrief').addEventListener('click', async () => {
+  const box = $('#briefBox');
+  if (!mails.length) await refreshMail();
+  if (!mails.length) return toast('Nu am emailuri de analizat');
+  $('#mailBrief').disabled = true;
+  box.classList.remove('hidden');
+  box.replaceChildren(el('div', { className: 'kicker', textContent: 'Quick brief' }),
+    el('div', { className: 'summary loading', textContent: `${settings.buddyName} îți pregătește brief-ul…` }));
+  const res = await api.mail.brief();
+  box.replaceChildren(
+    el('div', { className: 'kicker', textContent: `Quick brief · ${mails.length} emailuri` }),
+    el('div', { className: 'feedback' + (res.ok ? '' : ' summary error'), textContent: res.ok ? res.text : res.error }),
+    el('div', { className: 'row' }, [el('button', { className: 'btn small ghost', textContent: 'Închide', onclick: () => box.classList.add('hidden') })])
+  );
+  $('#mailBrief').disabled = false;
+});
 
 // ---------- setări ----------
 
@@ -268,6 +575,15 @@ function renderSettings() {
   $('#sClipLimit').value = settings.clipboardLimit;
   $('#sTheme').value = settings.theme;
   $('#sHideOnBlur').checked = settings.hidePanelOnBlur;
+  $('#sHourly').checked = settings.timerHourlyReminder;
+  $('#sTrackApps').checked = settings.timerTrackApps;
+  $('#sMailAddress').value = settings.mailAddress || '';
+  $('#sMailHost').value = settings.mailHost || '';
+  $('#sMailPort').value = settings.mailPort || 993;
+  $('#sMailCount').value = settings.mailCount || 15;
+  $('#sMailUnread').checked = settings.mailUnreadOnly;
+  $('#sMailPassStatus').textContent = settings.hasMailPassword ? 'Parolă salvată · criptată' : 'Nicio parolă salvată';
+  renderMailSetup();
   renderModelChip();
 }
 
@@ -329,6 +645,35 @@ $('#sReset').addEventListener('click', async () => {
   toast('Setări resetate');
 });
 $('#sQuit').addEventListener('click', () => api.app.quit());
+$('#sHourly').addEventListener('change', e => update({ timerHourlyReminder: e.target.checked }));
+$('#sTrackApps').addEventListener('change', e => update({ timerTrackApps: e.target.checked }));
+$('#sMailAddress').addEventListener('change', e => update({ mailAddress: e.target.value.trim() }));
+$('#sMailHost').addEventListener('change', e => update({ mailHost: e.target.value.trim() || 'imap.gmail.com' }));
+$('#sMailPort').addEventListener('change', e => update({ mailPort: Number(e.target.value) || 993 }));
+$('#sMailCount').addEventListener('change', e => update({ mailCount: Math.min(50, Math.max(1, Number(e.target.value) || 15)) }));
+$('#sMailUnread').addEventListener('change', e => update({ mailUnreadOnly: e.target.checked }));
+$('#sMailPassToggle').addEventListener('click', () => {
+  const i = $('#sMailPass');
+  i.type = i.type === 'password' ? 'text' : 'password';
+});
+$('#sMailPassSave').addEventListener('click', async () => {
+  const pass = $('#sMailPass').value.trim();
+  if (!pass) return toast('Lipește întâi parola de aplicație');
+  settings = await api.mail.setPassword(pass);
+  $('#sMailPass').value = '';
+  renderSettings();
+  toast('Parola de aplicație a fost salvată');
+});
+$('#sMailPassDelete').addEventListener('click', async () => {
+  if (!confirm('Ștergi parola de aplicație salvată?')) return;
+  settings = await api.mail.setPassword('');
+  renderSettings();
+  toast('Parola a fost ștearsă');
+});
+$('#appPassLink').addEventListener('click', e => {
+  e.preventDefault();
+  api.app.openExternal('https://myaccount.google.com/apppasswords');
+});
 
 api.settings.onUpdate(s => { settings = s; renderSettings(); });
 
@@ -343,5 +688,7 @@ api.settings.onUpdate(s => { settings = s; renderSettings(); });
   renderClipboard();
   renderNotes();
   renderChat(await api.ai.history());
+  setSession(await api.session.current());
+  loadHistory();
   setInterval(renderClipboard, 60000);
 })();
