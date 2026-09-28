@@ -3,15 +3,17 @@
 // dintr-o colecție atent aleasă. Se păstrează pe zile, ca să rămână aceeași toată ziua.
 const store = require('./store');
 const ai = require('./ai');
+const { AREAS, byId } = require('./lifeareas');
 
 const TYPES = {
   citat: 'Citatul zilei',
   vorba: 'Vorba de duh',
   cuvant: 'Cuvântul zilei',
   motivatie: 'Motivația zilei',
-  filozofie: 'Ideea zilei'
+  filozofie: 'Ideea zilei',
+  afirmatie: 'Afirmația zilei'
 };
-const ORDER = ['citat', 'cuvant', 'motivatie', 'filozofie', 'vorba'];
+const ORDER = ['citat', 'afirmatie', 'cuvant', 'motivatie', 'filozofie', 'vorba'];
 
 const LIBRARY = {
   citat: [
@@ -75,7 +77,19 @@ function typeFor(k) {
   return ORDER[dayIndex(k) % ORDER.length];
 }
 
+// Afirmația zilei vine din ariile de pe vision board (sau din toate, dacă board-ul e gol).
+function affirmationFor(k) {
+  let ids = [];
+  try { ids = require('./vision').boardAreas(); } catch { ids = []; }
+  const areas = (ids.length ? ids.map(byId).filter(Boolean) : AREAS);
+  const n = Math.floor(dayIndex(k) / ORDER.length);
+  const area = areas[n % areas.length];
+  const text = area.affirmations[Math.floor(n / areas.length) % area.affirmations.length];
+  return { type: 'afirmatie', label: TYPES.afirmatie, title: area.label, text, author: '', note: 'Spune-o cu voce tare, de trei ori, și crede-o.', source: 'library', area: area.id };
+}
+
 function fromLibrary(type, k) {
+  if (type === 'afirmatie') return affirmationFor(k);
   const list = LIBRARY[type];
   const item = list[Math.floor(dayIndex(k) / ORDER.length) % list.length];
   return { type, label: TYPES[type], title: item.title || '', text: item.text, author: item.author || '', note: item.note || '', source: 'library' };
@@ -120,7 +134,7 @@ async function today() {
     const type = typeFor(k);
     let m = fromLibrary(type, k);
     const s = d.settings;
-    if ((s.aiProvider || 'demo') !== 'demo') {
+    if (type !== 'afirmatie' && (s.aiProvider || 'demo') !== 'demo') {
       try {
         const j = parseJson(await ai.complete(aiPrompt(type), s, store.getApiKey()));
         if (j) m = { type, label: TYPES[type], title: j.titlu || '', text: j.text, author: j.autor || '', note: j.nota || '', source: 'ai' };

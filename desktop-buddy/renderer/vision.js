@@ -1,6 +1,17 @@
 const api = window.buddy;
 const $ = sel => document.querySelector(sel);
 let board = null;
+let filter = '';
+const areaLabel = id => board?.areas.find(a => a.id === id)?.label || '';
+
+function art(id) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 64 64');
+  const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+  use.setAttribute('href', `#a-${id}`);
+  svg.append(use);
+  return svg;
+}
 let titleTimer;
 
 function icon(name) {
@@ -31,6 +42,9 @@ function ops(item) {
     el('button', { title: 'Mută mai devreme', onclick: async () => set(await api.vision.move(item.id, -1)) }, [icon('left')]),
     el('button', { title: 'Mută mai târziu', onclick: async () => set(await api.vision.move(item.id, 1)) }, [icon('right')])
   ]);
+  if (item.type === 'text' && item.category) {
+    box.prepend(el('button', { title: 'Altă afirmație', onclick: async () => set(await api.vision.nextAff(item.id)) }, [icon('shuffle')]));
+  }
   if (item.type === 'text') {
     for (const [st, c] of [['noir', '#1f3a2e'], ['blush', '#f6e1dd'], ['ivory', '#fbf6ea'], ['sage', '#e3e9dc']]) {
       box.append(el('button', { className: 'dot', title: st, style: `background:${c}`, onclick: async () => set(await api.vision.update(item.id, { style: st })) }));
@@ -44,13 +58,40 @@ function render() {
   if (document.activeElement !== $('#title')) $('#title').value = board.title;
   if (document.activeElement !== $('#subtitle')) $('#subtitle').value = board.subtitle;
   $('#empty').classList.toggle('hidden', board.items.length > 0);
+  // filtre pe arii (doar ariile folosite)
+  const used = board.areas.filter(a => a.count);
+  $('#filters').replaceChildren(...(used.length ? [
+    el('button', { className: filter ? '' : 'on', textContent: 'Toate', onclick: () => { filter = ''; render(); } }),
+    ...used.map(a => el('button', { className: filter === a.id ? 'on' : '', onclick: () => { filter = a.id; render(); } }, [a.label, el('em', { textContent: a.count })]))
+  ] : []));
+  const items = board.items.filter(i => !filter || i.category === filter);
   const cols = el('div', { className: 'cols' });
   $('#board').replaceChildren(cols);
-  cols.replaceChildren(...board.items.map(item => {
+  cols.replaceChildren(...items.map(item => {
     const tile = el('div', { className: `tile ${item.type}` + (item.type === 'text' ? ' ' + item.style : '') });
     tile.style.setProperty('--tilt', `${item.tilt || 0}deg`);
     tile.append(el('span', { className: `tape ${item.tape}` }));
-    if (item.type === 'image') {
+    if (item.category && item.type === 'text') tile.append(el('span', { className: 'area-tag', textContent: areaLabel(item.category) }));
+    if (item.type === 'slot') {
+      tile.append(el('div', { className: 'slot-art' }, [
+        art(item.category),
+        el('span', { className: 'slabel', textContent: areaLabel(item.category) }),
+        el('span', { className: 'shint', textContent: '+ adaugă fotografia ta' })
+      ]));
+      tile.addEventListener('click', async e => { if (!e.target.closest('.ops')) set(await api.vision.fillSlot(item.id)); });
+      tile.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); tile.classList.add('dragover'); });
+      tile.addEventListener('dragleave', () => tile.classList.remove('dragover'));
+      tile.addEventListener('drop', async e => {
+        e.preventDefault();
+        e.stopPropagation();
+        tile.classList.remove('dragover');
+        dragDepth = 0;
+        $('#drop').classList.add('hidden');
+        const f = e.dataTransfer.files[0];
+        const p = f && api.vision.pathFor(f);
+        if (p) set(await api.vision.fillSlot(item.id, p));
+      });
+    } else if (item.type === 'image') {
       const cap = el('input', { className: 'cap', value: item.caption || '', placeholder: 'adaugă o legendă…', maxLength: 80 });
       cap.addEventListener('change', () => api.vision.update(item.id, { caption: cap.value }));
       tile.append(el('img', { src: item.url, alt: item.caption || '' }), cap);
@@ -68,7 +109,35 @@ function render() {
 
 function set(v) { board = v; render(); }
 
-$('#addImg').addEventListener('click', async () => set(await api.vision.pick()));
+$('#addImg').addEventListener('click', async () => set(await api.vision.pick(filter || undefined)));
+
+// alegerea ariilor vieții
+let picked = new Set();
+function openPicker() {
+  const existing = new Set(board.areas.filter(a => a.count).map(a => a.id));
+  picked = new Set(board.areas.map(a => a.id).filter(id => !existing.has(id)));
+  $('#pickerGrid').replaceChildren(...board.areas.map(a => el('button', {
+    className: picked.has(a.id) ? 'on' : '',
+    title: existing.has(a.id) ? 'Deja pe board' : '',
+    onclick: e => {
+      picked.has(a.id) ? picked.delete(a.id) : picked.add(a.id);
+      e.currentTarget.classList.toggle('on', picked.has(a.id));
+    }
+  }, [art(a.id), a.label + (existing.has(a.id) ? ' ✓' : '')])));
+  $('#picker').classList.remove('hidden');
+}
+$('#addAreas').addEventListener('click', openPicker);
+$('#startAreas').addEventListener('click', openPicker);
+$('#pickCancel').addEventListener('click', () => $('#picker').classList.add('hidden'));
+$('#pickAll').addEventListener('click', () => {
+  picked = new Set(board.areas.map(a => a.id));
+  document.querySelectorAll('#pickerGrid button').forEach(b => b.classList.add('on'));
+});
+$('#pickOk').addEventListener('click', async () => {
+  $('#picker').classList.add('hidden');
+  const order = board.areas.map(a => a.id).filter(id => picked.has(id));
+  if (order.length) set(await api.vision.addAreas(order));
+});
 $('#addText').addEventListener('click', async () => {
   set(await api.vision.addText('Scrie aici visul tău', ['noir', 'blush', 'ivory', 'sage'][board.items.length % 4]));
   const tas = document.querySelectorAll('.tile.text textarea');
@@ -97,9 +166,13 @@ window.addEventListener('drop', async e => {
   dragDepth = 0;
   $('#drop').classList.add('hidden');
   const paths = [...e.dataTransfer.files].map(f => api.vision.pathFor(f)).filter(Boolean);
-  if (paths.length) set(await api.vision.add(paths));
+  if (paths.length) set(await api.vision.add(paths, filter || undefined));
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) api.vision.close(); });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+  if (!$('#picker').classList.contains('hidden')) $('#picker').classList.add('hidden');
+  else api.vision.close();
+});
 
 function applyTheme(s) { document.documentElement.dataset.theme = s.themeResolved || s.theme; }
 api.settings.get().then(applyTheme);
@@ -113,11 +186,20 @@ window.__exportReady = async () => {
   await Promise.all([...document.images].map(i => (i.complete ? null : i.decode().catch(() => null))));
   await document.fonts.ready;
   const b = $('#board');
+  const tiles = [...document.querySelectorAll('.tile')];
+  // cadrele încă goale nu au ce căuta într-o imagine de împărtășit, dacă avem destul conținut
+  if (tiles.filter(t => !t.classList.contains('slot')).length >= 6) tiles.filter(t => t.classList.contains('slot')).forEach(t => t.remove());
   let k = 1;
   b.style.zoom = 1;
-  while (b.scrollHeight > b.clientHeight + 1 && k > 0.35) {
-    k -= 0.05;
+  const over = () => b.scrollHeight > b.clientHeight + 1;
+  while (over() && k > 0.62) {
+    k -= 0.04;
     b.style.zoom = k;
+  }
+  // tot nu încape: păstrăm primele elemente, lizibile
+  let rest = [...document.querySelectorAll('.tile')];
+  while (over() && rest.length > 4) {
+    rest.pop().remove();
   }
   await new Promise(r => setTimeout(r, 200));
   return true;

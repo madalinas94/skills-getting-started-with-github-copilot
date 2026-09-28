@@ -132,6 +132,65 @@ body {
   font: 16px "EB Garamond", Georgia, serif; letter-spacing: .3em; text-transform: uppercase; color: var(--gold);
 }
 .export .tile .cap::placeholder { color: transparent; }
-.export .tile img { max-height: 300px; object-fit: cover; }
+.export .tile img { max-height: 280px; object-fit: cover; }
+.export .tile.text { padding: 20px 16px; }
 .export .tile .cap { font-size: 20px; }
 .export .tile.text textarea { font-size: 28px; }
+
+/* ---------- ariile vieții ---------- */
+.filters { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 22px 0; }
+.filters:empty { display: none; }
+.filters button {
+  padding: 4px 12px; border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); border-radius: 20px;
+  background: transparent; color: var(--text); font: italic 14px "Cormorant Garamond", Georgia, serif; cursor: pointer;
+}
+.filters button em { font-style: normal; font-size: 11px; color: var(--muted); margin-left: 3px; }
+.filters button.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.filters button.on em { color: var(--accent-text); opacity: .8; }
+
+.tile .area-tag {
+  display: block; margin: 0 0 6px; text-align: center;
+  font: 10px "EB Garamond", Georgia, serif; letter-spacing: .22em; text-transform: uppercase; color: var(--gold);
+}
+.tile.text .area-tag { color: inherit; opacity: .7; margin-bottom: 10px; }
+.tile.slot { cursor: pointer; padding: 10px 10px 12px; }
+.slot-art {
+  aspect-ratio: 4 / 5; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  background:
+    radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--gold) 14%, transparent), transparent 65%),
+    linear-gradient(170deg, #fbf6ea, #f1e7d3);
+  border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
+}
+.slot-art svg { width: 46%; height: auto; fill: none; stroke: #b8955a; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.slot-art .slabel { font: italic 600 21px "Cormorant Garamond", Georgia, serif; color: #1f3a2e; text-align: center; padding: 0 8px; }
+.slot-art .shint { font: 11px "EB Garamond", Georgia, serif; letter-spacing: .16em; text-transform: uppercase; color: #a8864f; opacity: 0; transition: opacity .2s; }
+.tile.slot:hover .shint { opacity: 1; }
+.tile.slot.dragover .slot-art { outline: 2px dashed var(--gold); outline-offset: -8px; }
+.start {
+  margin-top: 14px; padding: 9px 18px; border: 1px solid var(--accent); border-radius: 3px; background: var(--accent); color: var(--accent-text);
+  font: 13px "EB Garamond", Georgia, serif; letter-spacing: .12em; text-transform: uppercase; cursor: pointer;
+}
+
+.picker { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(5px); }
+.picker-card {
+  width: min(720px, 92vw); background: var(--paper); border: 1px solid var(--gold); outline: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); outline-offset: 5px;
+  padding: 26px 28px 18px; box-shadow: 0 30px 60px rgba(0, 0, 0, .25);
+}
+.picker-card h2 { margin: 0; font: italic 600 32px "Cormorant Garamond", Georgia, serif; color: var(--accent); }
+.picker-card p { margin: 4px 0 16px; color: var(--muted); font-style: italic; }
+.picker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.picker-grid button {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent); border-radius: 4px; background: transparent; color: var(--text); cursor: pointer;
+  font: italic 15px "Cormorant Garamond", Georgia, serif; transition: .15s;
+}
+.picker-grid button svg { width: 46px; height: 46px; fill: none; stroke: var(--gold); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.picker-grid button.on { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 13%, transparent); box-shadow: inset 0 0 0 1px var(--gold); }
+.picker-nav { display: flex; align-items: center; gap: 8px; margin-top: 18px; }
+.picker-nav span { flex: 1; }
+.picker-nav button { padding: 7px 14px; border: 1px solid color-mix(in srgb, var(--gold) 50%, transparent); border-radius: 3px; background: transparent; color: var(--text); cursor: pointer; font: 12px "EB Garamond", Georgia, serif; letter-spacing: .12em; text-transform: uppercase; }
+.picker-nav .primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.picker-nav .link { border: 0; text-decoration: underline; text-transform: none; letter-spacing: 0; font-size: 14px; font-style: italic; }
+.export .filters, .export .shint { display: none !important; }
+.export .slot-art { aspect-ratio: auto; height: 190px; }
+.export .slot-art svg { width: 30%; }

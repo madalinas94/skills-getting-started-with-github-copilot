@@ -46,6 +46,12 @@ plus carduri de text (noir, blush, ivory, sage). Adaugi imagini din buton sau tr
 le reordonezi, le ștergi, schimbi titlul. **Exportă** creează o imagine 1080×1350 pentru Instagram.
 Imaginile se copiază în folderul aplicației, deci rămân chiar dacă muți originalele.
 
+**Ariile vieții:** butonul „Ariile vieții” creează secțiuni pentru Călătorii, Succes, Cărți,
+Libertate financiară, Mașina visurilor, Casa mea, Iubire adevărată, Credință și rugăciune, Frumusețe,
+Fit și sănătoasă, Eleganță și rafinament, Familia împreună. Fiecare are un cadru cu o ilustrație
+aurie (click sau trage o fotografie peste el ca să-l umpli) și o afirmație pe care o poți schimba
+(⟳). Filtrele de sus arată o singură arie. Afirmațiile apar și ca **„Afirmația zilei”** în mantra zilei.
+
 ## Raport lunar
 
 În Timer → „Luna aceasta”: ore de focus, zile lucrate, media pe zi, cea mai bună zi. Cardul
@@ -197,7 +203,8 @@ desktop-buddy/
 ├── src/today.js       # planner-ul zilei: Top 3, ritualuri, apă, stare, citate
 ├── src/cards.js       # cardurile de Instagram (zi, săptămână, lună, mantra), randate offscreen în PNG
 ├── src/mantra.js      # mantra zilei (AI sau colecție), favorite
-├── src/vision.js      # vision board: imagini și carduri de text
+├── src/vision.js      # vision board: imagini, carduri de text, ariile vieții
+├── src/lifeareas.js   # ariile vieții și afirmațiile lor
 ├── renderer/sticky.*  # notițele lipite pe desktop
 ├── renderer/          # HTML/CSS/JS pentru roboțel și panou
 ├── assets/            # buddy.svg, icon.svg, icon.png, icon.ico

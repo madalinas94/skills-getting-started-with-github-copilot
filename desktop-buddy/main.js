@@ -886,15 +886,23 @@ function registerIpc() {
   ipcMain.on('vision:open', openVision);
   ipcMain.on('vision:close', () => visionWin && visionWin.close());
   ipcMain.handle('vision:get', () => vision.view());
-  ipcMain.handle('vision:add', (_e, paths) => vision.addImages(paths));
-  ipcMain.handle('vision:pick', async () => {
-    const r = await dialog.showOpenDialog(visionWin || undefined, {
-      title: 'Alege imagini pentru vision board',
-      properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'Imagini', extensions: vision.IMAGE_EXT.map(e => e.slice(1)) }]
-    });
-    return r.canceled ? vision.view() : vision.addImages(r.filePaths);
+  ipcMain.handle('vision:add', (_e, paths, category) => vision.addImages(paths, category));
+  const pickImages = multi => dialog.showOpenDialog(visionWin || undefined, {
+    title: multi ? 'Alege imagini pentru vision board' : 'Alege fotografia',
+    properties: multi ? ['openFile', 'multiSelections'] : ['openFile'],
+    filters: [{ name: 'Imagini', extensions: vision.IMAGE_EXT.map(e => e.slice(1)) }]
   });
+  ipcMain.handle('vision:pick', async (_e, category) => {
+    const r = await pickImages(true);
+    return r.canceled ? vision.view() : vision.addImages(r.filePaths, category);
+  });
+  ipcMain.handle('vision:fillSlot', async (_e, id, file) => {
+    if (file) return vision.fillSlot(id, file);
+    const r = await pickImages(false);
+    return r.canceled ? vision.view() : vision.fillSlot(id, r.filePaths[0]);
+  });
+  ipcMain.handle('vision:addAreas', (_e, ids) => vision.addAreas(ids));
+  ipcMain.handle('vision:nextAff', (_e, id) => vision.nextAffirmation(id));
   ipcMain.handle('vision:addText', (_e, text, style) => vision.addText(text, style));
   ipcMain.handle('vision:update', (_e, id, patch) => vision.update(id, patch || {}));
   ipcMain.handle('vision:remove', (_e, id) => vision.remove(id));
