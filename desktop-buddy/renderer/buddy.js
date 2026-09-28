@@ -39,6 +39,10 @@ el.addEventListener('contextmenu', e => {
 });
 
 let toastTimer;
+// când Mady vorbește prin bule, etichetele mici ar dubla mesajul
+let speechOn = true;
+window.buddy.settings.get().then(s => { speechOn = !!s.buddySpeech; });
+window.buddy.settings.onUpdate(s => { speechOn = !!s.buddySpeech; });
 function toast(text, ms = 1600) {
   toastEl.textContent = text;
   toastEl.classList.add('show');
@@ -55,8 +59,8 @@ function applyTheme(s) { document.documentElement.dataset.theme = s.theme; }
 window.buddy.settings.get().then(applyTheme);
 window.buddy.settings.onUpdate(applyTheme);
 
-window.buddy.session.onHour(({ hours }) => toast(hours === 1 ? '1 Hour has passed' : `${hours} Hours have passed`, 8000));
-window.buddy.mail.onScanToast(n => { if (n) toast(`✉ ${n} ${n === 1 ? 'email nou' : 'emailuri noi'}`, 8000); });
+window.buddy.session.onHour(({ hours }) => speechOn || toast(hours === 1 ? '1 Hour has passed' : `${hours} Hours have passed`, 8000));
+window.buddy.mail.onScanToast(n => { if (n && !speechOn) toast(`✉ ${n} ${n === 1 ? 'email nou' : 'emailuri noi'}`, 8000); });
 
 function setState(state) { el.dataset.state = state || 'idle'; }
 window.buddy.buddy.state().then(setState);
