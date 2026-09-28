@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ro" data-theme="ivory">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; font-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'">
+  <title>Mantra zilei</title>
+  <link rel="stylesheet" href="fonts/fonts.css">
+  <link rel="stylesheet" href="mantra.css">
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.4 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z"/></symbol>
+      <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/><circle cx="9" cy="10" r="1.8"/><path d="M4 18l5-5 4 4 3-3 4 4"/></symbol>
+      <symbol id="i-open" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    </defs>
+  </svg>
+  <div class="card" id="card">
+    <div class="frame"></div>
+    <div class="top">
+      <span class="kicker" id="kicker">Mantra zilei</span>
+      <button class="x" id="close" title="Închide"><svg class="ic"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="label" id="label"></div>
+    <div class="title" id="title"></div>
+    <div class="text" id="text"></div>
+    <div class="author" id="author"></div>
+    <div class="note" id="note"></div>
+    <div class="actions">
+      <button id="fav" title="Favorită"><svg class="ic"><use href="#i-heart"/></svg></button>
+      <button id="save" title="Salvează ca imagine (Instagram) și copiaz-o"><svg class="ic"><use href="#i-image"/></svg><span>Imagine</span></button>
+      <button id="open" title="Deschide planner-ul zilei"><span>Azi</span><svg class="ic"><use href="#i-open"/></svg></button>
+      <span class="monogram">M</span>
+    </div>
+    <div class="progress"><i id="bar"></i></div>
+  </div>
+  <script src="mantra.js"></script>
+</body>
+</html>

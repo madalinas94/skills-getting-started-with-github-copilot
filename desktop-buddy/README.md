@@ -29,6 +29,35 @@ Primul tab din panou, inspirat din planner-ele „aesthetic” de productivitate
 - **Împărtășește:** cardul **„Ziua mea”** sau **„Săptămâna mea”**, în format **Post 4:5** (1080×1350) sau
   **Story 9:16** (1080×1920), salvat în `Imagini\Desktop Buddy` și copiat cu un click, gata de pus pe Instagram.
 
+## Mantra zilei
+
+La fiecare pornire, un card elegant apare separat, în colțul din dreapta-sus, cu **mesajul zilei**,
+și dispare singur după 30 de secunde (se oprește cât ții mouse-ul pe el; durata se schimbă din Setări).
+În fiecare zi alt tip: **citat**, **cuvântul zilei** (ex: Sprezzatura, Ikigai, Kaizen), **motivație**,
+**idee filozofică** (stoici, Aristotel…) sau **vorbă de duh**. Cu un model AI conectat, Mady o scrie
+în stilul ei; altfel alege dintr-o colecție atent aleasă. Rămâne aceeași toată ziua.
+Din card: ♡ favorită, **Imagine** (story 9:16 salvat și copiat), **Azi**. O găsești și în tab-ul Azi
+(„Pe desktop” o readuce), în meniul lui Mady și în tray.
+
+## Vision board
+
+Fereastră separată în stil Pinterest: fotografiile tale ca polaroid-uri cu bandă washi și legendă,
+plus carduri de text (noir, blush, ivory, sage). Adaugi imagini din buton sau trăgându-le din Explorer,
+le reordonezi, le ștergi, schimbi titlul. **Exportă** creează o imagine 1080×1350 pentru Instagram.
+Imaginile se copiază în folderul aplicației, deci rămân chiar dacă muți originalele.
+
+## Raport lunar
+
+În Timer → „Luna aceasta”: ore de focus, zile lucrate, media pe zi, cea mai bună zi. Cardul
+**„Luna mea”** (post sau story) adaugă calendarul lunii colorat după ore, procentul fiecărui ritual,
+prioritățile bifate, stările, apa și mantra preferată a lunii.
+
+## Teme sezoniere
+
+**Paris · toamnă** (burgundy și coniac, Mady cu beretă), **Viena · iarnă** (bleumarin și șampanie, cu
+fular), **Riviera · vară** (albastru mediteranean și lămâie, cu ochelari de soare), **Florența ·
+primăvară** (salvie și rose gold, cu coroniță de flori). **Sezonier automat** schimbă tema după anotimp.
+
 ## Focus mode
 
 - La pornirea unei sesiuni alegi **Liber**, **Pomodoro 25/5**, **Deep work 50/10** sau **Flow 90/20**.
@@ -131,7 +160,7 @@ emailurilor e trimis providerului AI ales în Setări (în modul Demo nu pleacă
 Pe Windows, în timpul unei sesiuni, aplicația citește la 5 secunde numele programului din
 prim-plan (printr-un proces PowerShell ascuns, fără module native). Timpul în care nu atingi
 mouse-ul/tastatura peste 5 minute e numărat ca „inactiv”. Se poate opri din Setări → Timer.
-Istoricul se păstrează 30 de zile.
+Calendarul arată ultimele 30 de zile; istoricul se păstrează mai mult, pentru raportul lunar.
 
 ## Agentul AI (placeholder)
 
@@ -166,7 +195,9 @@ desktop-buddy/
 ├── src/mood.js        # stările lui Mady și replicile ei
 ├── src/briefing.js    # briefingul de dimineață
 ├── src/today.js       # planner-ul zilei: Top 3, ritualuri, apă, stare, citate
-├── src/cards.js       # cardurile de Instagram (randate offscreen în PNG)
+├── src/cards.js       # cardurile de Instagram (zi, săptămână, lună, mantra), randate offscreen în PNG
+├── src/mantra.js      # mantra zilei (AI sau colecție), favorite
+├── src/vision.js      # vision board: imagini și carduri de text
 ├── renderer/sticky.*  # notițele lipite pe desktop
 ├── renderer/          # HTML/CSS/JS pentru roboțel și panou
 ├── assets/            # buddy.svg, icon.svg, icon.png, icon.ico

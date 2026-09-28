@@ -22,6 +22,6 @@ bubble.addEventListener('click', e => {
   api.bubble.click();
 });
 
-function applyTheme(s) { document.documentElement.dataset.theme = s.theme; }
+function applyTheme(s) { document.documentElement.dataset.theme = s.themeResolved || s.theme; }
 api.settings.get().then(applyTheme);
 api.settings.onUpdate(applyTheme);

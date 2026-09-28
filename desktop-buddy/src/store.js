@@ -34,7 +34,9 @@ const DEFAULT_DATA = {
     briefVoice: false,
     weeklyGoalHours: 40,
     quickHotkey: 'CommandOrControl+Shift+Space',
-    userName: ''
+    userName: '',
+    mantraOnStart: true,
+    mantraSeconds: 30
   },
   apiKeyEncrypted: '',
   mailPasswordEncrypted: '',

@@ -57,7 +57,7 @@ $('#opacity').addEventListener('click', async () => {
   await api.timer.setOpacity(OPACITIES[(i + 1) % OPACITIES.length]);
 });
 
-function applyTheme(s) { document.documentElement.dataset.theme = s.theme; }
+function applyTheme(s) { document.documentElement.dataset.theme = s.themeResolved || s.theme; }
 api.settings.get().then(applyTheme);
 api.settings.onUpdate(applyTheme);
 api.session.current().then(setState);

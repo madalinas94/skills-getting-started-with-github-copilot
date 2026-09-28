@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const on = channel => cb => {
   const listener = (_e, payload) => cb(payload);
@@ -28,6 +28,33 @@ contextBridge.exposeInMainWorld('buddy', {
     make: (kind, format) => ipcRenderer.invoke('card:make', kind, format),
     copy: () => ipcRenderer.invoke('card:copy'),
     show: () => ipcRenderer.send('card:show')
+  },
+  mantra: {
+    get: () => ipcRenderer.invoke('mantra:get'),
+    fav: (k, fav) => ipcRenderer.invoke('mantra:fav', k, fav),
+    favorites: () => ipcRenderer.invoke('mantra:favorites'),
+    close: () => ipcRenderer.send('mantra:close'),
+    show: () => ipcRenderer.send('mantra:show'),
+    openToday: () => ipcRenderer.send('mantra:openToday'),
+    size: h => ipcRenderer.send('mantra:size', h),
+    image: () => ipcRenderer.invoke('mantra:image')
+  },
+  vision: {
+    open: () => ipcRenderer.send('vision:open'),
+    close: () => ipcRenderer.send('vision:close'),
+    get: () => ipcRenderer.invoke('vision:get'),
+    add: paths => ipcRenderer.invoke('vision:add', paths),
+    pick: () => ipcRenderer.invoke('vision:pick'),
+    addText: (text, style) => ipcRenderer.invoke('vision:addText', text, style),
+    update: (id, patch) => ipcRenderer.invoke('vision:update', id, patch),
+    remove: id => ipcRenderer.invoke('vision:remove', id),
+    move: (id, delta) => ipcRenderer.invoke('vision:move', id, delta),
+    setTitle: (t, st) => ipcRenderer.invoke('vision:setTitle', t, st),
+    exportImage: () => ipcRenderer.invoke('vision:export'),
+    pathFor: file => { try { return webUtils.getPathForFile(file); } catch { return ''; } }
+  },
+  month: {
+    data: () => ipcRenderer.invoke('month:data')
   },
   onboarding: {
     onShow: on('onboarding:show'),

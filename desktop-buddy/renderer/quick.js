@@ -68,7 +68,7 @@ $('#chatBtn').addEventListener('click', () => api.quick.toChat(lastQuestion, las
 document.addEventListener('keydown', e => { if (e.key === 'Escape') api.quick.hide(); });
 
 function applyTheme(s) {
-  document.documentElement.dataset.theme = s.theme;
+  document.documentElement.dataset.theme = s.themeResolved || s.theme;
   $('#askInput').placeholder = `Întreab-o pe ${s.buddyName}…`;
   $('.monogram').textContent = (s.buddyName || 'M')[0].toUpperCase();
 }

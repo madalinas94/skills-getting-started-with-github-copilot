@@ -67,7 +67,8 @@ function showTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.id === `tab-${name}`));
   if (name === 'ai') setTimeout(() => $('#chatInput').focus(), 50);
   if (name === 'timer') loadHistory();
-  if (name === 'today') loadToday();
+  if (name === 'today') { loadToday(); loadMantra(); }
+  if (name === 'timer') loadMonth();
   if (name === 'inbox') api.mail.scanState().then(renderScan);
   if (name === 'inbox' && !mails.length) refreshMail();
 }
@@ -784,7 +785,43 @@ function renderToday() {
     onclick: () => saveToday({ mood: day.mood === k ? '' : k }, true)
   })));
 
-  $('#tdQuote').replaceChildren(`„${td.quote.text}”`, el('span', { textContent: td.quote.author }));
+}
+
+// ---------- mantra zilei ----------
+let mantraToday = null;
+async function loadMantra() {
+  mantraToday = await api.mantra.get();
+  const m = mantraToday;
+  $('#mLabel').textContent = m.label;
+  $('#mTitle').textContent = m.title || '';
+  $('#mText').textContent = m.type === 'citat' || m.type === 'vorba' ? `„${m.text}”` : m.text;
+  $('#mAuthor').textContent = m.author || '';
+  $('#mNote').textContent = m.note || '';
+  $('#mFav').textContent = m.fav ? '♥ Favorită' : '♡';
+  $('#mFav').classList.toggle('on', !!m.fav);
+}
+$('#mFav').addEventListener('click', async () => {
+  if (!mantraToday) return;
+  await api.mantra.fav(mantraToday.date, !mantraToday.fav);
+  loadMantra();
+});
+$('#mShow').addEventListener('click', () => api.mantra.show());
+$('#openVision').addEventListener('click', () => { api.vision.open(); api.panel.hide(); });
+
+// ---------- raport lunar (rezumat în Timer) ----------
+async function loadMonth() {
+  const d = await api.month.data();
+  $('#monthSum').replaceChildren(
+    el('div', { className: 'stat' }, [el('b', { textContent: d.focus }), el('span', { textContent: 'Focus' })]),
+    el('div', { className: 'stat' }, [el('b', { textContent: `${d.daysWorked}/${d.daysElapsed}` }), el('span', { textContent: 'Zile lucrate' })]),
+    el('div', { className: 'stat' }, [el('b', { textContent: d.avg }), el('span', { textContent: 'Medie/zi' })]),
+    el('div', { className: 'wide', textContent: [
+      d.month,
+      d.best ? `cea mai bună zi: ${d.best.label} (${d.best.focus})` : '',
+      d.prioritiesTotal ? `priorități ${d.prioritiesDone}/${d.prioritiesTotal}` : '',
+      d.pomodoros ? `${d.pomodoros} pomodoro` : ''
+    ].filter(Boolean).join(' · ') })
+  );
 }
 
 async function saveToday(patch, now = false) {
@@ -1009,7 +1046,7 @@ function fillModelSelect() {
 }
 
 function renderSettings() {
-  document.documentElement.dataset.theme = settings.theme;
+  document.documentElement.dataset.theme = settings.themeResolved || settings.theme;
   $('#title').textContent = settings.buddyName;
   $('#sProvider').value = settings.aiProvider;
   fillModelSelect();
@@ -1034,6 +1071,8 @@ function renderSettings() {
   $('#sSpontaneous').checked = settings.buddySpontaneous;
   $('#sMorningBrief').checked = settings.morningBrief;
   $('#sBriefVoice').checked = settings.briefVoice;
+  $('#sMantraStart').checked = settings.mantraOnStart;
+  $('#sMantraSec').value = settings.mantraSeconds || 30;
   if (document.activeElement !== $('#sHotkey')) $('#sHotkey').value = settings.quickHotkey || '';
   $('#sHotkeyStatus').textContent = settings.hotkeyActive
     ? `Activă: ${settings.hotkeyLabel}`
@@ -1120,6 +1159,8 @@ $('#sSpeech').addEventListener('change', e => update({ buddySpeech: e.target.che
 $('#sSpontaneous').addEventListener('change', e => update({ buddySpontaneous: e.target.checked }));
 $('#sMorningBrief').addEventListener('change', e => update({ morningBrief: e.target.checked }));
 $('#sBriefVoice').addEventListener('change', e => update({ briefVoice: e.target.checked }));
+$('#sMantraStart').addEventListener('change', e => update({ mantraOnStart: e.target.checked }));
+$('#sMantraSec').addEventListener('change', e => update({ mantraSeconds: Math.max(5, Math.min(300, Number(e.target.value) || 30)) }));
 $('#sHotkeySave').addEventListener('click', () => update({ quickHotkey: $('#sHotkey').value.trim() }, 'Scurtătură activă'));
 $('#sTrackApps').addEventListener('change', e => update({ timerTrackApps: e.target.checked }));
 $('#sMailAddress').addEventListener('change', e => update({ mailAddress: e.target.value.trim() }));
@@ -1169,5 +1210,7 @@ api.settings.onUpdate(s => { settings = s; renderSettings(); });
   setSession(await api.session.current());
   loadHistory();
   loadToday();
+  loadMantra();
+  loadMonth();
   setInterval(renderClipboard, 60000);
 })();

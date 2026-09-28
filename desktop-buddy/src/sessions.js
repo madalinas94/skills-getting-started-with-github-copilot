@@ -5,7 +5,7 @@ const { powerMonitor } = require('electron');
 const store = require('./store');
 const { ActivityTracker } = require('./activity');
 
-const KEEP_DAYS = 30;
+const KEEP_DAYS = 400; // calendarul arată 30 de zile; restul servește raportului lunar
 const IDLE_LIMIT_SEC = 5 * 60; // după 5 minute fără mouse/tastatură nu mai numărăm timp activ
 
 let tracker = null;

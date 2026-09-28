@@ -95,12 +95,30 @@
         <h3>Recunoștință</h3>
         <input id="tdGratitude" class="intention" placeholder="Azi sunt recunoscătoare pentru…" maxlength="140">
 
-        <div class="quote-card" id="tdQuote"></div>
+        <h3>Mantra zilei</h3>
+        <div class="quote-card mantra-card" id="tdMantra">
+          <div class="m-label" id="mLabel"></div>
+          <div class="m-title" id="mTitle"></div>
+          <div class="m-text" id="mText"></div>
+          <span id="mAuthor"></span>
+          <div class="m-note" id="mNote"></div>
+          <div class="m-actions">
+            <button id="mFav" title="Favorită">♡</button>
+            <button id="mShow">Pe desktop</button>
+          </div>
+        </div>
+
+        <h3>Inspirație</h3>
+        <button class="vision-cta" id="openVision">
+          <span class="vc-tape"></span>
+          <b>Vision board</b>
+          <span>Imaginile și cuvintele anului tău, în stil Pinterest</span>
+        </button>
 
         <h3>Împărtășește</h3>
         <div class="card share">
           <div class="row wrap">
-            <div class="seg" id="cardKind"><button data-v="day" class="on">Ziua mea</button><button data-v="week">Săptămâna mea</button></div>
+            <div class="seg" id="cardKind"><button data-v="day" class="on">Ziua</button><button data-v="week">Săptămâna</button><button data-v="month">Luna</button><button data-v="mantra">Mantra</button></div>
             <div class="seg" id="cardFormat"><button data-v="post" class="on">Post 4:5</button><button data-v="story">Story 9:16</button></div>
           </div>
           <button class="btn" id="cardMake"><svg class="ic"><use href="#i-share"/></svg>Creează cardul</button>
@@ -221,6 +239,9 @@
           <div class="goal" id="weekGoal"><div class="goal-bar"><i id="weekGoalFill"></i></div><span class="muted" id="weekGoalText"></span></div>
           <div class="bars" id="weekBars"></div>
         </div>
+
+        <h3>Luna aceasta</h3>
+        <div class="month-sum" id="monthSum"></div>
 
         <h3>Workdays · 30 de zile</h3>
         <div class="cal-head"><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
@@ -351,6 +372,10 @@
         <label class="check"><input type="checkbox" id="sSpontaneous"> Replici spontane din când în când</label>
         <label class="check"><input type="checkbox" id="sMorningBrief"> Briefing de dimineață la prima activitate din zi</label>
         <label class="check"><input type="checkbox" id="sBriefVoice"> Citește briefingul cu voce tare</label>
+        <label class="check"><input type="checkbox" id="sMantraStart"> Arată mantra zilei când pornește aplicația</label>
+        <label>Cât stă mantra pe ecran (secunde)
+          <input id="sMantraSec" type="number" min="5" max="300">
+        </label>
         <label>Scurtătură „Întreab-o pe Mady”
           <div class="row">
             <input id="sHotkey" placeholder="CommandOrControl+Shift+Space">
@@ -369,8 +394,13 @@
         <h3>Aspect</h3>
         <label>Temă
           <select id="sTheme">
+            <option value="seasonal">Sezonier automat (după anotimp)</option>
             <option value="ivory">Old Money · Ivory</option>
             <option value="evening">Old Money · Evening</option>
+            <option value="paris">Paris · toamnă</option>
+            <option value="vienna">Viena · iarnă</option>
+            <option value="riviera">Riviera · vară</option>
+            <option value="florence">Florența · primăvară</option>
             <option value="light">Roz · luminos</option>
             <option value="dark">Roz · întunecat</option>
           </select>

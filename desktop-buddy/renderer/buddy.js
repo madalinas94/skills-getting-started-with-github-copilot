@@ -55,7 +55,7 @@ window.buddy.clipboard.onUpdate(() => toast('Salvat'));
 window.buddy.settings.get().then(s => { el.title = `${s.buddyName} — click pentru meniu, trage ca să mă muți`; });
 window.buddy.settings.onUpdate(s => { el.title = `${s.buddyName} — click pentru meniu, trage ca să mă muți`; });
 
-function applyTheme(s) { document.documentElement.dataset.theme = s.theme; }
+function applyTheme(s) { document.documentElement.dataset.theme = s.themeResolved || s.theme; }
 window.buddy.settings.get().then(applyTheme);
 window.buddy.settings.onUpdate(applyTheme);
 

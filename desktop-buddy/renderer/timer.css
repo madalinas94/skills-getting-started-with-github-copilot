@@ -58,3 +58,9 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
 
 .break .dot { background: #8fa382; animation-duration: 4s; }
 .break .time { color: #cfe0c3; }
+
+/* teme sezoniere */
+:root[data-theme="paris"] { --bg: #5c1a2b; --gold: #b07a4f; }
+:root[data-theme="vienna"] { --bg: #1a2745; --gold: #b9a57a; }
+:root[data-theme="riviera"] { --bg: #1d5c8c; --gold: #d0a93a; }
+:root[data-theme="florence"] { --bg: #647a57; --gold: #c99a8e; }

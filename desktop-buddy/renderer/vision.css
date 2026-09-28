@@ -1,0 +1,137 @@
+:root, :root[data-theme="ivory"] { --bg: #f4efe4; --paper: #fbf8f2; --text: #1e2b24; --muted: #7d7461; --gold: #b8955a; --accent: #1f3a2e; --accent-text: #f6f1e6; }
+:root[data-theme="evening"] { --bg: #121c17; --paper: #1b2921; --text: #ede3cc; --muted: #a69b82; --gold: #c9a96e; --accent: #c2a36b; --accent-text: #121c17; }
+:root[data-theme="light"] { --bg: #fff5f8; --paper: #fff; --text: #3d2a36; --muted: #9a7f8e; --gold: #f56fa1; --accent: #f56fa1; --accent-text: #fff; }
+:root[data-theme="dark"] { --bg: #221c26; --paper: #2c2431; --text: #f6e9f0; --muted: #b39cab; --gold: #ff7fb0; --accent: #ff7fb0; --accent-text: #fff; }
+:root[data-theme="paris"] { --bg: #f3ebe1; --paper: #fbf6f0; --text: #2a1d1a; --muted: #8a7266; --gold: #b07a4f; --accent: #6e1f2e; --accent-text: #f7ede3; }
+:root[data-theme="vienna"] { --bg: #ebeff5; --paper: #f8fafc; --text: #1b2436; --muted: #6f7a8f; --gold: #b9a57a; --accent: #1f2d4d; --accent-text: #f1f4f9; }
+:root[data-theme="riviera"] { --bg: #f4f2ea; --paper: #fffdf8; --text: #13324a; --muted: #6b8193; --gold: #d0a93a; --accent: #1d5c8c; --accent-text: #fff; }
+:root[data-theme="florence"] { --bg: #f6eceb; --paper: #fffafa; --text: #3a2a2c; --muted: #9a8284; --gold: #c99a8e; --accent: #6f8660; --accent-text: #fff; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+  font-family: "EB Garamond", Georgia, serif;
+  background:
+    radial-gradient(900px 600px at 10% 0%, color-mix(in srgb, var(--gold) 12%, transparent), transparent 60%),
+    var(--bg);
+  overflow: hidden;
+}
+.hidden { display: none !important; }
+.ic { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px 12px 22px;
+  border-bottom: 1px solid color-mix(in srgb, var(--gold) 45%, transparent);
+  -webkit-app-region: drag;
+}
+.monogram {
+  width: 40px; height: 40px; flex: none; display: grid; place-items: center;
+  border: 1px solid var(--gold); border-radius: 50%;
+  outline: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); outline-offset: 2px;
+  font: italic 500 24px/1 "Cormorant Garamond", Georgia, serif; color: var(--gold);
+}
+.titles { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.titles input { border: 0; background: transparent; color: var(--text); outline: none; -webkit-app-region: no-drag; padding: 0; }
+#title { font: italic 600 30px/1.1 "Cormorant Garamond", Georgia, serif; }
+#subtitle { font: 12px "EB Garamond", Georgia, serif; letter-spacing: .22em; text-transform: uppercase; color: var(--gold); margin-top: 3px; }
+.tools { display: flex; gap: 6px; -webkit-app-region: no-drag; }
+.tools button {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border: 1px solid color-mix(in srgb, var(--gold) 50%, transparent); border-radius: 3px;
+  background: var(--paper); color: var(--text); cursor: pointer;
+  font: 12px "EB Garamond", Georgia, serif; text-transform: uppercase; letter-spacing: .12em;
+}
+.tools button:hover { border-color: var(--gold); }
+.tools .primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.tools .icon { padding: 7px; border: 0; background: transparent; }
+
+.board { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 26px 26px 40px; }
+.cols { column-count: 4; column-gap: 22px; }
+@media (max-width: 900px) { .cols { column-count: 3; } }
+@media (max-width: 640px) { .cols { column-count: 2; } }
+.tile {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  break-inside: avoid;
+  margin: 12px 0 26px;
+  background: var(--paper);
+  padding: 10px 10px 8px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, .14), 0 2px 5px rgba(0, 0, 0, .08);
+  transform: rotate(var(--tilt, 0deg));
+  transition: transform .25s, box-shadow .25s;
+}
+.tile:hover { transform: rotate(0deg) translateY(-3px) scale(1.015); box-shadow: 0 16px 30px rgba(0, 0, 0, .2); z-index: 2; }
+.tile img { display: block; width: 100%; height: auto; }
+.tile .cap {
+  width: 100%; margin-top: 7px; border: 0; background: transparent; outline: none; color: var(--text);
+  font: italic 500 17px "Cormorant Garamond", Georgia, serif; text-align: center;
+}
+.tile .cap::placeholder { color: var(--muted); opacity: .7; }
+.tape {
+  position: absolute; top: -11px; left: calc(50% - 42px); width: 84px; height: 22px; transform: rotate(-3deg); opacity: .85;
+  -webkit-mask: linear-gradient(90deg, transparent 0 2px, #000 2px calc(100% - 2px), transparent calc(100% - 2px));
+}
+.tape.gold { background: repeating-linear-gradient(45deg, rgba(184, 149, 90, .6) 0 6px, rgba(184, 149, 90, .32) 6px 12px); }
+.tape.blush { background: repeating-linear-gradient(45deg, rgba(201, 143, 134, .6) 0 6px, rgba(201, 143, 134, .3) 6px 12px); }
+.tape.sage { background: repeating-linear-gradient(45deg, rgba(143, 163, 130, .6) 0 6px, rgba(143, 163, 130, .3) 6px 12px); }
+.tape.powder { background: repeating-linear-gradient(45deg, rgba(129, 153, 179, .6) 0 6px, rgba(129, 153, 179, .3) 6px 12px); }
+.tape.champagne { background: repeating-linear-gradient(45deg, rgba(212, 182, 118, .6) 0 6px, rgba(212, 182, 118, .3) 6px 12px); }
+
+.tile.text { padding: 26px 20px; text-align: center; }
+.tile.text textarea {
+  width: 100%; border: 0; background: transparent; outline: none; resize: none; overflow: hidden;
+  font: italic 600 24px/1.25 "Cormorant Garamond", Georgia, serif; text-align: center; color: inherit;
+}
+.tile.text.noir { background: #1f3a2e; color: #f1e5c8; outline: 1px solid rgba(201, 169, 110, .5); outline-offset: -7px; }
+.tile.text.blush { background: #f6e1dd; color: #4a2e2b; }
+.tile.text.ivory { background: #fbf6ea; color: #2b2a26; outline: 1px solid rgba(184, 149, 90, .45); outline-offset: -7px; }
+.tile.text.sage { background: #e3e9dc; color: #2e3b2f; }
+
+.tile .ops {
+  position: absolute; top: 6px; right: 6px; display: flex; gap: 2px; opacity: 0; transition: opacity .2s;
+  background: rgba(255, 255, 255, .88); border-radius: 14px; padding: 2px;
+}
+.tile:hover .ops { opacity: 1; }
+.tile .ops button { width: 24px; height: 24px; display: grid; place-items: center; border: 0; background: transparent; border-radius: 50%; cursor: pointer; color: #333; }
+.tile .ops button:hover { background: rgba(0, 0, 0, .08); }
+.tile .ops .dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, .2); margin: 5px 2px; padding: 0; }
+
+.empty { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); width: 440px; text-align: center; color: var(--muted); }
+.empty .big { font: italic 600 34px "Cormorant Garamond", Georgia, serif; color: var(--accent); margin: 0 0 8px; }
+.drop {
+  position: fixed; inset: 12px; display: grid; place-items: center; z-index: 20;
+  border: 2px dashed var(--gold); border-radius: 8px; background: color-mix(in srgb, var(--bg) 85%, transparent);
+  font: italic 600 30px "Cormorant Garamond", Georgia, serif; color: var(--accent);
+}
+.toast {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%) translateY(8px); opacity: 0; transition: .25s;
+  background: var(--accent); color: var(--accent-text); border: 1px solid var(--gold); padding: 7px 14px; border-radius: 3px; font-style: italic;
+}
+.toast.show { opacity: 1; transform: translateX(-50%); }
+::-webkit-scrollbar { width: 7px; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--gold) 45%, transparent); border-radius: 7px; }
+
+/* export */
+.export .tools, .export .tile .ops, .export .empty { display: none !important; }
+.export .bar { padding: 56px 60px 22px; border-bottom: 0; }
+.export .monogram { width: 64px; height: 64px; font-size: 38px; }
+.export #title { font-size: 58px; }
+.export #subtitle { font-size: 18px; }
+.export .board { overflow: hidden; padding: 20px 60px 90px; }
+.export .cols { column-count: 3; }
+.export::after {
+  content: "Vision board · Mady";
+  position: fixed; left: 0; right: 0; bottom: 34px; text-align: center;
+  font: 16px "EB Garamond", Georgia, serif; letter-spacing: .3em; text-transform: uppercase; color: var(--gold);
+}
+.export .tile .cap::placeholder { color: transparent; }
+.export .tile img { max-height: 300px; object-fit: cover; }
+.export .tile .cap { font-size: 20px; }
+.export .tile.text textarea { font-size: 28px; }

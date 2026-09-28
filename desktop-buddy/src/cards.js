@@ -66,6 +66,64 @@ function weekData() {
   };
 }
 
+const MOOD_LABELS = { radiant: 'radiantă', bine: 'bine', ok: 'ok', obosit: 'obosită', stresat: 'stresată' };
+
+function monthData(ref = new Date()) {
+  const hist = sessions.history();
+  const y = ref.getFullYear(), m = ref.getMonth();
+  const lastDay = new Date(y, m + 1, 0).getDate();
+  const upTo = (y === new Date().getFullYear() && m === new Date().getMonth()) ? new Date().getDate() : lastDay;
+  const keys = [...Array(lastDay)].map((_, i) => today.key(new Date(y, m, i + 1)));
+  const elapsed = keys.slice(0, upTo);
+  const d = store.get();
+  const days = keys.map((k, i) => ({ day: i + 1, sec: hist[k]?.totalSec || 0, future: i >= upTo, today: k === today.key() }));
+  const worked = days.filter(x => x.sec > 0);
+  const total = worked.reduce((a, x) => a + x.sec, 0);
+  const best = worked.reduce((a, x) => (x.sec > (a?.sec || 0) ? x : a), null);
+  const apps = {};
+  elapsed.forEach(k => (hist[k]?.topApps || []).forEach(a => { apps[a.name] = (apps[a.name] || 0) + a.sec; }));
+  const tops = elapsed.flatMap(k => d.days?.[k]?.top3 || []).filter(x => x.text && x.text.trim());
+  const moods = {};
+  elapsed.forEach(k => { const mo = d.days?.[k]?.mood; if (mo) moods[mo] = (moods[mo] || 0) + 1; });
+  const waterDays = elapsed.map(k => d.days?.[k]?.water || 0).filter(Boolean);
+  const habits = (d.habits || []).map(h => {
+    const log = d.habitLog?.[h.id] || {};
+    const done = elapsed.filter(k => log[k]).length;
+    return { name: h.name, done, pct: Math.round((done / elapsed.length) * 100) };
+  });
+  const favs = Object.values(d.mantras || {}).filter(x => x.fav && keys.includes(x.date));
+  const mantraPick = favs[0] || d.mantras?.[today.key()] || null;
+  const monthName = new Date(y, m, 1).toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' });
+  return {
+    kind: 'month',
+    month: monthName[0].toUpperCase() + monthName.slice(1),
+    firstWeekday: (new Date(y, m, 1).getDay() + 6) % 7,
+    focus: sessions.fmt(total),
+    totalSec: total,
+    daysWorked: worked.length,
+    daysElapsed: upTo,
+    best: best ? { label: new Date(y, m, best.day).toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric' }), focus: sessions.fmt(best.sec) } : null,
+    avg: worked.length ? sessions.fmt(Math.round(total / worked.length)) : '0m',
+    sessions: elapsed.reduce((a, k) => a + (hist[k]?.sessions.length || 0), 0),
+    pomodoros: elapsed.reduce((a, k) => a + (hist[k]?.pomodoros || 0), 0),
+    days,
+    topApps: Object.entries(apps).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n]) => n),
+    prioritiesDone: tops.filter(x => x.done).length,
+    prioritiesTotal: tops.length,
+    moods: Object.entries(moods).sort((a, b) => b[1] - a[1]).map(([k, n]) => ({ label: MOOD_LABELS[k] || k, n })),
+    water: waterDays.length ? +(waterDays.reduce((a, b) => a + b, 0) / waterDays.length).toFixed(1) : 0,
+    habits,
+    mantra: mantraPick ? { text: mantraPick.text, author: mantraPick.author || mantraPick.title || '', label: mantraPick.label } : null,
+    quote: today.quote()
+  };
+}
+
+async function mantraData() {
+  const mantra = require('./mantra');
+  const mm = await mantra.today();
+  return { kind: 'mantra', date: new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' }), mantra: mm };
+}
+
 function outDir() {
   const dir = path.join(app.getPath('pictures'), 'Desktop Buddy');
   fs.mkdirSync(dir, { recursive: true });
@@ -74,7 +132,7 @@ function outDir() {
 
 async function render(kind, format) {
   const size = FORMATS[format] || FORMATS.post;
-  const data = kind === 'week' ? weekData() : dayData();
+  const data = kind === 'week' ? weekData() : kind === 'month' ? monthData() : kind === 'mantra' ? await mantraData() : dayData();
   const s = store.get().settings;
   data.name = s.buddyName;
   data.user = s.userName || '';
@@ -89,7 +147,8 @@ async function render(kind, format) {
     await win.loadFile(path.join(__dirname, '..', 'renderer', 'card.html'));
     await win.webContents.executeJavaScript(`render(${JSON.stringify(data)}).then(() => new Promise(r => setTimeout(r, 250)))`);
     const img = await win.webContents.capturePage({ x: 0, y: 0, width: size.width, height: size.height });
-    const file = path.join(outDir(), `mady-${kind === 'week' ? 'saptamana' : 'ziua'}-${today.key()}-${format}.png`);
+    const names = { week: 'saptamana', month: 'luna', mantra: 'mantra', day: 'ziua' };
+    const file = path.join(outDir(), `mady-${names[kind] || 'ziua'}-${today.key()}-${format}.png`);
     fs.writeFileSync(file, img.toPNG());
     return { file, dataUrl: img.resize({ width: 360 }).toDataURL(), image: img };
   } finally {
@@ -97,4 +156,4 @@ async function render(kind, format) {
   }
 }
 
-module.exports = { render, outDir, dayData, weekData };
+module.exports = { render, outDir, dayData, weekData, monthData };

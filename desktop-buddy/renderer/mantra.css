@@ -1,0 +1,83 @@
+:root, :root[data-theme="ivory"] { --bg: #fbf7ee; --bg2: #f1e8d4; --text: #1e2b24; --muted: #7d7461; --gold: #b8955a; --accent: #1f3a2e; }
+:root[data-theme="evening"] { --bg: #18251e; --bg2: #101a15; --text: #efe6d2; --muted: #a8a08a; --gold: #c9a96e; --accent: #c9a96e; }
+:root[data-theme="light"] { --bg: #fff8fb; --bg2: #fde8f0; --text: #3d2a36; --muted: #9a7f8e; --gold: #f56fa1; --accent: #f56fa1; }
+:root[data-theme="dark"] { --bg: #2c2431; --bg2: #221c26; --text: #f6e9f0; --muted: #b39cab; --gold: #ff7fb0; --accent: #ff7fb0; }
+:root[data-theme="paris"] { --bg: #fbf5ee; --bg2: #efe1d1; --text: #2a1d1a; --muted: #8a7266; --gold: #b07a4f; --accent: #6e1f2e; }
+:root[data-theme="vienna"] { --bg: #f7f9fc; --bg2: #e3e8f0; --text: #1b2436; --muted: #6f7a8f; --gold: #b9a57a; --accent: #1f2d4d; }
+:root[data-theme="riviera"] { --bg: #fffdf7; --bg2: #e8f0f5; --text: #13324a; --muted: #6b8193; --gold: #d0a93a; --accent: #1d5c8c; }
+:root[data-theme="florence"] { --bg: #fffafa; --bg2: #f3e4e2; --text: #3a2a2c; --muted: #9a8284; --gold: #c99a8e; --accent: #6f8660; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; }
+body { padding: 14px 16px 22px; }
+.ic { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+.card {
+  position: relative;
+  padding: 20px 24px 16px;
+  color: var(--text);
+  background:
+    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--gold) 18%, transparent), transparent 55%),
+    linear-gradient(165deg, var(--bg), var(--bg2));
+  border: 1px solid var(--gold);
+  border-radius: 4px;
+  box-shadow: 0 18px 40px rgba(20, 25, 20, .3), 0 3px 8px rgba(20, 25, 20, .12);
+  font-family: "EB Garamond", Georgia, serif;
+  overflow: hidden;
+  animation: enter .8s cubic-bezier(.2, .9, .25, 1.05) both;
+  -webkit-app-region: drag;
+}
+.card.leaving { animation: leave .6s ease-in forwards; }
+@keyframes enter { from { opacity: 0; transform: translateY(-18px) rotate(-1.5deg) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes leave { to { opacity: 0; transform: translateY(-12px) scale(.97); } }
+.frame { position: absolute; inset: 6px; border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); border-radius: 2px; pointer-events: none; }
+/* sclipire aurie care trece o dată peste card */
+.card::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  left: -60%;
+  width: 40%;
+  height: 180%;
+  background: linear-gradient(100deg, transparent, rgba(255, 240, 200, .45), transparent);
+  transform: rotate(18deg);
+  opacity: 0;
+  animation: shine 2.2s .6s ease-out;
+  pointer-events: none;
+}
+@keyframes shine { 0% { left: -60%; opacity: 1; } 85% { opacity: 1; } 100% { left: 180%; opacity: 0; } }
+
+.top { display: flex; align-items: center; justify-content: space-between; }
+.kicker { font-size: 10.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--gold); }
+.label { margin-top: 12px; font: italic 600 15px "Cormorant Garamond", Georgia, serif; color: var(--gold); letter-spacing: .04em; }
+.title { font: italic 600 34px/1.05 "Cormorant Garamond", Georgia, serif; color: var(--accent); margin-top: 2px; }
+.title:empty { display: none; }
+.text { margin-top: 8px; font: italic 500 23px/1.3 "Cormorant Garamond", Georgia, serif; }
+.author { margin-top: 8px; font-size: 11.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+.author:empty, .note:empty { display: none; }
+.note { margin-top: 10px; padding-top: 8px; border-top: 1px dashed color-mix(in srgb, var(--gold) 45%, transparent); font-style: italic; font-size: 14.5px; color: var(--muted); }
+
+.actions { display: flex; align-items: center; gap: 6px; margin-top: 14px; -webkit-app-region: no-drag; }
+.actions button, .x {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text);
+  font: 12px "EB Garamond", Georgia, serif;
+  letter-spacing: .06em;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+.actions button:hover, .x:hover { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, transparent); }
+.x { border: 0; padding: 3px; color: var(--muted); }
+#fav.on { color: #b8475a; border-color: #b8475a; }
+#fav.on .ic { fill: currentColor; }
+.monogram { margin-left: auto; font: italic 600 18px "Cormorant Garamond", Georgia, serif; color: var(--gold); }
+
+.progress { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: color-mix(in srgb, var(--gold) 18%, transparent); }
+.progress i { display: block; height: 100%; width: 100%; background: var(--gold); transform-origin: left; }
+.toast { font-size: 12px; font-style: italic; color: var(--gold); }

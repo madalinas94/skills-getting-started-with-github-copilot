@@ -808,3 +808,57 @@ textarea { resize: none; }
 .confirm-card { width: 100%; background: var(--surface); border: 1px solid var(--gold); border-radius: var(--radius); padding: 18px 18px 12px; box-shadow: var(--shadow); animation: rise .25s ease-out; }
 .confirm-card p { margin: 0 0 8px; font: italic 500 19px/1.35 var(--font-display); }
 .confirm-card .row.end { justify-content: flex-end; margin: 6px 0 0; }
+
+/* ---------- teme sezoniere ---------- */
+:root[data-theme="paris"] {
+  --bg: #f5ede4; --surface: #fbf6f0; --surface-2: #efe2d3; --text: #2a1d1a; --muted: #8a7266; --border: #e0cbb8;
+  --accent: #6e1f2e; --accent-text: #f7ede3; --gold: #b07a4f; --danger: #8b2635;
+  --bubble-user: #6e1f2e; --bubble-user-text: #f7ede3; --bubble-ai: #fbf6f0;
+  --header-bg: linear-gradient(180deg, #74243a, #5c1a2b); --header-text: #f3e2cf;
+}
+:root[data-theme="vienna"] {
+  --bg: #eef1f5; --surface: #f8fafc; --surface-2: #e2e7ef; --text: #1b2436; --muted: #6f7a8f; --border: #d3dae6;
+  --accent: #1f2d4d; --accent-text: #f1f4f9; --gold: #b9a57a; --danger: #9b2c3c;
+  --bubble-user: #1f2d4d; --bubble-user-text: #eef1f7; --bubble-ai: #f8fafc;
+  --header-bg: linear-gradient(180deg, #24345a, #1a2745); --header-text: #e9edf5;
+}
+:root[data-theme="riviera"] {
+  --bg: #f7f5ef; --surface: #fffdf8; --surface-2: #e9f0f5; --text: #13324a; --muted: #6b8193; --border: #d6e2ea;
+  --accent: #1d5c8c; --accent-text: #ffffff; --gold: #d0a93a; --danger: #b23a48;
+  --bubble-user: #1d5c8c; --bubble-user-text: #ffffff; --bubble-ai: #fffdf8;
+  --header-bg: linear-gradient(180deg, #2a72a8, #1d5c8c); --header-text: #fff8e1;
+}
+:root[data-theme="florence"] {
+  --bg: #f8f0ef; --surface: #fffafa; --surface-2: #f1e3e3; --text: #3a2a2c; --muted: #9a8284; --border: #ecd6d6;
+  --accent: #6f8660; --accent-text: #ffffff; --gold: #c99a8e; --danger: #a8445a;
+  --bubble-user: #6f8660; --bubble-user-text: #ffffff; --bubble-ai: #fffafa;
+  --header-bg: linear-gradient(180deg, #7d9470, #647a57); --header-text: #fff4f1;
+}
+
+.mantra-card { display: flex; flex-direction: column; gap: 3px; }
+.mantra-card .m-label { font: 10.5px var(--font-text); font-style: normal; letter-spacing: .2em; text-transform: uppercase; color: #c9a96e; }
+.mantra-card .m-title { font: italic 600 26px/1.1 "Cormorant Garamond", Georgia, serif; }
+.mantra-card .m-title:empty, .mantra-card .m-note:empty, .mantra-card #mAuthor:empty { display: none; }
+.mantra-card .m-text { font: italic 500 19px/1.35 "Cormorant Garamond", Georgia, serif; }
+.mantra-card .m-note { font: italic 13.5px var(--font-text); color: #d8c9a6; border-top: 1px dashed rgba(201, 169, 110, .4); padding-top: 6px; margin-top: 4px; }
+.mantra-card .m-actions { display: flex; gap: 6px; margin-top: 8px; }
+.mantra-card .m-actions button { border: 1px solid rgba(201, 169, 110, .6); background: transparent; color: #f1e5c8; border-radius: 20px; padding: 3px 11px; font: 12px var(--font-text); cursor: pointer; }
+.mantra-card .m-actions button:hover { background: rgba(201, 169, 110, .15); }
+.mantra-card #mFav.on { color: #f4a6b5; border-color: #f4a6b5; }
+.vision-cta {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 16px 16px 14px; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; text-align: left; color: var(--text);
+  background:
+    linear-gradient(120deg, color-mix(in srgb, var(--surface) 88%, transparent), color-mix(in srgb, var(--surface) 70%, transparent)),
+    repeating-linear-gradient(45deg, color-mix(in srgb, var(--gold) 10%, transparent) 0 12px, transparent 12px 24px);
+  transition: border-color .2s, transform .2s;
+}
+.vision-cta:hover { border-color: var(--gold); transform: translateY(-1px); }
+.vision-cta b { font: italic 600 22px var(--font-display); color: var(--accent); }
+:root[data-theme="evening"] .vision-cta b { color: var(--gold); }
+.vision-cta span:last-child { font-size: 13px; color: var(--muted); font-style: italic; }
+.vc-tape { position: absolute; top: -9px; right: 22px; width: 70px; height: 18px; transform: rotate(4deg); background: repeating-linear-gradient(45deg, rgba(184, 149, 90, .6) 0 6px, rgba(184, 149, 90, .3) 6px 12px); }
+.seg button { padding: 5px 8px; }
+.month-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.month-sum .stat b { font-size: 17px; }
+.month-sum .wide { grid-column: 1 / -1; font-size: 13px; font-style: italic; color: var(--muted); }

@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, clipboard, ClipboardItem, screen, Tray, Menu, nativeImage, shell, Notification, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, clipboard, ClipboardItem, screen, Tray, Menu, nativeImage, shell, Notification, globalShortcut, dialog } = require('electron');
+const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const store = require('./src/store');
@@ -10,6 +11,8 @@ const mood = require('./src/mood');
 const briefing = require('./src/briefing');
 const today = require('./src/today');
 const cards = require('./src/cards');
+const mantra = require('./src/mantra');
+const vision = require('./src/vision');
 
 const BUDDY_W = 170;
 const BUDDY_H = 210;
@@ -36,6 +39,9 @@ let bubbleHeight = 90;
 let quickWin = null;
 let lastSessionId = null;
 let lastCard = null;
+let mantraWin = null;
+let visionWin = null;
+const MANTRA_W = 420;
 const stickyWins = new Map(); // id notiță → fereastră
 let tray = null;
 let clipboardTimer = null;
@@ -364,6 +370,73 @@ function restoreStickies() {
   for (const n of store.get().notes) if (n.sticky) createStickyWindow(n);
 }
 
+// ---------- Mantra zilei (card separat pe desktop) ----------
+
+function showMantra() {
+  if (mantraWin && !mantraWin.isDestroyed()) mantraWin.close();
+  const area = screen.getPrimaryDisplay().workArea;
+  const w = mantraWin = new BrowserWindow({
+    width: MANTRA_W, height: 300,
+    x: area.x + area.width - MANTRA_W - 24, y: area.y + 24,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    hasShadow: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    focusable: false,
+    maximizable: false,
+    fullscreenable: false,
+    backgroundColor: '#00000000',
+    webPreferences: { preload: path.join(__dirname, 'preload.js') }
+  });
+  w.setAlwaysOnTop(true, 'floating');
+  w.loadFile(path.join(__dirname, 'renderer', 'mantra.html'));
+  w.once('ready-to-show', () => { if (!w.isDestroyed()) w.showInactive(); });
+  // referința se golește doar dacă e tot fereastra asta (nu una deschisă între timp)
+  w.on('closed', () => { if (mantraWin === w) mantraWin = null; });
+}
+
+// ---------- Vision board ----------
+
+function openVision() {
+  if (visionWin && !visionWin.isDestroyed()) { visionWin.show(); visionWin.focus(); return; }
+  const area = screen.getPrimaryDisplay().workArea;
+  const w = Math.min(1100, area.width - 80), h = Math.min(760, area.height - 60);
+  visionWin = new BrowserWindow({
+    width: w, height: h,
+    x: Math.round(area.x + (area.width - w) / 2), y: Math.round(area.y + (area.height - h) / 2),
+    minWidth: 560, minHeight: 420,
+    frame: false,
+    backgroundColor: '#f4efe4',
+    title: 'Vision board',
+    webPreferences: { preload: path.join(__dirname, 'preload.js') }
+  });
+  visionWin.loadFile(path.join(__dirname, 'renderer', 'vision.html'));
+  visionWin.on('closed', () => { visionWin = null; });
+}
+
+async function exportVision() {
+  const W = 1080, H = 1350;
+  const win = new BrowserWindow({ width: W, height: H, show: false, useContentSize: true, webPreferences: { offscreen: true, preload: path.join(__dirname, 'preload.js') } });
+  win.setContentSize(W, H);
+  try {
+    await win.loadFile(path.join(__dirname, 'renderer', 'vision.html'), { query: { export: '1' } });
+    await win.webContents.executeJavaScript('new Promise(r => setTimeout(r, 300)).then(() => window.__exportReady())');
+    const img = await win.webContents.capturePage({ x: 0, y: 0, width: W, height: H });
+    const file = path.join(cards.outDir(), `mady-vision-board-${today.key()}.png`);
+    fs.writeFileSync(file, img.toPNG());
+    lastCard = { file, image: img, dataUrl: img.resize({ width: 360 }).toDataURL() };
+    await clipboard.write([new ClipboardItem({ 'image/png': new Blob([img.toPNG()], { type: 'image/png' }) })]);
+    return { ok: true, file };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  } finally {
+    win.destroy();
+  }
+}
+
 // ---------- Fereastra rapidă (scurtătura globală) ----------
 
 function createQuickWindow() {
@@ -448,6 +521,8 @@ function createTray() {
     { label: 'Ascunde roboțelul', click: () => buddyWin && buddyWin.hide() },
     { label: `Întreab-o pe Mady (${hotkeyLabel(settings().quickHotkey)})`, click: () => openQuick() },
     { label: 'Azi (planner)', click: () => togglePanel('today') },
+    { label: 'Mantra zilei', click: showMantra },
+    { label: 'Vision board', click: openVision },
     { label: 'Notiță nouă pe desktop', click: newSticky },
     { label: 'Arată notițele lipite', click: showAllStickies },
     { label: 'Timer și statistici', click: () => togglePanel('timer') },
@@ -507,7 +582,7 @@ function trimClipboard() {
 }
 
 function broadcast(channel, payload) {
-  for (const w of [buddyWin, panelWin, timerWin, bubbleWin, quickWin, ...stickyWins.values()]) if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
+  for (const w of [buddyWin, panelWin, timerWin, bubbleWin, quickWin, mantraWin, visionWin, ...stickyWins.values()]) if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
 }
 
 // ---------- Setări ----------
@@ -524,9 +599,19 @@ function applySettings() {
   broadcast('settings:updated', publicSettings());
 }
 
+// „Sezonier automat”: tema se schimbă singură după anotimp.
+function seasonTheme(d = new Date()) {
+  const m = d.getMonth();
+  if (m >= 2 && m <= 4) return 'florence';
+  if (m >= 5 && m <= 7) return 'riviera';
+  if (m >= 8 && m <= 10) return 'paris';
+  return 'vienna';
+}
+
 function publicSettings() {
   return {
     ...settings(), hasApiKey: !!store.getApiKey(), hasMailPassword: !!store.getMailPassword(),
+    themeResolved: settings().theme === 'seasonal' ? seasonTheme() : settings().theme,
     hotkeyActive: registeredHotkey === settings().quickHotkey, hotkeyLabel: hotkeyLabel(settings().quickHotkey)
   };
 }
@@ -555,6 +640,8 @@ function registerIpc() {
       { label: 'Deschide panoul', click: () => togglePanel('clipboard') },
       { label: 'Notițe', click: () => togglePanel('notes') },
       { label: 'Notiță nouă pe desktop', click: newSticky },
+      { label: 'Mantra zilei', click: showMantra },
+      { label: 'Vision board', click: openVision },
       { label: `Întreab-o pe Mady (${hotkeyLabel(settings().quickHotkey)})`, click: () => openQuick() },
       { label: 'Asistent AI', click: () => togglePanel('ai') },
       { label: 'Timer și statistici', click: () => togglePanel('timer') },
@@ -773,12 +860,58 @@ function registerIpc() {
   });
   ipcMain.on('card:show', () => { if (lastCard) shell.showItemInFolder(lastCard.file); });
 
+  // mantra zilei
+  ipcMain.handle('mantra:get', () => mantra.today());
+  ipcMain.handle('mantra:fav', (_e, k, fav) => mantra.setFav(k, fav));
+  ipcMain.handle('mantra:favorites', () => mantra.favorites());
+  ipcMain.on('mantra:close', () => { if (mantraWin) mantraWin.close(); });
+  ipcMain.on('mantra:show', showMantra);
+  ipcMain.on('mantra:openToday', () => togglePanel('today'));
+  ipcMain.on('mantra:size', (_e, h) => {
+    if (!mantraWin) return;
+    const b = mantraWin.getBounds();
+    mantraWin.setBounds({ x: b.x, y: b.y, width: MANTRA_W, height: Math.max(160, Math.min(520, Math.round(h))) });
+  });
+  ipcMain.handle('mantra:image', async () => {
+    try {
+      lastCard = await cards.render('mantra', 'story');
+      await clipboard.write([new ClipboardItem({ 'image/png': new Blob([lastCard.image.toPNG()], { type: 'image/png' }) })]);
+      return { ok: true, file: lastCard.file };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+
+  // vision board
+  ipcMain.on('vision:open', openVision);
+  ipcMain.on('vision:close', () => visionWin && visionWin.close());
+  ipcMain.handle('vision:get', () => vision.view());
+  ipcMain.handle('vision:add', (_e, paths) => vision.addImages(paths));
+  ipcMain.handle('vision:pick', async () => {
+    const r = await dialog.showOpenDialog(visionWin || undefined, {
+      title: 'Alege imagini pentru vision board',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Imagini', extensions: vision.IMAGE_EXT.map(e => e.slice(1)) }]
+    });
+    return r.canceled ? vision.view() : vision.addImages(r.filePaths);
+  });
+  ipcMain.handle('vision:addText', (_e, text, style) => vision.addText(text, style));
+  ipcMain.handle('vision:update', (_e, id, patch) => vision.update(id, patch || {}));
+  ipcMain.handle('vision:remove', (_e, id) => vision.remove(id));
+  ipcMain.handle('vision:move', (_e, id, delta) => vision.move(id, delta));
+  ipcMain.handle('vision:setTitle', (_e, t, st) => vision.setTitle(t, st));
+  ipcMain.handle('vision:export', () => exportVision());
+
+  // raport lunar
+  ipcMain.handle('month:data', () => cards.monthData());
+
   // ghidul de bun venit
   ipcMain.handle('onboarding:done', (_e, patch) => {
     const allowed = ['userName', 'weeklyGoalHours', 'morningBrief', 'buddySpeech'];
     for (const k of allowed) if (patch && k in patch) settings()[k] = patch[k];
     store.get().onboarded = true;
     store.save();
+    if (settings().mantraOnStart) setTimeout(showMantra, 9000);
     broadcast('settings:updated', publicSettings());
     const n = settings().userName;
     say(`${n ? `Încântată, ${n}.` : 'Încântată.'} De acum mă ocup eu de ordine, tu de strălucire.`, { state: 'celebrate', ms: 9000 });
@@ -1063,6 +1196,7 @@ if (!app.requestSingleInstanceLock()) {
         say('Bună! Sunt Mady, noua ta asistentă. Hai să ne cunoaștem.', { state: 'happy', ms: 9000 });
         return;
       }
+      if (settings().mantraOnStart) showMantra();
       if (briefing.due()) await runBriefing();
       else say(mood.line('welcome'), { state: 'happy', ms: 7000 });
     }, 4000);

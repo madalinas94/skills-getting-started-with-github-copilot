@@ -159,3 +159,73 @@ html, body {
 /* vorbește */
 #buddy.talking .mouth { animation: talk .28s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 @keyframes talk { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.25) scaleX(.8); } }
+
+/* ---------- ținute sezoniere ---------- */
+:root[data-theme="paris"] .dress-top { stop-color: #8a2b41; }
+:root[data-theme="paris"] .dress-bot { stop-color: #5c1a2b; }
+:root[data-theme="paris"] .dress { stroke: #b07a4f; }
+:root[data-theme="paris"] .emblem { fill: #d8b48a; transform: scale(.72); transform-origin: 100px 153px; }
+:root[data-theme="paris"] .dots { display: none; }
+:root[data-theme="paris"] .hem { display: inline; stroke: #b07a4f; }
+:root[data-theme="paris"] .pearls { display: inline; }
+:root[data-theme="paris"] .bow { fill: #d8b48a; stroke: #8a5a35; }
+:root[data-theme="paris"] .bow-knot { fill: #8a5a35; }
+:root[data-theme="paris"] .glow-in { stop-color: #fff1dc; }
+:root[data-theme="paris"] .glow-out { stop-color: #b07a4f; }
+:root[data-theme="paris"] .eye { fill: #f3dca6; }
+:root[data-theme="paris"] .mouth, :root[data-theme="paris"] .eye-line { stroke: #f3dca6; }
+:root[data-theme="paris"] .blush { fill: #d99a8a; }
+:root[data-theme="paris"] .shoe { fill: #2a1d1a; }
+:root[data-theme="paris"] .acc-beret { display: inline; }
+:root[data-theme="paris"] #toast { font: italic 600 13px "Cormorant Garamond", Georgia, serif; color: #5c1a2b; background: #fffdf8; border: 1px solid #b07a4f; border-radius: 3px; }
+:root[data-theme="vienna"] .dress-top { stop-color: #2a3d66; }
+:root[data-theme="vienna"] .dress-bot { stop-color: #1a2745; }
+:root[data-theme="vienna"] .dress { stroke: #b9a57a; }
+:root[data-theme="vienna"] .emblem { fill: #eef1f7; transform: scale(.72); transform-origin: 100px 153px; }
+:root[data-theme="vienna"] .dots { display: none; }
+:root[data-theme="vienna"] .hem { display: inline; stroke: #b9a57a; }
+:root[data-theme="vienna"] .pearls { display: none; }
+:root[data-theme="vienna"] .bow { fill: #eef1f7; stroke: #b9a57a; }
+:root[data-theme="vienna"] .bow-knot { fill: #b9a57a; }
+:root[data-theme="vienna"] .glow-in { stop-color: #ffffff; }
+:root[data-theme="vienna"] .glow-out { stop-color: #b9a57a; }
+:root[data-theme="vienna"] .eye { fill: #d4e6ff; }
+:root[data-theme="vienna"] .mouth, :root[data-theme="vienna"] .eye-line { stroke: #d4e6ff; }
+:root[data-theme="vienna"] .blush { fill: #d9a3ad; }
+:root[data-theme="vienna"] .shoe { fill: #1b2436; }
+:root[data-theme="vienna"] .acc-scarf { display: inline; }
+:root[data-theme="vienna"] #toast { font: italic 600 13px "Cormorant Garamond", Georgia, serif; color: #1a2745; background: #fffdf8; border: 1px solid #b9a57a; border-radius: 3px; }
+:root[data-theme="riviera"] .dress-top { stop-color: #2f7ab3; }
+:root[data-theme="riviera"] .dress-bot { stop-color: #1d5c8c; }
+:root[data-theme="riviera"] .dress { stroke: #d0a93a; }
+:root[data-theme="riviera"] .emblem { fill: #fff4c2; transform: scale(.72); transform-origin: 100px 153px; }
+:root[data-theme="riviera"] .dots { display: none; }
+:root[data-theme="riviera"] .hem { display: inline; stroke: #d0a93a; }
+:root[data-theme="riviera"] .pearls { display: inline; }
+:root[data-theme="riviera"] .bow { fill: #f3d36b; stroke: #c79b21; }
+:root[data-theme="riviera"] .bow-knot { fill: #c79b21; }
+:root[data-theme="riviera"] .glow-in { stop-color: #fff8d6; }
+:root[data-theme="riviera"] .glow-out { stop-color: #d0a93a; }
+:root[data-theme="riviera"] .eye { fill: #c4ecff; }
+:root[data-theme="riviera"] .mouth, :root[data-theme="riviera"] .eye-line { stroke: #c4ecff; }
+:root[data-theme="riviera"] .blush { fill: #f0a38f; }
+:root[data-theme="riviera"] .shoe { fill: #8a5a35; }
+:root[data-theme="riviera"] .acc-sun { display: inline; }
+:root[data-theme="riviera"] #toast { font: italic 600 13px "Cormorant Garamond", Georgia, serif; color: #1d5c8c; background: #fffdf8; border: 1px solid #d0a93a; border-radius: 3px; }
+:root[data-theme="florence"] .dress-top { stop-color: #9bb08b; }
+:root[data-theme="florence"] .dress-bot { stop-color: #6f8660; }
+:root[data-theme="florence"] .dress { stroke: #c99a8e; }
+:root[data-theme="florence"] .emblem { fill: #fbe4e8; transform: scale(.72); transform-origin: 100px 153px; }
+:root[data-theme="florence"] .dots { display: none; }
+:root[data-theme="florence"] .hem { display: inline; stroke: #c99a8e; }
+:root[data-theme="florence"] .pearls { display: inline; }
+:root[data-theme="florence"] .bow { fill: #f4c7cf; stroke: #c99a8e; }
+:root[data-theme="florence"] .bow-knot { fill: #c99a8e; }
+:root[data-theme="florence"] .glow-in { stop-color: #fff4f1; }
+:root[data-theme="florence"] .glow-out { stop-color: #c99a8e; }
+:root[data-theme="florence"] .eye { fill: #f7e0c8; }
+:root[data-theme="florence"] .mouth, :root[data-theme="florence"] .eye-line { stroke: #f7e0c8; }
+:root[data-theme="florence"] .blush { fill: #eab1b8; }
+:root[data-theme="florence"] .shoe { fill: #5a4a40; }
+:root[data-theme="florence"] .acc-flowers { display: inline; }
+:root[data-theme="florence"] #toast { font: italic 600 13px "Cormorant Garamond", Georgia, serif; color: #6f8660; background: #fffdf8; border: 1px solid #c99a8e; border-radius: 3px; }

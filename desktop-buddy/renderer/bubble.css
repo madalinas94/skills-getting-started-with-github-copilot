@@ -54,3 +54,9 @@ body { padding: 6px 8px 16px; }
   padding: 2px 4px;
 }
 .close:hover { color: var(--gold); }
+
+/* teme sezoniere */
+:root[data-theme="paris"] { --bg: #fbf6f0; --text: #2a1d1a; --gold: #b07a4f; --muted: #8a7266; }
+:root[data-theme="vienna"] { --bg: #f8fafc; --text: #1b2436; --gold: #b9a57a; --muted: #6f7a8f; }
+:root[data-theme="riviera"] { --bg: #fffdf8; --text: #13324a; --gold: #d0a93a; --muted: #6b8193; }
+:root[data-theme="florence"] { --bg: #fffafa; --text: #3a2a2c; --gold: #c99a8e; --muted: #9a8284; }

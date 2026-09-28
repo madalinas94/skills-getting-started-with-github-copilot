@@ -85,3 +85,38 @@ body {
 .hdots { display: flex; gap: 10px; }
 .hdots i { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #b8955a; }
 .hdots i.on { background: #b8955a; }
+
+/* luna */
+.mcal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; }
+.mcal .mh { text-align: center; font-size: 20px; letter-spacing: .15em; color: #a8864f; }
+.mcal i {
+  aspect-ratio: 1; display: grid; place-items: center; font: normal 20px "EB Garamond", Georgia, serif; font-variant-numeric: lining-nums;
+  border: 1px solid #e3d5b8; border-radius: 4px; color: #3d3222;
+  background: color-mix(in srgb, #1f3a2e calc(var(--lvl, 0) * 100%), #fbf6ea);
+}
+.mcal i.dark { color: #f1e5c8; }
+.mcal i.blank { visibility: hidden; }
+.mcal i.future { opacity: .35; }
+.mcal i.today { outline: 2px solid #b8955a; outline-offset: 1px; }
+.hbars { display: flex; flex-direction: column; gap: 16px; }
+.hbn { display: flex; justify-content: space-between; font-size: 26px; }
+.hbn em { color: #a8864f; font-variant-numeric: lining-nums; }
+.hbar { height: 10px; border-radius: 10px; background: #e8dcc2; overflow: hidden; margin-top: 6px; }
+.hbar i { display: block; height: 100%; background: linear-gradient(90deg, #1f3a2e, #b8955a); }
+.list.small { font-size: 26px; gap: 10px; }
+.list.small b { font-weight: 500; color: #a8864f; }
+.moods-l { display: flex; flex-wrap: wrap; gap: 10px; }
+.moods-l span { padding: 6px 16px; border: 1px solid #b8955a; border-radius: 30px; font: italic 26px "Cormorant Garamond", Georgia, serif; }
+.moods-l b { color: #a8864f; font-weight: 500; font-style: normal; }
+
+/* mantra */
+.mantra { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 22px; padding: 0 30px; }
+.mantra .medal { width: 170px; height: 170px; margin-bottom: 20px; }
+.story .mantra .medal { width: 210px; height: 210px; }
+.mlabel { font: italic 600 40px "Cormorant Garamond", Georgia, serif; color: #a8864f; }
+.mtitle { font: italic 600 110px/1 "Cormorant Garamond", Georgia, serif; color: #1f3a2e; }
+.mtext { font: italic 500 62px/1.25 "Cormorant Garamond", Georgia, serif; color: #1e2b24; max-width: 860px; }
+.story .mtext { font-size: 70px; }
+.mauthor { font-size: 26px; letter-spacing: .3em; text-transform: uppercase; color: #8a806b; }
+.mnote { font: italic 32px/1.35 "EB Garamond", Georgia, serif; color: #6e604a; border-top: 1px solid #d9c7a2; padding-top: 22px; max-width: 760px; }
+.orn { font-size: 34px; color: #b8955a; }
