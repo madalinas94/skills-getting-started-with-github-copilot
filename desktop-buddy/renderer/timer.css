@@ -64,3 +64,6 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
 :root[data-theme="vienna"] { --bg: #1a2745; --gold: #b9a57a; }
 :root[data-theme="riviera"] { --bg: #1d5c8c; --gold: #d0a93a; }
 :root[data-theme="florence"] { --bg: #647a57; --gold: #c99a8e; }
+
+/* Heritage */
+:root[data-theme="heritage"] { --bg: #1c2433; --gold: #a88a5c; --radius: 0px; }

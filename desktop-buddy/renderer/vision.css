@@ -194,3 +194,28 @@ body {
 .export .filters, .export .shint { display: none !important; }
 .export .slot-art { aspect-ratio: auto; height: 190px; }
 .export .slot-art svg { width: 30%; }
+
+/* ---------- imagini de pe internet ---------- */
+.tools .gold { background: linear-gradient(135deg, #c9a96e, #a8864f); color: #fff; border-color: #a8864f; }
+.credit { display: block; margin-top: 2px; text-align: center; font: 10px "EB Garamond", Georgia, serif; color: var(--muted); opacity: .8; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.credit:hover { color: var(--gold); }
+.querybar { display: flex; align-items: center; gap: 8px; padding: 8px 22px 0; font: italic 14px "Cormorant Garamond", Georgia, serif; color: var(--muted); }
+.querybar input { flex: 0 1 320px; padding: 5px 9px; border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); border-radius: 3px; background: var(--paper); color: var(--text); font: 14px "EB Garamond", Georgia, serif; outline: none; }
+.querybar input:focus { border-color: var(--gold); }
+.querybar button { padding: 5px 12px; border: 1px solid color-mix(in srgb, var(--gold) 50%, transparent); border-radius: 3px; background: transparent; color: var(--text); font: 11px "EB Garamond", Georgia, serif; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
+.progress { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 60%, transparent); backdrop-filter: blur(3px); }
+.pcard { width: 380px; background: var(--paper); border: 1px solid var(--gold); padding: 22px 24px 20px; text-align: center; box-shadow: 0 20px 44px rgba(0, 0, 0, .2); }
+.pk { font: 11px "EB Garamond", Georgia, serif; letter-spacing: .24em; text-transform: uppercase; color: var(--gold); }
+.pt { margin: 8px 0 12px; font: italic 600 24px "Cormorant Garamond", Georgia, serif; color: var(--accent); }
+.pbar { height: 3px; background: color-mix(in srgb, var(--gold) 20%, transparent); }
+.pbar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .4s; }
+.tile.loading { opacity: .55; pointer-events: none; }
+.webfill { display: flex; align-items: center; gap: 6px; font: italic 14px "Cormorant Garamond", Georgia, serif; color: var(--text); margin-right: 6px; }
+.webfill input { accent-color: var(--accent); }
+.export .credit { font-size: 9px; }
+
+/* Heritage */
+:root[data-theme="heritage"] { --bg: #f1ebe0; --paper: #faf7f1; --text: #1c2433; --muted: #7a7466; --gold: #a88a5c; --accent: #1c2433; --accent-text: #f4efe6; }
+:root[data-theme="heritage"] #title { font-style: normal; font-weight: 500; letter-spacing: .02em; }
+:root[data-theme="heritage"] .bar { border-bottom: 3px double var(--gold); }
+:root[data-theme="heritage"] .tools button { border-radius: 0; }

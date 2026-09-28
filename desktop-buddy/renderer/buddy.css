@@ -229,3 +229,25 @@ html, body {
 :root[data-theme="florence"] .shoe { fill: #5a4a40; }
 :root[data-theme="florence"] .acc-flowers { display: inline; }
 :root[data-theme="florence"] #toast { font: italic 600 13px "Cormorant Garamond", Georgia, serif; color: #6f8660; background: #fffdf8; border: 1px solid #c99a8e; border-radius: 3px; }
+
+/* ---------- coafura: coc elegant ---------- */
+#buddy[data-hair="coc"] .pigtail, #buddy[data-hair="coc"] .bow, #buddy[data-hair="coc"] .bow-knot, #buddy[data-hair="coc"] .antenna-stick { display: none; }
+#buddy[data-hair="coc"] .hair-bun, #buddy[data-hair="coc"] .earrings { display: inline; }
+#buddy[data-hair="coc"] .antenna-light { r: 5px; cy: 9px; }
+
+/* ---------- Heritage: blazer bleumarin, alamă, perle ---------- */
+:root[data-theme="heritage"] .dress-top { stop-color: #2b3650; }
+:root[data-theme="heritage"] .dress-bot { stop-color: #1c2433; }
+:root[data-theme="heritage"] .dress { stroke: #a88a5c; }
+:root[data-theme="heritage"] .emblem, :root[data-theme="heritage"] .dots { display: none; }
+:root[data-theme="heritage"] .hem { display: inline; stroke: #a88a5c; }
+:root[data-theme="heritage"] .pearls, :root[data-theme="heritage"] .acc-blazer { display: inline; }
+:root[data-theme="heritage"] .bow { fill: #f4efe6; stroke: #a88a5c; }
+:root[data-theme="heritage"] .bow-knot { fill: #a88a5c; }
+:root[data-theme="heritage"] .glow-in { stop-color: #fbf6ea; }
+:root[data-theme="heritage"] .glow-out { stop-color: #e9e1cf; }
+:root[data-theme="heritage"] .eye { fill: #f3e3bf; }
+:root[data-theme="heritage"] .mouth, :root[data-theme="heritage"] .eye-line { stroke: #f3e3bf; }
+:root[data-theme="heritage"] .blush { fill: #d9a9a0; }
+:root[data-theme="heritage"] .shoe { fill: #3a2a22; }
+:root[data-theme="heritage"] #toast { font: 600 11px "EB Garamond", Georgia, serif; letter-spacing: .18em; text-transform: uppercase; color: #1c2433; background: #faf7f1; border: 1px solid #a88a5c; border-radius: 0; }

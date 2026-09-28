@@ -10,7 +10,8 @@ const DEFAULT_DATA = {
     alwaysOnTop: true,
     startWithWindows: false,
     hidePanelOnBlur: true,
-    theme: 'ivory',
+    theme: 'heritage',
+    buddyHair: 'coc',
     clipboardEnabled: true,
     clipboardLimit: 50,
     aiProvider: 'demo',
@@ -36,10 +37,12 @@ const DEFAULT_DATA = {
     quickHotkey: 'CommandOrControl+Shift+Space',
     userName: '',
     mantraOnStart: true,
-    mantraSeconds: 30
+    mantraSeconds: 30,
+    visionProvider: 'openverse'
   },
   apiKeyEncrypted: '',
   mailPasswordEncrypted: '',
+  visionKeyEncrypted: '',
   mailLastScan: null,
   lastBriefDate: '',
   onboarded: false,
@@ -119,5 +122,7 @@ const setApiKey = key => setSecret('apiKeyEncrypted', key);
 const getApiKey = () => getSecret('apiKeyEncrypted');
 const setMailPassword = pass => setSecret('mailPasswordEncrypted', pass);
 const getMailPassword = () => getSecret('mailPasswordEncrypted');
+const setVisionKey = k => setSecret('visionKeyEncrypted', k);
+const getVisionKey = () => getSecret('visionKeyEncrypted');
 
-module.exports = { get, save, flush, setApiKey, getApiKey, setMailPassword, getMailPassword, DEFAULT_DATA };
+module.exports = { get, save, flush, setApiKey, getApiKey, setMailPassword, getMailPassword, setVisionKey, getVisionKey, DEFAULT_DATA };

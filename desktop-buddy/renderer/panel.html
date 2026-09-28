@@ -357,6 +357,23 @@
         </label>
         <label class="check"><input type="checkbox" id="sMailNotifyEmpty"> Notifică și când nu am emailuri noi</label>
 
+        <h3>Vision board</h3>
+        <label>Sursa imaginilor reale
+          <select id="sVisionProvider">
+            <option value="openverse">Openverse (fără cheie, licențe libere)</option>
+            <option value="pexels">Pexels (cheie gratuită, foto editoriale)</option>
+            <option value="unsplash">Unsplash (cheie gratuită, foto editoriale)</option>
+          </select>
+        </label>
+        <label id="visionKeyRow">Cheie API pentru imagini
+          <div class="row">
+            <input id="sVisionKey" type="password" placeholder="lipește cheia aici" autocomplete="off">
+            <button class="btn small" id="sVisionKeySave" type="button">Salvează</button>
+          </div>
+          <span class="muted" id="sVisionKeyStatus"></span>
+        </label>
+        <p class="hint" id="visionHint"></p>
+
         <h3>Mady</h3>
         <label>Numele tău (cum te salută Mady)
           <input id="sUserName" maxlength="30" placeholder="ex: Mădălina">
@@ -366,6 +383,12 @@
         </label>
         <label>Mărime <span class="muted" id="sScaleVal"></span>
           <input id="sScale" type="range" min="0.6" max="1.6" step="0.1">
+        </label>
+        <label>Coafura lui Mady
+          <select id="sHair">
+            <option value="coc">Coc elegant (matur)</option>
+            <option value="codite">Codițe (jucăuș)</option>
+          </select>
         </label>
         <label class="check"><input type="checkbox" id="sOnTop"> Mereu deasupra altor ferestre</label>
         <label class="check"><input type="checkbox" id="sSpeech"> Mady vorbește (bule de dialog)</label>
@@ -394,6 +417,7 @@
         <h3>Aspect</h3>
         <label>Temă
           <select id="sTheme">
+            <option value="heritage">Heritage · matur, old money</option>
             <option value="seasonal">Sezonier automat (după anotimp)</option>
             <option value="ivory">Old Money · Ivory</option>
             <option value="evening">Old Money · Evening</option>

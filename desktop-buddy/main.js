@@ -610,7 +610,7 @@ function seasonTheme(d = new Date()) {
 
 function publicSettings() {
   return {
-    ...settings(), hasApiKey: !!store.getApiKey(), hasMailPassword: !!store.getMailPassword(),
+    ...settings(), hasApiKey: !!store.getApiKey(), hasMailPassword: !!store.getMailPassword(), hasVisionKey: !!store.getVisionKey(),
     themeResolved: settings().theme === 'seasonal' ? seasonTheme() : settings().theme,
     hotkeyActive: registeredHotkey === settings().quickHotkey, hotkeyLabel: hotkeyLabel(settings().quickHotkey)
   };
@@ -903,6 +903,24 @@ function registerIpc() {
   });
   ipcMain.handle('vision:addAreas', (_e, ids) => vision.addAreas(ids));
   ipcMain.handle('vision:nextAff', (_e, id) => vision.nextAffirmation(id));
+  const imgOpts = () => ({ provider: settings().visionProvider || 'openverse', key: store.getVisionKey() });
+  ipcMain.handle('vision:webFill', async (_e, id, next) => {
+    try { return { ok: true, view: await vision.webFill(id, imgOpts(), { next }) }; } catch (err) { return { ok: false, error: err.message, view: vision.view() }; }
+  });
+  ipcMain.handle('vision:generate', async e => {
+    try {
+      const r = await vision.generate(imgOpts(), p => { if (!e.sender.isDestroyed()) e.sender.send('vision:progress', p); });
+      return { ok: true, view: r.view, errors: r.errors };
+    } catch (err) {
+      return { ok: false, error: err.message, view: vision.view() };
+    }
+  });
+  ipcMain.handle('vision:setQuery', (_e, area, q) => vision.setQuery(area, q));
+  ipcMain.handle('vision:setKey', (_e, key) => {
+    store.setVisionKey(String(key || '').trim());
+    broadcast('settings:updated', publicSettings());
+    return publicSettings();
+  });
   ipcMain.handle('vision:addText', (_e, text, style) => vision.addText(text, style));
   ipcMain.handle('vision:update', (_e, id, patch) => vision.update(id, patch || {}));
   ipcMain.handle('vision:remove', (_e, id) => vision.remove(id));

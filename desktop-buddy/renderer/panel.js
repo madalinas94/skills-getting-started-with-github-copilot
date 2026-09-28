@@ -1072,6 +1072,16 @@ function renderSettings() {
   $('#sMorningBrief').checked = settings.morningBrief;
   $('#sBriefVoice').checked = settings.briefVoice;
   $('#sMantraStart').checked = settings.mantraOnStart;
+  $('#sHair').value = settings.buddyHair || 'coc';
+  $('#sVisionProvider').value = settings.visionProvider || 'openverse';
+  const vp = settings.visionProvider || 'openverse';
+  $('#visionKeyRow').classList.toggle('hidden', vp === 'openverse');
+  $('#sVisionKeyStatus').textContent = settings.hasVisionKey ? 'Cheie salvată · criptată' : 'Nicio cheie salvată';
+  $('#visionHint').replaceChildren(...({
+    openverse: ['Imagini cu licențe Creative Commons; autorul apare sub fiecare fotografie.'],
+    pexels: ['Cheie gratuită în 1 minut: ', el('a', { href: '#', textContent: 'pexels.com/api', onclick: e => { e.preventDefault(); api.app.openExternal('https://www.pexels.com/api/'); } }), '.'],
+    unsplash: ['Cheie gratuită („Access Key”): ', el('a', { href: '#', textContent: 'unsplash.com/developers', onclick: e => { e.preventDefault(); api.app.openExternal('https://unsplash.com/developers'); } }), '.']
+  })[vp]);
   $('#sMantraSec').value = settings.mantraSeconds || 30;
   if (document.activeElement !== $('#sHotkey')) $('#sHotkey').value = settings.quickHotkey || '';
   $('#sHotkeyStatus').textContent = settings.hotkeyActive
@@ -1159,6 +1169,16 @@ $('#sSpeech').addEventListener('change', e => update({ buddySpeech: e.target.che
 $('#sSpontaneous').addEventListener('change', e => update({ buddySpontaneous: e.target.checked }));
 $('#sMorningBrief').addEventListener('change', e => update({ morningBrief: e.target.checked }));
 $('#sBriefVoice').addEventListener('change', e => update({ briefVoice: e.target.checked }));
+$('#sHair').addEventListener('change', e => update({ buddyHair: e.target.value }));
+$('#sVisionProvider').addEventListener('change', e => update({ visionProvider: e.target.value }));
+$('#sVisionKeySave').addEventListener('click', async () => {
+  const k = $('#sVisionKey').value.trim();
+  if (!k) return toast('Lipește întâi cheia');
+  settings = await api.vision.setKey(k);
+  $('#sVisionKey').value = '';
+  renderSettings();
+  toast('Cheia pentru imagini a fost salvată');
+});
 $('#sMantraStart').addEventListener('change', e => update({ mantraOnStart: e.target.checked }));
 $('#sMantraSec').addEventListener('change', e => update({ mantraSeconds: Math.max(5, Math.min(300, Number(e.target.value) || 30)) }));
 $('#sHotkeySave').addEventListener('click', () => update({ quickHotkey: $('#sHotkey').value.trim() }, 'Scurtătură activă'));

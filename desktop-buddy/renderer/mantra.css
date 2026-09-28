@@ -81,3 +81,9 @@ body { padding: 26px 30px 44px; }
 .progress { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: color-mix(in srgb, var(--gold) 18%, transparent); }
 .progress i { display: block; height: 100%; width: 100%; background: var(--gold); transform-origin: left; }
 .toast { font-size: 12px; font-style: italic; color: var(--gold); }
+
+/* Heritage */
+:root[data-theme="heritage"] { --bg: #faf7f1; --bg2: #efe8da; --text: #1c2433; --muted: #7a7466; --gold: #a88a5c; --accent: #5a1a24; }
+:root[data-theme="heritage"] .card { border-radius: 0; }
+:root[data-theme="heritage"] .label { font: 600 10.5px "EB Garamond", Georgia, serif; letter-spacing: .24em; text-transform: uppercase; color: #5a1a24; }
+:root[data-theme="heritage"] .title { font-style: normal; font-weight: 500; }

@@ -50,13 +50,27 @@ Imaginile se copiază în folderul aplicației, deci rămân chiar dacă muți o
 Libertate financiară, Mașina visurilor, Casa mea, Iubire adevărată, Credință și rugăciune, Frumusețe,
 Fit și sănătoasă, Eleganță și rafinament, Familia împreună. Fiecare are un cadru cu o ilustrație
 aurie (click sau trage o fotografie peste el ca să-l umpli) și o afirmație pe care o poți schimba
-(⟳). Filtrele de sus arată o singură arie. Afirmațiile apar și ca **„Afirmația zilei”** în mantra zilei.
+(⟳). Filtrele de sus arată o singură arie.
+
+**Imagini reale de pe internet:** „Imagini reale” (sau bifa din fereastra ariilor) umple automat
+cadrele cu fotografii găsite pe internet, pe căutări în registrul „old money” (Amalfi, manor englezesc,
+bibliotecă clasică, Mercedes vintage, perle și mătase…). Pe fiecare poză: ⟳ altă imagine. Cu un filtru
+activ, căutarea ariei se poate schimba (ex: „Range Rover Autobiography”). Sub fiecare fotografie apare
+autorul și licența. Sursa se alege din Setări → Vision board: **Openverse** (fără cheie, licențe
+Creative Commons), **Pexels** sau **Unsplash** (cheie gratuită, fotografii editoriale). Afirmațiile apar și ca **„Afirmația zilei”** în mantra zilei.
 
 ## Raport lunar
 
 În Timer → „Luna aceasta”: ore de focus, zile lucrate, media pe zi, cea mai bună zi. Cardul
 **„Luna mea”** (post sau story) adaugă calendarul lunii colorat după ore, procentul fiecărui ritual,
 prioritățile bifate, stările, apa și mantra preferată a lunii.
+
+## Heritage (tema implicită)
+
+Varianta cea mai matură și luxoasă: hârtie ivory cu textură fină de in, cerneală bleumarin, accente
+oxblood și alamă, titluri în majuscule mici între linii fine, rame cu linie dublă, colțuri drepte.
+Mady poartă un **coc elegant**, cercei cu perle și un **blazer bleumarin** cu nasturi de alamă
+(Setări → Mady → Coafura: „Codițe” pentru varianta jucăușă).
 
 ## Teme sezoniere
 
@@ -205,6 +219,7 @@ desktop-buddy/
 ├── src/mantra.js      # mantra zilei (AI sau colecție), favorite
 ├── src/vision.js      # vision board: imagini, carduri de text, ariile vieții
 ├── src/lifeareas.js   # ariile vieții și afirmațiile lor
+├── src/imagesearch.js # căutare și descărcare de imagini (Openverse / Pexels / Unsplash)
 ├── renderer/sticky.*  # notițele lipite pe desktop
 ├── renderer/          # HTML/CSS/JS pentru roboțel și panou
 ├── assets/            # buddy.svg, icon.svg, icon.png, icon.ico

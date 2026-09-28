@@ -42,6 +42,20 @@ function ops(item) {
     el('button', { title: 'Mută mai devreme', onclick: async () => set(await api.vision.move(item.id, -1)) }, [icon('left')]),
     el('button', { title: 'Mută mai târziu', onclick: async () => set(await api.vision.move(item.id, 1)) }, [icon('right')])
   ]);
+  if (item.category && (item.type === 'slot' || item.type === 'image')) {
+    box.prepend(el('button', {
+      title: item.type === 'slot' ? 'Imagine reală de pe internet' : 'Altă imagine de pe internet',
+      onclick: async e => {
+        e.stopPropagation();
+        const tile = e.currentTarget.closest('.tile');
+        tile.classList.add('loading');
+        const r = await api.vision.webFill(item.id, item.type === 'image');
+        tile.classList.remove('loading');
+        if (!r.ok) toast(r.error);
+        set(r.view);
+      }
+    }, [icon(item.type === 'slot' ? 'globe' : 'refresh')]));
+  }
   if (item.type === 'text' && item.category) {
     box.prepend(el('button', { title: 'Altă afirmație', onclick: async () => set(await api.vision.nextAff(item.id)) }, [icon('shuffle')]));
   }
@@ -64,6 +78,8 @@ function render() {
     el('button', { className: filter ? '' : 'on', textContent: 'Toate', onclick: () => { filter = ''; render(); } }),
     ...used.map(a => el('button', { className: filter === a.id ? 'on' : '', onclick: () => { filter = a.id; render(); } }, [a.label, el('em', { textContent: a.count })]))
   ] : []));
+  $('#querybar').classList.toggle('hidden', !filter);
+  if (filter && document.activeElement !== $('#queryInput')) $('#queryInput').value = board.areas.find(a => a.id === filter)?.query || '';
   const items = board.items.filter(i => !filter || i.category === filter);
   const cols = el('div', { className: 'cols' });
   $('#board').replaceChildren(cols);
@@ -95,6 +111,15 @@ function render() {
       const cap = el('input', { className: 'cap', value: item.caption || '', placeholder: 'adaugă o legendă…', maxLength: 80 });
       cap.addEventListener('change', () => api.vision.update(item.id, { caption: cap.value }));
       tile.append(el('img', { src: item.url, alt: item.caption || '' }), cap);
+      if (item.source) {
+        const src = item.source;
+        tile.append(el('span', {
+          className: 'credit',
+          title: `${src.provider}${src.link ? ' · ' + src.link : ''}`,
+          textContent: `Foto: ${src.creator || 'autor necunoscut'} · ${src.license}`,
+          onclick: () => src.link && api.app.openExternal(src.link)
+        }));
+      }
     } else {
       const ta = el('textarea', { value: item.text, rows: 1, maxLength: 200 });
       ta.addEventListener('input', () => autoGrow(ta));
@@ -127,6 +152,34 @@ function openPicker() {
   $('#picker').classList.remove('hidden');
 }
 $('#addAreas').addEventListener('click', openPicker);
+
+async function generateAll() {
+  $('#progress').classList.remove('hidden');
+  $('#progressText').textContent = 'Pregătesc board-ul…';
+  $('#progressBar').style.width = '0%';
+  const r = await api.vision.generate();
+  $('#progress').classList.add('hidden');
+  set(r.view);
+  if (!r.ok) toast(r.error);
+  else if (r.errors.length) toast(r.errors[0]);
+  else toast('Board-ul tău e gata');
+}
+api.vision.onProgress(p => {
+  $('#progressText').textContent = p.area ? `${p.area} (${p.done + 1}/${p.total})` : 'Aproape gata…';
+  $('#progressBar').style.width = (p.total ? Math.round((p.done / p.total) * 100) : 100) + '%';
+});
+$('#generate').addEventListener('click', generateAll);
+$('#queryApply').addEventListener('click', async () => {
+  if (!filter) return;
+  set(await api.vision.setQuery(filter, $('#queryInput').value));
+  const targets = board.items.filter(i => i.category === filter && (i.type === 'slot' || (i.type === 'image' && i.source)));
+  for (const t of targets) {
+    const r = await api.vision.webFill(t.id, false);
+    if (!r.ok) { toast(r.error); break; }
+    set(r.view);
+  }
+});
+$('#queryInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('#queryApply').click(); });
 $('#startAreas').addEventListener('click', openPicker);
 $('#pickCancel').addEventListener('click', () => $('#picker').classList.add('hidden'));
 $('#pickAll').addEventListener('click', () => {
@@ -137,6 +190,7 @@ $('#pickOk').addEventListener('click', async () => {
   $('#picker').classList.add('hidden');
   const order = board.areas.map(a => a.id).filter(id => picked.has(id));
   if (order.length) set(await api.vision.addAreas(order));
+  if (order.length && $('#pickWeb').checked) generateAll();
 });
 $('#addText').addEventListener('click', async () => {
   set(await api.vision.addText('Scrie aici visul tău', ['noir', 'blush', 'ivory', 'sage'][board.items.length % 4]));

@@ -60,3 +60,7 @@ body { padding: 6px 8px 16px; }
 :root[data-theme="vienna"] { --bg: #f8fafc; --text: #1b2436; --gold: #b9a57a; --muted: #6f7a8f; }
 :root[data-theme="riviera"] { --bg: #fffdf8; --text: #13324a; --gold: #d0a93a; --muted: #6b8193; }
 :root[data-theme="florence"] { --bg: #fffafa; --text: #3a2a2c; --gold: #c99a8e; --muted: #9a8284; }
+
+/* Heritage */
+:root[data-theme="heritage"] { --bg: #faf7f1; --text: #1c2433; --gold: #a88a5c; --muted: #7a7466; --radius: 0px; }
+:root[data-theme="heritage"] .name { color: #5a1a24; font: 600 10.5px "EB Garamond", Georgia, serif; letter-spacing: .24em; text-transform: uppercase; margin-bottom: 5px; }

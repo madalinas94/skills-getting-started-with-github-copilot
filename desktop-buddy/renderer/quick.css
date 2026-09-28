@@ -87,3 +87,8 @@ kbd { font: 11px var(--font); color: var(--muted); border: 1px solid var(--borde
 :root[data-theme="vienna"] { --bg: #eef1f5; --surface: #f8fafc; --text: #1b2436; --muted: #6f7a8f; --border: #d3dae6; --accent: #1f2d4d; --accent-text: #f1f4f9; --gold: #b9a57a; --danger: #9b2c3c; }
 :root[data-theme="riviera"] { --bg: #f7f5ef; --surface: #fffdf8; --text: #13324a; --muted: #6b8193; --border: #d6e2ea; --accent: #1d5c8c; --accent-text: #ffffff; --gold: #d0a93a; --danger: #b23a48; }
 :root[data-theme="florence"] { --bg: #f8f0ef; --surface: #fffafa; --text: #3a2a2c; --muted: #9a8284; --border: #ecd6d6; --accent: #6f8660; --accent-text: #ffffff; --gold: #c99a8e; --danger: #a8445a; }
+
+/* Heritage */
+:root[data-theme="heritage"] { --bg: #f3eee5; --surface: #faf7f1; --text: #1c2433; --muted: #7a7466; --border: #d8cebd; --accent: #1c2433; --accent-text: #f4efe6; --gold: #a88a5c; --danger: #6b1d28; --radius: 0px; }
+:root[data-theme="heritage"] .monogram { color: #5a1a24; font-style: normal; font-weight: 600; }
+:root[data-theme="heritage"] .kicker { color: #5a1a24; }
