@@ -5,7 +5,7 @@ const { app, safeStorage } = require('electron');
 
 const DEFAULT_DATA = {
   settings: {
-    buddyName: 'Robi',
+    buddyName: 'Mady',
     buddyScale: 1,
     alwaysOnTop: true,
     startWithWindows: false,
@@ -16,7 +16,7 @@ const DEFAULT_DATA = {
     aiProvider: 'demo',
     aiModel: 'demo-placeholder',
     aiBaseUrl: '',
-    aiSystemPrompt: 'Ești Robi, un asistent prietenos care trăiește pe desktop. Răspunde scurt și util, în limba română.',
+    aiSystemPrompt: 'Ești Mady, un asistent prietenos care trăiește pe desktop. Răspunde scurt și util, în limba română.',
     aiMaxTokens: 1024
   },
   apiKeyEncrypted: '',

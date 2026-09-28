@@ -299,7 +299,7 @@ $('#sApiKeyDelete').addEventListener('click', async () => {
   toast('Cheia API a fost ștearsă');
 });
 
-$('#sName').addEventListener('change', e => update({ buddyName: e.target.value.trim() || 'Robi' }));
+$('#sName').addEventListener('change', e => update({ buddyName: e.target.value.trim() || 'Mady' }));
 $('#sScale').addEventListener('input', e => { $('#sScaleVal').textContent = `${Math.round(e.target.value * 100)}%`; });
 $('#sScale').addEventListener('change', e => update({ buddyScale: Number(e.target.value) }));
 $('#sOnTop').addEventListener('change', e => update({ alwaysOnTop: e.target.checked }));
