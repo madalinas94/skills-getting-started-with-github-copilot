@@ -41,7 +41,7 @@ let lastSessionId = null;
 let lastCard = null;
 let mantraWin = null;
 let visionWin = null;
-const MANTRA_W = 420;
+const MANTRA_W = 450;
 const stickyWins = new Map(); // id notiță → fereastră
 let tray = null;
 let clipboardTimer = null;
@@ -377,7 +377,7 @@ function showMantra() {
   const area = screen.getPrimaryDisplay().workArea;
   const w = mantraWin = new BrowserWindow({
     width: MANTRA_W, height: 300,
-    x: area.x + area.width - MANTRA_W - 24, y: area.y + 24,
+    x: area.x + area.width - MANTRA_W - 10, y: area.y + 10,
     show: false,
     frame: false,
     transparent: true,

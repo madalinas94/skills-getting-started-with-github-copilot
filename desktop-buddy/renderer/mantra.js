@@ -8,7 +8,7 @@ let hovering = false;
 let closing = false;
 
 function fit() {
-  api.mantra.size(Math.ceil($('#card').getBoundingClientRect().height) + 36);
+  api.mantra.size(Math.ceil($('#card').getBoundingClientRect().height) + 70);
 }
 
 function render() {

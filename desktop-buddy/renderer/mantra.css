@@ -9,7 +9,7 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; }
-body { padding: 14px 16px 22px; }
+body { padding: 26px 30px 44px; }
 .ic { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 
 .card {
