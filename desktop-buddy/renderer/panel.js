@@ -168,7 +168,7 @@ function renderChat(chat, { error, typing } = {}) {
   const box = $('#chat');
   box.replaceChildren();
   if (!chat.length) {
-    box.append(el('div', { className: 'msg assistant', textContent: `Bună! Sunt ${settings.buddyName} 💕 Cu ce te pot ajuta?` }));
+    box.append(el('div', { className: 'msg assistant', textContent: `Sunt ${settings.buddyName}. Ce obiectiv atacăm azi? 🎯` }));
   }
   for (const m of chat) {
     const bubble = el('div', { className: `msg ${m.role}`, textContent: m.content });
