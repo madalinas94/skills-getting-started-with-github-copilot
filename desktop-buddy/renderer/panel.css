@@ -561,3 +561,12 @@ textarea { resize: none; }
 .scan-count { font: 600 20px/1.2 var(--font-display); font-variant-numeric: lining-nums; }
 .scan-count b { color: var(--gold); font-size: 26px; }
 .scan.error .scan-count { color: var(--danger); font-size: 15px; font-style: italic; }
+
+.goal { display: flex; flex-direction: column; gap: 4px; }
+.goal-bar { height: 6px; background: var(--surface-2); border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+.goal-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--gold)); transition: width .6s ease; }
+.goal .muted { font-style: italic; }
+.msg.brief { max-width: 94%; border-left-width: 3px; }
+.msg.brief .who::after { content: " · briefing"; font-style: normal; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; opacity: .8; }
+
+.settings label > .muted { text-transform: none; letter-spacing: normal; font-style: italic; }

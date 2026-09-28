@@ -73,6 +73,10 @@ function renderClipboard() {
         clipItems = await api.clipboard.pin(item.id);
         renderClipboard();
       } }, icon('pin')),
+      el('button', { title: `Cere-i lui ${settings.buddyName}: corectează / rezumă / traduce`, onclick: e => {
+        e.stopPropagation();
+        api.quick.openFor(item.text);
+      } }, icon('spark')),
       el('button', { title: 'Salvează ca notiță', onclick: async e => {
         e.stopPropagation();
         await api.clipboard.toNote(item.id);
@@ -186,7 +190,7 @@ function renderChat(chat, { error, typing } = {}) {
     ]));
   }
   for (const m of chat) {
-    const bubble = el('div', { className: `msg ${m.role}` });
+    const bubble = el('div', { className: `msg ${m.role}` + (m.brief ? ' brief' : '') });
     if (m.role === 'assistant') bubble.append(el('span', { className: 'who', textContent: settings.buddyName }));
     bubble.append(m.content);
     if (m.role === 'assistant') {
@@ -229,6 +233,29 @@ $('#chatInput').addEventListener('keydown', e => {
   }
 });
 $('#aiClear').addEventListener('click', async () => renderChat(await api.ai.clear()));
+$('#aiBrief').addEventListener('click', async () => {
+  $('#aiBrief').disabled = true;
+  const history = await api.ai.history();
+  renderChat(history, { typing: true });
+  const res = await api.brief.now();
+  renderChat(res.chat);
+  $('#aiBrief').disabled = false;
+});
+api.ai.onUpdated(chat => renderChat(chat));
+
+// citire cu voce (voce românească dacă e instalată în Windows)
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text.replace(/[•–#*]/g, ' '));
+  const voices = speechSynthesis.getVoices();
+  const ro = voices.filter(v => /^ro/i.test(v.lang));
+  u.voice = ro.find(v => /female|ioana|carmen|alina|elena/i.test(v.name)) || ro[0] || null;
+  u.lang = u.voice ? u.voice.lang : 'ro-RO';
+  u.rate = 1;
+  speechSynthesis.speak(u);
+}
+api.tts.onSpeak(speak);
 $('#aiModelChip').addEventListener('click', () => showTab('settings'));
 
 // ---------- timer & sesiuni ----------
@@ -356,6 +383,13 @@ function renderWeek() {
     ` săptămâna aceasta · ${fmtDur(lastWeek)} săptămâna trecută` +
       (lastWeek ? ` (${delta >= 0 ? '+' : '−'}${fmtDur(Math.abs(delta))})` : '')
   );
+  const goalH = Number(settings.weeklyGoalHours) || 0;
+  $('#weekGoal').classList.toggle('hidden', !goalH);
+  if (goalH) {
+    const pct = Math.round((total / (goalH * 3600)) * 100);
+    $('#weekGoalFill').style.width = Math.min(100, pct) + '%';
+    $('#weekGoalText').textContent = `Obiectiv: ${goalH}h · ${pct}% atins` + (pct >= 100 ? ' — bravo!' : '');
+  }
   $('#weekBars').replaceChildren(...days.map((d, i) => el('div', {
     className: 'b' + (dayKey(d) === dayKey(today) ? ' today' : ''),
     title: `${d.toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'short' })}: ${fmtDur(secs[i])}`
@@ -612,6 +646,15 @@ function renderSettings() {
   $('#sTheme').value = settings.theme;
   $('#sHideOnBlur').checked = settings.hidePanelOnBlur;
   $('#sHourly').checked = settings.timerHourlyReminder;
+  $('#sWeeklyGoal').value = settings.weeklyGoalHours ?? 40;
+  $('#sSpeech').checked = settings.buddySpeech;
+  $('#sSpontaneous').checked = settings.buddySpontaneous;
+  $('#sMorningBrief').checked = settings.morningBrief;
+  $('#sBriefVoice').checked = settings.briefVoice;
+  if (document.activeElement !== $('#sHotkey')) $('#sHotkey').value = settings.quickHotkey || '';
+  $('#sHotkeyStatus').textContent = settings.hotkeyActive
+    ? `Activă: ${settings.hotkeyLabel}`
+    : 'Inactivă (scurtătura e folosită de alt program sau nu e validă)';
   $('#sTrackApps').checked = settings.timerTrackApps;
   $('#sMailAddress').value = settings.mailAddress || '';
   $('#sMailHost').value = settings.mailHost || '';
@@ -627,9 +670,11 @@ function renderSettings() {
 }
 
 async function update(patch, msg = 'Setare salvată') {
-  settings = await api.settings.set(patch);
+  const res = await api.settings.set(patch);
+  const { error, ...rest } = res;
+  settings = rest;
   renderSettings();
-  toast(msg);
+  toast(error || msg);
 }
 
 $('#sProvider').addEventListener('change', e => {
@@ -685,6 +730,12 @@ $('#sReset').addEventListener('click', async () => {
 });
 $('#sQuit').addEventListener('click', () => api.app.quit());
 $('#sHourly').addEventListener('change', e => update({ timerHourlyReminder: e.target.checked }));
+$('#sWeeklyGoal').addEventListener('change', e => { update({ weeklyGoalHours: Math.max(0, Math.min(100, Number(e.target.value) || 0)) }).then(loadHistory); });
+$('#sSpeech').addEventListener('change', e => update({ buddySpeech: e.target.checked }));
+$('#sSpontaneous').addEventListener('change', e => update({ buddySpontaneous: e.target.checked }));
+$('#sMorningBrief').addEventListener('change', e => update({ morningBrief: e.target.checked }));
+$('#sBriefVoice').addEventListener('change', e => update({ briefVoice: e.target.checked }));
+$('#sHotkeySave').addEventListener('click', () => update({ quickHotkey: $('#sHotkey').value.trim() }, 'Scurtătură activă'));
 $('#sTrackApps').addEventListener('change', e => update({ timerTrackApps: e.target.checked }));
 $('#sMailAddress').addEventListener('change', e => update({ mailAddress: e.target.value.trim() }));
 $('#sMailHost').addEventListener('change', e => update({ mailHost: e.target.value.trim() || 'imap.gmail.com' }));

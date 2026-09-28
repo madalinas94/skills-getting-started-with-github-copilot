@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, clipboard, screen, Tray, Menu, nativeImage, shell, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, clipboard, screen, Tray, Menu, nativeImage, shell, Notification, globalShortcut } = require('electron');
 const path = require('path');
 const crypto = require('crypto');
 const store = require('./src/store');
@@ -6,6 +6,8 @@ const ai = require('./src/ai');
 const sessions = require('./src/sessions');
 const mail = require('./src/mail');
 const mailscan = require('./src/mailscan');
+const mood = require('./src/mood');
+const briefing = require('./src/briefing');
 
 const BUDDY_W = 170;
 const BUDDY_H = 210;
@@ -13,11 +15,20 @@ const PANEL_W = 440;
 const PANEL_H = 620;
 const TIMER_W = 310;
 const TIMER_H = 66;
+const BUBBLE_W = 280;
+const QUICK_W = 620;
+const QUICK_H = 460;
 
 let buddyWin = null;
 let panelWin = null;
 let timerWin = null;
 let timerHidden = false; // ascuns explicit de utilizator
+let bubbleWin = null;
+let bubbleTimer = null;
+let bubbleTab = null;
+let bubbleHeight = 90;
+let quickWin = null;
+let lastSessionId = null;
 let tray = null;
 let clipboardTimer = null;
 let lastClipboardText = '';
@@ -172,6 +183,139 @@ function hideTimer() {
   broadcast('timer:visible', false);
 }
 
+// ---------- Bula de dialog a lui Mady ----------
+
+function createBubbleWindow() {
+  bubbleWin = new BrowserWindow({
+    width: BUBBLE_W, height: bubbleHeight,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    hasShadow: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    focusable: false,
+    maximizable: false,
+    fullscreenable: false,
+    backgroundColor: '#00000000',
+    webPreferences: { preload: path.join(__dirname, 'preload.js') }
+  });
+  bubbleWin.setAlwaysOnTop(true, 'floating');
+  bubbleWin.loadFile(path.join(__dirname, 'renderer', 'bubble.html'));
+  bubbleWin.on('closed', () => { bubbleWin = null; });
+}
+
+// Deasupra lui Mady; dacă nu e loc sus, în lateral.
+function positionBubble() {
+  if (!bubbleWin || !buddyWin) return;
+  const b = buddyWin.getBounds();
+  const area = screen.getDisplayMatching(b).workArea;
+  let x = Math.round(b.x + b.width / 2 - BUBBLE_W / 2);
+  let y = b.y - bubbleHeight + 14;
+  let side = 'bottom';
+  if (y < area.y) {
+    y = b.y + 10;
+    x = b.x - BUBBLE_W + 6;
+    side = 'right';
+    if (x < area.x) { x = b.x + b.width - 6; side = 'left'; }
+  }
+  x = Math.max(area.x, Math.min(x, area.x + area.width - BUBBLE_W));
+  bubbleWin.setBounds({ x, y: Math.round(y), width: BUBBLE_W, height: bubbleHeight });
+  bubbleWin.webContents.send('bubble:side', side);
+}
+
+function say(text, { tab = null, ms = 9000, state = null } = {}) {
+  if (!settings().buddySpeech || !text) return;
+  if (!buddyWin || !buddyWin.isVisible()) return;
+  mood.noteSpoke();
+  if (state) mood.flash(state, Math.min(ms, 8000));
+  bubbleTab = tab;
+  if (!bubbleWin) createBubbleWindow();
+  const show = () => {
+    if (!bubbleWin) return;
+    bubbleWin.webContents.send('bubble:show', { text, name: settings().buddyName, clickable: !!tab });
+    positionBubble();
+    bubbleWin.showInactive();
+    broadcast('buddy:talking', true);
+  };
+  if (bubbleWin.webContents.isLoading()) bubbleWin.webContents.once('did-finish-load', show);
+  else show();
+  clearTimeout(bubbleTimer);
+  bubbleTimer = setTimeout(hideBubble, ms);
+}
+
+function hideBubble() {
+  clearTimeout(bubbleTimer);
+  if (bubbleWin) bubbleWin.hide();
+  broadcast('buddy:talking', false);
+}
+
+// ---------- Fereastra rapidă (scurtătura globală) ----------
+
+function createQuickWindow() {
+  quickWin = new BrowserWindow({
+    width: QUICK_W, height: QUICK_H,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    hasShadow: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    maximizable: false,
+    fullscreenable: false,
+    backgroundColor: '#00000000',
+    webPreferences: { preload: path.join(__dirname, 'preload.js') }
+  });
+  quickWin.setAlwaysOnTop(true, 'pop-up-menu');
+  quickWin.loadFile(path.join(__dirname, 'renderer', 'quick.html'));
+  quickWin.on('blur', () => quickWin && quickWin.hide());
+  quickWin.on('closed', () => { quickWin = null; });
+}
+
+async function openQuick(prefill) {
+  if (!quickWin) createQuickWindow();
+  const cursor = screen.getCursorScreenPoint();
+  const area = screen.getDisplayNearestPoint(cursor).workArea;
+  quickWin.setBounds({
+    x: Math.round(area.x + (area.width - QUICK_W) / 2),
+    y: Math.round(area.y + area.height * 0.18),
+    width: QUICK_W, height: QUICK_H
+  });
+  const text = typeof prefill === 'string' ? prefill : await clipboard.readText();
+  const send = () => quickWin && quickWin.webContents.send('quick:open', { clipboard: text || '', fromItem: typeof prefill === 'string' });
+  if (quickWin.webContents.isLoading()) quickWin.webContents.once('did-finish-load', send);
+  else send();
+  quickWin.show();
+  quickWin.focus();
+}
+
+function toggleQuick() {
+  if (quickWin && quickWin.isVisible()) quickWin.hide();
+  else openQuick();
+}
+
+let registeredHotkey = null;
+function registerHotkey(accel) {
+  if (registeredHotkey) globalShortcut.unregister(registeredHotkey);
+  registeredHotkey = null;
+  if (!accel) return true;
+  try {
+    if (globalShortcut.register(accel, toggleQuick)) {
+      registeredHotkey = accel;
+      return true;
+    }
+  } catch {
+    // acceleratorul nu e valid
+  }
+  return false;
+}
+
+function hotkeyLabel(accel) {
+  return String(accel || '').replace('CommandOrControl', process.platform === 'darwin' ? 'Cmd' : 'Ctrl');
+}
+
 function notify(title, body, onClick) {
   if (!Notification.isSupported()) return;
   const n = new Notification({ title, body, icon: path.join(__dirname, 'assets', 'icon.png') });
@@ -189,6 +333,7 @@ function createTray() {
     { label: 'Deschide panoul', click: () => togglePanel('clipboard') },
     { label: 'Arată roboțelul', click: showBuddy },
     { label: 'Ascunde roboțelul', click: () => buddyWin && buddyWin.hide() },
+    { label: `Întreab-o pe Mady (${hotkeyLabel(settings().quickHotkey)})`, click: () => openQuick() },
     { label: 'Timer și statistici', click: () => togglePanel('timer') },
     { label: 'Arată timerul', click: showTimer },
     { label: 'Inbox', click: () => togglePanel('inbox') },
@@ -246,7 +391,7 @@ function trimClipboard() {
 }
 
 function broadcast(channel, payload) {
-  for (const w of [buddyWin, panelWin, timerWin]) if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
+  for (const w of [buddyWin, panelWin, timerWin, bubbleWin, quickWin]) if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
 }
 
 // ---------- Setări ----------
@@ -264,7 +409,10 @@ function applySettings() {
 }
 
 function publicSettings() {
-  return { ...settings(), hasApiKey: !!store.getApiKey(), hasMailPassword: !!store.getMailPassword() };
+  return {
+    ...settings(), hasApiKey: !!store.getApiKey(), hasMailPassword: !!store.getMailPassword(),
+    hotkeyActive: registeredHotkey === settings().quickHotkey, hotkeyLabel: hotkeyLabel(settings().quickHotkey)
+  };
 }
 
 // ---------- IPC ----------
@@ -276,6 +424,7 @@ function registerIpc() {
     const { width, height } = buddySize();
     buddyWin.setBounds({ x: Math.round(x), y: Math.round(y), width, height });
     if (panelWin && panelWin.isVisible()) positionPanel();
+    if (bubbleWin && bubbleWin.isVisible()) positionBubble();
   });
   ipcMain.on('buddy:moved', () => {
     if (!buddyWin) return;
@@ -289,6 +438,7 @@ function registerIpc() {
     Menu.buildFromTemplate([
       { label: 'Deschide panoul', click: () => togglePanel('clipboard') },
       { label: 'Notițe', click: () => togglePanel('notes') },
+      { label: `Întreab-o pe Mady (${hotkeyLabel(settings().quickHotkey)})`, click: () => openQuick() },
       { label: 'Asistent AI', click: () => togglePanel('ai') },
       { label: 'Timer și statistici', click: () => togglePanel('timer') },
       { label: 'Inbox', click: () => togglePanel('inbox') },
@@ -309,6 +459,13 @@ function registerIpc() {
   // setări
   ipcMain.handle('settings:get', () => publicSettings());
   ipcMain.handle('settings:set', (_e, patch) => {
+    if (patch && 'quickHotkey' in patch) {
+      const old = settings().quickHotkey;
+      if (!registerHotkey(patch.quickHotkey)) {
+        registerHotkey(old);
+        return { ...publicSettings(), error: `Scurtătura „${hotkeyLabel(patch.quickHotkey)}” nu e validă sau e folosită de alt program.` };
+      }
+    }
     const allowed = Object.keys(store.DEFAULT_DATA.settings);
     for (const k of Object.keys(patch || {})) if (allowed.includes(k)) settings()[k] = patch[k];
     store.save();
@@ -454,6 +611,58 @@ function registerIpc() {
     }
   });
 
+  // bula
+  ipcMain.on('bubble:size', (_e, h) => {
+    bubbleHeight = Math.max(60, Math.min(260, Math.round(h)));
+    positionBubble();
+  });
+  ipcMain.on('bubble:click', () => {
+    const tab = bubbleTab;
+    hideBubble();
+    if (tab) togglePanel(tab);
+  });
+  ipcMain.on('bubble:close', hideBubble);
+
+  // fereastra rapidă
+  ipcMain.on('quick:hide', () => quickWin && quickWin.hide());
+  ipcMain.on('quick:openFor', (_e, text) => openQuick(String(text || '')));
+  ipcMain.handle('quick:action', async (_e, { action, text, lang }) => {
+    try {
+      return { ok: true, text: await ai.runAction(action, text, lang, settings(), store.getApiKey()) };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+  ipcMain.handle('quick:ask', async (_e, question) => {
+    try {
+      return { ok: true, text: await ai.complete(String(question), settings(), store.getApiKey(),
+        `Întrebarea ta: „${String(question).slice(0, 200)}”. În modul demo nu pot răspunde cu adevărat.`) };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+  ipcMain.handle('quick:copy', async (_e, text) => {
+    lastClipboardText = String(text);
+    await clipboard.writeText(String(text));
+    return true;
+  });
+  ipcMain.on('quick:toChat', (_e, { question, answer }) => {
+    const d = store.get();
+    d.chat.push({ role: 'user', content: String(question), at: Date.now() });
+    d.chat.push({ role: 'assistant', content: String(answer), at: Date.now() });
+    store.save();
+    broadcast('ai:updated', d.chat);
+    if (quickWin) quickWin.hide();
+    togglePanel('ai');
+  });
+
+  // briefing
+  ipcMain.handle('brief:now', async () => {
+    const r = await runBriefing(true);
+    return { chat: store.get().chat, ok: !!r };
+  });
+  ipcMain.handle('buddy:state', () => mood.current());
+
   // AI
   ipcMain.handle('ai:history', () => store.get().chat);
   ipcMain.handle('ai:clear', () => {
@@ -491,20 +700,29 @@ function initSessions() {
     onChange(s) {
       if (s && !timerWin) { timerHidden = false; createTimerWindow(); }
       if (!s && timerWin) timerWin.close();
+      if (s && s.id !== lastSessionId) say(mood.line('sessionStart'), { tab: 'timer', ms: 6000 });
+      lastSessionId = s ? s.id : null;
+      mood.refresh();
       broadcast('session:changed', currentSessionState());
     },
     onHour(hours, s) {
       const text = hours === 1 ? '1 Hour has passed' : `${hours} Hours have passed`;
       notify(text, `„${s.title}” – ${hours === 1 ? 'o oră' : hours + ' ore'} de lucru. Ia o pauză scurtă și continuă.`);
       broadcast('session:hour', { hours, title: s.title });
+      say(mood.line('hour'), { state: 'happy', ms: 9000 });
     },
     onEnd(rep) {
       notify('Sesiune încheiată', `„${rep.title}”: ${sessions.fmt(rep.durationSec)} total, ${sessions.fmt(rep.activeSec)} activ.`);
       togglePanel('timer');
       broadcast('session:ended', rep);
+      const long = rep.durationSec >= 25 * 60;
+      const dur = rep.durationSec < 60 ? 'sub un minut' : sessions.fmt(rep.durationSec);
+      say(mood.line(long ? 'sessionEndLong' : 'sessionEndShort', { dur }),
+        { tab: 'timer', state: long ? 'celebrate' : 'happy', ms: 9000 });
     }
   });
   if (sessions.current()) createTimerWindow();
+  lastSessionId = sessions.current()?.id || null;
 }
 
 function initMailScan() {
@@ -527,8 +745,39 @@ function initMailScan() {
         : `${settings().buddyName} a verificat inboxul.`;
       notify(title, body, () => togglePanel('inbox'));
       broadcast('mail:scanToast', r.count);
+      if (r.count) {
+        const top = r.important[0];
+        say(`Ai ${r.count} ${r.count === 1 ? 'email necitit' : 'emailuri necitite'} azi.` +
+          (top ? ` Cel mai important: ${top.from} – „${top.subject}”.` : ''), { tab: 'inbox', state: 'alert', ms: 12000 });
+      }
     }
   });
+}
+
+function initMood() {
+  mood.init({
+    getSession: () => sessions.current(),
+    settings,
+    onState(state) { broadcast('buddy:state', state); },
+    onWake(sleptMin) {
+      if (briefing.due()) runBriefing();
+      else if (sleptMin >= 10) say(mood.line('wake'), { state: 'happy', ms: 7000 });
+    },
+    say: text => say(text, { ms: 10000 })
+  });
+}
+
+async function runBriefing(manual = false) {
+  if (!manual && !briefing.due()) return null;
+  const r = await briefing.generate();
+  if (!r) return null;
+  broadcast('ai:updated', store.get().chat);
+  if (!manual) {
+    say(`${new Date().getHours() < 12 ? 'Bună dimineața' : 'Bună ziua'}! Ți-am pregătit briefingul zilei.` +
+      (r.emails ? ` Ai ${r.emails} ${r.emails === 1 ? 'email nou' : 'emailuri noi'}.` : ''), { tab: 'ai', state: 'celebrate', ms: 12000 });
+  }
+  if (settings().briefVoice && panelWin) panelWin.webContents.send('tts:speak', r.text);
+  return r;
 }
 
 function saveNote(note) {
@@ -564,8 +813,18 @@ if (!app.requestSingleInstanceLock()) {
     startClipboardWatcher();
     initSessions();
     initMailScan();
+    initMood();
+    registerHotkey(settings().quickHotkey);
+    // la pornire: briefingul zilei (dacă n-a fost încă) sau un salut
+    setTimeout(async () => {
+      if (briefing.due()) await runBriefing();
+      else say(mood.line('welcome'), { state: 'happy', ms: 7000 });
+    }, 4000);
+    // pentru calculatoarele lăsate pornite peste noapte
+    setInterval(() => { if (briefing.due()) runBriefing(); }, 10 * 60 * 1000);
   });
 
   app.on('window-all-closed', e => e.preventDefault());
-  app.on('before-quit', () => { sessions.shutdown(); mailscan.shutdown(); store.flush(); });
+  app.on('before-quit', () => { sessions.shutdown(); mailscan.shutdown(); mood.shutdown(); store.flush(); });
+  app.on('will-quit', () => globalShortcut.unregisterAll());
 }

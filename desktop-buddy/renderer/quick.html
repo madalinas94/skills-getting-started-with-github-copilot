@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ro" data-theme="ivory">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; font-src 'self'; style-src 'self' 'unsafe-inline'">
+  <title>Întreab-o pe Mady</title>
+  <link rel="stylesheet" href="fonts/fonts.css">
+  <link rel="stylesheet" href="quick.css">
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M4.5 12.5l5 5 10-11"/></symbol>
+      <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.5" cy="6.5" r=".8"/><circle cx="4.5" cy="12" r=".8"/><circle cx="4.5" cy="17.5" r=".8"/></symbol>
+      <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.5 3.5 5.5 3.5 8.5s-1 6-3.5 8.5M12 3.5C9.5 6 8.5 9 8.5 12s1 6 3.5 8.5"/></symbol>
+      <symbol id="i-quill" viewBox="0 0 24 24"><path d="M20 4c-6 1-11 5.5-13 12l-1.5 4.5"/><path d="M20 4c-.5 5-3.5 9.5-8.5 11.5H8"/><path d="M11 12h4"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5.5h16v10H9l-5 4z"/></symbol>
+    </defs>
+  </svg>
+  <div class="card">
+    <form class="ask" id="askForm">
+      <div class="monogram">M</div>
+      <input id="askInput" placeholder="Întreab-o pe Mady…" autocomplete="off">
+      <kbd>Esc</kbd>
+    </form>
+
+    <div class="clip" id="clipBox">
+      <div class="kicker">Din clipboard</div>
+      <div class="preview" id="clipPreview"></div>
+      <div class="actions">
+        <button data-action="correct"><svg class="ic"><use href="#i-check"/></svg>Corectează</button>
+        <button data-action="summarize"><svg class="ic"><use href="#i-list"/></svg>Rezumă</button>
+        <span class="split">
+          <button data-action="translate"><svg class="ic"><use href="#i-globe"/></svg>Traduce în</button>
+          <select id="lang">
+            <option value="en">engleză</option>
+            <option value="ro">română</option>
+            <option value="es">spaniolă</option>
+            <option value="fr">franceză</option>
+            <option value="it">italiană</option>
+            <option value="de">germană</option>
+          </select>
+        </span>
+        <button data-action="elegant"><svg class="ic"><use href="#i-quill"/></svg>Mai elegant</button>
+      </div>
+    </div>
+    <p class="empty hidden" id="clipEmpty">Copiază un text (Ctrl+C) și îl pot corecta, rezuma, traduce sau rescrie elegant.</p>
+
+    <div class="result hidden" id="result">
+      <div class="kicker" id="resultTitle"></div>
+      <div class="result-text" id="resultText"></div>
+      <div class="result-actions">
+        <button class="primary" id="copyBtn"><svg class="ic"><use href="#i-copy"/></svg>Copiază</button>
+        <button id="chatBtn" class="hidden"><svg class="ic"><use href="#i-chat"/></svg>Continuă în chat</button>
+      </div>
+    </div>
+  </div>
+  <script src="quick.js"></script>
+</body>
+</html>

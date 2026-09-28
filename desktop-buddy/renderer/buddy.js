@@ -57,3 +57,8 @@ window.buddy.settings.onUpdate(applyTheme);
 
 window.buddy.session.onHour(({ hours }) => toast(hours === 1 ? '1 Hour has passed' : `${hours} Hours have passed`, 8000));
 window.buddy.mail.onScanToast(n => { if (n) toast(`✉ ${n} ${n === 1 ? 'email nou' : 'emailuri noi'}`, 8000); });
+
+function setState(state) { el.dataset.state = state || 'idle'; }
+window.buddy.buddy.state().then(setState);
+window.buddy.buddy.onState(setState);
+window.buddy.buddy.onTalking(t => el.classList.toggle('talking', !!t));

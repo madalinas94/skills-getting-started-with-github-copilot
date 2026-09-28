@@ -12,7 +12,32 @@ contextBridge.exposeInMainWorld('buddy', {
     moved: () => ipcRenderer.send('buddy:moved'),
     position: () => ipcRenderer.invoke('buddy:position'),
     click: () => ipcRenderer.send('buddy:click'),
-    menu: () => ipcRenderer.send('buddy:menu')
+    menu: () => ipcRenderer.send('buddy:menu'),
+    state: () => ipcRenderer.invoke('buddy:state'),
+    onState: on('buddy:state'),
+    onTalking: on('buddy:talking')
+  },
+  bubble: {
+    onShow: on('bubble:show'),
+    onSide: on('bubble:side'),
+    size: h => ipcRenderer.send('bubble:size', h),
+    click: () => ipcRenderer.send('bubble:click'),
+    close: () => ipcRenderer.send('bubble:close')
+  },
+  quick: {
+    onOpen: on('quick:open'),
+    hide: () => ipcRenderer.send('quick:hide'),
+    openFor: text => ipcRenderer.send('quick:openFor', text),
+    action: (action, text, lang) => ipcRenderer.invoke('quick:action', { action, text, lang }),
+    ask: question => ipcRenderer.invoke('quick:ask', question),
+    copy: text => ipcRenderer.invoke('quick:copy', text),
+    toChat: (question, answer) => ipcRenderer.send('quick:toChat', { question, answer })
+  },
+  brief: {
+    now: () => ipcRenderer.invoke('brief:now')
+  },
+  tts: {
+    onSpeak: on('tts:speak')
   },
   panel: {
     hide: () => ipcRenderer.send('panel:hide'),
@@ -80,6 +105,7 @@ contextBridge.exposeInMainWorld('buddy', {
   ai: {
     history: () => ipcRenderer.invoke('ai:history'),
     send: text => ipcRenderer.invoke('ai:send', text),
-    clear: () => ipcRenderer.invoke('ai:clear')
+    clear: () => ipcRenderer.invoke('ai:clear'),
+    onUpdated: on('ai:updated')
   }
 });

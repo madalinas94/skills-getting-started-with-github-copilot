@@ -76,13 +76,27 @@ function demoReply(messages, settings) {
     'Apoi ne apucăm serios de treabă.';
 }
 
-async function chat(messages, settings, apiKey) {
+// Conversația trimisă la API trebuie să înceapă cu utilizatorul și să alterneze rolurile
+// (briefingul de dimineață apare în chat ca mesaj al lui Mady, fără întrebare înainte).
+function normalize(messages) {
+  const out = [];
+  for (const m of messages) {
+    if (!m.content) continue;
+    if (!out.length && m.role !== 'user') continue;
+    const prev = out[out.length - 1];
+    if (prev && prev.role === m.role) prev.content += '\n\n' + m.content;
+    else out.push({ role: m.role, content: m.content });
+  }
+  return out;
+}
+
+async function chat(messages, settings, apiKey, systemOverride) {
   const provider = settings.aiProvider || 'demo';
   const opts = {
     apiKey,
     model: settings.aiModel,
-    system: settings.aiSystemPrompt,
-    messages: messages.map(m => ({ role: m.role, content: m.content })),
+    system: systemOverride || settings.aiSystemPrompt,
+    messages: normalize(messages),
     maxTokens: Number(settings.aiMaxTokens) || 1024,
     baseUrl: settings.aiBaseUrl
   };
@@ -105,13 +119,46 @@ async function chat(messages, settings, apiKey) {
 }
 
 // O singură cerere (rezumat email, brief, feedback sesiune) cu personalitatea din Setări.
-async function complete(prompt, settings, apiKey, demoText) {
+// `system` înlocuiește personalitatea (pentru corectură/traducere, unde vrem doar textul).
+async function complete(prompt, settings, apiKey, demoText, { system, demoNote = true } = {}) {
   if ((settings.aiProvider || 'demo') === 'demo') {
     await new Promise(r => setTimeout(r, 400));
     return (demoText || 'Rezultat demo.') +
-      '\n\n(Mod demo: conectează un model din Setări → Asistent AI pentru analiza reală.)';
+      (demoNote ? '\n\n(Mod demo: conectează un model din Setări → Asistent AI pentru analiza reală.)' : '');
   }
-  return chat([{ role: 'user', content: prompt }], settings, apiKey);
+  return chat([{ role: 'user', content: prompt }], settings, apiKey, system);
 }
 
-module.exports = { PROVIDERS, chat, complete };
+// Acțiuni rapide pe text (scurtătura globală).
+const LANGS = { ro: 'română', en: 'engleză', es: 'spaniolă', fr: 'franceză', it: 'italiană', de: 'germană' };
+const TEXT_ONLY = 'Ești un editor de text precis. Returnezi DOAR rezultatul cerut, fără introducere, explicații sau ghilimele.';
+
+function actionPrompt(action, text, lang) {
+  switch (action) {
+    case 'correct':
+      return 'Corectează gramatica, ortografia (inclusiv diacriticele) și punctuația textului de mai jos. ' +
+        'Păstrează limba, sensul și tonul. Returnează doar textul corectat.\n\n' + text;
+    case 'summarize':
+      return 'Rezumă textul de mai jos în 3-5 puncte scurte, în limba textului.\n\n' + text;
+    case 'translate':
+      return `Tradu textul de mai jos în limba ${LANGS[lang] || 'engleză'}. Păstrează formatarea. Returnează doar traducerea.\n\n` + text;
+    case 'elegant':
+      return 'Rescrie textul de mai jos mai elegant și profesionist, potrivit pentru un email de business. ' +
+        'Păstrează limba și sensul. Returnează doar textul rescris.\n\n' + text;
+    default:
+      throw new Error('Acțiune necunoscută.');
+  }
+}
+
+function demoAction(action, text, lang) {
+  const labels = { correct: 'corectat', summarize: 'rezumat', translate: `tradus (${LANGS[lang] || 'engleză'})`, elegant: 'rescris elegant' };
+  return `[Demo · textul ${labels[action] || ''} apare aici după ce conectezi un model AI]\n\n${text}`;
+}
+
+async function runAction(action, text, lang, settings, apiKey) {
+  if (!String(text || '').trim()) throw new Error('Nu am niciun text. Copiază (Ctrl+C) textul și încearcă din nou.');
+  const system = action === 'summarize' ? undefined : TEXT_ONLY;
+  return complete(actionPrompt(action, text.slice(0, 12000), lang), settings, apiKey, demoAction(action, text, lang), { system, demoNote: false });
+}
+
+module.exports = { PROVIDERS, LANGS, chat, complete, runAction, normalize };

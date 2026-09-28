@@ -29,6 +29,7 @@
       <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></symbol>
       <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z"/></symbol>
       <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/></symbol>
       <symbol id="i-new" viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M13.5 7.5l3 3"/></symbol>
     </defs>
   </svg>
@@ -87,6 +88,7 @@
     <section id="tab-ai" class="tab">
       <div class="toolbar">
         <span class="chip" id="aiModelChip"></span>
+        <button class="btn ghost square" id="aiBrief" title="Briefingul zilei"><svg class="ic"><use href="#i-sun"/></svg></button>
         <button class="btn ghost" id="aiClear" title="Conversație nouă"><svg class="ic"><use href="#i-new"/></svg>Nouă</button>
       </div>
       <div id="chat" class="chat"></div>
@@ -124,6 +126,7 @@
         <h3>Săptămâna aceasta</h3>
         <div class="week">
           <div class="week-sum" id="weekSum"></div>
+          <div class="goal" id="weekGoal"><div class="goal-bar"><i id="weekGoalFill"></i></div><span class="muted" id="weekGoalText"></span></div>
           <div class="bars" id="weekBars"></div>
         </div>
 
@@ -197,6 +200,9 @@
         <h3>Timer</h3>
         <label class="check"><input type="checkbox" id="sHourly"> Reminder la fiecare oră („1 Hour has passed”)</label>
         <label class="check"><input type="checkbox" id="sTrackApps"> Urmărește aplicațiile folosite în sesiune</label>
+        <label>Obiectiv săptămânal (ore)
+          <input id="sWeeklyGoal" type="number" min="0" max="100">
+        </label>
 
         <h3>Inbox</h3>
         <label>Adresă de email
@@ -246,6 +252,17 @@
           <input id="sScale" type="range" min="0.6" max="1.6" step="0.1">
         </label>
         <label class="check"><input type="checkbox" id="sOnTop"> Mereu deasupra altor ferestre</label>
+        <label class="check"><input type="checkbox" id="sSpeech"> Mady vorbește (bule de dialog)</label>
+        <label class="check"><input type="checkbox" id="sSpontaneous"> Replici spontane din când în când</label>
+        <label class="check"><input type="checkbox" id="sMorningBrief"> Briefing de dimineață la prima activitate din zi</label>
+        <label class="check"><input type="checkbox" id="sBriefVoice"> Citește briefingul cu voce tare</label>
+        <label>Scurtătură „Întreab-o pe Mady”
+          <div class="row">
+            <input id="sHotkey" placeholder="CommandOrControl+Shift+Space">
+            <button class="btn small" id="sHotkeySave" type="button">Aplică</button>
+          </div>
+          <span class="muted" id="sHotkeyStatus"></span>
+        </label>
         <label class="check"><input type="checkbox" id="sStartup"> Pornește odată cu Windows</label>
 
         <h3>Clipboard</h3>

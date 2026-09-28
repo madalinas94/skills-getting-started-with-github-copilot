@@ -93,7 +93,8 @@ html, body {
 :root[data-theme="ivory"] .glow-in, :root[data-theme="evening"] .glow-in { stop-color: #fff4d6; }
 :root[data-theme="ivory"] .glow-out, :root[data-theme="evening"] .glow-out { stop-color: #c9a96e; }
 :root[data-theme="ivory"] .eye, :root[data-theme="evening"] .eye { fill: #f3dca6; }
-:root[data-theme="ivory"] .mouth, :root[data-theme="evening"] .mouth { stroke: #f3dca6; }
+:root[data-theme="ivory"] .mouth, :root[data-theme="evening"] .mouth,
+:root[data-theme="ivory"] .eye-line, :root[data-theme="evening"] .eye-line { stroke: #f3dca6; }
 :root[data-theme="ivory"] .blush, :root[data-theme="evening"] .blush { fill: #e3a393; }
 :root[data-theme="ivory"] .shoe, :root[data-theme="evening"] .shoe { fill: #3b2a1e; }
 
@@ -106,3 +107,55 @@ html, body {
   border-radius: 3px;
 }
 :root[data-theme="evening"] #toast { color: #e4cf9f; background: #121c17; }
+
+/* ---------- stări (expresii) ---------- */
+#buddy[data-state] .eyes-happy, #buddy[data-state] .eyes-closed, #buddy[data-state] .mouth-o,
+#buddy[data-state] .mouth-flat, #buddy[data-state] .zzz, #buddy[data-state] .sparkles, #buddy[data-state] .alert { display: none; }
+
+/* concentrată: ochi îngustați, gură dreaptă, antena pulsează rar */
+#buddy[data-state="focus"] .eyes { animation: none; transform: scaleY(.55); }
+#buddy[data-state="focus"] .mouth { display: none; }
+#buddy[data-state="focus"] .mouth-flat { display: inline; }
+#buddy[data-state="focus"] .antenna-light { animation-duration: 3.5s; }
+
+/* doarme: ochi închiși, zzz, plutire lentă */
+#buddy[data-state="sleep"] .eyes { display: none; }
+#buddy[data-state="sleep"] .eyes-closed { display: inline; }
+#buddy[data-state="sleep"] .mouth { display: none; }
+#buddy[data-state="sleep"] .mouth-o { display: inline; transform: scale(.7); transform-origin: 100px 107.5px; }
+#buddy[data-state="sleep"] .zzz { display: inline; }
+#buddy[data-state="sleep"] svg { animation-duration: 6s; filter: drop-shadow(0 6px 8px rgba(40, 20, 50, .2)) saturate(.8) brightness(.96); }
+#buddy[data-state="sleep"] .antenna-light { animation: none; opacity: .35; }
+.zzz text { animation: zfloat 3s ease-in-out infinite; opacity: 0; }
+.zzz .z2 { animation-delay: .6s; }
+.zzz .z3 { animation-delay: 1.2s; }
+@keyframes zfloat { 0% { opacity: 0; translate: 0 6px; } 30% { opacity: 1; } 100% { opacity: 0; translate: 4px -8px; } }
+
+/* sărbătorește: ochi fericiți, sclipiri, sare */
+#buddy[data-state="celebrate"] .eyes, #buddy[data-state="happy"] .eyes { display: none; }
+#buddy[data-state="celebrate"] .eyes-happy, #buddy[data-state="happy"] .eyes-happy { display: inline; }
+#buddy[data-state="celebrate"] .sparkles { display: inline; }
+#buddy[data-state="celebrate"] svg { animation: jump .7s ease-in-out 4, float 3.2s ease-in-out 2.8s infinite; }
+#buddy[data-state="celebrate"] .arm-left { transform-origin: 53px 144px; animation: waveL .6s ease-in-out infinite; }
+#buddy[data-state="celebrate"] .arm-right { animation: wave .6s ease-in-out infinite; }
+@keyframes jump { 0%, 100% { translate: 0 0; } 40% { translate: 0 -16px; } 60% { translate: 0 -16px; } }
+@keyframes waveL { 0%, 100% { transform: rotate(150deg); } 50% { transform: rotate(120deg); } }
+.sparkles path { animation: twinkle 1.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.sparkles .sp2 { animation-delay: .3s; }
+.sparkles .sp3 { animation-delay: .6s; }
+.sparkles .sp4 { animation-delay: .9s; }
+.sparkles .sp5 { animation-delay: .45s; }
+@keyframes twinkle { 0%, 100% { opacity: .2; transform: scale(.5) rotate(0); } 50% { opacity: 1; transform: scale(1.15) rotate(20deg); } }
+
+/* alertă: gură „o”, semn de exclamare, antena clipește */
+#buddy[data-state="alert"] .mouth { display: none; }
+#buddy[data-state="alert"] .mouth-o { display: inline; }
+#buddy[data-state="alert"] .alert { display: inline; animation: pop .5s ease-out; transform-box: fill-box; transform-origin: center; }
+#buddy[data-state="alert"] .antenna-light { animation-duration: .5s; }
+#buddy[data-state="alert"] svg { animation: shake .5s ease-in-out 2, float 3.2s ease-in-out 1s infinite; }
+@keyframes pop { 0% { transform: scale(0); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
+@keyframes shake { 0%, 100% { rotate: 0deg; } 25% { rotate: -4deg; } 75% { rotate: 4deg; } }
+
+/* vorbește */
+#buddy.talking .mouth { animation: talk .28s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes talk { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.25) scaleX(.8); } }

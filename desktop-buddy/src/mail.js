@@ -169,6 +169,14 @@ function briefPrompt() {
   ].join('\n\n');
 }
 
+// Necitite primite după un anumit moment (briefingul de dimineață: de ieri seară încoace).
+async function fetchUnreadSince(opts, sinceTs) {
+  const day = new Date(sinceTs);
+  day.setHours(0, 0, 0, 0);
+  const msgs = await fetchMessages({ ...opts, unreadOnly: true, since: day, count: 50 });
+  return msgs.filter(m => m.date >= sinceTs);
+}
+
 const AUTOMATED = /no-?reply|newsletter|notific|mailer-daemon|marketing|promo|news@|info@|updates?@/i;
 
 function importantPrompt(msgs) {
@@ -209,6 +217,6 @@ function demoBrief() {
 }
 
 module.exports = {
-  fetchInbox, fetchTodayUnread, list, get, summaryPrompt, briefPrompt, importantPrompt,
+  fetchInbox, fetchTodayUnread, fetchUnreadSince, list, get, summaryPrompt, briefPrompt, importantPrompt,
   rankImportant, demoSummary, demoBrief, demoImportant
 };

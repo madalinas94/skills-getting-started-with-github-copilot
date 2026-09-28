@@ -1,0 +1,56 @@
+:root, :root[data-theme="ivory"] {
+  --bg: #fbf8f2; --text: #1e2b24; --gold: #b8955a; --muted: #7d7461;
+  --display: "Cormorant Garamond", Georgia, serif; --font: "EB Garamond", Georgia, serif; --radius: 6px;
+}
+:root[data-theme="evening"] { --bg: #18251e; --text: #ede3cc; --gold: #c9a96e; --muted: #a69b82; }
+:root[data-theme="light"], :root[data-theme="dark"] {
+  --bg: #ffffff; --text: #3d2a36; --gold: #f56fa1; --muted: #9a7f8e;
+  --display: "Segoe UI", system-ui, sans-serif; --font: "Segoe UI", system-ui, sans-serif; --radius: 14px;
+}
+:root[data-theme="dark"] { --bg: #2c2431; --text: #f6e9f0; --gold: #ff7fb0; --muted: #b39cab; }
+
+html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; }
+body { padding: 6px 8px 16px; }
+.bubble {
+  position: relative;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--gold);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 22px rgba(20, 30, 25, .28);
+  padding: 9px 26px 10px 13px;
+  font: 14.5px/1.4 var(--font);
+  animation: in .35s cubic-bezier(.2, .9, .3, 1.2);
+}
+.bubble.clickable { cursor: pointer; }
+@keyframes in { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+/* coada spre Mady */
+.bubble::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--bg);
+  border-right: 1px solid var(--gold);
+  border-bottom: 1px solid var(--gold);
+}
+.bubble[data-side="bottom"]::after { left: calc(50% - 6px); bottom: -7px; transform: rotate(45deg); }
+.bubble[data-side="right"]::after { right: -7px; top: 22px; transform: rotate(-45deg); }
+.bubble[data-side="left"]::after { left: -7px; top: 22px; transform: rotate(135deg); }
+.name { font: italic 600 14px/1 var(--display); color: var(--gold); margin-bottom: 3px; }
+.text { white-space: pre-wrap; }
+.hint { display: none; margin-top: 4px; font-size: 11px; font-style: italic; color: var(--muted); }
+.clickable .hint { display: block; }
+.close {
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.close:hover { color: var(--gold); }

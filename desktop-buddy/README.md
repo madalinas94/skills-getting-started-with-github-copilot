@@ -17,6 +17,23 @@ iar când dai click pe ea se deschide un panou mic (ca un tray) cu:
 - **⚙️ Setări** – provider AI, model, API key (salvată criptat), system prompt, numele și mărimea
   roboțelului, „mereu deasupra”, pornire cu Windows, clipboard, temă.
 
+## Mady e vie
+
+- **Stări:** e concentrată (ochi îngustați) cât rulează o sesiune, adoarme (zzz) după 5 minute fără
+  activitate, sărbătorește (sclipiri aurii, sare) la final de sesiune și la briefing, și se alarmează (!)
+  când vin emailuri importante. Face cu mâna când treci cu mouse-ul peste ea.
+- **Bule de dialog:** îți vorbește în stilul ei la începutul și finalul sesiunilor, la fiecare oră, când
+  vin emailuri, când revii la calculator, plus replici spontane (artă, finanțe, filozofie). Click pe
+  bulă deschide secțiunea potrivită. Se pot opri din Setări → Mady.
+- **Briefing de dimineață:** la prima activitate din zi îți pregătește în chat: emailurile importante de
+  ieri seară încoace, câte ore ai lucrat în ultima zi, progresul față de obiectivul săptămânal și
+  prioritatea zilei. Opțional ți-l citește cu voce tare (voce românească dacă e instalată în Windows).
+  Butonul ☀ din tab-ul Asistent îl generează oricând.
+- **Ctrl+Shift+Space (din orice aplicație):** o fereastră rapidă „Întreab-o pe Mady” pentru întrebări
+  și pentru textul copiat: **Corectează**, **Rezumă**, **Traduce** (RO/EN/ES/FR/IT/DE) și **Mai elegant**
+  (pentru emailuri). Rezultatul se copiază cu un click. Scurtătura se poate schimba din Setări.
+  Aceleași acțiuni sunt și pe fiecare element din Clipboard (butonul ✦).
+
 ## Teme
 
 - **Old Money · Ivory** (implicit) – ivory, verde englezesc și auriu, fonturi serif clasice;
@@ -109,6 +126,8 @@ desktop-buddy/
 ├── src/activity.js    # detectarea aplicației din prim-plan
 ├── src/mail.js        # citire inbox prin IMAP + prompturi pentru rezumat/brief
 ├── src/mailscan.js    # scanarea automată orară + notificarea
+├── src/mood.js        # stările lui Mady și replicile ei
+├── src/briefing.js    # briefingul de dimineață
 ├── renderer/          # HTML/CSS/JS pentru roboțel și panou
 ├── assets/            # buddy.svg, icon.svg, icon.png, icon.ico
 └── scripts/make-ico.js# regenerează icon.ico din assets/icons/*.png
