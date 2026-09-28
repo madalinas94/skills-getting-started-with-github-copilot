@@ -64,6 +64,11 @@ ultimul run → secțiunea **Artifacts** → `DesktopBuddy-windows`.
 3. În Gmail → Setări → *Forwarding and POP/IMAP*, verifică să fie activ **IMAP**.
 4. În Desktop Buddy → Setări → Inbox: adresa de email + parola de aplicație (server `imap.gmail.com`, port `993`).
 
+**Scanare automată:** la fiecare oră (configurabil: 30 min – 4 ore) Mady verifică inboxul și îți
+arată o notificare Windows cu câte emailuri necitite ai primit azi și care sunt cele mai importante.
+În tab-ul Inbox găsești rezumatul complet făcut de AI, ora ultimei scanări și a următoarei, plus
+butonul „Scanează acum”. Click pe notificare deschide direct Inbox-ul.
+
 Parola se păstrează criptat. Emailurile sunt ținute doar în memorie. Pentru rezumate, textul
 emailurilor e trimis providerului AI ales în Setări (în modul Demo nu pleacă nicăieri).
 
@@ -103,6 +108,7 @@ desktop-buddy/
 ├── src/sessions.js    # sesiuni, reminder orar, rapoarte, istoric 30 zile
 ├── src/activity.js    # detectarea aplicației din prim-plan
 ├── src/mail.js        # citire inbox prin IMAP + prompturi pentru rezumat/brief
+├── src/mailscan.js    # scanarea automată orară + notificarea
 ├── renderer/          # HTML/CSS/JS pentru roboțel și panou
 ├── assets/            # buddy.svg, icon.svg, icon.png, icon.ico
 └── scripts/make-ico.js# regenerează icon.ico din assets/icons/*.png

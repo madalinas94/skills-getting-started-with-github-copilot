@@ -71,7 +71,11 @@ contextBridge.exposeInMainWorld('buddy', {
     fetch: () => ipcRenderer.invoke('mail:fetch'),
     list: () => ipcRenderer.invoke('mail:list'),
     summary: uid => ipcRenderer.invoke('mail:summary', uid),
-    brief: () => ipcRenderer.invoke('mail:brief')
+    brief: () => ipcRenderer.invoke('mail:brief'),
+    scanState: () => ipcRenderer.invoke('mail:scanState'),
+    scanNow: () => ipcRenderer.invoke('mail:scanNow'),
+    onScanState: on('mail:scanState'),
+    onScanToast: on('mail:scanToast')
   },
   ai: {
     history: () => ipcRenderer.invoke('ai:history'),

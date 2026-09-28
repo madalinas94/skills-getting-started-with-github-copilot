@@ -49,6 +49,7 @@ function showTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.id === `tab-${name}`));
   if (name === 'ai') setTimeout(() => $('#chatInput').focus(), 50);
   if (name === 'timer') loadHistory();
+  if (name === 'inbox') api.mail.scanState().then(renderScan);
   if (name === 'inbox' && !mails.length) refreshMail();
 }
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
@@ -513,6 +514,41 @@ async function refreshMail() {
   $('#mailRefresh').disabled = false;
 }
 
+function fmtTime(ts) {
+  return new Date(ts).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderScan(st) {
+  const box = $('#scanBox');
+  box.classList.toggle('hidden', !st.configured);
+  if (!st.configured) return;
+  const last = st.last;
+  box.classList.toggle('error', !!last?.error);
+  $('#scanNow').disabled = st.running;
+  $('#scanTitle').textContent = settings.mailAutoScan ? 'Scanare automată' : 'Scanare (automată oprită)';
+  if (st.running) {
+    $('#scanCount').textContent = `${settings.buddyName} verifică inboxul…`;
+  } else if (!last) {
+    $('#scanCount').textContent = 'Încă nu am scanat inboxul azi.';
+  } else if (last.error) {
+    $('#scanCount').textContent = '⚠ ' + last.error;
+  } else {
+    const n = last.count;
+    $('#scanCount').replaceChildren(el('b', { textContent: n }), ` ${n === 1 ? 'email necitit primit' : 'emailuri necitite primite'} azi`);
+  }
+  $('#scanMeta').textContent = [
+    last ? `Ultima scanare: ${fmtTime(last.at)}` : '',
+    st.next ? `următoarea: ${fmtTime(st.next)}` : ''
+  ].filter(Boolean).join(' · ');
+  const sum = $('#scanSummary');
+  const text = last && !last.error ? (last.summary || (last.summaryError ? '⚠ Rezumat indisponibil: ' + last.summaryError : '')) : '';
+  sum.textContent = text;
+  sum.classList.toggle('hidden', !text || st.running);
+}
+
+$('#scanNow').addEventListener('click', async () => renderScan(await api.mail.scanNow()));
+api.mail.onScanState(renderScan);
+
 $('#mailRefresh').addEventListener('click', refreshMail);
 $('#mailGoSettings').addEventListener('click', () => {
   showTab('settings');
@@ -582,6 +618,9 @@ function renderSettings() {
   $('#sMailPort').value = settings.mailPort || 993;
   $('#sMailCount').value = settings.mailCount || 15;
   $('#sMailUnread').checked = settings.mailUnreadOnly;
+  $('#sMailAutoScan').checked = settings.mailAutoScan;
+  $('#sMailScanMinutes').value = String(settings.mailScanMinutes || 60);
+  $('#sMailNotifyEmpty').checked = settings.mailNotifyEmpty;
   $('#sMailPassStatus').textContent = settings.hasMailPassword ? 'Parolă salvată · criptată' : 'Nicio parolă salvată';
   renderMailSetup();
   renderModelChip();
@@ -652,6 +691,9 @@ $('#sMailHost').addEventListener('change', e => update({ mailHost: e.target.valu
 $('#sMailPort').addEventListener('change', e => update({ mailPort: Number(e.target.value) || 993 }));
 $('#sMailCount').addEventListener('change', e => update({ mailCount: Math.min(50, Math.max(1, Number(e.target.value) || 15)) }));
 $('#sMailUnread').addEventListener('change', e => update({ mailUnreadOnly: e.target.checked }));
+$('#sMailAutoScan').addEventListener('change', e => update({ mailAutoScan: e.target.checked }));
+$('#sMailScanMinutes').addEventListener('change', e => update({ mailScanMinutes: Number(e.target.value) || 60 }));
+$('#sMailNotifyEmpty').addEventListener('change', e => update({ mailNotifyEmpty: e.target.checked }));
 $('#sMailPassToggle').addEventListener('click', () => {
   const i = $('#sMailPass');
   i.type = i.type === 'password' ? 'text' : 'password';

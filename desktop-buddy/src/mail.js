@@ -32,7 +32,7 @@ function htmlToText(html) {
     .replace(/&#39;/g, "'");
 }
 
-async function fetchInbox({ host, port, user, pass, count, unreadOnly }) {
+async function fetchMessages({ host, port, user, pass, count, unreadOnly, since }) {
   if (!user || !pass) throw new Error('Completează adresa de email și parola de aplicație în Setări → Inbox.');
   const client = new ImapFlow({
     host: host || 'imap.gmail.com',
@@ -58,14 +58,17 @@ async function fetchInbox({ host, port, user, pass, count, unreadOnly }) {
   try {
     let range;
     let byUid = false;
-    if (unreadOnly) {
-      const uids = (await client.search({ seen: false }, { uid: true })) || [];
-      if (!uids.length) return (cache = []);
+    if (unreadOnly || since) {
+      const query = {};
+      if (unreadOnly) query.seen = false;
+      if (since) query.since = since;
+      const uids = (await client.search(query, { uid: true })) || [];
+      if (!uids.length) return [];
       range = uids.slice(-n).join(',');
       byUid = true;
     } else {
       const total = client.mailbox.exists;
-      if (!total) return (cache = []);
+      if (!total) return [];
       range = `${Math.max(1, total - n + 1)}:*`;
     }
 
@@ -113,8 +116,21 @@ async function fetchInbox({ host, port, user, pass, count, unreadOnly }) {
   }
 
   messages.sort((a, b) => b.date - a.date);
-  cache = messages;
   return messages;
+}
+
+async function fetchInbox(opts) {
+  cache = await fetchMessages(opts);
+  return cache;
+}
+
+// Emailurile necitite primite azi (pentru scanarea automată). Nu modifică lista din panou.
+async function fetchTodayUnread(opts) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const msgs = await fetchMessages({ ...opts, unreadOnly: true, since: today, count: 50 });
+  // SINCE e pe zile în fusul orar al serverului; filtrăm exact după ora locală
+  return msgs.filter(m => m.date >= today.getTime());
 }
 
 function list() {
@@ -153,6 +169,35 @@ function briefPrompt() {
   ].join('\n\n');
 }
 
+const AUTOMATED = /no-?reply|newsletter|notific|mailer-daemon|marketing|promo|news@|info@|updates?@/i;
+
+function importantPrompt(msgs) {
+  const items = msgs.slice(0, 30).map((m, i) =>
+    `#${i + 1} | ${new Date(m.date).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })} | De la: ${m.from} <${m.fromAddress}> | Subiect: ${m.subject}\n${m.text.slice(0, 500)}`
+  );
+  return [
+    `Am ${msgs.length} emailuri necitite primite azi. Alege cele mai importante (maxim 5) și ignoră newsletterele și notificările automate.`,
+    'Pentru fiecare: „#număr Expeditor – Subiect”, apoi o frază despre ce e important și ce trebuie să fac.',
+    'La final, o singură frază despre restul. Fii concisă.',
+    '',
+    ...items
+  ].join('\n\n');
+}
+
+// Pentru modul demo și pentru textul notificării: o ordonare simplă (oameni reali înaintea mesajelor automate).
+function rankImportant(msgs) {
+  return msgs
+    .map(m => ({ m, score: (AUTOMATED.test(m.fromAddress + ' ' + m.from) ? 0 : 2) + (/urgent|important|asap|deadline|până|confirm/i.test(m.subject) ? 1 : 0) }))
+    .sort((a, b) => b.score - a.score || b.m.date - a.m.date)
+    .map(x => x.m);
+}
+
+function demoImportant(msgs) {
+  const top = rankImportant(msgs).slice(0, 5);
+  return 'Cele mai importante (ordonare simplă, fără AI):\n' +
+    top.map((m, i) => `#${i + 1} ${m.from} – ${m.subject}`).join('\n');
+}
+
 function demoSummary(m) {
   return `Email de la ${m.from}, subiect „${m.subject}”.\nÎnceput: ${m.text.slice(0, 160)}…`;
 }
@@ -163,4 +208,7 @@ function demoBrief() {
     cache.slice(0, 5).map((m, i) => `#${i + 1} ${m.from}: ${m.subject}`).join('\n');
 }
 
-module.exports = { fetchInbox, list, get, summaryPrompt, briefPrompt, demoSummary, demoBrief };
+module.exports = {
+  fetchInbox, fetchTodayUnread, list, get, summaryPrompt, briefPrompt, importantPrompt,
+  rankImportant, demoSummary, demoBrief, demoImportant
+};

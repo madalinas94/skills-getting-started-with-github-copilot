@@ -556,3 +556,8 @@ textarea { resize: none; }
 .summary.loading { color: var(--muted); font-style: italic; }
 .summary.error { color: var(--danger); font-style: italic; }
 .brief .feedback { border: 0; padding: 0; }
+
+.scan .row { justify-content: space-between; }
+.scan-count { font: 600 20px/1.2 var(--font-display); font-variant-numeric: lining-nums; }
+.scan-count b { color: var(--gold); font-size: 26px; }
+.scan.error .scan-count { color: var(--danger); font-size: 15px; font-style: italic; }

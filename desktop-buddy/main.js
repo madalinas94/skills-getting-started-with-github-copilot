@@ -5,6 +5,7 @@ const store = require('./src/store');
 const ai = require('./src/ai');
 const sessions = require('./src/sessions');
 const mail = require('./src/mail');
+const mailscan = require('./src/mailscan');
 
 const BUDDY_W = 170;
 const BUDDY_H = 210;
@@ -171,8 +172,11 @@ function hideTimer() {
   broadcast('timer:visible', false);
 }
 
-function notify(title, body) {
-  if (Notification.isSupported()) new Notification({ title, body, icon: path.join(__dirname, 'assets', 'icon.png') }).show();
+function notify(title, body, onClick) {
+  if (!Notification.isSupported()) return;
+  const n = new Notification({ title, body, icon: path.join(__dirname, 'assets', 'icon.png') });
+  if (onClick) n.on('click', onClick);
+  n.show();
 }
 
 // ---------- Tray ----------
@@ -310,6 +314,7 @@ function registerIpc() {
     store.save();
     applySettings();
     if ('clipboardLimit' in patch) { trimClipboard(); broadcast('clipboard:updated', store.get().clipboard); }
+    if (Object.keys(patch).some(k => k.startsWith('mail'))) broadcast('mail:scanState', mailscan.state());
     if ('timerTrackApps' in patch) patch.timerTrackApps ? sessions.startTracking() : sessions.stopTracking();
     return publicSettings();
   });
@@ -410,6 +415,7 @@ function registerIpc() {
   ipcMain.handle('mail:setPassword', (_e, pass) => {
     store.setMailPassword(String(pass || '').replace(/\s+/g, ''));
     broadcast('settings:updated', publicSettings());
+    broadcast('mail:scanState', mailscan.state());
     return publicSettings();
   });
   ipcMain.handle('mail:fetch', async () => {
@@ -425,6 +431,11 @@ function registerIpc() {
     }
   });
   ipcMain.handle('mail:list', () => mail.list());
+  ipcMain.handle('mail:scanState', () => mailscan.state());
+  ipcMain.handle('mail:scanNow', async () => {
+    await mailscan.scan({ manual: true });
+    return mailscan.state();
+  });
   ipcMain.handle('mail:summary', async (_e, uid) => {
     const m = mail.get(uid);
     if (!m) return { ok: false, error: 'Emailul nu mai e în listă. Apasă Actualizează.' };
@@ -496,6 +507,30 @@ function initSessions() {
   if (sessions.current()) createTimerWindow();
 }
 
+function initMailScan() {
+  mailscan.init({
+    onStart() {
+      broadcast('mail:scanState', mailscan.state());
+    },
+    onResult(r, manual) {
+      broadcast('mail:scanState', mailscan.state());
+      if (r.error) {
+        if (!manual) notify('Inbox: scanarea a eșuat', r.error, () => togglePanel('inbox'));
+        return;
+      }
+      if (!r.count && !manual && !settings().mailNotifyEmpty) return;
+      const title = r.count
+        ? `${r.count} ${r.count === 1 ? 'email necitit' : 'emailuri necitite'} primite azi`
+        : 'Inbox curat: niciun email necitit azi';
+      const body = r.important.length
+        ? 'Important: ' + r.important.map(m => `${m.from} – ${m.subject}`).join('; ')
+        : `${settings().buddyName} a verificat inboxul.`;
+      notify(title, body, () => togglePanel('inbox'));
+      broadcast('mail:scanToast', r.count);
+    }
+  });
+}
+
 function saveNote(note) {
   const d = store.get();
   const now = Date.now();
@@ -528,8 +563,9 @@ if (!app.requestSingleInstanceLock()) {
     createTray();
     startClipboardWatcher();
     initSessions();
+    initMailScan();
   });
 
   app.on('window-all-closed', e => e.preventDefault());
-  app.on('before-quit', () => { sessions.shutdown(); store.flush(); });
+  app.on('before-quit', () => { sessions.shutdown(); mailscan.shutdown(); store.flush(); });
 }

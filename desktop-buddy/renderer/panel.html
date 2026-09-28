@@ -147,6 +147,15 @@
           <p>Adaugă adresa ta și o <em>parolă de aplicație</em> în Setări → Inbox. Mady citește emailurile fără să le marcheze ca citite.</p>
           <button class="btn" id="mailGoSettings">Mergi la setări</button>
         </div>
+        <div id="scanBox" class="card scan hidden">
+          <div class="row">
+            <div class="kicker" id="scanTitle">Scanare automată</div>
+            <button class="btn small ghost" id="scanNow"><svg class="ic"><use href="#i-refresh"/></svg>Scanează acum</button>
+          </div>
+          <div class="scan-count" id="scanCount"></div>
+          <div class="muted" id="scanMeta"></div>
+          <div class="feedback hidden" id="scanSummary"></div>
+        </div>
         <div id="briefBox" class="card brief hidden"></div>
         <ul id="mailList" class="list plain"></ul>
         <p class="empty hidden" id="mailEmpty">Niciun email de afișat.</p>
@@ -218,6 +227,16 @@
           <input id="sMailCount" type="number" min="1" max="50">
         </label>
         <label class="check"><input type="checkbox" id="sMailUnread"> Doar emailurile necitite</label>
+        <label class="check"><input type="checkbox" id="sMailAutoScan"> Scanare automată: numără emailurile necitite de azi și rezumă-le pe cele importante</label>
+        <label>Scanează la fiecare
+          <select id="sMailScanMinutes">
+            <option value="30">30 de minute</option>
+            <option value="60">1 oră</option>
+            <option value="120">2 ore</option>
+            <option value="240">4 ore</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="sMailNotifyEmpty"> Notifică și când nu am emailuri noi</label>
 
         <h3>Mady</h3>
         <label>Nume

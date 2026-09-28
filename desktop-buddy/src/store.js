@@ -24,10 +24,14 @@ const DEFAULT_DATA = {
     mailHost: 'imap.gmail.com',
     mailPort: 993,
     mailCount: 15,
-    mailUnreadOnly: false
+    mailUnreadOnly: false,
+    mailAutoScan: true,
+    mailScanMinutes: 60,
+    mailNotifyEmpty: false
   },
   apiKeyEncrypted: '',
   mailPasswordEncrypted: '',
+  mailLastScan: null,
   buddyPosition: null,
   timerPosition: null,
   timerOpacity: 1,

@@ -56,3 +56,4 @@ window.buddy.settings.get().then(applyTheme);
 window.buddy.settings.onUpdate(applyTheme);
 
 window.buddy.session.onHour(({ hours }) => toast(hours === 1 ? '1 Hour has passed' : `${hours} Hours have passed`, 8000));
+window.buddy.mail.onScanToast(n => { if (n) toast(`✉ ${n} ${n === 1 ? 'email nou' : 'emailuri noi'}`, 8000); });
