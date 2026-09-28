@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" width="200" height="240">
+  <defs>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#D5DEE9"/>
+    </linearGradient>
+    <linearGradient id="hair" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8A5530"/>
+      <stop offset="1" stop-color="#5E3519"/>
+    </linearGradient>
+    <linearGradient id="dress" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FF9CC2"/>
+      <stop offset="1" stop-color="#F56FA1"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#FFE3F0"/>
+      <stop offset="1" stop-color="#FF6FA5"/>
+    </radialGradient>
+  </defs>
+
+  <!-- codițe (pigtails) -->
+  <g class="pigtail pigtail-left">
+    <path d="M46 72 C14 82 8 132 26 168 C32 158 36 150 34 140 C44 150 46 130 44 118 C52 108 54 92 56 82 Z" fill="url(#hair)"/>
+    <path d="M30 110 C26 126 28 146 30 156" stroke="#4A2812" stroke-width="2" fill="none" stroke-linecap="round" opacity=".5"/>
+  </g>
+  <g class="pigtail pigtail-right">
+    <path d="M154 72 C186 82 192 132 174 168 C168 158 164 150 166 140 C156 150 154 130 156 118 C148 108 146 92 144 82 Z" fill="url(#hair)"/>
+    <path d="M170 110 C174 126 172 146 170 156" stroke="#4A2812" stroke-width="2" fill="none" stroke-linecap="round" opacity=".5"/>
+  </g>
+
+  <!-- antenă -->
+  <line x1="100" y1="34" x2="100" y2="14" stroke="#9AA8B8" stroke-width="4" stroke-linecap="round"/>
+  <circle class="antenna-light" cx="100" cy="11" r="7" fill="url(#glow)"/>
+
+  <!-- urechi robot -->
+  <circle cx="45" cy="92" r="10" fill="#B8C4D2" stroke="#8E9BAC" stroke-width="2"/>
+  <circle cx="155" cy="92" r="10" fill="#B8C4D2" stroke="#8E9BAC" stroke-width="2"/>
+
+  <!-- cap -->
+  <rect x="46" y="32" width="108" height="96" rx="40" fill="url(#metal)" stroke="#9AA8B8" stroke-width="3"/>
+
+  <!-- păr + breton -->
+  <path d="M42 86 C32 12 168 12 158 86 C150 66 138 56 124 58 C120 48 108 44 100 50 C92 44 80 48 76 58 C62 56 50 66 44 84 Z" fill="url(#hair)"/>
+  <path d="M68 42 C80 34 92 32 104 34" stroke="#A76B40" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/>
+
+  <!-- fundițe -->
+  <g transform="translate(48 74)">
+    <path d="M0 0 L-12 -9 L-12 9 Z M0 0 L12 -9 L12 9 Z" fill="#FF6FA5" stroke="#E0467F" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle r="4" fill="#E0467F"/>
+  </g>
+  <g transform="translate(152 74)">
+    <path d="M0 0 L-12 -9 L-12 9 Z M0 0 L12 -9 L12 9 Z" fill="#FF6FA5" stroke="#E0467F" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle r="4" fill="#E0467F"/>
+  </g>
+
+  <!-- ecran față -->
+  <rect x="62" y="70" width="76" height="48" rx="18" fill="#1E2A3A"/>
+  <g class="eyes">
+    <ellipse cx="84" cy="92" rx="7" ry="9" fill="#6FF3FF"/>
+    <ellipse cx="116" cy="92" rx="7" ry="9" fill="#6FF3FF"/>
+    <circle cx="86" cy="88" r="2.2" fill="#FFFFFF"/>
+    <circle cx="118" cy="88" r="2.2" fill="#FFFFFF"/>
+  </g>
+  <circle cx="72" cy="106" r="5" fill="#FF8FB8" opacity=".7"/>
+  <circle cx="128" cy="106" r="5" fill="#FF8FB8" opacity=".7"/>
+  <path class="mouth" d="M93 106 Q100 112 107 106" stroke="#6FF3FF" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+  <!-- gât -->
+  <rect x="90" y="126" width="20" height="10" rx="3" fill="#B8C4D2"/>
+
+  <!-- brațe -->
+  <g class="arm arm-left">
+    <rect x="46" y="140" width="14" height="40" rx="7" fill="url(#metal)" stroke="#9AA8B8" stroke-width="2"/>
+    <circle cx="53" cy="184" r="7" fill="#B8C4D2"/>
+  </g>
+  <g class="arm arm-right">
+    <rect x="140" y="140" width="14" height="40" rx="7" fill="url(#metal)" stroke="#9AA8B8" stroke-width="2"/>
+    <circle cx="147" cy="184" r="7" fill="#B8C4D2"/>
+  </g>
+
+  <!-- rochiță -->
+  <path d="M68 134 L132 134 L150 204 Q100 214 50 204 Z" fill="url(#dress)" stroke="#E0467F" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M100 150 C95 143 86 147 90 154 L100 163 L110 154 C114 147 105 143 100 150 Z" fill="#FFFFFF"/>
+  <circle cx="80" cy="186" r="3" fill="#FFFFFF" opacity=".6"/>
+  <circle cx="100" cy="192" r="3" fill="#FFFFFF" opacity=".6"/>
+  <circle cx="120" cy="186" r="3" fill="#FFFFFF" opacity=".6"/>
+
+  <!-- picioare -->
+  <rect x="80" y="206" width="13" height="18" rx="5" fill="#B8C4D2"/>
+  <rect x="107" y="206" width="13" height="18" rx="5" fill="#B8C4D2"/>
+  <ellipse cx="85" cy="226" rx="11" ry="6" fill="#6B3E5E"/>
+  <ellipse cx="115" cy="226" rx="11" ry="6" fill="#6B3E5E"/>
+</svg>

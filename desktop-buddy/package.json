@@ -1,0 +1,50 @@
+{
+  "name": "desktop-buddy",
+  "productName": "Desktop Buddy",
+  "version": "1.0.0",
+  "description": "Un roboțel-fetiță pe desktop cu clipboard saver, notițe și asistent AI.",
+  "main": "main.js",
+  "author": "madalinas94",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "icon": "node scripts/make-ico.js",
+    "dist": "electron-builder --win --publish never",
+    "dist:portable": "electron-builder --win portable --publish never"
+  },
+  "devDependencies": {
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.madalinas94.desktopbuddy",
+    "productName": "Desktop Buddy",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "renderer/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Desktop Buddy"
+    },
+    "portable": {
+      "artifactName": "DesktopBuddy-Portable-${version}.exe"
+    }
+  }
+}

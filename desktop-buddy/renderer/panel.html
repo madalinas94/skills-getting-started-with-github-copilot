@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <title>Desktop Buddy</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <div class="panel">
+    <header class="titlebar">
+      <img src="../assets/icon.png" alt="" class="logo">
+      <span id="title">Robi</span>
+      <button class="icon-btn" id="closeBtn" title="Închide">✕</button>
+    </header>
+
+    <nav class="tabs">
+      <button data-tab="clipboard" class="active">📋<span>Clipboard</span></button>
+      <button data-tab="notes">📝<span>Notițe</span></button>
+      <button data-tab="ai">🤖<span>Asistent AI</span></button>
+      <button data-tab="settings">⚙️<span>Setări</span></button>
+    </nav>
+
+    <!-- CLIPBOARD -->
+    <section id="tab-clipboard" class="tab active">
+      <div class="toolbar">
+        <input type="search" id="clipSearch" placeholder="Caută în clipboard…">
+        <button class="btn ghost" id="clipClear" title="Șterge tot (fără cele fixate)">🗑️</button>
+      </div>
+      <ul id="clipList" class="list"></ul>
+      <p class="empty" id="clipEmpty">Copiază ceva (Ctrl+C) și apare aici ✨</p>
+    </section>
+
+    <!-- NOTIȚE -->
+    <section id="tab-notes" class="tab">
+      <div id="notesListView">
+        <div class="toolbar">
+          <input type="search" id="noteSearch" placeholder="Caută notițe…">
+          <button class="btn" id="noteNew">＋ Nouă</button>
+        </div>
+        <ul id="noteList" class="list"></ul>
+        <p class="empty" id="noteEmpty">Nicio notiță încă. Apasă „＋ Nouă”.</p>
+      </div>
+      <div id="noteEditView" class="editor hidden">
+        <div class="toolbar">
+          <button class="btn ghost" id="noteBack">← Înapoi</button>
+          <span class="muted" id="noteStatus"></span>
+          <button class="btn ghost danger" id="noteDelete" title="Șterge notița">🗑️</button>
+        </div>
+        <input id="noteTitle" placeholder="Titlu">
+        <textarea id="noteBody" placeholder="Scrie aici…"></textarea>
+      </div>
+    </section>
+
+    <!-- AI -->
+    <section id="tab-ai" class="tab">
+      <div class="toolbar">
+        <span class="chip" id="aiModelChip"></span>
+        <button class="btn ghost" id="aiClear" title="Conversație nouă">🧹 Nou</button>
+      </div>
+      <div id="chat" class="chat"></div>
+      <form id="chatForm" class="chat-form">
+        <textarea id="chatInput" rows="2" placeholder="Întreabă-mă ceva… (Enter trimite, Shift+Enter rând nou)"></textarea>
+        <button class="btn" type="submit" id="chatSend">➤</button>
+      </form>
+    </section>
+
+    <!-- SETĂRI -->
+    <section id="tab-settings" class="tab">
+      <div class="settings">
+        <h3>🤖 Asistent AI</h3>
+        <label>Provider
+          <select id="sProvider"></select>
+        </label>
+        <label>Model
+          <select id="sModelSelect"></select>
+          <input id="sModel" placeholder="numele modelului (ex: claude-sonnet-5)">
+        </label>
+        <label id="baseUrlRow">Base URL
+          <input id="sBaseUrl" placeholder="https://api.exemplu.com/v1">
+        </label>
+        <label>API key
+          <div class="row">
+            <input id="sApiKey" type="password" placeholder="lipește cheia API aici" autocomplete="off">
+            <button class="btn ghost" id="sApiKeyToggle" type="button" title="Arată/ascunde">👁️</button>
+          </div>
+          <div class="row">
+            <span class="muted" id="sApiKeyStatus"></span>
+            <button class="btn small" id="sApiKeySave" type="button">Salvează cheia</button>
+            <button class="btn small ghost danger" id="sApiKeyDelete" type="button">Șterge</button>
+          </div>
+        </label>
+        <label>Instrucțiuni (system prompt)
+          <textarea id="sSystemPrompt" rows="3"></textarea>
+        </label>
+        <label>Lungime maximă răspuns (tokeni)
+          <input id="sMaxTokens" type="number" min="64" max="32000" step="64">
+        </label>
+
+        <h3>🎀 Roboțel</h3>
+        <label>Nume
+          <input id="sName" maxlength="24">
+        </label>
+        <label>Mărime <span class="muted" id="sScaleVal"></span>
+          <input id="sScale" type="range" min="0.6" max="1.6" step="0.1">
+        </label>
+        <label class="check"><input type="checkbox" id="sOnTop"> Mereu deasupra altor ferestre</label>
+        <label class="check"><input type="checkbox" id="sStartup"> Pornește odată cu Windows</label>
+
+        <h3>📋 Clipboard</h3>
+        <label class="check"><input type="checkbox" id="sClipEnabled"> Salvează automat ce copiez</label>
+        <label>Câte elemente păstrez
+          <input id="sClipLimit" type="number" min="5" max="500">
+        </label>
+
+        <h3>🎨 Aspect</h3>
+        <label>Temă
+          <select id="sTheme">
+            <option value="light">Luminoasă</option>
+            <option value="dark">Întunecată</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="sHideOnBlur"> Ascunde panoul când dau click în altă parte</label>
+
+        <div class="row end">
+          <button class="btn ghost" id="sReset" type="button">Resetează setările</button>
+          <button class="btn ghost danger" id="sQuit" type="button">Ieșire din aplicație</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="toast" class="toast"></div>
+  </div>
+  <script src="panel.js"></script>
+</body>
+</html>
