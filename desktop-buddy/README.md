@@ -1,6 +1,6 @@
-# Desktop Buddy 🤖🎀
+# Desktop Buddy — Mady
 
-Un roboțel-fetiță șatenă cu codițe care stă pe desktop. O poți muta oriunde cu mouse-ul,
+Mady, un roboțel-fetiță șatenă cu codițe, care stă pe desktop. O poți muta oriunde cu mouse-ul,
 iar când dai click pe ea se deschide un panou mic (ca un tray) cu:
 
 - **📋 Clipboard** – salvează automat tot ce copiezi (Ctrl+C). Click pe un element îl copiază înapoi.
@@ -8,7 +8,17 @@ iar când dai click pe ea se deschide un panou mic (ca un tray) cu:
 - **📝 Notițe** – notițe cu salvare automată și căutare.
 - **🤖 Asistent AI** – chat cu un agent AI. Providerul, modelul și cheia API se aleg din Setări.
 - **⚙️ Setări** – provider AI, model, API key (salvată criptat), system prompt, numele și mărimea
-  roboțelului, „mereu deasupra”, pornire cu Windows, clipboard, temă luminoasă/întunecată.
+  roboțelului, „mereu deasupra”, pornire cu Windows, clipboard, temă.
+
+## Teme
+
+- **Old Money · Ivory** (implicit) – ivory, verde englezesc și auriu, fonturi serif clasice;
+  Mady poartă rochiță verde cu tiv auriu, fundițe crem și colier de perle.
+- **Old Money · Evening** – aceeași eleganță, pe fundal verde-noapte.
+- **Roz · luminos / întunecat** – look-ul original, cu Mady în rochiță roz.
+
+Fonturile (Cormorant Garamond, EB Garamond, licență SIL OFL 1.1) sunt incluse în
+`renderer/fonts/`, deci aplicația arată la fel și fără internet.
 
 Click dreapta pe roboțel → meniu rapid (Notițe, AI, Setări, Ascunde, Ieșire).
 Aplicația apare și în system tray (lângă ceas).

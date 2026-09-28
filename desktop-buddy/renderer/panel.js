@@ -10,6 +10,15 @@ let currentNoteId = null;
 
 // ---------- utilitare ----------
 
+function icon(name) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'ic');
+  const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+  use.setAttribute('href', `#i-${name}`);
+  svg.append(use);
+  return svg;
+}
+
 function el(tag, props = {}, children = []) {
   const node = Object.assign(document.createElement(tag), props);
   for (const c of [].concat(children)) node.append(c);
@@ -56,26 +65,26 @@ function renderClipboard() {
   list.replaceChildren();
   for (const item of items) {
     const actions = el('span', { className: 'actions' }, [
-      el('button', { title: item.pinned ? 'Anulează fixarea' : 'Fixează', textContent: item.pinned ? '📌' : '📍', onclick: async e => {
+      el('button', { className: item.pinned ? 'on' : '', title: item.pinned ? 'Anulează fixarea' : 'Fixează', onclick: async e => {
         e.stopPropagation();
         clipItems = await api.clipboard.pin(item.id);
         renderClipboard();
-      } }),
-      el('button', { title: 'Salvează ca notiță', textContent: '📝', onclick: async e => {
+      } }, icon('pin')),
+      el('button', { title: 'Salvează ca notiță', onclick: async e => {
         e.stopPropagation();
         await api.clipboard.toNote(item.id);
         toast('Salvat în notițe');
-      } }),
-      el('button', { title: 'Șterge', textContent: '🗑️', onclick: async e => {
+      } }, icon('note')),
+      el('button', { title: 'Șterge', onclick: async e => {
         e.stopPropagation();
         clipItems = await api.clipboard.remove(item.id);
         renderClipboard();
-      } })
+      } }, icon('trash'))
     ]);
     list.append(el('li', {
       className: 'item' + (item.pinned ? ' pinned' : ''),
       title: 'Click pentru a copia',
-      onclick: async () => { await api.clipboard.copy(item.id); toast('Copiat în clipboard ✓'); }
+      onclick: async () => { await api.clipboard.copy(item.id); toast('Copiat în clipboard'); }
     }, [
       el('div', { className: 'text', textContent: item.text }),
       el('div', { className: 'meta' }, [el('span', { className: 'muted', textContent: timeAgo(item.createdAt) }), actions])
@@ -142,7 +151,7 @@ async function flushNote() {
   if (!currentNoteId && !title.trim() && !body.trim()) return;
   const saved = await api.notes.save({ id: currentNoteId, title, body });
   currentNoteId = saved.id;
-  $('#noteStatus').textContent = 'Salvat ✓';
+  $('#noteStatus').textContent = 'Salvat';
 }
 
 $('#noteNew').addEventListener('click', () => openNote(null));
@@ -168,14 +177,19 @@ function renderChat(chat, { error, typing } = {}) {
   const box = $('#chat');
   box.replaceChildren();
   if (!chat.length) {
-    box.append(el('div', { className: 'msg assistant', textContent: `Sunt ${settings.buddyName}. Ce obiectiv atacăm azi? 🎯` }));
+    box.append(el('div', { className: 'msg assistant' }, [
+      el('span', { className: 'who', textContent: settings.buddyName }),
+      'Bine ai revenit. Ce obiectiv atacăm azi?'
+    ]));
   }
   for (const m of chat) {
-    const bubble = el('div', { className: `msg ${m.role}`, textContent: m.content });
+    const bubble = el('div', { className: `msg ${m.role}` });
+    if (m.role === 'assistant') bubble.append(el('span', { className: 'who', textContent: settings.buddyName }));
+    bubble.append(m.content);
     if (m.role === 'assistant') {
       bubble.append(el('button', { className: 'copy', textContent: 'Copiază', onclick: () => {
         navigator.clipboard.writeText(m.content);
-        toast('Copiat ✓');
+        toast('Copiat');
       } }));
     }
     box.append(bubble);
@@ -242,7 +256,7 @@ function renderSettings() {
   fillModelSelect();
   $('#sBaseUrl').value = settings.aiBaseUrl || '';
   $('#baseUrlRow').classList.toggle('hidden', settings.aiProvider !== 'custom');
-  $('#sApiKeyStatus').textContent = settings.hasApiKey ? '🔒 Cheie salvată (criptată)' : 'Nicio cheie salvată';
+  $('#sApiKeyStatus').textContent = settings.hasApiKey ? 'Cheie salvată · criptată' : 'Nicio cheie salvată';
   $('#sSystemPrompt').value = settings.aiSystemPrompt;
   $('#sMaxTokens').value = settings.aiMaxTokens;
   $('#sName').value = settings.buddyName;
@@ -257,7 +271,7 @@ function renderSettings() {
   renderModelChip();
 }
 
-async function update(patch, msg = 'Setare salvată ✓') {
+async function update(patch, msg = 'Setare salvată') {
   settings = await api.settings.set(patch);
   renderSettings();
   toast(msg);
@@ -290,7 +304,7 @@ $('#sApiKeySave').addEventListener('click', async () => {
   settings = await api.settings.setApiKey(key);
   $('#sApiKey').value = '';
   renderSettings();
-  toast('Cheia API a fost salvată 🔒');
+  toast('Cheia API a fost salvată');
 });
 $('#sApiKeyDelete').addEventListener('click', async () => {
   if (!confirm('Ștergi cheia API salvată?')) return;

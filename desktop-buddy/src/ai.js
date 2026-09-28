@@ -70,10 +70,10 @@ async function callOpenAICompatible({ baseUrl, apiKey, model, system, messages, 
 
 function demoReply(messages, settings) {
   const last = messages[messages.length - 1]?.content || '';
-  return `Sunt ${settings.buddyName} și momentan rulez în modul demo 💼\n\n` +
+  return `Sunt ${settings.buddyName} și momentan rulez în modul demo.\n\n` +
     `Mi-ai scris: „${last.slice(0, 200)}”\n\n` +
     'Next action pentru tine: Setări → Asistent AI → alege providerul, modelul și pune cheia API. ' +
-    'Apoi ne apucăm serios de treabă. 🎯';
+    'Apoi ne apucăm serios de treabă.';
 }
 
 async function chat(messages, settings, apiKey) {

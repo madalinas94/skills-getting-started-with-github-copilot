@@ -10,7 +10,7 @@ const DEFAULT_DATA = {
     alwaysOnTop: true,
     startWithWindows: false,
     hidePanelOnBlur: true,
-    theme: 'light',
+    theme: 'ivory',
     clipboardEnabled: true,
     clipboardLimit: 50,
     aiProvider: 'demo',

@@ -1,34 +1,57 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="ro" data-theme="ivory">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'">
   <title>Desktop Buddy</title>
+  <link rel="stylesheet" href="fonts/fonts.css">
   <link rel="stylesheet" href="panel.css">
 </head>
 <body>
+  <!-- iconițe line-art, folosite cu <use href="#i-..."> -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-clip" viewBox="0 0 24 24"><rect x="5" y="4.5" width="14" height="16.5" rx="1.5"/><rect x="9" y="3" width="6" height="3.2" rx="1"/><path d="M8.5 11h7M8.5 14.5h7M8.5 18h4"/></symbol>
+      <symbol id="i-quill" viewBox="0 0 24 24"><path d="M20 4c-6 1-11 5.5-13 12l-1.5 4.5"/><path d="M20 4c-.5 5-3.5 9.5-8.5 11.5H8"/><path d="M11 12h4"/></symbol>
+      <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3c.6 4.6 2.4 6.4 7 7-4.6.6-6.4 2.4-7 7-.6-4.6-2.4-6.4-7-7 4.6-.6 6.4-2.4 7-7z"/><path d="M19 16c.2 1.6.9 2.3 2.5 2.5-1.6.2-2.3.9-2.5 2.5-.2-1.6-.9-2.3-2.5-2.5 1.6-.2 2.3-.9 2.5-2.5z"/></symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9M4 12h3M11 12h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/><circle cx="9" cy="12" r="2"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10.5 10.5v6M13.5 10.5v6"/></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 3.5h6l-1 5 3.5 3.5h-11L10 8.5z"/><path d="M12 12v8.5"/></symbol>
+      <symbol id="i-note" viewBox="0 0 24 24"><path d="M5 3.5h10l4 4v13H5z"/><path d="M15 3.5v4h4M8.5 12h7M8.5 15.5h7"/></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 12H5M11 6l-6 6 6 6"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-new" viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M13.5 7.5l3 3"/></symbol>
+    </defs>
+  </svg>
+
   <div class="panel">
     <header class="titlebar">
-      <img src="../assets/icon.png" alt="" class="logo">
-      <span id="title">Mady</span>
-      <button class="icon-btn" id="closeBtn" title="Închide">✕</button>
+      <div class="monogram">M</div>
+      <div class="brand">
+        <span id="title">Mady</span>
+        <small>Asistentă personală</small>
+      </div>
+      <button class="icon-btn" id="closeBtn" title="Închide"><svg class="ic"><use href="#i-close"/></svg></button>
     </header>
 
     <nav class="tabs">
-      <button data-tab="clipboard" class="active">📋<span>Clipboard</span></button>
-      <button data-tab="notes">📝<span>Notițe</span></button>
-      <button data-tab="ai">🤖<span>Asistent AI</span></button>
-      <button data-tab="settings">⚙️<span>Setări</span></button>
+      <button data-tab="clipboard" class="active"><svg class="ic"><use href="#i-clip"/></svg><span>Clipboard</span></button>
+      <button data-tab="notes"><svg class="ic"><use href="#i-quill"/></svg><span>Notițe</span></button>
+      <button data-tab="ai"><svg class="ic"><use href="#i-spark"/></svg><span>Asistent</span></button>
+      <button data-tab="settings"><svg class="ic"><use href="#i-sliders"/></svg><span>Setări</span></button>
     </nav>
 
     <!-- CLIPBOARD -->
     <section id="tab-clipboard" class="tab active">
       <div class="toolbar">
         <input type="search" id="clipSearch" placeholder="Caută în clipboard…">
-        <button class="btn ghost" id="clipClear" title="Șterge tot (fără cele fixate)">🗑️</button>
+        <button class="btn ghost square" id="clipClear" title="Șterge tot (fără cele fixate)"><svg class="ic"><use href="#i-trash"/></svg></button>
       </div>
       <ul id="clipList" class="list"></ul>
-      <p class="empty" id="clipEmpty">Copiază ceva (Ctrl+C) și apare aici ✨</p>
+      <p class="empty" id="clipEmpty">Copiază ceva și îl păstrez aici.</p>
     </section>
 
     <!-- NOTIȚE -->
@@ -36,16 +59,16 @@
       <div id="notesListView">
         <div class="toolbar">
           <input type="search" id="noteSearch" placeholder="Caută notițe…">
-          <button class="btn" id="noteNew">＋ Nouă</button>
+          <button class="btn" id="noteNew"><svg class="ic"><use href="#i-plus"/></svg>Nouă</button>
         </div>
         <ul id="noteList" class="list"></ul>
-        <p class="empty" id="noteEmpty">Nicio notiță încă. Apasă „＋ Nouă”.</p>
+        <p class="empty" id="noteEmpty">Nicio notiță încă.</p>
       </div>
       <div id="noteEditView" class="editor hidden">
         <div class="toolbar">
-          <button class="btn ghost" id="noteBack">← Înapoi</button>
+          <button class="btn ghost" id="noteBack"><svg class="ic"><use href="#i-back"/></svg>Înapoi</button>
           <span class="muted" id="noteStatus"></span>
-          <button class="btn ghost danger" id="noteDelete" title="Șterge notița">🗑️</button>
+          <button class="btn ghost square danger" id="noteDelete" title="Șterge notița"><svg class="ic"><use href="#i-trash"/></svg></button>
         </div>
         <input id="noteTitle" placeholder="Titlu">
         <textarea id="noteBody" placeholder="Scrie aici…"></textarea>
@@ -56,19 +79,19 @@
     <section id="tab-ai" class="tab">
       <div class="toolbar">
         <span class="chip" id="aiModelChip"></span>
-        <button class="btn ghost" id="aiClear" title="Conversație nouă">🧹 Nou</button>
+        <button class="btn ghost" id="aiClear" title="Conversație nouă"><svg class="ic"><use href="#i-new"/></svg>Nouă</button>
       </div>
       <div id="chat" class="chat"></div>
       <form id="chatForm" class="chat-form">
-        <textarea id="chatInput" rows="2" placeholder="Întreabă-mă ceva… (Enter trimite, Shift+Enter rând nou)"></textarea>
-        <button class="btn" type="submit" id="chatSend">➤</button>
+        <textarea id="chatInput" rows="2" placeholder="Scrie-i lui Mady… (Enter trimite)"></textarea>
+        <button class="btn square" type="submit" id="chatSend" title="Trimite"><svg class="ic"><use href="#i-send"/></svg></button>
       </form>
     </section>
 
     <!-- SETĂRI -->
     <section id="tab-settings" class="tab">
       <div class="settings">
-        <h3>🤖 Asistent AI</h3>
+        <h3>Asistent AI</h3>
         <label>Provider
           <select id="sProvider"></select>
         </label>
@@ -82,22 +105,22 @@
         <label>API key
           <div class="row">
             <input id="sApiKey" type="password" placeholder="lipește cheia API aici" autocomplete="off">
-            <button class="btn ghost" id="sApiKeyToggle" type="button" title="Arată/ascunde">👁️</button>
+            <button class="btn ghost square" id="sApiKeyToggle" type="button" title="Arată/ascunde"><svg class="ic"><use href="#i-eye"/></svg></button>
           </div>
           <div class="row">
             <span class="muted" id="sApiKeyStatus"></span>
-            <button class="btn small" id="sApiKeySave" type="button">Salvează cheia</button>
+            <button class="btn small" id="sApiKeySave" type="button">Salvează</button>
             <button class="btn small ghost danger" id="sApiKeyDelete" type="button">Șterge</button>
           </div>
         </label>
-        <label>Instrucțiuni (system prompt)
+        <label>Personalitate (system prompt)
           <textarea id="sSystemPrompt" rows="7"></textarea>
         </label>
         <label>Lungime maximă răspuns (tokeni)
           <input id="sMaxTokens" type="number" min="64" max="32000" step="64">
         </label>
 
-        <h3>🎀 Roboțel</h3>
+        <h3>Mady</h3>
         <label>Nume
           <input id="sName" maxlength="24">
         </label>
@@ -107,24 +130,26 @@
         <label class="check"><input type="checkbox" id="sOnTop"> Mereu deasupra altor ferestre</label>
         <label class="check"><input type="checkbox" id="sStartup"> Pornește odată cu Windows</label>
 
-        <h3>📋 Clipboard</h3>
+        <h3>Clipboard</h3>
         <label class="check"><input type="checkbox" id="sClipEnabled"> Salvează automat ce copiez</label>
         <label>Câte elemente păstrez
           <input id="sClipLimit" type="number" min="5" max="500">
         </label>
 
-        <h3>🎨 Aspect</h3>
+        <h3>Aspect</h3>
         <label>Temă
           <select id="sTheme">
-            <option value="light">Luminoasă</option>
-            <option value="dark">Întunecată</option>
+            <option value="ivory">Old Money · Ivory</option>
+            <option value="evening">Old Money · Evening</option>
+            <option value="light">Roz · luminos</option>
+            <option value="dark">Roz · întunecat</option>
           </select>
         </label>
         <label class="check"><input type="checkbox" id="sHideOnBlur"> Ascunde panoul când dau click în altă parte</label>
 
         <div class="row end">
           <button class="btn ghost" id="sReset" type="button">Resetează setările</button>
-          <button class="btn ghost danger" id="sQuit" type="button">Ieșire din aplicație</button>
+          <button class="btn ghost danger" id="sQuit" type="button">Ieșire</button>
         </div>
       </div>
     </section>
