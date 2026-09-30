@@ -57,7 +57,15 @@ cadrele cu fotografii găsite pe internet, pe căutări în registrul „old mon
 bibliotecă clasică, Mercedes vintage, perle și mătase…). Pe fiecare poză: ⟳ altă imagine. Cu un filtru
 activ, căutarea ariei se poate schimba (ex: „Range Rover Autobiography”). Sub fiecare fotografie apare
 autorul și licența. Sursa se alege din Setări → Vision board: **Openverse** (fără cheie, licențe
-Creative Commons), **Pexels** sau **Unsplash** (cheie gratuită, fotografii editoriale). Afirmațiile apar și ca **„Afirmația zilei”** în mantra zilei.
+Creative Commons), **Pexels** sau **Unsplash** (cheie gratuită, fotografii editoriale), sau
+**Google Imagini** (cheie Google Cloud pentru Custom Search JSON API + ID-ul unui motor de căutare cu
+căutare de imagini activă).
+
+**Din Google, fără nicio cheie:** butonul **G** de pe fiecare cadru (sau „Caută pe Google” din bara
+de căutare a ariei) deschide Google Imagini în browser, cu căutarea ariei. Alegi poza și:
+- o **tragi** direct peste cadru (sau oriunde pe board), sau
+- click dreapta → **Copiază imaginea**, apoi butonul **Lipește** de pe cadru (sau **Ctrl+V** pe board).
+Merg și linkurile Google copiate („imgres?imgurl=…”), linkurile directe la imagini și miniaturile. Afirmațiile apar și ca **„Afirmația zilei”** în mantra zilei.
 
 ## Raport lunar
 

@@ -1076,10 +1076,13 @@ function renderSettings() {
   $('#sVisionProvider').value = settings.visionProvider || 'openverse';
   const vp = settings.visionProvider || 'openverse';
   $('#visionKeyRow').classList.toggle('hidden', vp === 'openverse');
+  $('#visionCxRow').classList.toggle('hidden', vp !== 'google');
+  if (document.activeElement !== $('#sVisionCx')) $('#sVisionCx').value = settings.visionGoogleCx || '';
   $('#sVisionKeyStatus').textContent = settings.hasVisionKey ? 'Cheie salvată · criptată' : 'Nicio cheie salvată';
   $('#visionHint').replaceChildren(...({
     openverse: ['Imagini cu licențe Creative Commons; autorul apare sub fiecare fotografie.'],
     pexels: ['Cheie gratuită în 1 minut: ', el('a', { href: '#', textContent: 'pexels.com/api', onclick: e => { e.preventDefault(); api.app.openExternal('https://www.pexels.com/api/'); } }), '.'],
+    google: ['Cheie API Google Cloud (Custom Search JSON API) și un motor de căutare cu „Căutare de imagini” activă: ', el('a', { href: '#', textContent: 'programmablesearchengine.google.com', onclick: e => { e.preventDefault(); api.app.openExternal('https://programmablesearchengine.google.com/'); } }), '. Fără cheie, butonul G de pe fiecare poză deschide Google Imagini în browser.'],
     unsplash: ['Cheie gratuită („Access Key”): ', el('a', { href: '#', textContent: 'unsplash.com/developers', onclick: e => { e.preventDefault(); api.app.openExternal('https://unsplash.com/developers'); } }), '.']
   })[vp]);
   $('#sMantraSec').value = settings.mantraSeconds || 30;
@@ -1170,6 +1173,7 @@ $('#sSpontaneous').addEventListener('change', e => update({ buddySpontaneous: e.
 $('#sMorningBrief').addEventListener('change', e => update({ morningBrief: e.target.checked }));
 $('#sBriefVoice').addEventListener('change', e => update({ briefVoice: e.target.checked }));
 $('#sHair').addEventListener('change', e => update({ buddyHair: e.target.value }));
+$('#sVisionCx').addEventListener('change', e => update({ visionGoogleCx: e.target.value.trim() }));
 $('#sVisionProvider').addEventListener('change', e => update({ visionProvider: e.target.value }));
 $('#sVisionKeySave').addEventListener('click', async () => {
   const k = $('#sVisionKey').value.trim();

@@ -42,6 +42,25 @@ function ops(item) {
     el('button', { title: 'Mută mai devreme', onclick: async () => set(await api.vision.move(item.id, -1)) }, [icon('left')]),
     el('button', { title: 'Mută mai târziu', onclick: async () => set(await api.vision.move(item.id, 1)) }, [icon('right')])
   ]);
+  if (item.type === 'slot' || item.type === 'image') {
+    box.prepend(el('button', {
+      title: 'Lipește imaginea copiată (în Google: click dreapta pe poză → Copiază imaginea)',
+      onclick: async e => {
+        e.stopPropagation();
+        const r = await api.vision.paste(item.id);
+        if (!r.ok) toast(r.error);
+        set(r.view);
+      }
+    }, [icon('paste')]));
+    if (item.category) box.prepend(el('button', {
+      title: 'Caută pe Google Imagini',
+      onclick: e => {
+        e.stopPropagation();
+        api.vision.google(item.category);
+        toast('Alege poza în Google, apoi trage-o aici sau: click dreapta → Copiază imaginea → Lipește');
+      }
+    }, [icon('google')]));
+  }
   if (item.category && (item.type === 'slot' || item.type === 'image')) {
     box.prepend(el('button', {
       title: item.type === 'slot' ? 'Imagine reală de pe internet' : 'Altă imagine de pe internet',
@@ -105,7 +124,14 @@ function render() {
         $('#drop').classList.add('hidden');
         const f = e.dataTransfer.files[0];
         const p = f && api.vision.pathFor(f);
-        if (p) set(await api.vision.fillSlot(item.id, p));
+        if (p) return set(await api.vision.fillSlot(item.id, p));
+        const src = droppedUrl(e.dataTransfer);
+        if (!src) return toast('Nu am găsit o imagine în ce ai tras aici.');
+        tile.classList.add('loading');
+        const r = await api.vision.fromUrl(src, item.id);
+        tile.classList.remove('loading');
+        if (!r.ok) toast(r.error);
+        set(r.view);
       });
     } else if (item.type === 'image') {
       const cap = el('input', { className: 'cap', value: item.caption || '', placeholder: 'adaugă o legendă…', maxLength: 80 });
@@ -179,6 +205,11 @@ $('#queryApply').addEventListener('click', async () => {
     set(r.view);
   }
 });
+$('#queryGoogle').addEventListener('click', () => {
+  if (!filter) return;
+  api.vision.google(filter, $('#queryInput').value.trim());
+  toast('Alege poza în Google, apoi trage-o pe un cadru sau: click dreapta → Copiază imaginea → Lipește');
+});
 $('#queryInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('#queryApply').click(); });
 $('#startAreas').addEventListener('click', openPicker);
 $('#pickCancel').addEventListener('click', () => $('#picker').classList.add('hidden'));
@@ -210,6 +241,24 @@ for (const id of ['title', 'subtitle']) {
   });
 }
 
+// Imaginea trasă dintr-un browser: sursa <img> din HTML, altfel linkul.
+function droppedUrl(dt) {
+  const html = dt.getData('text/html');
+  const m = html && /<img[^>]+src="([^"]+)"/i.exec(html);
+  if (m) return m[1].replace(/&amp;/g, '&');
+  const uri = (dt.getData('text/uri-list') || dt.getData('text/plain') || '').split('\n').find(l => l && !l.startsWith('#'));
+  return uri ? uri.trim() : '';
+}
+
+// Ctrl+V pe board: imaginea copiată intră în aria filtrată (sau fără arie)
+document.addEventListener('paste', async e => {
+  if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+  e.preventDefault();
+  const r = await api.vision.paste(null, filter || undefined);
+  if (!r.ok) toast(r.error);
+  set(r.view);
+});
+
 // trage imagini din Explorer
 let dragDepth = 0;
 window.addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; $('#drop').classList.remove('hidden'); });
@@ -220,7 +269,13 @@ window.addEventListener('drop', async e => {
   dragDepth = 0;
   $('#drop').classList.add('hidden');
   const paths = [...e.dataTransfer.files].map(f => api.vision.pathFor(f)).filter(Boolean);
-  if (paths.length) set(await api.vision.add(paths, filter || undefined));
+  if (paths.length) return set(await api.vision.add(paths, filter || undefined));
+  const src = droppedUrl(e.dataTransfer);
+  if (src) {
+    const r = await api.vision.fromUrl(src, null, filter || undefined);
+    if (!r.ok) toast(r.error);
+    set(r.view);
+  }
 });
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape' || ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;

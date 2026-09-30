@@ -363,6 +363,7 @@
             <option value="openverse">Openverse (fără cheie, licențe libere)</option>
             <option value="pexels">Pexels (cheie gratuită, foto editoriale)</option>
             <option value="unsplash">Unsplash (cheie gratuită, foto editoriale)</option>
+            <option value="google">Google Imagini (cheie API + ID motor de căutare)</option>
           </select>
         </label>
         <label id="visionKeyRow">Cheie API pentru imagini
@@ -371,6 +372,9 @@
             <button class="btn small" id="sVisionKeySave" type="button">Salvează</button>
           </div>
           <span class="muted" id="sVisionKeyStatus"></span>
+        </label>
+        <label id="visionCxRow">ID motor de căutare Google (cx)
+          <input id="sVisionCx" placeholder="ex: 0123456789abcdef0" spellcheck="false">
         </label>
         <p class="hint" id="visionHint"></p>
 

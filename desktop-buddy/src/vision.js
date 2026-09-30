@@ -180,12 +180,13 @@ async function webFill(itemId, opts, { next = false } = {}) {
   const area = item.category;
   const query = queryFor(area);
   const used = new Set(v.items.map(i => i.source?.url).filter(Boolean));
+  const per = images.PAGE_SIZE[opts.provider] || 20;
   let pos = next && item.source?.query === query ? (item.source.pos || 0) + 1 : 0;
   for (let tries = 0; tries < 12; tries++, pos++) {
-    const page = 1 + Math.floor(pos / 20);
+    const page = 1 + Math.floor(pos / per);
     const list = await results(query, opts, page);
     if (!list.length) break;
-    const r = list[pos % 20];
+    const r = list[pos % per];
     if (!r) break;
     if (used.has(r.url)) continue;
     try {
@@ -207,6 +208,47 @@ async function webFill(itemId, opts, { next = false } = {}) {
     }
   }
   throw new Error(`Nu am găsit imagini pentru „${query}”. Încearcă altă căutare.`);
+}
+
+// Pune pe board o imagine adusă de utilizator (link, „data:”, sau octeți din clipboard).
+// Cu `itemId` umple/înlocuiește acel cadru; altfel adaugă o fotografie nouă în aria dată.
+function saveBuffer({ buf, ext }, itemId, category, source) {
+  const v = data();
+  const id = crypto.randomUUID();
+  const file = id + ext;
+  fs.writeFileSync(path.join(dir(), file), buf);
+  const idx = itemId ? v.items.findIndex(x => x.id === itemId) : -1;
+  if (idx >= 0) {
+    const old = v.items[idx];
+    if (old.type === 'image' && old.file) fs.rmSync(path.join(dir(), old.file), { force: true });
+    v.items[idx] = {
+      id, type: 'image', file, category: old.category || '',
+      caption: old.type === 'image' ? old.caption : (byId(old.category)?.label || ''),
+      tape: old.tape, tilt: old.tilt, ...(source ? { source } : {})
+    };
+  } else {
+    v.items.push({ id, type: 'image', file, caption: byId(category)?.label || '', category: byId(category) ? category : '', tape: tape(v.items.length), tilt: +(Math.random() * 3 - 1.5).toFixed(2), ...(source ? { source } : {}) });
+  }
+  store.save();
+  return view();
+}
+
+async function fromSource(src, itemId, category) {
+  const img = await images.fromAnywhere(src);
+  let source = null;
+  const s = String(src || '');
+  if (/^https?:/i.test(s)) {
+    const real = images.realUrl(s);
+    let host = '';
+    try { host = new URL(real).hostname.replace(/^www\./, ''); } catch {}
+    source = { url: real, creator: host, license: 'din browser', link: real, provider: 'Web' };
+  }
+  return saveBuffer(img, itemId, category, source);
+}
+
+function fromBuffer(buf, ext, itemId, category) {
+  if (!buf || buf.length < 2000) throw new Error('În clipboard nu e o imagine. În Google: click dreapta pe poză → Copiază imaginea.');
+  return saveBuffer({ buf, ext }, itemId, category, null);
 }
 
 // Generează tot board-ul: creează ariile (dacă lipsesc) și umple cadrele goale cu imagini reale.
@@ -235,4 +277,4 @@ function boardAreas() {
   return [...new Set(data().items.map(i => i.category).filter(Boolean))];
 }
 
-module.exports = { view, addImages, addText, update, remove, move, setTitle, addAreas, fillSlot, nextAffirmation, boardAreas, webFill, generate, setQuery, IMAGE_EXT, dir };
+module.exports = { view, addImages, addText, update, remove, move, setTitle, addAreas, fillSlot, nextAffirmation, boardAreas, webFill, generate, setQuery, fromSource, fromBuffer, queryFor, IMAGE_EXT, dir };

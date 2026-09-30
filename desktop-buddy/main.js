@@ -610,7 +610,7 @@ function seasonTheme(d = new Date()) {
 
 function publicSettings() {
   return {
-    ...settings(), hasApiKey: !!store.getApiKey(), hasMailPassword: !!store.getMailPassword(), hasVisionKey: !!store.getVisionKey(),
+    ...settings(), hasApiKey: !!store.getApiKey(), hasMailPassword: !!store.getMailPassword(), hasVisionKey: !!store.getVisionKey(settings().visionProvider || 'openverse'),
     themeResolved: settings().theme === 'seasonal' ? seasonTheme() : settings().theme,
     hotkeyActive: registeredHotkey === settings().quickHotkey, hotkeyLabel: hotkeyLabel(settings().quickHotkey)
   };
@@ -903,7 +903,36 @@ function registerIpc() {
   });
   ipcMain.handle('vision:addAreas', (_e, ids) => vision.addAreas(ids));
   ipcMain.handle('vision:nextAff', (_e, id) => vision.nextAffirmation(id));
-  const imgOpts = () => ({ provider: settings().visionProvider || 'openverse', key: store.getVisionKey() });
+  const imgOpts = () => {
+    const provider = settings().visionProvider || 'openverse';
+    return { provider, key: store.getVisionKey(provider), cx: settings().visionGoogleCx || '' };
+  };
+  // imagini aduse de utilizator din browser (link / imagine trasă) sau din clipboard
+  ipcMain.handle('vision:fromUrl', async (_e, src, itemId, category) => {
+    try { return { ok: true, view: await vision.fromSource(src, itemId, category) }; } catch (err) { return { ok: false, error: err.message, view: vision.view() }; }
+  });
+  ipcMain.handle('vision:paste', async (_e, itemId, category) => {
+    try {
+      const items = await clipboard.read();
+      for (const it of items) {
+        const type = it.types.find(t => /^image\/(png|jpeg|webp)$/.test(t));
+        if (type) {
+          const blob = await it.getType(type);
+          const buf = Buffer.from(await blob.arrayBuffer());
+          return { ok: true, view: vision.fromBuffer(buf, type === 'image/png' ? '.png' : type === 'image/webp' ? '.webp' : '.jpg', itemId, category) };
+        }
+      }
+      const text = await clipboard.readText();
+      if (text && /^(https?:|data:image)/i.test(text.trim())) return { ok: true, view: await vision.fromSource(text.trim(), itemId, category) };
+      throw new Error('În clipboard nu e o imagine. În Google: click dreapta pe poză → Copiază imaginea.');
+    } catch (err) {
+      return { ok: false, error: err.message, view: vision.view() };
+    }
+  });
+  ipcMain.on('vision:google', (_e, area, customQuery) => {
+    const q = customQuery || vision.queryFor(area);
+    shell.openExternal(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(q)}`);
+  });
   ipcMain.handle('vision:webFill', async (_e, id, next) => {
     try { return { ok: true, view: await vision.webFill(id, imgOpts(), { next }) }; } catch (err) { return { ok: false, error: err.message, view: vision.view() }; }
   });
@@ -917,7 +946,7 @@ function registerIpc() {
   });
   ipcMain.handle('vision:setQuery', (_e, area, q) => vision.setQuery(area, q));
   ipcMain.handle('vision:setKey', (_e, key) => {
-    store.setVisionKey(String(key || '').trim());
+    store.setVisionKey(settings().visionProvider || 'openverse', String(key || '').trim());
     broadcast('settings:updated', publicSettings());
     return publicSettings();
   });

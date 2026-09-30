@@ -4,6 +4,10 @@
 const OPENVERSE = process.env.BUDDY_OPENVERSE_URL || 'https://api.openverse.org/v1/images/';
 const PEXELS = 'https://api.pexels.com/v1/search';
 const UNSPLASH = 'https://api.unsplash.com/search/photos';
+const GOOGLE = process.env.BUDDY_GOOGLE_URL || 'https://www.googleapis.com/customsearch/v1';
+
+// Câte rezultate întoarce o pagină, per sursă.
+const PAGE_SIZE = { google: 10, pexels: 20, unsplash: 20, openverse: 20 };
 
 // Căutări implicite, în registrul „old money”: rafinat, matur, atemporal.
 const QUERIES = {
@@ -40,8 +44,18 @@ async function getJson(url, headers = {}) {
 }
 
 // Rezultat comun: { url, thumb, creator, license, link, provider, title }
-async function search(query, { provider = 'openverse', key = '', page = 1 } = {}) {
+async function search(query, { provider = 'openverse', key = '', cx = '', page = 1 } = {}) {
   const q = encodeURIComponent(query);
+  if (provider === 'google') {
+    if (!key || !cx) throw new Error('Pentru Google adaugă cheia API și ID-ul motorului de căutare în Setări → Vision board.');
+    const start = (page - 1) * 10 + 1;
+    if (start > 91) return [];
+    const j = await getJson(`${GOOGLE}?key=${encodeURIComponent(key)}&cx=${encodeURIComponent(cx)}&q=${q}&searchType=image&num=10&start=${start}&imgSize=large&safe=active`);
+    return (j.items || []).map(i => ({
+      url: i.link, thumb: i.image?.thumbnailLink || i.link, creator: i.displayLink || '', license: 'Google Imagini',
+      link: i.image?.contextLink || i.link, provider: 'Google', title: i.title || ''
+    }));
+  }
   if (provider === 'pexels') {
     if (!key) throw new Error('Adaugă cheia Pexels în Setări → Vision board.');
     const j = await getJson(`${PEXELS}?query=${q}&per_page=20&page=${page}&orientation=portrait`, { authorization: key });
@@ -66,6 +80,40 @@ async function search(query, { provider = 'openverse', key = '', page = 1 } = {}
     }));
 }
 
+// Imagine din orice sursă primită de la utilizator: link (inclusiv linkuri Google „imgres?imgurl=”),
+// imagine „data:” (miniaturile Google) sau octeții unei imagini copiate.
+function fromDataUri(uri) {
+  const m = /^data:image\/(png|jpe?g|webp);base64,(.+)$/i.exec(uri || '');
+  if (!m) return null;
+  const buf = Buffer.from(m[2], 'base64');
+  if (buf.length < 2000) throw new Error('Imaginea e prea mică. Deschide poza mare în Google, apoi copiaz-o.');
+  return { buf, ext: m[1].toLowerCase() === 'png' ? '.png' : m[1].toLowerCase() === 'webp' ? '.webp' : '.jpg' };
+}
+
+function realUrl(url) {
+  try {
+    const u = new URL(url);
+    const direct = u.searchParams.get('imgurl') || u.searchParams.get('mediaurl');
+    if (direct) return direct;
+  } catch {}
+  return url;
+}
+
+async function fromAnywhere(src) {
+  const s = String(src || '').trim();
+  if (s.startsWith('data:')) {
+    const d = fromDataUri(s);
+    if (!d) throw new Error('Formatul imaginii nu e acceptat.');
+    return d;
+  }
+  if (!/^https?:\/\//i.test(s)) throw new Error('Nu am găsit o imagine. Copiază imaginea (click dreapta → Copiază imaginea) sau trage-o aici.');
+  try {
+    return await download(realUrl(s));
+  } catch {
+    throw new Error('Nu am putut descărca imaginea de la acest link. Încearcă „Copiază imaginea” și apoi „Lipește”.');
+  }
+}
+
 async function download(url) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 30000);
@@ -82,4 +130,4 @@ async function download(url) {
   }
 }
 
-module.exports = { QUERIES, search, download };
+module.exports = { QUERIES, PAGE_SIZE, search, download, fromAnywhere, realUrl };

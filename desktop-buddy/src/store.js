@@ -38,7 +38,8 @@ const DEFAULT_DATA = {
     userName: '',
     mantraOnStart: true,
     mantraSeconds: 30,
-    visionProvider: 'openverse'
+    visionProvider: 'openverse',
+    visionGoogleCx: ''
   },
   apiKeyEncrypted: '',
   mailPasswordEncrypted: '',
@@ -122,7 +123,8 @@ const setApiKey = key => setSecret('apiKeyEncrypted', key);
 const getApiKey = () => getSecret('apiKeyEncrypted');
 const setMailPassword = pass => setSecret('mailPasswordEncrypted', pass);
 const getMailPassword = () => getSecret('mailPasswordEncrypted');
-const setVisionKey = k => setSecret('visionKeyEncrypted', k);
-const getVisionKey = () => getSecret('visionKeyEncrypted');
+// o cheie pentru fiecare sursă de imagini (pexels / unsplash / google)
+const setVisionKey = (provider, k) => setSecret(`visionKey_${provider}`, k);
+const getVisionKey = provider => getSecret(`visionKey_${provider}`);
 
 module.exports = { get, save, flush, setApiKey, getApiKey, setMailPassword, getMailPassword, setVisionKey, getVisionKey, DEFAULT_DATA };
