@@ -953,3 +953,73 @@ textarea { resize: none; }
 }
 :root[data-theme="heritage"] .settings h3, :root[data-theme="heritage"] .scroll h3 { gap: 12px; }
 :root[data-theme="heritage"] .tabs button span { font-size: 10px; letter-spacing: .11em; }
+
+/* ================= BORDEAUX & AUR · catifea vișinie, aur, hârtie crem ================= */
+:root[data-theme="bordeaux"] {
+  --bg: #f5ede3; --surface: #fcf7f0; --surface-2: #efe2d2; --text: #2e1419; --muted: #86706a; --border: #e2cfbb;
+  --accent: #6b1228; --accent-text: #f6e7c8; --gold: #b8913f; --danger: #8b1e2f;
+  --bubble-user: #6b1228; --bubble-user-text: #f6e7c8; --bubble-ai: #fcf7f0;
+  --header-bg: linear-gradient(180deg, #6e1329, #4a0b1b); --header-text: #ecd49c;
+  --radius: 0px; --radius-lg: 2px; --caps: .2em;
+  --oxblood: #6b1228;
+  --shadow: 0 24px 50px rgba(74, 12, 29, .26), 0 2px 6px rgba(74, 12, 29, .12);
+}
+/* hârtie cu textură fină de in */
+:root[data-theme="bordeaux"] .panel {
+  background:
+    repeating-linear-gradient(0deg, rgba(74, 12, 29, .018) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(74, 12, 29, .014) 0 1px, transparent 1px 4px),
+    var(--bg);
+  border: 1px solid var(--gold);
+  outline: 1px solid color-mix(in srgb, var(--gold) 35%, transparent);
+  outline-offset: -5px;
+}
+:root[data-theme="bordeaux"] .titlebar { border-bottom: 3px double var(--gold); box-shadow: none; padding: 14px 14px 12px 18px; }
+:root[data-theme="bordeaux"] .monogram { color: var(--oxblood); border-color: var(--gold); font-style: normal; font-weight: 600; }
+:root[data-theme="bordeaux"] .brand span { font: 600 16px/1 var(--font-text); letter-spacing: .42em; text-transform: uppercase; }
+:root[data-theme="bordeaux"] .brand small { font-style: italic; text-transform: none; letter-spacing: .04em; font-size: 12.5px; opacity: .75; margin-top: 4px; }
+:root[data-theme="bordeaux"] .icon-btn:hover { background: var(--surface-2); }
+:root[data-theme="bordeaux"] .tabs { background: transparent; border-bottom: 1px solid var(--border); padding: 0 10px; }
+:root[data-theme="bordeaux"] .tabs .ic { display: none; }
+:root[data-theme="bordeaux"] .tabs button { padding: 12px 2px 10px; }
+:root[data-theme="bordeaux"] .tabs button span { font-size: 10.5px; letter-spacing: .16em; }
+:root[data-theme="bordeaux"] .tabs button.active { color: var(--oxblood); border-bottom-color: var(--oxblood); }
+/* titluri de secțiune: majuscule mici, centrate între linii fine */
+:root[data-theme="bordeaux"] .settings h3, :root[data-theme="bordeaux"] .scroll h3 {
+  justify-content: center; font: 600 11px var(--font-text); font-style: normal; letter-spacing: .3em; text-transform: uppercase; color: var(--oxblood); margin-top: 12px;
+}
+:root[data-theme="bordeaux"] .settings h3::before, :root[data-theme="bordeaux"] .scroll h3::before {
+  content: ""; flex: 1; height: 1px; background: linear-gradient(270deg, var(--gold), transparent);
+}
+:root[data-theme="bordeaux"] .hello { font: 500 29px/1.1 var(--font-display); font-style: normal; color: var(--text); letter-spacing: .01em; }
+:root[data-theme="bordeaux"] .hero { background: var(--surface); }
+:root[data-theme="bordeaux"] .hero::after { border-color: color-mix(in srgb, var(--gold) 45%, transparent); }
+:root[data-theme="bordeaux"] .card, :root[data-theme="bordeaux"] .item, :root[data-theme="bordeaux"] .hero {
+  box-shadow: 0 0 0 3px var(--surface), 0 0 0 4px color-mix(in srgb, var(--border) 80%, transparent);
+}
+:root[data-theme="bordeaux"] .btn { letter-spacing: .18em; font-size: 10.5px; }
+:root[data-theme="bordeaux"] .btn:not(.ghost) { background: var(--accent); border-color: var(--accent); }
+:root[data-theme="bordeaux"] .quote-card { background: linear-gradient(160deg, #6b1228, #43091a); border-color: #c9a35a; }
+:root[data-theme="bordeaux"] .msg.assistant { border-left-color: var(--oxblood); }
+:root[data-theme="bordeaux"] .msg .who { color: var(--oxblood); font-style: normal; letter-spacing: .12em; text-transform: uppercase; font-size: 11px; font-family: var(--font-text); }
+:root[data-theme="bordeaux"] .check-round.on { background: var(--oxblood); border-color: var(--oxblood); }
+:root[data-theme="bordeaux"] .habit .dots button.on { background: var(--oxblood); border-color: var(--oxblood); }
+:root[data-theme="bordeaux"] .habit .meta { color: var(--oxblood); }
+:root[data-theme="bordeaux"] .moods button.on { background: var(--oxblood); border-color: var(--oxblood); }
+:root[data-theme="bordeaux"] .kicker { color: var(--oxblood); }
+:root[data-theme="bordeaux"] .big-time, :root[data-theme="bordeaux"] .pomo-center b { color: var(--text); }
+:root[data-theme="bordeaux"] .toast { border-radius: 0; letter-spacing: .06em; }
+:root[data-theme="bordeaux"] .settings h3::after, :root[data-theme="bordeaux"] .scroll h3::after {
+  content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--gold), transparent);
+}
+:root[data-theme="bordeaux"] .settings h3, :root[data-theme="bordeaux"] .scroll h3 { gap: 12px; }
+:root[data-theme="bordeaux"] .tabs button span { font-size: 10px; letter-spacing: .11em; }
+
+/* antetul vișiniu cu monogramă și titlu aurii */
+:root[data-theme="bordeaux"] .titlebar { border-bottom: 3px double #c9a35a; }
+:root[data-theme="bordeaux"] .titlebar .monogram { color: #e6c77f; border-color: #c9a35a; background: radial-gradient(circle at 35% 30%, rgba(233, 205, 140, .18), transparent 70%); }
+:root[data-theme="bordeaux"] .brand span { color: #f1dca6; }
+:root[data-theme="bordeaux"] .tabs { background: linear-gradient(180deg, color-mix(in srgb, #6b1228 6%, transparent), transparent); }
+:root[data-theme="bordeaux"] .evening-cta { background: radial-gradient(120% 140% at 0% 0%, #7a1730, #3e0816); }
+:root[data-theme="bordeaux"] .vision-cta b { color: #6b1228; }
+:root[data-theme="bordeaux"] .gm .line i { background: linear-gradient(90deg, #6b1228, #c9a35a); }

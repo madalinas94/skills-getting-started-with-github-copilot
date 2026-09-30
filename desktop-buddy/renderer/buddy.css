@@ -251,3 +251,21 @@ html, body {
 :root[data-theme="heritage"] .blush { fill: #d9a9a0; }
 :root[data-theme="heritage"] .shoe { fill: #3a2a22; }
 :root[data-theme="heritage"] #toast { font: 600 11px "EB Garamond", Georgia, serif; letter-spacing: .18em; text-transform: uppercase; color: #1c2433; background: #faf7f1; border: 1px solid #a88a5c; border-radius: 0; }
+
+/* Bordeaux & aur */
+:root[data-theme="bordeaux"] .dress-top { stop-color: #8c1d38; }
+:root[data-theme="bordeaux"] .dress-bot { stop-color: #4f0c1d; }
+:root[data-theme="bordeaux"] .dress { stroke: #c9a35a; }
+:root[data-theme="bordeaux"] .emblem { fill: #e2c27d; transform: scale(.72); transform-origin: 100px 153px; }
+:root[data-theme="bordeaux"] .dots { display: none; }
+:root[data-theme="bordeaux"] .hem { display: inline; stroke: #c9a35a; }
+:root[data-theme="bordeaux"] .pearls { display: inline; }
+:root[data-theme="bordeaux"] .bow { fill: #d8b467; stroke: #8a6a2a; }
+:root[data-theme="bordeaux"] .bow-knot { fill: #8a6a2a; }
+:root[data-theme="bordeaux"] .glow-in { stop-color: #fff3dc; }
+:root[data-theme="bordeaux"] .glow-out { stop-color: #c9a35a; }
+:root[data-theme="bordeaux"] .eye { fill: #f5dea0; }
+:root[data-theme="bordeaux"] .mouth, :root[data-theme="bordeaux"] .eye-line { stroke: #f5dea0; }
+:root[data-theme="bordeaux"] .blush { fill: #d9978a; }
+:root[data-theme="bordeaux"] .shoe { fill: #2e1419; }
+:root[data-theme="bordeaux"] #toast { font: italic 600 13px "Cormorant Garamond", Georgia, serif; color: #6b1228; background: #fcf7f0; border: 1px solid #c9a35a; border-radius: 0; }

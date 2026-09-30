@@ -1,10 +1,11 @@
 /* Paletă „stationery” inspirată de șabloanele elegante: ivory, blush, sage, champagne, powder blue, noir */
-.paper[data-color="ivory"]     { --paper: #fbf6ea; --paper2: #f3ebd8; --ink: #2b2a26; --muted: #8a806b; --accent: #b8955a; --line: rgba(184, 149, 90, .22); }
-.paper[data-color="blush"]     { --paper: #f8e6e1; --paper2: #efd3cc; --ink: #4a2e2b; --muted: #a07a73; --accent: #c98f86; --line: rgba(201, 143, 134, .28); }
-.paper[data-color="sage"]      { --paper: #e6ecdf; --paper2: #d6dfcc; --ink: #2e3b2f; --muted: #7b8a75; --accent: #8fa382; --line: rgba(143, 163, 130, .32); }
-.paper[data-color="champagne"] { --paper: #f4e8cf; --paper2: #e9d8b3; --ink: #3d3222; --muted: #94825f; --accent: #b8955a; --line: rgba(184, 149, 90, .28); }
-.paper[data-color="powder"]    { --paper: #e3e9f0; --paper2: #d0dae5; --ink: #26303b; --muted: #74839a; --accent: #8199b3; --line: rgba(129, 153, 179, .3); }
-.paper[data-color="noir"]      { --paper: #1f2e26; --paper2: #17231c; --ink: #efe6d2; --muted: #a8a08a; --accent: #c9a96e; --line: rgba(201, 169, 110, .18); }
+.paper[data-color="ivory"], .swatches button[data-color="ivory"] { --paper: #fbf6ea; --paper2: #f3ebd8; --ink: #2b2a26; --muted: #8a806b; --accent: #b8955a; --line: rgba(184, 149, 90, .22); }
+.paper[data-color="blush"], .swatches button[data-color="blush"] { --paper: #f8e6e1; --paper2: #efd3cc; --ink: #4a2e2b; --muted: #a07a73; --accent: #c98f86; --line: rgba(201, 143, 134, .28); }
+.paper[data-color="sage"], .swatches button[data-color="sage"] { --paper: #e6ecdf; --paper2: #d6dfcc; --ink: #2e3b2f; --muted: #7b8a75; --accent: #8fa382; --line: rgba(143, 163, 130, .32); }
+.paper[data-color="champagne"], .swatches button[data-color="champagne"] { --paper: #f4e8cf; --paper2: #e9d8b3; --ink: #3d3222; --muted: #94825f; --accent: #b8955a; --line: rgba(184, 149, 90, .28); }
+.paper[data-color="powder"], .swatches button[data-color="powder"] { --paper: #e3e9f0; --paper2: #d0dae5; --ink: #26303b; --muted: #74839a; --accent: #8199b3; --line: rgba(129, 153, 179, .3); }
+.paper[data-color="bordeaux"], .swatches button[data-color="bordeaux"] { --paper: #5e0f22; --paper2: #460a19; --ink: #f6e7c8; --muted: #d4b88a; --accent: #d8b467; --line: rgba(216, 180, 103, .2); }
+.paper[data-color="noir"], .swatches button[data-color="noir"] { --paper: #1f2e26; --paper2: #17231c; --ink: #efe6d2; --muted: #a8a08a; --accent: #c9a96e; --line: rgba(201, 169, 110, .18); }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
@@ -175,7 +176,7 @@ footer {
   -webkit-app-region: no-drag;
 }
 .label { font: 10px "EB Garamond", Georgia, serif; text-transform: uppercase; letter-spacing: .16em; color: #a8864f; margin: 2px 0 6px; }
-.swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 8px; }
+.swatches { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 8px; }
 .swatches button {
   width: 24px;
   height: 24px;

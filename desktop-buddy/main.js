@@ -27,7 +27,7 @@ const QUICK_W = 620;
 const QUICK_H = 460;
 const STICKY_W = 270;
 const STICKY_H = 290;
-const STICKY_COLORS = ['ivory', 'blush', 'sage', 'champagne', 'powder', 'noir'];
+const STICKY_COLORS = ['ivory', 'blush', 'sage', 'champagne', 'powder', 'noir', 'bordeaux'];
 const STICKY_DECOS = ['tape', 'pin', 'clip', 'none'];
 
 let buddyWin = null;

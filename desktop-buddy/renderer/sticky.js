@@ -1,7 +1,7 @@
 const api = window.buddy;
 const $ = sel => document.querySelector(sel);
 const id = api.sticky.id();
-const COLORS = ['ivory', 'blush', 'sage', 'champagne', 'powder', 'noir'];
+const COLORS = ['ivory', 'blush', 'sage', 'champagne', 'powder', 'noir', 'bordeaux'];
 const DECOS = [['tape', 'Bandă'], ['pin', 'Pioneză'], ['clip', 'Agrafă'], ['none', 'Simplu']];
 let note = null;
 let saveTimer = null;

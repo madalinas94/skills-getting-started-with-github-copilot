@@ -1,5 +1,6 @@
 :root, :root[data-theme="ivory"] { --bg: #f4efe4; --paper: #fbf8f2; --text: #1e2b24; --muted: #7d7461; --gold: #b8955a; --accent: #1f3a2e; --accent-text: #f6f1e6; }
 :root[data-theme="heritage"] { --bg: #f3eee5; --paper: #faf7f1; --text: #1c2433; --muted: #7a7466; --gold: #a88a5c; --accent: #1c2433; --accent-text: #f4efe6; }
+:root[data-theme="bordeaux"] { --bg: #f3e9dd; --paper: #fcf7f0; --text: #2e1419; --muted: #86706a; --gold: #b8913f; --accent: #6b1228; --accent-text: #f6e7c8; }
 :root[data-theme="evening"] { --bg: #121c17; --paper: #1b2921; --text: #ede3cc; --muted: #a69b82; --gold: #c9a96e; --accent: #c2a36b; --accent-text: #121c17; }
 :root[data-theme="light"] { --bg: #fff5f8; --paper: #fff; --text: #3d2a36; --muted: #9a7f8e; --gold: #f56fa1; --accent: #f56fa1; --accent-text: #fff; }
 :root[data-theme="dark"] { --bg: #221c26; --paper: #2c2431; --text: #f6e9f0; --muted: #b39cab; --gold: #ff7fb0; --accent: #ff7fb0; --accent-text: #fff; }
@@ -191,3 +192,6 @@ h1 { margin: 0; font: italic 600 30px/1.1 "Cormorant Garamond", Georgia, serif; 
 ::-webkit-scrollbar { width: 7px; }
 ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--gold) 45%, transparent); border-radius: 7px; }
 @media (max-width: 760px) { .summary { grid-template-columns: 1fr 1fr; } }
+
+:root[data-theme="bordeaux"] .bar { border-bottom: 3px double var(--gold); }
+:root[data-theme="bordeaux"] h1 { color: #6b1228; }

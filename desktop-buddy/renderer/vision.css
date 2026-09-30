@@ -232,3 +232,9 @@ body {
 .goal-badge .bg { stroke: color-mix(in srgb, var(--gold) 25%, transparent); }
 .goal-badge .fg { stroke: var(--gold); stroke-linecap: round; }
 .export .goal-badge { cursor: default; }
+
+/* Bordeaux & aur */
+:root[data-theme="bordeaux"] { --bg: #f3e9dd; --paper: #fcf7f0; --text: #2e1419; --muted: #86706a; --gold: #b8913f; --accent: #6b1228; --accent-text: #f6e7c8; }
+:root[data-theme="bordeaux"] .bar { border-bottom: 3px double var(--gold); }
+:root[data-theme="bordeaux"] .tools button { border-radius: 0; }
+:root[data-theme="bordeaux"] #title { color: #6b1228; }

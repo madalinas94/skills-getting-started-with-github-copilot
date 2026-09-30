@@ -87,3 +87,8 @@ body { padding: 26px 30px 44px; }
 :root[data-theme="heritage"] .card { border-radius: 0; }
 :root[data-theme="heritage"] .label { font: 600 10.5px "EB Garamond", Georgia, serif; letter-spacing: .24em; text-transform: uppercase; color: #5a1a24; }
 :root[data-theme="heritage"] .title { font-style: normal; font-weight: 500; }
+
+/* Bordeaux & aur */
+:root[data-theme="bordeaux"] { --bg: #fcf7f0; --bg2: #f0dfcb; --text: #2e1419; --muted: #86706a; --gold: #b8913f; --accent: #6b1228; }
+:root[data-theme="bordeaux"] .card { border-radius: 0; }
+:root[data-theme="bordeaux"] .label { font: 600 10.5px "EB Garamond", Georgia, serif; letter-spacing: .24em; text-transform: uppercase; color: #6b1228; }

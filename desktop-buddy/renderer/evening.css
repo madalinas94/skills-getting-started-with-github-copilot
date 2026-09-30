@@ -7,6 +7,7 @@
 :root[data-theme="florence"] { --leather: #5c6e50; --leather2: #435139; --paper: #fffaf6; --ink: #3a2a2c; --muted: #9a8284; --gold: #c99a8e; --accent: #6f8660; --accent-text: #fff; }
 :root[data-theme="light"] { --leather: #d9829f; --leather2: #b8627f; --paper: #fffafc; --ink: #3d2a36; --muted: #9a7f8e; --gold: #e0a3b8; --accent: #d95f8c; --accent-text: #fff; }
 :root[data-theme="dark"] { --leather: #2c2431; --leather2: #1a151d; --paper: #f6eef3; --ink: #2c2431; --muted: #8e7a86; --gold: #d99cb6; --accent: #7a3d5c; --accent-text: #fff; }
+:root[data-theme="bordeaux"] { --leather: #5e0f22; --leather2: #34060f; --paper: #fbf5ec; --ink: #2e1419; --muted: #86706a; --gold: #b8913f; --accent: #6b1228; --accent-text: #f6e7c8; }
 :root[data-theme="heritage"] { --leather: #1c2433; --leather2: #111722; --paper: #f8f3e8; --ink: #1f2530; --muted: #7f7765; --gold: #a88a5c; --accent: #1c2433; --accent-text: #f3ecdc; }
 
 * { box-sizing: border-box; }

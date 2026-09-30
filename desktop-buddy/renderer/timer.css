@@ -67,3 +67,6 @@ html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
 
 /* Heritage */
 :root[data-theme="heritage"] { --bg: #1c2433; --gold: #a88a5c; --radius: 0px; }
+
+/* Bordeaux & aur */
+:root[data-theme="bordeaux"] { --bg: #5a0f22; --gold: #c9a35a; --radius: 0px; }

@@ -64,3 +64,7 @@ body { padding: 6px 8px 16px; }
 /* Heritage */
 :root[data-theme="heritage"] { --bg: #faf7f1; --text: #1c2433; --gold: #a88a5c; --muted: #7a7466; --radius: 0px; }
 :root[data-theme="heritage"] .name { color: #5a1a24; font: 600 10.5px "EB Garamond", Georgia, serif; letter-spacing: .24em; text-transform: uppercase; margin-bottom: 5px; }
+
+/* Bordeaux & aur */
+:root[data-theme="bordeaux"] { --bg: #fcf7f0; --text: #2e1419; --gold: #b8913f; --muted: #86706a; --radius: 0px; }
+:root[data-theme="bordeaux"] .name { color: #6b1228; font: 600 10.5px "EB Garamond", Georgia, serif; letter-spacing: .24em; text-transform: uppercase; margin-bottom: 5px; }

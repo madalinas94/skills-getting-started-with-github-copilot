@@ -141,7 +141,7 @@ Se poate relua din Setări → **Ghid de bun venit**.
 Orice notiță poate fi lipită pe desktop (butonul **Pe desktop** din editor, butonul cu notiță din
 tab-ul Notițe, sau din meniul lui Mady / tray: **Notiță nouă pe desktop**).
 
-- **Hârtie:** ivory, blush, sage, champagne, powder blue, noir; **decor:** bandă washi, pioneză aurie,
+- **Hârtie:** ivory, blush, sage, champagne, powder blue, bordeaux, noir; **decor:** bandă washi, pioneză aurie,
   agrafă sau simplu; titlu serif italic și rânduri fine, ca pe o foaie de jurnal.
 - Le muți trăgând de marginea de sus/jos, le redimensionezi din colțul din dreapta-jos, le restrângi
   la titlu, le ții mereu deasupra sau le dezlipești (notița rămâne în panou și revine cu același aspect).
@@ -170,6 +170,9 @@ tab-ul Notițe, sau din meniul lui Mady / tray: **Notiță nouă pe desktop**).
 - **Old Money · Ivory** (implicit) – ivory, verde englezesc și auriu, fonturi serif clasice;
   Mady poartă rochiță verde cu tiv auriu, fundițe crem și colier de perle.
 - **Old Money · Evening** – aceeași eleganță, pe fundal verde-noapte.
+- **Bordeaux & aur** – catifea vișinie și aur pe hârtie crem: antet bordeaux cu monogramă aurie,
+  linii duble aurii, butoane vișinii; Mady poartă o rochie de catifea bordeaux cu broderie aurie și perle.
+  Tema se aplică peste tot: panou, timer, mantra, vision board, obiective și jurnalul de seară.
 - **Roz · luminos / întunecat** – look-ul original, cu Mady în rochiță roz.
 
 Fonturile (Cormorant Garamond, EB Garamond, licență SIL OFL 1.1) sunt incluse în

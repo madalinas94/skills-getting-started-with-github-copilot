@@ -92,3 +92,8 @@ kbd { font: 11px var(--font); color: var(--muted); border: 1px solid var(--borde
 :root[data-theme="heritage"] { --bg: #f3eee5; --surface: #faf7f1; --text: #1c2433; --muted: #7a7466; --border: #d8cebd; --accent: #1c2433; --accent-text: #f4efe6; --gold: #a88a5c; --danger: #6b1d28; --radius: 0px; }
 :root[data-theme="heritage"] .monogram { color: #5a1a24; font-style: normal; font-weight: 600; }
 :root[data-theme="heritage"] .kicker { color: #5a1a24; }
+
+/* Bordeaux & aur */
+:root[data-theme="bordeaux"] { --bg: #f5ede3; --surface: #fcf7f0; --text: #2e1419; --muted: #86706a; --border: #e2cfbb; --accent: #6b1228; --accent-text: #f6e7c8; --gold: #b8913f; --danger: #8b1e2f; --radius: 0px; }
+:root[data-theme="bordeaux"] .monogram { color: #6b1228; font-style: normal; font-weight: 600; }
+:root[data-theme="bordeaux"] .kicker { color: #6b1228; }
