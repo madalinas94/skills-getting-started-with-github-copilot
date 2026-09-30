@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ro" data-theme="ivory">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; font-src 'self'; img-src 'self' data: file:; style-src 'self' 'unsafe-inline'">
+  <title>Ritualul de seară</title>
+  <link rel="stylesheet" href="fonts/fonts.css">
+  <link rel="stylesheet" href="evening.css">
+</head>
+<body>
+  <div class="book">
+    <header class="top">
+      <div class="moon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/></svg></div>
+      <div class="titles">
+        <div class="kicker">Ritualul de seară</div>
+        <div class="date" id="date"></div>
+      </div>
+      <button class="link" id="openHistory">Jurnalele trecute</button>
+      <button class="x" id="close" title="Închide">×</button>
+    </header>
+    <nav class="steps" id="steps">
+      <button data-i="0"><i>I</i>Ce a mers bine</button>
+      <button data-i="1"><i>II</i>Ce am învățat</button>
+      <button data-i="2"><i>III</i>Recunoștință</button>
+      <button data-i="3"><i>IV</i>Mâine</button>
+    </nav>
+
+    <main class="pages">
+      <section class="page" data-page="0">
+        <h2>Ce a mers bine azi?</h2>
+        <p class="lead">Începe cu victoriile, oricât de mici. Mintea reține ce repeți seara.</p>
+        <div class="stats" id="stats"></div>
+        <textarea id="wins" rows="4" maxlength="600" placeholder="Azi am reușit să…"></textarea>
+        <div class="rating-row">
+          <span>Cum a fost ziua?</span>
+          <div class="stars" id="stars"></div>
+        </div>
+      </section>
+
+      <section class="page" data-page="1">
+        <h2>Ce am învățat?</h2>
+        <p class="lead">O idee, o lecție, o observație despre tine. Scrisă, rămâne.</p>
+        <div class="chips" id="learnChips"></div>
+        <textarea id="learned" rows="6" maxlength="600" placeholder="Am înțeles că…"></textarea>
+      </section>
+
+      <section class="page" data-page="2">
+        <h2>Recunoștință și rugăciune</h2>
+        <p class="lead">Trei lucruri pentru care mulțumești azi.</p>
+        <textarea id="gratitude" rows="3" maxlength="300" placeholder="Sunt recunoscătoare pentru…"></textarea>
+        <div class="prayer">
+          <div class="p-aff" id="prayerAff"></div>
+          <p class="p-text">Doamne, îți mulțumesc pentru ziua de azi, pentru cei dragi și pentru tot ce am primit. Iartă-mi greșelile, ocrotește-mi familia și dă-mi liniște în noaptea aceasta. Amin.</p>
+          <label class="check"><input type="checkbox" id="prayed"> Am spus rugăciunea de seară</label>
+        </div>
+      </section>
+
+      <section class="page" data-page="3">
+        <h2>Mâine</h2>
+        <p class="lead">Închide ziua cu un plan. Dimineață îl găsești în tab-ul Azi.</p>
+        <label class="line">Intenția de mâine<input id="tIntention" maxlength="90" placeholder="calm, clar, curajos…"></label>
+        <div class="line">Top 3 priorități
+          <ol class="t3">
+            <li><input id="t0" maxlength="120"></li>
+            <li><input id="t1" maxlength="120"></li>
+            <li><input id="t2" maxlength="120"></li>
+          </ol>
+        </div>
+        <p class="hint" id="carry"></p>
+      </section>
+
+      <section class="page final" data-page="4">
+        <div class="seal">M</div>
+        <h2>Noapte bună</h2>
+        <p class="note" id="note"></p>
+        <div class="sign" id="sign"></div>
+        <div class="final-actions">
+          <button class="btn" id="edit">Editează jurnalul</button>
+          <button class="btn" id="dayCard">Cardul zilei</button>
+          <button class="btn primary" id="done">Închide ziua</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="nav" id="nav">
+      <button class="btn ghost" id="prev">Înapoi</button>
+      <span class="dots" id="dots"></span>
+      <button class="btn primary" id="next">Mai departe</button>
+    </footer>
+  </div>
+
+  <div class="history hidden" id="history">
+    <div class="h-card">
+      <div class="h-head"><h2>Jurnalele trecute</h2><button class="x" id="closeHistory">×</button></div>
+      <div class="h-list" id="hList"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script src="evening.js"></script>
+</body>
+</html>

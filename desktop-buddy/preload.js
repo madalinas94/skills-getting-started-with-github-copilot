@@ -22,7 +22,8 @@ contextBridge.exposeInMainWorld('buddy', {
     update: patch => ipcRenderer.invoke('today:update', patch),
     toggleHabit: (id, k) => ipcRenderer.invoke('habit:toggle', id, k),
     addHabit: name => ipcRenderer.invoke('habit:add', name),
-    removeHabit: id => ipcRenderer.invoke('habit:remove', id)
+    removeHabit: id => ipcRenderer.invoke('habit:remove', id),
+    onChange: on('today:changed')
   },
   card: {
     make: (kind, format) => ipcRenderer.invoke('card:make', kind, format),
@@ -63,6 +64,26 @@ contextBridge.exposeInMainWorld('buddy', {
     setTitle: (t, st) => ipcRenderer.invoke('vision:setTitle', t, st),
     exportImage: () => ipcRenderer.invoke('vision:export'),
     pathFor: file => { try { return webUtils.getPathForFile(file); } catch { return ''; } }
+  },
+  goals: {
+    open: opts => ipcRenderer.send('goals:open', opts),
+    close: () => ipcRenderer.send('goals:close'),
+    get: () => ipcRenderer.invoke('goals:get'),
+    add: patch => ipcRenderer.invoke('goals:add', patch),
+    update: (id, patch) => ipcRenderer.invoke('goals:update', id, patch),
+    contribute: (id, amount) => ipcRenderer.invoke('goals:contribute', id, amount),
+    addStep: (id, text) => ipcRenderer.invoke('goals:addStep', id, text),
+    toggleStep: (id, stepId) => ipcRenderer.invoke('goals:toggleStep', id, stepId),
+    removeStep: (id, stepId) => ipcRenderer.invoke('goals:removeStep', id, stepId),
+    remove: id => ipcRenderer.invoke('goals:remove', id),
+    onUpdate: on('goals:updated')
+  },
+  evening: {
+    open: () => ipcRenderer.send('evening:open'),
+    close: () => ipcRenderer.send('evening:close'),
+    context: () => ipcRenderer.invoke('evening:context'),
+    history: () => ipcRenderer.invoke('evening:history'),
+    save: input => ipcRenderer.invoke('evening:save', input)
   },
   month: {
     data: () => ipcRenderer.invoke('month:data')

@@ -5,6 +5,8 @@ const store = require('./store');
 const sessions = require('./sessions');
 const mail = require('./mail');
 const ai = require('./ai');
+const goals = require('./goals');
+const evening = require('./evening');
 
 const settings = () => store.get().settings;
 
@@ -47,7 +49,8 @@ async function collect() {
   const s = settings();
   const { weekSec, lastDay } = weekStats();
   const goalH = Number(s.weeklyGoalHours) || 0;
-  const data = { weekSec, goalH, lastDay, emails: null, emailError: '' };
+  const active = goals.view().goals.filter(g => g.stats.pct < 100).sort((a, b) => b.stats.pct - a.stats.pct);
+  const data = { weekSec, goalH, lastDay, emails: null, emailError: '', plan: evening.lastNightPlan(), goal: active[0] || null };
   if (s.mailAddress && store.getMailPassword()) {
     const since = new Date();
     since.setDate(since.getDate() - 1);
@@ -90,9 +93,25 @@ function templateBrief(d, name) {
     const pct = Math.round((d.weekSec / (d.goalH * 3600)) * 100);
     lines.push(`• Săptămâna aceasta: ${sessions.fmt(d.weekSec)} din ${d.goalH}h (${pct}%).`);
   }
+  if (d.plan && (d.plan.intention || d.plan.top3.length)) {
+    lines.push(`• Aseară ți-ai propus${d.plan.intention ? ` o zi „${d.plan.intention}”` : ''}${d.plan.top3.length ? `; priorități: ${d.plan.top3.join(', ')}` : ''}.`);
+  }
+  if (d.goal) lines.push(`• Obiectiv: ${goalLine(d.goal)}.`);
   const top = d.emails?.top?.[0];
+  if (d.plan?.top3?.[0]) {
+    lines.push('', `Prioritatea zilei: „${d.plan.top3[0]}”, din planul tău de aseară. Dă-i primele 2 ore de focus.`);
+    return lines.join('\n');
+  }
   lines.push('', `Prioritatea zilei: ${top ? `răspunde-i lui ${top.from} („${top.subject}”), apoi blochează 2 ore de focus.` : 'alege un singur obiectiv important și dă-i primele 2 ore de focus.'}`);
   return lines.join('\n');
+}
+
+function goalLine(g) {
+  const n = v => new Intl.NumberFormat('ro-RO').format(Math.round(v));
+  const unit = g.unit ? ' ' + g.unit : '';
+  const amount = g.type === 'milestone' ? '' : ` (${n(g.current)}${unit} din ${n(g.target)}${unit})`;
+  const pace = g.stats.perMonth ? `, ritm necesar ${n(g.stats.perMonth)}${unit}/lună` : '';
+  return `„${g.title}” – ${g.stats.pct}%${amount}${pace}`;
 }
 
 function aiPrompt(d) {
@@ -114,6 +133,8 @@ function aiPrompt(d) {
     parts.push('Nu există sesiuni de lucru înregistrate.');
   }
   if (d.goalH) parts.push(`Săptămâna aceasta: ${sessions.fmt(d.weekSec)} lucrate din obiectivul de ${d.goalH}h.`);
+  if (d.plan) parts.push(`Planul scris aseară în jurnal: intenție „${d.plan.intention || '-'}”; priorități: ${d.plan.top3.join('; ') || '-'}. Folosește-l pentru „Prioritatea zilei”.`);
+  if (d.goal) parts.push(`Obiectivul principal în curs: ${goalLine(d.goal)}.`);
   return parts.join('\n');
 }
 

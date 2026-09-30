@@ -26,6 +26,7 @@ Primul tab din panou, inspirat din planner-ele „aesthetic” de productivitate
 - **Ritualuri (habit tracker):** săptămâna ca puncte aurii, cu serii („3 zile”); ritualurile se adaugă și se șterg liber.
 - **Apă** (8 pahare), **stare** (radiantă / bine / ok / obosită / stresată) și **recunoștință**.
 - **Citatul zilei** (Seneca, da Vinci, Buffett, Audrey Hepburn…).
+- **Obiective:** primele 3 obiective cu progres și următorul pas; **Ritualul de seară** se deschide de aici.
 - **Împărtășește:** cardul **„Ziua mea”** sau **„Săptămâna mea”**, în format **Post 4:5** (1080×1350) sau
   **Story 9:16** (1080×1920), salvat în `Imagini\Desktop Buddy` și copiat cu un click, gata de pus pe Instagram.
 
@@ -66,6 +67,42 @@ de căutare a ariei) deschide Google Imagini în browser, cu căutarea ariei. Al
 - o **tragi** direct peste cadru (sau oriunde pe board), sau
 - click dreapta → **Copiază imaginea**, apoi butonul **Lipește** de pe cadru (sau **Ctrl+V** pe board).
 Merg și linkurile Google copiate („imgres?imgurl=…”), linkurile directe la imagini și miniaturile. Afirmațiile apar și ca **„Afirmația zilei”** în mantra zilei.
+
+## Obiective cu progres
+
+Vision board-ul devine plan: **Obiectivele mele** (din Azi → „Toate obiectivele”, din tray sau de pe
+insigna unei arii din vision board) urmărește trei tipuri de obiective, fiecare legat de o arie a vieții:
+
+- **Bani (fonduri):** fondul de libertate financiară, fondul de siguranță, avansul pentru casă,
+  mașina visurilor, călătoriile. Adaugi contribuții (sau +50 / +100 / +250 / +500 dintr-un click),
+  iar Mady calculează **ritmul necesar pe lună** până la termen și, din ritmul ultimelor 3 luni,
+  **luna în care ajungi** („✓ la timp” sau „mărește puțin contribuția”). Pentru libertatea financiară
+  există un **calculator cu regula de 4%** (cheltuieli lunare × 12 × 25). Nu e sfat financiar personalizat.
+- **Număr:** 24 de cărți, 150 de antrenamente, km alergați, cu progres și ritm pe lună.
+- **Etapă:** „Vacanță cu toată familia”, cu pași de bifat și „Marchează ca atins”.
+
+Fiecare obiectiv are un inel de progres, **pașii următori** (checklist) și un rezumat sus: fonduri
+economisite din total, obiective active, pași bifați săptămâna asta, obiective atinse. La **25%, 50%, 75%
+și 100%** apare confetti aurie, iar Mady te felicită. În tab-ul **Azi** vezi primele 3 obiective cu
+următorul pas (bifabil direct de acolo), pe **vision board** fiecare afirmație primește o insignă cu
+progresul ariei, iar **briefingul de dimineață** amintește obiectivul principal și ritmul lui.
+
+## Ritualul de seară
+
+Un jurnal elegant (copertă de piele în culoarea temei, hârtie liniată) în patru pagini:
+
+1. **Ce a mers bine** – cu statisticile zilei (focus, priorități, ritualuri, apă, pași și contribuții
+   la obiective), prioritățile bifate deja trecute pe listă și o notă a zilei (1–5 stele).
+2. **Ce am învățat** – cu începuturi de frază („Despre bani și piețe…”, „Despre mine…”).
+3. **Recunoștință și rugăciune** – afirmația zilei din aria Credință, o rugăciune scurtă de seară și bifa
+   „Am spus rugăciunea de seară”.
+4. **Mâine** – intenția și Top 3 pentru mâine, precompletate cu ce a rămas nebifat azi. Dimineață le
+   găsești direct în tab-ul Azi, iar briefingul pornește de la ele.
+
+La final, Mady îți scrie un **gând de noapte bună** (cu modelul AI din Setări, sau din șablon în modul
+demo), iar „Cardul zilei” creează imaginea pentru Instagram. **Jurnalele trecute** se văd oricând.
+La ora aleasă (implicit 21:00, Setări → Mady) Mady te invită printr-o bulă și o notificare; invitația
+vine o singură dată pe seară și doar dacă ești la calculator.
 
 ## Raport lunar
 
@@ -227,6 +264,8 @@ desktop-buddy/
 ├── src/mantra.js      # mantra zilei (AI sau colecție), favorite
 ├── src/vision.js      # vision board: imagini, carduri de text, ariile vieții
 ├── src/lifeareas.js   # ariile vieții și afirmațiile lor
+├── src/goals.js       # obiective cu progres: fonduri, număr, etape, ritm și dată estimată
+├── src/evening.js     # ritualul de seară: jurnal, gând de noapte bună, planul de mâine
 ├── src/imagesearch.js # căutare și descărcare de imagini (Openverse / Pexels / Unsplash)
 ├── renderer/sticky.*  # notițele lipite pe desktop
 ├── renderer/          # HTML/CSS/JS pentru roboțel și panou

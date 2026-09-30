@@ -73,6 +73,9 @@
         <h3>Top 3 priorități</h3>
         <div class="top3" id="tdTop3"></div>
 
+        <h3>Obiective</h3>
+        <div class="goals-mini" id="tdGoals"></div>
+
         <h3>Ritualuri</h3>
         <div class="habits">
           <div class="habit-head"><span></span><span class="days" id="tdDays"></span><span></span></div>
@@ -94,6 +97,12 @@
 
         <h3>Recunoștință</h3>
         <input id="tdGratitude" class="intention" placeholder="Azi sunt recunoscătoare pentru…" maxlength="140">
+
+        <h3>Seara</h3>
+        <button class="evening-cta" id="openEvening">
+          <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/></svg>
+          <span class="ev-text"><b>Ritualul de seară</b><span id="eveningStatus">Ce a mers bine, ce ai învățat, recunoștință și planul de mâine</span></span>
+        </button>
 
         <h3>Mantra zilei</h3>
         <div class="quote-card mantra-card" id="tdMantra">
@@ -402,6 +411,10 @@
         <label class="check"><input type="checkbox" id="sMantraStart"> Arată mantra zilei când pornește aplicația</label>
         <label>Cât stă mantra pe ecran (secunde)
           <input id="sMantraSec" type="number" min="5" max="300">
+        </label>
+        <label class="check"><input type="checkbox" id="sEvening"> Ritualul de seară: Mady mă invită la jurnal</label>
+        <label>Ora ritualului de seară
+          <input id="sEveningTime" type="time">
         </label>
         <label>Scurtătură „Întreab-o pe Mady”
           <div class="row">

@@ -27,6 +27,7 @@ function view() {
   return {
     ...v,
     areas: AREAS.map(a => ({ id: a.id, label: a.label, count: v.items.filter(i => i.category === a.id).length, query: queryFor(a.id) })),
+    goals: require('./goals').byArea(),
     items: v.items
       .filter(i => i.type !== 'image' || fs.existsSync(path.join(dir(), i.file)))
       .map(i => (i.type === 'image' ? { ...i, url: 'file:///' + path.join(dir(), i.file).replace(/\\/g, '/') } : i))

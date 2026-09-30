@@ -61,6 +61,23 @@ const LINES = {
     '{n} zile la rând: „{name}”. Așa se construiește un stil de viață.',
     'Seria continuă: {n} zile de „{name}”. Nu o rupe.'
   ],
+  goalMilestone: [
+    '{pct}% din „{title}”. Vezi? Planul funcționează.',
+    'Ai trecut de {pct}% la „{title}”. Continuăm în același ritm, elegant și constant.'
+  ],
+  goalDone: [
+    '„{title}”: atins. Brava! Asta merită sărbătorit, apoi următorul vis.',
+    'Obiectiv îndeplinit: „{title}”. Știam că poți.'
+  ],
+  goalStep: [
+    'Un pas mai aproape de „{title}”. Așa se construiește.',
+    'Pas bifat la „{title}”. Mic azi, mare peste un an.'
+  ],
+  eveningInvite: [
+    'E seară. Cinci minute pentru jurnal: ce a mers bine, ce ai învățat și planul de mâine?',
+    'Hai să închidem ziua frumos. Te aștept în jurnalul de seară.',
+    'Înainte de somn: recunoștință, o rugăciune și Top 3 pentru mâine. Deschid jurnalul?'
+  ],
   spontaneous: [
     'Monet spunea că pictează așa cum cântă o pasăre. Tu lucrezi la fel de natural azi?',
     'Randamentul compus e a opta minune a lumii. Valabil și pentru obiceiuri.',

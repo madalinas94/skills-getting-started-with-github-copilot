@@ -219,3 +219,16 @@ body {
 :root[data-theme="heritage"] #title { font-style: normal; font-weight: 500; letter-spacing: .02em; }
 :root[data-theme="heritage"] .bar { border-bottom: 3px double var(--gold); }
 :root[data-theme="heritage"] .tools button { border-radius: 0; }
+
+/* insigna obiectivului pe afirmația ariei */
+.goal-badge {
+  display: flex; align-items: center; gap: 6px; margin: 8px auto 2px; padding: 3px 10px 3px 4px; max-width: 100%;
+  border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent); border-radius: 20px; background: transparent;
+  color: inherit; cursor: pointer; font: italic 13px "EB Garamond", Georgia, serif;
+}
+.goal-badge span { font-variant-numeric: lining-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.goal-badge svg { width: 20px; height: 20px; flex: none; transform: rotate(-90deg); }
+.goal-badge circle { fill: none; stroke-width: 3; }
+.goal-badge .bg { stroke: color-mix(in srgb, var(--gold) 25%, transparent); }
+.goal-badge .fg { stroke: var(--gold); stroke-linecap: round; }
+.export .goal-badge { cursor: default; }

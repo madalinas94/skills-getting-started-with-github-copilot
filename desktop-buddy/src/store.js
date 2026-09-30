@@ -39,13 +39,17 @@ const DEFAULT_DATA = {
     mantraOnStart: true,
     mantraSeconds: 30,
     visionProvider: 'openverse',
-    visionGoogleCx: ''
+    visionGoogleCx: '',
+    eveningRitual: true,
+    eveningTime: '21:00'
   },
   apiKeyEncrypted: '',
   mailPasswordEncrypted: '',
   visionKeyEncrypted: '',
   mailLastScan: null,
   lastBriefDate: '',
+  lastEveningPrompt: '',
+  goals: [],
   onboarded: false,
   buddyPosition: null,
   timerPosition: null,

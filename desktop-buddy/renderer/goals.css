@@ -1,0 +1,193 @@
+:root, :root[data-theme="ivory"] { --bg: #f4efe4; --paper: #fbf8f2; --text: #1e2b24; --muted: #7d7461; --gold: #b8955a; --accent: #1f3a2e; --accent-text: #f6f1e6; }
+:root[data-theme="heritage"] { --bg: #f3eee5; --paper: #faf7f1; --text: #1c2433; --muted: #7a7466; --gold: #a88a5c; --accent: #1c2433; --accent-text: #f4efe6; }
+:root[data-theme="evening"] { --bg: #121c17; --paper: #1b2921; --text: #ede3cc; --muted: #a69b82; --gold: #c9a96e; --accent: #c2a36b; --accent-text: #121c17; }
+:root[data-theme="light"] { --bg: #fff5f8; --paper: #fff; --text: #3d2a36; --muted: #9a7f8e; --gold: #f56fa1; --accent: #f56fa1; --accent-text: #fff; }
+:root[data-theme="dark"] { --bg: #221c26; --paper: #2c2431; --text: #f6e9f0; --muted: #b39cab; --gold: #ff7fb0; --accent: #ff7fb0; --accent-text: #fff; }
+:root[data-theme="paris"] { --bg: #f3ebe1; --paper: #fbf6f0; --text: #2a1d1a; --muted: #8a7266; --gold: #b07a4f; --accent: #6e1f2e; --accent-text: #f7ede3; }
+:root[data-theme="vienna"] { --bg: #ebeff5; --paper: #f8fafc; --text: #1b2436; --muted: #6f7a8f; --gold: #b9a57a; --accent: #1f2d4d; --accent-text: #f1f4f9; }
+:root[data-theme="riviera"] { --bg: #f4f2ea; --paper: #fffdf8; --text: #13324a; --muted: #6b8193; --gold: #d0a93a; --accent: #1d5c8c; --accent-text: #fff; }
+:root[data-theme="florence"] { --bg: #f6eceb; --paper: #fffafa; --text: #3a2a2c; --muted: #9a8284; --gold: #c99a8e; --accent: #6f8660; --accent-text: #fff; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  display: flex; flex-direction: column; overflow: hidden;
+  color: var(--text); font-family: "EB Garamond", Georgia, serif;
+  background: radial-gradient(900px 600px at 90% 0%, color-mix(in srgb, var(--gold) 12%, transparent), transparent 60%), var(--bg);
+}
+.hidden { display: none !important; }
+.ic { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+button { font-family: inherit; }
+body, input, button { font-variant-numeric: lining-nums; }
+
+.bar {
+  display: flex; align-items: center; gap: 14px; padding: 14px 18px 12px 22px;
+  border-bottom: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); -webkit-app-region: drag;
+}
+.monogram {
+  width: 40px; height: 40px; flex: none; display: grid; place-items: center;
+  border: 1px solid var(--gold); border-radius: 50%;
+  outline: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); outline-offset: 2px;
+  font: italic 500 24px/1 "Cormorant Garamond", Georgia, serif; color: var(--gold);
+}
+.titles { flex: 1; min-width: 0; }
+h1 { margin: 0; font: italic 600 30px/1.1 "Cormorant Garamond", Georgia, serif; }
+.sub { font-size: 12px; letter-spacing: .22em; text-transform: uppercase; color: var(--gold); margin-top: 3px; }
+.tools { display: flex; gap: 6px; -webkit-app-region: no-drag; }
+.tools button, .btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px;
+  border: 1px solid color-mix(in srgb, var(--gold) 50%, transparent); border-radius: 3px;
+  background: var(--paper); color: var(--text); cursor: pointer;
+  font-size: 12px; text-transform: uppercase; letter-spacing: .12em;
+}
+.tools button:hover, .btn:hover { border-color: var(--gold); }
+.tools .primary, .btn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.tools .icon { padding: 7px; border: 0; background: transparent; }
+
+/* rezumat */
+.summary { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 14px; padding: 18px 26px 4px; }
+.stat {
+  position: relative; padding: 12px 16px 13px; background: var(--paper);
+  border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent); border-radius: 3px;
+}
+.stat::before { content: ""; position: absolute; inset: 4px; border: 1px solid color-mix(in srgb, var(--gold) 18%, transparent); pointer-events: none; }
+.stat .k { font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+.stat .v { font: 600 28px/1.15 "Cormorant Garamond", Georgia, serif; color: var(--accent); margin-top: 3px; }
+:root[data-theme="evening"] .stat .v, :root[data-theme="dark"] .stat .v { color: var(--gold); }
+.stat .v small { font-size: 15px; color: var(--muted); font-weight: 500; }
+.bar-line { height: 4px; margin-top: 8px; background: color-mix(in srgb, var(--gold) 18%, transparent); border-radius: 4px; overflow: hidden; }
+.bar-line i { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), color-mix(in srgb, var(--gold) 60%, var(--accent))); border-radius: 4px; transition: width .6s; }
+
+/* obiective */
+.goals { flex: 1; overflow-y: auto; padding: 16px 26px 36px; display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 18px; align-content: start; }
+.goal {
+  position: relative; display: flex; flex-direction: column; gap: 10px; padding: 18px 18px 14px;
+  background: var(--paper); border: 1px solid color-mix(in srgb, var(--gold) 38%, transparent); border-radius: 3px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .07);
+}
+.goal::before { content: ""; position: absolute; inset: 5px; border: 1px solid color-mix(in srgb, var(--gold) 16%, transparent); pointer-events: none; }
+.goal.done { background: linear-gradient(160deg, color-mix(in srgb, var(--gold) 14%, var(--paper)), var(--paper)); }
+.g-head { display: flex; gap: 14px; align-items: center; }
+.ring { position: relative; width: 78px; height: 78px; flex: none; }
+.ring svg.r { width: 78px; height: 78px; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 4; }
+.ring .bg { stroke: color-mix(in srgb, var(--gold) 20%, transparent); }
+.ring .fg { stroke: var(--gold); stroke-linecap: round; transition: stroke-dashoffset .8s cubic-bezier(.2, .8, .2, 1); }
+.ring .inner { position: absolute; inset: 0; display: grid; place-items: center; }
+.ring .inner svg { width: 30px; height: 30px; fill: none; stroke: var(--gold); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; margin-top: -10px; }
+.ring .pct { position: absolute; bottom: 15px; left: 0; right: 0; text-align: center; font: 600 14px "Cormorant Garamond", Georgia, serif; }
+.g-title { flex: 1; min-width: 0; }
+.g-title b { display: block; font: italic 600 23px/1.15 "Cormorant Garamond", Georgia, serif; color: var(--accent); }
+:root[data-theme="evening"] .g-title b, :root[data-theme="dark"] .g-title b { color: var(--gold); }
+.g-title span { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
+.g-ops { display: flex; gap: 2px; align-self: flex-start; opacity: .35; transition: opacity .2s; }
+.goal:hover .g-ops { opacity: 1; }
+.g-ops button { border: 0; background: transparent; color: var(--muted); padding: 4px; cursor: pointer; border-radius: 3px; }
+.g-ops button:hover { color: var(--text); background: color-mix(in srgb, var(--gold) 14%, transparent); }
+.g-ops button.confirm { color: #9b2d2d; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.g-amount { font: 600 21px "Cormorant Garamond", Georgia, serif; }
+.g-amount small { font-size: 14px; color: var(--muted); font-weight: 500; }
+.g-pace { font-size: 13.5px; color: var(--muted); font-style: italic; line-height: 1.4; }
+.g-pace b { font-style: normal; color: var(--text); font-weight: 600; }
+.g-pace .ok { color: #3f6b4d; font-style: normal; }
+.g-pace .warn { color: #9b5a2d; font-style: normal; }
+:root[data-theme="evening"] .g-pace .ok, :root[data-theme="dark"] .g-pace .ok { color: #9fcaa5; }
+.contrib { display: flex; gap: 6px; }
+.contrib input {
+  flex: 1; min-width: 0; padding: 6px 9px; border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); border-radius: 3px;
+  background: transparent; color: var(--text); font: 15px "EB Garamond", Georgia, serif; outline: none;
+}
+.contrib input:focus { border-color: var(--gold); }
+.chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.chips button {
+  padding: 3px 9px; border: 1px solid color-mix(in srgb, var(--gold) 35%, transparent); border-radius: 20px;
+  background: transparent; color: var(--text); cursor: pointer; font-size: 13px;
+}
+.chips button:hover { background: color-mix(in srgb, var(--gold) 14%, transparent); }
+.steps { border-top: 1px solid color-mix(in srgb, var(--gold) 25%, transparent); padding-top: 8px; }
+.steps .sk { font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.step { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 15px; }
+.step input[type="checkbox"] { appearance: none; width: 15px; height: 15px; flex: none; border: 1px solid var(--gold); border-radius: 50%; margin: 0; cursor: pointer; display: grid; place-items: center; }
+.step input[type="checkbox"]:checked { background: var(--gold); }
+.step input[type="checkbox"]:checked::after { content: ""; width: 5px; height: 8px; border: solid var(--paper); border-width: 0 1.6px 1.6px 0; transform: translate(0, -1px) rotate(45deg); }
+.step span { flex: 1; }
+.step.done span { text-decoration: line-through; color: var(--muted); }
+.step button { border: 0; background: transparent; color: var(--muted); cursor: pointer; opacity: 0; }
+.step:hover button { opacity: 1; }
+.step-add input {
+  width: 100%; margin-top: 4px; padding: 4px 0; border: 0; border-bottom: 1px dashed color-mix(in srgb, var(--gold) 45%, transparent);
+  background: transparent; color: var(--text); font: italic 14.5px "EB Garamond", Georgia, serif; outline: none;
+}
+
+/* gol */
+.empty { position: fixed; inset: 150px 40px 40px; text-align: center; color: var(--muted); }
+.empty .big { font: italic 600 34px "Cormorant Garamond", Georgia, serif; color: var(--accent); margin: 10px 0 6px; }
+.templates { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 20px; }
+.templates button {
+  display: flex; align-items: center; gap: 8px; padding: 8px 14px 8px 10px; background: var(--paper); color: var(--text); cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); border-radius: 3px; font-size: 15px;
+}
+.templates button:hover { border-color: var(--gold); }
+.templates button svg { width: 26px; height: 26px; fill: none; stroke: var(--gold); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.templates.small { justify-content: flex-start; margin: 0 0 12px; gap: 5px; }
+.templates.small button { padding: 3px 10px 3px 6px; font-size: 13px; }
+.templates.small button svg { width: 18px; height: 18px; }
+
+/* formular */
+.modal { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(5px); }
+.modal-card {
+  width: min(640px, 92vw); max-height: 92vh; overflow-y: auto; padding: 22px 26px; background: var(--paper);
+  border: 1px solid var(--gold); box-shadow: 0 30px 60px rgba(0, 0, 0, .2); display: flex; flex-direction: column; gap: 10px;
+}
+.modal-card h2 { margin: 0 0 4px; font: italic 600 30px "Cormorant Garamond", Georgia, serif; color: var(--accent); }
+:root[data-theme="evening"] .modal-card h2, :root[data-theme="dark"] .modal-card h2 { color: var(--gold); }
+.modal-card label, .field { display: flex; flex-direction: column; gap: 4px; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
+.modal-card input {
+  padding: 7px 9px; border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); border-radius: 3px; background: transparent;
+  color: var(--text); font: 16px "EB Garamond", Georgia, serif; letter-spacing: 0; text-transform: none; outline: none; min-width: 0; width: 100%;
+}
+.modal-card input:focus { border-color: var(--gold); }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.areas { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.areas button {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 2px; background: transparent; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--gold) 28%, transparent); border-radius: 3px; color: var(--text);
+  font-size: 10.5px; letter-spacing: 0; text-transform: none; line-height: 1.1;
+}
+.areas button svg { width: 26px; height: 26px; fill: none; stroke: var(--gold); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.areas button.on { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 14%, transparent); box-shadow: inset 0 0 0 1px var(--gold); }
+.seg { display: inline-flex; border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); border-radius: 3px; overflow: hidden; align-self: flex-start; }
+.seg button { padding: 6px 16px; border: 0; background: transparent; color: var(--text); cursor: pointer; font-size: 14px; letter-spacing: 0; text-transform: none; }
+.seg button.on { background: var(--accent); color: var(--accent-text); }
+.calc {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 12px; font-size: 14px;
+  background: color-mix(in srgb, var(--gold) 9%, transparent); border: 1px dashed color-mix(in srgb, var(--gold) 50%, transparent);
+}
+.calc input { width: 90px; flex: none; padding: 4px 7px; }
+.calc b { font: 600 18px "Cormorant Garamond", Georgia, serif; }
+.calc button { padding: 3px 10px; border: 1px solid var(--gold); background: transparent; color: var(--text); cursor: pointer; border-radius: 3px; }
+.calc em { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+.modal-nav { display: flex; gap: 8px; margin-top: 6px; }
+.modal-nav span { flex: 1; }
+.modal-nav button {
+  padding: 7px 14px; border: 1px solid color-mix(in srgb, var(--gold) 50%, transparent); border-radius: 3px; background: transparent;
+  color: var(--text); cursor: pointer; font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
+}
+.modal-nav .primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+
+.toast {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%) translateY(8px); opacity: 0; transition: .25s; z-index: 50; pointer-events: none;
+  background: var(--accent); color: var(--accent-text); border: 1px solid var(--gold); padding: 8px 16px; border-radius: 3px; font-style: italic; font-size: 15px;
+}
+.toast.show { opacity: 1; transform: translateX(-50%); }
+
+/* sărbătoare la praguri */
+.confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 60; }
+.confetti i { position: absolute; top: -12px; width: 7px; height: 12px; opacity: .9; animation: fall 2.6s ease-in forwards; }
+@keyframes fall { to { transform: translateY(105vh) rotate(540deg); opacity: .2; } }
+.goal.pulse { animation: pulse 1.2s ease; }
+@keyframes pulse { 30% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 50%, transparent), 0 10px 24px rgba(0, 0, 0, .07); } }
+
+::-webkit-scrollbar { width: 7px; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--gold) 45%, transparent); border-radius: 7px; }
+@media (max-width: 760px) { .summary { grid-template-columns: 1fr 1fr; } }

@@ -21,7 +21,7 @@ function icon(name) {
 
 function el(tag, props = {}, children = []) {
   const node = Object.assign(document.createElement(tag), props);
-  for (const c of [].concat(children)) node.append(c);
+  for (const c of [].concat(children)) if (c !== null && c !== undefined && c !== false) node.append(c);
   return node;
 }
 
@@ -67,7 +67,7 @@ function showTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.id === `tab-${name}`));
   if (name === 'ai') setTimeout(() => $('#chatInput').focus(), 50);
   if (name === 'timer') loadHistory();
-  if (name === 'today') { loadToday(); loadMantra(); }
+  if (name === 'today') { loadToday(); loadMantra(); loadGoals(); }
   if (name === 'timer') loadMonth();
   if (name === 'inbox') api.mail.scanState().then(renderScan);
   if (name === 'inbox' && !mails.length) refreshMail();
@@ -784,6 +784,7 @@ function renderToday() {
     textContent: label,
     onclick: () => saveToday({ mood: day.mood === k ? '' : k }, true)
   })));
+  renderEvening();
 
 }
 
@@ -807,6 +808,49 @@ $('#mFav').addEventListener('click', async () => {
 });
 $('#mShow').addEventListener('click', () => api.mantra.show());
 $('#openVision').addEventListener('click', () => { api.vision.open(); api.panel.hide(); });
+
+// ---------- obiective (rezumat în Azi) ----------
+function renderGoals(v) {
+  const box = $('#tdGoals');
+  const active = v.goals.filter(g => g.stats.pct < 100).sort((a, b) => b.stats.pct - a.stats.pct).slice(0, 3);
+  const open = () => { api.goals.open(); api.panel.hide(); };
+  const rows = active.map(g => {
+    const next = g.steps.find(s => !s.done);
+    const sub = next
+      ? [el('button', { className: 'check-round', title: 'Bifează pasul', onclick: async e => {
+          e.stopPropagation();
+          renderGoals((await api.goals.toggleStep(g.id, next.id)).view);
+        } }), `Următorul pas: ${next.text}`]
+      : [g.stats.perMonth ? `Ritm necesar: ${new Intl.NumberFormat('ro-RO').format(g.stats.perMonth)}${g.unit ? ' ' + g.unit : ''}/lună` : g.areaLabel || 'Adaugă un prim pas'];
+    return el('div', { className: 'gm', title: 'Deschide obiectivele', onclick: open }, [
+      el('b', { textContent: g.title }),
+      el('span', { className: 'pct', textContent: g.stats.pct + '%' }),
+      el('div', { className: 'line' }, [el('i', { style: `width:${g.stats.pct}%` })]),
+      el('div', { className: 'sub' }, sub)
+    ]);
+  });
+  const done = v.summary.done ? ` · ${v.summary.done} atinse` : '';
+  box.replaceChildren(
+    ...(rows.length ? rows : [el('div', { className: 'goals-empty', textContent: v.goals.length ? `Toate obiectivele sunt atinse${done}. Timpul pentru un vis nou.` : 'Transformă vision board-ul în planuri: fonduri, cărți, călătorii, cu progres și termene.' })]),
+    el('div', { className: 'goals-actions' }, [
+      el('button', { className: 'btn small', textContent: v.goals.length ? `Toate obiectivele${done}` : 'Primul obiectiv', onclick: () => { api.goals.open(v.goals.length ? {} : { new: true }); api.panel.hide(); } }),
+      v.goals.length ? el('button', { className: 'btn small ghost', textContent: '+ Obiectiv', onclick: () => { api.goals.open({ new: true }); api.panel.hide(); } }) : null
+    ])
+  );
+}
+async function loadGoals() { renderGoals(await api.goals.get()); }
+api.goals.onUpdate(renderGoals);
+
+// ---------- ritualul de seară ----------
+function renderEvening() {
+  const ev = td?.day?.evening;
+  $('#openEvening').classList.toggle('done', !!ev);
+  $('#eveningStatus').textContent = ev
+    ? `Jurnalul de azi e scris${ev.rating ? ' · ' + '★'.repeat(ev.rating) : ''}. Planul de mâine te așteaptă.`
+    : `Ce a mers bine, ce ai învățat, recunoștință și planul de mâine${settings.eveningTime ? ` · la ${settings.eveningTime}` : ''}`;
+}
+$('#openEvening').addEventListener('click', () => { api.evening.open(); api.panel.hide(); });
+api.today.onChange(state => { td = state; renderToday(); });
 
 // ---------- raport lunar (rezumat în Timer) ----------
 async function loadMonth() {
@@ -1072,6 +1116,8 @@ function renderSettings() {
   $('#sMorningBrief').checked = settings.morningBrief;
   $('#sBriefVoice').checked = settings.briefVoice;
   $('#sMantraStart').checked = settings.mantraOnStart;
+  $('#sEvening').checked = settings.eveningRitual;
+  if (document.activeElement !== $('#sEveningTime')) $('#sEveningTime').value = settings.eveningTime || '21:00';
   $('#sHair').value = settings.buddyHair || 'coc';
   $('#sVisionProvider').value = settings.visionProvider || 'openverse';
   const vp = settings.visionProvider || 'openverse';
@@ -1184,6 +1230,8 @@ $('#sVisionKeySave').addEventListener('click', async () => {
   toast('Cheia pentru imagini a fost salvată');
 });
 $('#sMantraStart').addEventListener('change', e => update({ mantraOnStart: e.target.checked }));
+$('#sEvening').addEventListener('change', e => update({ eveningRitual: e.target.checked }));
+$('#sEveningTime').addEventListener('change', e => update({ eveningTime: /^\d{2}:\d{2}$/.test(e.target.value) ? e.target.value : '21:00' }));
 $('#sMantraSec').addEventListener('change', e => update({ mantraSeconds: Math.max(5, Math.min(300, Number(e.target.value) || 30)) }));
 $('#sHotkeySave').addEventListener('click', () => update({ quickHotkey: $('#sHotkey').value.trim() }, 'Scurtătură activă'));
 $('#sTrackApps').addEventListener('change', e => update({ timerTrackApps: e.target.checked }));
@@ -1235,6 +1283,7 @@ api.settings.onUpdate(s => { settings = s; renderSettings(); });
   loadHistory();
   loadToday();
   loadMantra();
+  loadGoals();
   loadMonth();
   setInterval(renderClipboard, 60000);
 })();

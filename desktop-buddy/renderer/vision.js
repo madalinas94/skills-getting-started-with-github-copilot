@@ -107,6 +107,8 @@ function render() {
     tile.style.setProperty('--tilt', `${item.tilt || 0}deg`);
     tile.append(el('span', { className: `tape ${item.tape}` }));
     if (item.category && item.type === 'text') tile.append(el('span', { className: 'area-tag', textContent: areaLabel(item.category) }));
+    const goal = item.category && item.type === 'text' && board.goals?.[item.category];
+    if (goal) tile.append(goalBadge(goal));
     if (item.type === 'slot') {
       tile.append(el('div', { className: 'slot-art' }, [
         art(item.category),
@@ -156,6 +158,17 @@ function render() {
     tile.append(ops(item));
     return tile;
   }));
+}
+
+// progresul obiectivului din aria respectivă, ca o insignă pe afirmație
+function goalBadge(g) {
+  const r = 9, c = 2 * Math.PI * r;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.innerHTML = `<circle cx="12" cy="12" r="${r}" class="bg"/><circle cx="12" cy="12" r="${r}" class="fg" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - g.pct / 100)}"/>`;
+  return el('button', { className: 'goal-badge', title: `Obiectiv: ${g.title} – deschide obiectivele`, onclick: e => { e.stopPropagation(); api.goals.open(); } }, [
+    svg, el('span', { textContent: `${g.pct}% · ${g.title}` })
+  ]);
 }
 
 function set(v) { board = v; render(); }
@@ -287,6 +300,7 @@ function applyTheme(s) { document.documentElement.dataset.theme = s.themeResolve
 api.settings.get().then(applyTheme);
 api.settings.onUpdate(applyTheme);
 api.vision.get().then(set);
+api.goals.onUpdate(() => api.vision.get().then(set));
 
 // ---------- export ca imagine (randat offscreen la 1080×1350) ----------
 const EXPORT = new URLSearchParams(location.search).has('export');

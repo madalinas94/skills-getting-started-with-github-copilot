@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ro" data-theme="ivory">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; font-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'">
+  <title>Obiectivele mele</title>
+  <link rel="stylesheet" href="fonts/fonts.css">
+  <link rel="stylesheet" href="goals.css">
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-edit" viewBox="0 0 24 24"><path d="M5 19l1-4L16 5l3 3L9 18z"/><path d="M14 7l3 3"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/></symbol>
+      <symbol id="a-none" viewBox="0 0 64 64"><circle cx="32" cy="32" r="18"/><circle cx="32" cy="32" r="10"/><circle cx="32" cy="32" r="2.5"/><path d="M32 32l16-16M44 16h4v4"/></symbol>
+      <symbol id="a-calatorii" viewBox="0 0 64 64"><rect x="15" y="24" width="34" height="26" rx="3"/><path d="M26 24v-5h12v5M15 36h34M24 24v26M40 24v26"/><path d="M8 16c10-9 30-11 44-4" stroke-dasharray="2 3"/><path d="M52 12l4-1-1 4"/></symbol>
+      <symbol id="a-succes" viewBox="0 0 64 64"><path d="M22 12h20v11a10 10 0 0 1-20 0z"/><path d="M22 15h-6a6 6 0 0 0 6 10M42 15h6a6 6 0 0 1-6 10M32 33v9M25 52h14M27 42h10v10"/><path d="M28 18l3 3 5-6"/></symbol>
+      <symbol id="a-carti" viewBox="0 0 64 64"><rect x="12" y="40" width="40" height="9" rx="1.5"/><rect x="16" y="31" width="32" height="9" rx="1.5"/><rect x="13" y="22" width="34" height="9" rx="1.5" transform="rotate(-6 30 26)"/><path d="M18 44.5h28M21 35.5h22"/><path d="M40 12l2 4 4 1-3 3 1 4-4-2-4 2 1-4-3-3 4-1z"/></symbol>
+      <symbol id="a-bani" viewBox="0 0 64 64"><rect x="9" y="17" width="40" height="24" rx="3"/><circle cx="29" cy="29" r="6"/><path d="M13 22h4M41 36h4"/><ellipse cx="46" cy="50" rx="9" ry="3"/><path d="M37 50v-4M55 50v-4"/><ellipse cx="46" cy="46" rx="9" ry="3"/></symbol>
+      <symbol id="a-masina" viewBox="0 0 64 64"><path d="M7 40c1-7 6-10 13-11l7-7h13l8 7c6 1 10 4 10 11z"/><circle cx="19" cy="41" r="5"/><circle cx="45" cy="41" r="5"/><path d="M27 29h19M33 22v7"/><path d="M6 48h52" stroke-dasharray="3 3"/></symbol>
+      <symbol id="a-casa" viewBox="0 0 64 64"><path d="M10 30L32 12l22 18"/><path d="M16 26v26h32V26"/><rect x="28" y="38" width="8" height="14"/><rect x="19" y="31" width="7" height="7"/><rect x="38" y="31" width="7" height="7"/><path d="M42 18v-6h5v10"/></symbol>
+      <symbol id="a-iubire" viewBox="0 0 64 64"><circle cx="26" cy="36" r="11"/><circle cx="38" cy="36" r="11"/><path d="M32 22c-3-5-10-2-7 4l7 6 7-6c3-6-4-9-7-4z"/></symbol>
+      <symbol id="a-credinta" viewBox="0 0 64 64"><path d="M32 12v40M23 22h18"/><path d="M32 6v2M18 10l2 2M46 10l-2 2M12 22h3M49 22h3"/><path d="M22 52h20"/></symbol>
+      <symbol id="a-frumusete" viewBox="0 0 64 64"><circle cx="28" cy="24" r="12"/><circle cx="28" cy="24" r="8.5"/><path d="M36 33l12 17"/><path d="M47 14l1.5 3.5L52 19l-3.5 1.5L47 24l-1.5-3.5L42 19l3.5-1.5z"/></symbol>
+      <symbol id="a-fit" viewBox="0 0 64 64"><rect x="8" y="27" width="6" height="12" rx="1"/><rect x="14" y="23" width="5" height="20" rx="1"/><path d="M19 33h26"/><rect x="45" y="23" width="5" height="20" rx="1"/><rect x="50" y="27" width="6" height="12" rx="1"/><path d="M26 50c4-3 8-3 12 0"/></symbol>
+      <symbol id="a-eleganta" viewBox="0 0 64 64"><path d="M12 16c4 18 36 18 40 0"/><circle cx="13.0" cy="20.0" r="2.6"/><circle cx="15.8" cy="23.6" r="2.6"/><circle cx="20.2" cy="26.5" r="2.6"/><circle cx="25.8" cy="28.4" r="2.6"/><circle cx="32.0" cy="29.0" r="2.6"/><circle cx="38.2" cy="28.4" r="2.6"/><circle cx="43.8" cy="26.5" r="2.6"/><circle cx="48.2" cy="23.6" r="2.6"/><circle cx="51.0" cy="20.0" r="2.6"/><path d="M32 30v6"/><path d="M32 36l-4 6h8z"/></symbol>
+      <symbol id="a-familie" viewBox="0 0 64 64"><circle cx="18" cy="22" r="4.5"/><circle cx="30" cy="20" r="5"/><circle cx="41" cy="26" r="3.5"/><circle cx="50" cy="28" r="3"/><path d="M12 48c0-10 3-16 6-16s6 6 6 16M23 48c0-12 3-19 7-19s7 7 7 19M36 48c0-8 2-13 5-13s5 5 5 13M46 48c0-6 2-10 4-10s4 4 4 10"/><path d="M8 52h48"/></symbol>
+    </defs>
+  </svg>
+  <header class="bar">
+    <div class="monogram">M</div>
+    <div class="titles">
+      <h1>Obiectivele mele</h1>
+      <div class="sub">Pas cu pas, spre viața din vision board</div>
+    </div>
+    <div class="tools">
+      <button id="newGoal" class="primary"><svg class="ic"><use href="#i-plus"/></svg>Obiectiv nou</button>
+      <button id="close" class="icon" title="Închide"><svg class="ic"><use href="#i-close"/></svg></button>
+    </div>
+  </header>
+  <section class="summary" id="summary"></section>
+  <main class="goals" id="goals"></main>
+  <div class="empty hidden" id="empty">
+    <p class="big">Un vis cu termen devine plan.</p>
+    <p>Alege un model sau creează-ți propriul obiectiv. Mady urmărește ritmul și îți spune dacă ești pe drumul cel bun.</p>
+    <div class="templates" id="emptyTemplates"></div>
+  </div>
+
+  <div class="modal hidden" id="modal">
+    <form class="modal-card" id="form">
+      <h2 id="formTitle">Obiectiv nou</h2>
+      <div class="templates small" id="templates"></div>
+      <label>Titlu<input id="fTitle" maxlength="80" placeholder="ex: Fondul de libertate financiară" required></label>
+      <div class="field">Aria vieții<div class="areas" id="fAreas"></div></div>
+      <div class="field">Tip
+        <div class="seg" id="fType">
+          <button type="button" data-v="money">Bani</button>
+          <button type="button" data-v="count">Număr</button>
+          <button type="button" data-v="milestone">Etapă</button>
+        </div>
+      </div>
+      <div class="grid3" id="fNumbers">
+        <label>Țintă<input id="fTarget" type="number" min="0" step="any"></label>
+        <label>Acum<input id="fCurrent" type="number" min="0" step="any"></label>
+        <label>Unitate<input id="fUnit" maxlength="12" placeholder="€, cărți, km"></label>
+      </div>
+      <div class="calc hidden" id="fCalc">
+        <span>Calculator libertate financiară: cheltuieli lunare</span>
+        <input id="fExpenses" type="number" min="0" step="50" placeholder="2500">
+        <span>× 12 × 25 =</span>
+        <b id="fCalcOut">–</b>
+        <button type="button" id="fCalcUse">Folosește</button>
+        <em>Regula de 4%: un portofoliu de 25 de ori cheltuielile anuale te poate susține pe termen lung. Nu e sfat financiar personalizat.</em>
+      </div>
+      <label>Termen<input id="fDeadline" type="month"></label>
+      <div class="modal-nav">
+        <span></span>
+        <button type="button" id="fCancel">Renunță</button>
+        <button type="submit" class="primary" id="fSave">Salvează</button>
+      </div>
+    </form>
+  </div>
+  <div class="confetti" id="confetti"></div>
+  <div class="toast" id="toast"></div>
+  <script src="goals.js"></script>
+</body>
+</html>

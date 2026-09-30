@@ -13,6 +13,8 @@ const today = require('./src/today');
 const cards = require('./src/cards');
 const mantra = require('./src/mantra');
 const vision = require('./src/vision');
+const goals = require('./src/goals');
+const evening = require('./src/evening');
 
 const BUDDY_W = 170;
 const BUDDY_H = 210;
@@ -41,6 +43,8 @@ let lastSessionId = null;
 let lastCard = null;
 let mantraWin = null;
 let visionWin = null;
+let goalsWin = null;
+let eveningWin = null;
 const MANTRA_W = 450;
 const stickyWins = new Map(); // id notiță → fereastră
 let tray = null;
@@ -417,6 +421,69 @@ function openVision() {
   visionWin.on('closed', () => { visionWin = null; });
 }
 
+// ---------- Obiective ----------
+
+function openGoals(opts = {}) {
+  if (goalsWin && !goalsWin.isDestroyed()) {
+    goalsWin.show();
+    goalsWin.focus();
+    if (opts.new) goalsWin.webContents.executeJavaScript("document.getElementById('newGoal').click()").catch(() => {});
+    return;
+  }
+  const area = screen.getPrimaryDisplay().workArea;
+  const w = Math.min(980, area.width - 80), h = Math.min(740, area.height - 60);
+  goalsWin = new BrowserWindow({
+    width: w, height: h,
+    x: Math.round(area.x + (area.width - w) / 2), y: Math.round(area.y + (area.height - h) / 2),
+    minWidth: 520, minHeight: 420,
+    frame: false,
+    backgroundColor: '#f4efe4',
+    title: 'Obiectivele mele',
+    webPreferences: { preload: path.join(__dirname, 'preload.js') }
+  });
+  goalsWin.loadFile(path.join(__dirname, 'renderer', 'goals.html'), opts.new ? { query: { new: '1' } } : undefined);
+  goalsWin.on('closed', () => { goalsWin = null; });
+}
+
+// Orice schimbare ajunge la panou și la vision board; pragurile (25/50/75/100%) le sărbătorește Mady.
+function goalsResult(r) {
+  broadcast('goals:updated', r.view);
+  if (r.milestone && r.goal) {
+    const vars = { title: r.goal.title, pct: r.milestone };
+    say(mood.line(r.milestone >= 100 ? 'goalDone' : 'goalMilestone', vars), { state: 'celebrate', ms: 10000 });
+    notify(r.milestone >= 100 ? 'Obiectiv atins' : `${r.milestone}% din obiectiv`, r.goal.title, () => openGoals());
+  } else if (r.stepDone) {
+    say(mood.line('goalStep', { title: r.goal.title }), { state: 'happy', ms: 6000 });
+  }
+  return r;
+}
+
+// ---------- Ritualul de seară ----------
+
+function openEvening() {
+  if (eveningWin && !eveningWin.isDestroyed()) { eveningWin.show(); eveningWin.focus(); return; }
+  const area = screen.getPrimaryDisplay().workArea;
+  const w = Math.min(760, area.width - 40), h = Math.min(680, area.height - 40);
+  eveningWin = new BrowserWindow({
+    width: w, height: h,
+    x: Math.round(area.x + (area.width - w) / 2), y: Math.round(area.y + (area.height - h) / 2),
+    minWidth: 560, minHeight: 520,
+    frame: false,
+    backgroundColor: '#1f3a2e',
+    title: 'Ritualul de seară',
+    webPreferences: { preload: path.join(__dirname, 'preload.js') }
+  });
+  eveningWin.loadFile(path.join(__dirname, 'renderer', 'evening.html'));
+  eveningWin.on('closed', () => { eveningWin = null; });
+}
+
+function checkEvening() {
+  if (!evening.due()) return;
+  evening.prompted();
+  say(mood.line('eveningInvite'), { tab: 'evening', state: 'happy', ms: 20000 });
+  notify('Ritualul de seară', 'Cinci minute pentru tine: ce a mers bine, ce ai învățat și planul de mâine.', openEvening);
+}
+
 async function exportVision() {
   const W = 1080, H = 1350;
   const win = new BrowserWindow({ width: W, height: H, show: false, useContentSize: true, webPreferences: { offscreen: true, preload: path.join(__dirname, 'preload.js') } });
@@ -523,6 +590,8 @@ function createTray() {
     { label: 'Azi (planner)', click: () => togglePanel('today') },
     { label: 'Mantra zilei', click: showMantra },
     { label: 'Vision board', click: openVision },
+    { label: 'Obiectivele mele', click: () => openGoals() },
+    { label: 'Ritualul de seară', click: openEvening },
     { label: 'Notiță nouă pe desktop', click: newSticky },
     { label: 'Arată notițele lipite', click: showAllStickies },
     { label: 'Timer și statistici', click: () => togglePanel('timer') },
@@ -582,7 +651,7 @@ function trimClipboard() {
 }
 
 function broadcast(channel, payload) {
-  for (const w of [buddyWin, panelWin, timerWin, bubbleWin, quickWin, mantraWin, visionWin, ...stickyWins.values()]) if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
+  for (const w of [buddyWin, panelWin, timerWin, bubbleWin, quickWin, mantraWin, visionWin, goalsWin, eveningWin, ...stickyWins.values()]) if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
 }
 
 // ---------- Setări ----------
@@ -642,6 +711,8 @@ function registerIpc() {
       { label: 'Notiță nouă pe desktop', click: newSticky },
       { label: 'Mantra zilei', click: showMantra },
       { label: 'Vision board', click: openVision },
+      { label: 'Obiectivele mele', click: () => openGoals() },
+      { label: 'Ritualul de seară', click: openEvening },
       { label: `Întreab-o pe Mady (${hotkeyLabel(settings().quickHotkey)})`, click: () => openQuick() },
       { label: 'Asistent AI', click: () => togglePanel('ai') },
       { label: 'Timer și statistici', click: () => togglePanel('timer') },
@@ -882,6 +953,34 @@ function registerIpc() {
     }
   });
 
+  // obiective
+  ipcMain.on('goals:open', (_e, opts) => openGoals(opts || {}));
+  ipcMain.on('goals:close', () => goalsWin && goalsWin.close());
+  ipcMain.handle('goals:get', () => goals.view());
+  ipcMain.handle('goals:add', (_e, patch) => {
+    const r = goals.add(patch || {});
+    broadcast('goals:updated', r.view);
+    return r;
+  });
+  ipcMain.handle('goals:update', (_e, id, patch) => goalsResult(goals.update(id, patch || {})));
+  ipcMain.handle('goals:contribute', (_e, id, amount) => goalsResult(goals.contribute(id, amount)));
+  ipcMain.handle('goals:addStep', (_e, id, text) => goalsResult(goals.addStep(id, text)));
+  ipcMain.handle('goals:toggleStep', (_e, id, stepId) => goalsResult(goals.toggleStep(id, stepId)));
+  ipcMain.handle('goals:removeStep', (_e, id, stepId) => goalsResult(goals.removeStep(id, stepId)));
+  ipcMain.handle('goals:remove', (_e, id) => goalsResult(goals.remove(id)));
+
+  // ritualul de seară
+  ipcMain.on('evening:open', openEvening);
+  ipcMain.on('evening:close', () => eveningWin && eveningWin.close());
+  ipcMain.handle('evening:context', () => evening.context());
+  ipcMain.handle('evening:history', () => evening.history());
+  ipcMain.handle('evening:save', async (_e, input) => {
+    const r = await evening.save(input || {});
+    broadcast('today:changed', today.state());
+    say(r.note, { state: 'happy', ms: 14000 });
+    return r;
+  });
+
   // vision board
   ipcMain.on('vision:open', openVision);
   ipcMain.on('vision:close', () => visionWin && visionWin.close());
@@ -1031,7 +1130,9 @@ function registerIpc() {
   ipcMain.on('bubble:click', () => {
     const tab = bubbleTab;
     hideBubble();
-    if (tab) togglePanel(tab);
+    if (tab === 'evening') openEvening();
+    else if (tab === 'goals') openGoals();
+    else if (tab) togglePanel(tab);
   });
   ipcMain.on('bubble:close', hideBubble);
 
@@ -1257,6 +1358,9 @@ if (!app.requestSingleInstanceLock()) {
     }, 4000);
     // pentru calculatoarele lăsate pornite peste noapte
     setInterval(() => { if (briefing.due()) runBriefing(); }, 10 * 60 * 1000);
+    // invitația la ritualul de seară, după ora aleasă în Setări
+    setInterval(checkEvening, 5 * 60 * 1000);
+    setTimeout(checkEvening, 60 * 1000);
   });
 
   app.on('window-all-closed', e => e.preventDefault());

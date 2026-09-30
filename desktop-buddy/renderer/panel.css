@@ -863,6 +863,36 @@ textarea { resize: none; }
 .month-sum .stat b { font-size: 17px; }
 .month-sum .wide { grid-column: 1 / -1; font-size: 13px; font-style: italic; color: var(--muted); }
 
+/* obiective (mini) și ritualul de seară */
+.goals-mini { display: flex; flex-direction: column; gap: 6px; }
+.gm {
+  display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; align-items: center; padding: 9px 12px 10px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer;
+}
+.gm:hover { border-color: var(--gold); }
+.gm b { font: italic 600 17px var(--font-display); color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root[data-theme="evening"] .gm b, :root[data-theme="dark"] .gm b { color: var(--gold); }
+.gm .pct { font: 600 15px var(--font-display); color: var(--gold); font-variant-numeric: lining-nums; }
+.gm .line { grid-column: 1 / -1; height: 3px; background: color-mix(in srgb, var(--gold) 20%, transparent); border-radius: 3px; overflow: hidden; }
+.gm .line i { display: block; height: 100%; background: var(--gold); border-radius: 3px; }
+.gm .sub { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); font-style: italic; display: flex; align-items: center; gap: 6px; }
+.gm .sub .check-round { width: 15px; height: 15px; flex: none; }
+.goals-actions { display: flex; gap: 6px; }
+.goals-empty { font-size: 13px; color: var(--muted); font-style: italic; }
+.evening-cta {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 16px; text-align: left; cursor: pointer; font-family: var(--font-text);
+  border: 1px solid color-mix(in srgb, var(--gold) 60%, transparent); border-radius: var(--radius); color: #efe4c8;
+  background: radial-gradient(120% 140% at 0% 0%, #2a4a3b, #13241c);
+  transition: transform .2s, box-shadow .2s;
+}
+.evening-cta:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(0, 0, 0, .18); }
+.evening-cta .moon { width: 30px; height: 30px; flex: none; fill: rgba(201, 169, 110, .25); stroke: #c9a96e; stroke-width: 1.2; }
+.evening-cta .ev-text { display: flex; flex-direction: column; gap: 1px; }
+.evening-cta b { font: italic 600 20px var(--font-display); color: #f4e8c9; }
+.evening-cta .ev-text span { font-size: 12.5px; font-style: italic; opacity: .8; }
+.evening-cta.done { background: radial-gradient(120% 140% at 0% 0%, #3b3a2a, #1d1c13); }
+:root[data-theme="heritage"] .evening-cta { background: radial-gradient(120% 140% at 0% 0%, #2b3548, #141a26); }
+
 /* ================= HERITAGE · varianta matură, old money ================= */
 :root[data-theme="heritage"] {
   --bg: #f3eee5; --surface: #faf7f1; --surface-2: #ece5d8; --text: #1c2433; --muted: #7a7466; --border: #d8cebd;
