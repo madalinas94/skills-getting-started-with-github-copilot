@@ -69,7 +69,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') api.quick.hi
 
 function applyTheme(s) {
   document.documentElement.dataset.theme = s.themeResolved || s.theme;
-  $('#askInput').placeholder = `Întreab-o pe ${s.buddyName}…`;
+  $('#askInput').placeholder = t('Întreab-o pe {name}…', { name: s.buddyName });
   $('.monogram').textContent = (s.buddyName || 'M')[0].toUpperCase();
 }
 api.settings.get().then(applyTheme);

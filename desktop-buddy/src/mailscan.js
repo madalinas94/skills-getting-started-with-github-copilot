@@ -33,7 +33,7 @@ function nextScanAt() {
 async function scan({ manual = false } = {}) {
   if (running) return lastScan();
   if (!configured()) {
-    return { at: Date.now(), count: null, important: [], summary: '', error: 'Inboxul nu e configurat (Setări → Inbox).' };
+    return { at: Date.now(), count: null, important: [], summary: '', error: require('./i18n').t('Inboxul nu e configurat (Setări → Inbox).') };
   }
   running = true;
   hooks.onStart();

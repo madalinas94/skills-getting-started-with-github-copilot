@@ -61,6 +61,24 @@ const AREAS = [
   ] }
 ];
 
+// Numele și afirmațiile urmează limba interfeței; originalele românești rămân în labelRo / affirmationsRo.
+for (const a of AREAS) {
+  const label = a.label, affirmations = a.affirmations;
+  delete a.label;
+  delete a.affirmations;
+  Object.defineProperties(a, {
+    labelRo: { value: label },
+    affirmationsRo: { value: affirmations },
+    label: { enumerable: true, get() { return tr(a.id)?.[0] || label; } },
+    affirmations: { enumerable: true, get() { return tr(a.id)?.[1] || affirmations; } }
+  });
+}
+
+function tr(id) {
+  const lang = require('./i18n').lang();
+  return lang === 'ro' ? null : require('./quotes-i18n').AREAS[lang]?.[id];
+}
+
 const byId = id => AREAS.find(a => a.id === id);
 
 module.exports = { AREAS, byId };

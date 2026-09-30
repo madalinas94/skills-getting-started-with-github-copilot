@@ -1034,3 +1034,37 @@ textarea { resize: none; }
 .lang-chips button:hover { border-color: var(--gold); }
 .lang-chips button.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 :root[data-theme="evening"] .lang-chips button.on { background: var(--gold); color: #121c17; border-color: var(--gold); }
+
+/* email din notiță */
+.note-mail { display: flex; align-items: center; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
+.note-mail .nm-info { flex: 1; min-width: 0; font-size: 12px; font-style: italic; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compose {
+  position: absolute; inset: 0; z-index: 55; display: flex; align-items: stretch; padding: 12px;
+  background: color-mix(in srgb, var(--bg) 55%, transparent); backdrop-filter: blur(3px); border-radius: var(--radius-lg);
+}
+.compose-card {
+  flex: 1; display: flex; flex-direction: column; gap: 7px; padding: 14px 14px 12px; min-height: 0;
+  background: var(--surface); border: 1px solid var(--gold); border-radius: var(--radius); box-shadow: var(--shadow); animation: rise .25s ease-out;
+}
+.compose-head { display: flex; align-items: baseline; gap: 8px; }
+.compose-head b { font: italic 600 22px var(--font-display); color: var(--accent); }
+:root[data-theme="evening"] .compose-head b, :root[data-theme="dark"] .compose-head b { color: var(--gold); }
+.compose-head .muted { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compose-head .icon-btn { color: var(--muted); }
+.cf { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding: 2px 0; }
+.cf span { width: 58px; flex: none; font-size: 10.5px; letter-spacing: var(--caps); text-transform: uppercase; color: var(--muted); }
+.cf input { flex: 1; min-width: 0; border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 6px 0 !important; }
+#cBody { flex: 1; min-height: 120px; line-height: 1.55; resize: none; }
+.c-sign { font-size: 12.5px; color: var(--muted); font-style: italic; white-space: pre-line; }
+.c-sign:empty { display: none; }
+.compose-actions { display: flex; align-items: center; gap: 6px; }
+.compose-actions span { flex: 1; }
+#cPolish.loading { opacity: .6; }
+.sendbar {
+  position: absolute; left: 14px; right: 14px; bottom: 14px; z-index: 70; display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px 10px 14px; background: var(--accent); color: var(--accent-text); border: 1px solid var(--gold); border-radius: var(--radius); box-shadow: var(--shadow);
+  font-style: italic; animation: rise .2s ease-out;
+}
+.sendbar span { flex: 1; }
+.sendbar button { border: 1px solid color-mix(in srgb, var(--accent-text) 60%, transparent); background: transparent; color: var(--accent-text); border-radius: var(--radius); padding: 4px 12px; cursor: pointer; font: 600 11px var(--font-text); letter-spacing: .12em; text-transform: uppercase; }
+.sendbar button:hover { background: color-mix(in srgb, var(--accent-text) 15%, transparent); }

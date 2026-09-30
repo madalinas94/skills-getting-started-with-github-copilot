@@ -12,9 +12,9 @@ function fit() {
 }
 
 function render() {
-  const date = new Date().toLocaleDateString(m.locale || 'ro-RO', { weekday: 'long', day: 'numeric', month: 'long' });
+  const date = new Date().toLocaleDateString(m.locale || I18N.locale, { weekday: 'long', day: 'numeric', month: 'long' });
   const [qo, qc] = m.q || ['„', '”'];
-  $('#kicker').textContent = `${m.kicker || 'Mantra zilei'} · ${date}`;
+  $('#kicker').textContent = `${m.kicker || t('Mantra zilei')} · ${date}`;
   $('#label').textContent = m.label;
   $('#title').textContent = m.title || '';
   $('#text').textContent = m.type === 'citat' || m.type === 'vorba' ? `${qo}${m.text}${qc}` : m.text;

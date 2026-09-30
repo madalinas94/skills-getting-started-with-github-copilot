@@ -2,6 +2,7 @@
 const crypto = require('crypto');
 const store = require('./store');
 const i18n = require('./quotes-i18n');
+const { t } = require('./i18n');
 
 const QUOTES = [
   ['Disciplina este podul dintre obiective și realizări.', 'Jim Rohn'],
@@ -78,7 +79,7 @@ function habitsView() {
   const week = weekDays();
   return d.habits.map(h => ({
     id: h.id,
-    name: h.name,
+    name: DEFAULT_HABITS.includes(h.name) ? t(h.name) : h.name,
     week: week.map(k => !!(d.habitLog[h.id] || {})[k]),
     streak: streak(h.id)
   }));

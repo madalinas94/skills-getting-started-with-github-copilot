@@ -1,6 +1,8 @@
 // Agentul AI. Providerii sunt placeholdere configurabile din Setări:
 // alegi providerul, modelul și cheia API, iar la final îl legi de serviciul dorit.
 
+const { t } = require('./i18n');
+
 const PROVIDERS = {
   demo: {
     label: 'Demo (fără API, placeholder)',
@@ -24,6 +26,18 @@ const PROVIDERS = {
   }
 };
 
+// Personalitatea din Setări (sau cea implicită, în limba interfeței) + numele utilizatorului
+// + limba în care răspunde.
+function personality(settings) {
+  const { lang } = require('./i18n');
+  const { PROMPTS } = require('./store');
+  const l = lang();
+  let p = (settings.aiSystemPrompt || '').trim() || PROMPTS[l] || PROMPTS.ro;
+  if (settings.userName) p += '\n\n' + t('Utilizatorul se numește {name}.', { name: settings.userName });
+  if (l === 'en') p += '\n\nAlways answer in English, unless the user writes in another language or explicitly asks for one.';
+  return p;
+}
+
 async function readError(res) {
   let detail = '';
   try {
@@ -32,7 +46,7 @@ async function readError(res) {
   } catch {
     detail = await res.text().catch(() => '');
   }
-  return new Error(`Eroare API (${res.status}): ${detail}`);
+  return new Error(t('Eroare API ({s}): {d}', { s: res.status, d: detail }));
 }
 
 async function callAnthropic({ apiKey, model, system, messages, maxTokens }) {
@@ -70,10 +84,9 @@ async function callOpenAICompatible({ baseUrl, apiKey, model, system, messages, 
 
 function demoReply(messages, settings) {
   const last = messages[messages.length - 1]?.content || '';
-  return `Sunt ${settings.buddyName} și momentan rulez în modul demo.\n\n` +
-    `Mi-ai scris: „${last.slice(0, 200)}”\n\n` +
-    'Next action pentru tine: Setări → Asistent AI → alege providerul, modelul și pune cheia API. ' +
-    'Apoi ne apucăm serios de treabă.';
+  return t('Sunt {name} și momentan rulez în modul demo.', { name: settings.buddyName }) + '\n\n' +
+    t('Mi-ai scris: „{text}”', { text: last.slice(0, 200) }) + '\n\n' +
+    t('Next action pentru tine: Setări → Asistent AI → alege providerul, modelul și pune cheia API. Apoi ne apucăm serios de treabă.');
 }
 
 // Conversația trimisă la API trebuie să înceapă cu utilizatorul și să alterneze rolurile
@@ -95,7 +108,7 @@ async function chat(messages, settings, apiKey, systemOverride) {
   const opts = {
     apiKey,
     model: settings.aiModel,
-    system: systemOverride || (settings.aiSystemPrompt + (settings.userName ? `\n\nUtilizatorul se numește ${settings.userName}.` : '')),
+    system: systemOverride || personality(settings),
     messages: normalize(messages),
     maxTokens: Number(settings.aiMaxTokens) || 1024,
     baseUrl: settings.aiBaseUrl
@@ -106,16 +119,16 @@ async function chat(messages, settings, apiKey, systemOverride) {
     return demoReply(messages, settings);
   }
   if (PROVIDERS[provider]?.needsKey && !apiKey) {
-    throw new Error('Lipsește cheia API. Adaug-o în Setări → Asistent AI.');
+    throw new Error(t('Lipsește cheia API. Adaug-o în Setări → Asistent AI.'));
   }
-  if (!opts.model) throw new Error('Alege un model în Setări → Asistent AI.');
+  if (!opts.model) throw new Error(t('Alege un model în Setări → Asistent AI.'));
   if (provider === 'anthropic') return callAnthropic(opts);
   if (provider === 'openai') return callOpenAICompatible({ ...opts, baseUrl: '' });
   if (provider === 'custom') {
-    if (!opts.baseUrl) throw new Error('Completează Base URL pentru providerul custom.');
+    if (!opts.baseUrl) throw new Error(t('Completează Base URL pentru providerul custom.'));
     return callOpenAICompatible(opts);
   }
-  throw new Error(`Provider necunoscut: ${provider}`);
+  throw new Error(t('Provider necunoscut: {p}', { p: provider }));
 }
 
 // O singură cerere (rezumat email, brief, feedback sesiune) cu personalitatea din Setări.
@@ -123,8 +136,8 @@ async function chat(messages, settings, apiKey, systemOverride) {
 async function complete(prompt, settings, apiKey, demoText, { system, demoNote = true } = {}) {
   if ((settings.aiProvider || 'demo') === 'demo') {
     await new Promise(r => setTimeout(r, 400));
-    return (demoText || 'Rezultat demo.') +
-      (demoNote ? '\n\n(Mod demo: conectează un model din Setări → Asistent AI pentru analiza reală.)' : '');
+    return (demoText || t('Rezultat demo.')) +
+      (demoNote ? '\n\n' + t('(Mod demo: conectează un model din Setări → Asistent AI pentru analiza reală.)') : '');
   }
   return chat([{ role: 'user', content: prompt }], settings, apiKey, system);
 }
@@ -146,17 +159,17 @@ function actionPrompt(action, text, lang) {
       return 'Rescrie textul de mai jos mai elegant și profesionist, potrivit pentru un email de business. ' +
         'Păstrează limba și sensul. Returnează doar textul rescris.\n\n' + text;
     default:
-      throw new Error('Acțiune necunoscută.');
+      throw new Error(t('Acțiune necunoscută.'));
   }
 }
 
 function demoAction(action, text, lang) {
-  const labels = { correct: 'corectat', summarize: 'rezumat', translate: `tradus (${LANGS[lang] || 'engleză'})`, elegant: 'rescris elegant' };
-  return `[Demo · textul ${labels[action] || ''} apare aici după ce conectezi un model AI]\n\n${text}`;
+  const labels = { correct: t('Demo · textul corectat apare aici după ce conectezi un model AI'), summarize: t('Demo · rezumatul apare aici după ce conectezi un model AI'), elegant: t('Demo · textul rescris elegant apare aici după ce conectezi un model AI'), translate: t('Demo · traducerea ({lang}) apare aici după ce conectezi un model AI', { lang: t(LANGS[lang] || 'engleză') }) };
+  return `[${labels[action] || labels.correct}]\n\n${text}`;
 }
 
 async function runAction(action, text, lang, settings, apiKey) {
-  if (!String(text || '').trim()) throw new Error('Nu am niciun text. Copiază (Ctrl+C) textul și încearcă din nou.');
+  if (!String(text || '').trim()) throw new Error(t('Nu am niciun text. Copiază (Ctrl+C) textul și încearcă din nou.'));
   const system = action === 'summarize' ? undefined : TEXT_ONLY;
   return complete(actionPrompt(action, text.slice(0, 12000), lang), settings, apiKey, demoAction(action, text, lang), { system, demoNote: false });
 }

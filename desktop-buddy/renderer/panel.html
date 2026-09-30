@@ -21,6 +21,8 @@
       <symbol id="i-note" viewBox="0 0 24 24"><path d="M5 3.5h10l4 4v13H5z"/><path d="M15 3.5v4h4M8.5 12h7M8.5 15.5h7"/></symbol>
       <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
       <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24"><path d="M20.5 3.5L3.5 10.5l7 2.5 2.5 7z"/><path d="M20.5 3.5L10.5 13"/></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
       <symbol id="i-back" viewBox="0 0 24 24"><path d="M20 12H5M11 6l-6 6 6 6"/></symbol>
       <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
       <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2M10 3h4"/></symbol>
@@ -173,7 +175,36 @@
         </div>
         <input id="noteTitle" placeholder="Titlu">
         <textarea id="noteBody" placeholder="Scrie aici…"></textarea>
+        <div class="note-mail">
+          <span class="nm-info" id="noteSentInfo"></span>
+          <button class="btn ghost" id="noteCompose" title="Vezi și editează emailul înainte de trimitere"><svg class="ic"><use href="#i-eye"/></svg>Previzualizează</button>
+          <button class="btn" id="noteSend" title="Trimite notița ca email (subiect = titlul; un rând „Către: adresă” alege destinatarul)"><svg class="ic"><use href="#i-send"/></svg>Trimite email</button>
+        </div>
       </div>
+
+      <!-- email din notiță: previzualizare și trimitere -->
+      <div class="compose hidden" id="compose">
+        <div class="compose-card">
+          <div class="compose-head">
+            <b>Email nou</b>
+            <span class="muted" id="cFrom"></span>
+            <button class="icon-btn" id="cClose" title="Închide"><svg class="ic"><use href="#i-close"/></svg></button>
+          </div>
+          <label class="cf"><span>Către</span><input id="cTo" list="cRecents" placeholder="nume@exemplu.com, altcineva@exemplu.com" autocomplete="off"></label>
+          <label class="cf" id="cCcRow"><span>Cc</span><input id="cCc" list="cRecents" placeholder="opțional" autocomplete="off"></label>
+          <label class="cf"><span>Subiect</span><input id="cSubject" maxlength="200"></label>
+          <textarea id="cBody"></textarea>
+          <div class="c-sign" id="cSign"></div>
+          <div class="compose-actions">
+            <button class="btn ghost" id="cPolish"><svg class="ic"><use href="#i-spark"/></svg>Mady îl face elegant</button>
+            <span></span>
+            <button class="btn ghost" id="cCancel">Renunță</button>
+            <button class="btn" id="cSend"><svg class="ic"><use href="#i-send"/></svg>Trimite</button>
+          </div>
+          <datalist id="cRecents"></datalist>
+        </div>
+      </div>
+      <div class="sendbar hidden" id="sendbar"><span id="sendbarText"></span><button id="sendUndo">Anulează</button></div>
     </section>
 
     <!-- AI -->
@@ -253,7 +284,7 @@
         <div class="month-sum" id="monthSum"></div>
 
         <h3>Workdays · 30 de zile</h3>
-        <div class="cal-head"><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
+        <div class="cal-head" id="calHead" translate="no"><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
         <div class="calendar" id="calendar"></div>
         <div id="dayDetail" class="card hidden"></div>
       </div>
@@ -365,6 +396,10 @@
           </select>
         </label>
         <label class="check"><input type="checkbox" id="sMailNotifyEmpty"> Notifică și când nu am emailuri noi</label>
+        <label>Semnătură pentru emailurile trimise (opțional)
+          <textarea id="sMailSignature" rows="3" maxlength="400" placeholder="ex: Mădălina Scripcar · Senior Analyst"></textarea>
+        </label>
+        <p class="hint">Emailurile din notițe pleacă prin Gmail (smtp.gmail.com), cu aceeași parolă de aplicație.</p>
 
         <h3>Vision board</h3>
         <label>Sursa imaginilor reale
@@ -442,6 +477,13 @@
         </label>
 
         <h3>Aspect</h3>
+        <label>Limba aplicației
+          <select id="sUiLang">
+            <option value="en">English</option>
+            <option value="ro">Română</option>
+          </select>
+        </label>
+        <p class="hint">Meniurile, notificările și răspunsurile lui Mady. Citatele au limba lor, mai sus.</p>
         <label>Temă
           <select id="sTheme">
             <option value="heritage">Heritage · matur, old money</option>
@@ -511,6 +553,8 @@
 
     <div id="toast" class="toast"></div>
   </div>
+  <script src="i18n-en.js"></script>
+  <script src="i18n.js"></script>
   <script src="panel.js"></script>
 </body>
 </html>

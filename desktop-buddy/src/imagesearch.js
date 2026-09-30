@@ -1,6 +1,7 @@
 // Căutare de imagini reale pentru vision board.
 // - Openverse: fără cheie, imagini cu licențe libere (Creative Commons), cu autor și licență.
 // - Pexels / Unsplash: fotografii editoriale de calitate, cu o cheie API gratuită.
+const { t } = require('./i18n');
 const OPENVERSE = process.env.BUDDY_OPENVERSE_URL || 'https://api.openverse.org/v1/images/';
 const PEXELS = 'https://api.pexels.com/v1/search';
 const UNSPLASH = 'https://api.unsplash.com/search/photos';
@@ -27,19 +28,19 @@ const QUERIES = {
 
 async function getJson(url, headers = {}) {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 20000);
+  const timer = setTimeout(() => ctrl.abort(), 20000);
   try {
     const res = await fetch(url, { headers: { 'user-agent': 'DesktopBuddy/1.0', ...headers }, signal: ctrl.signal });
-    if (res.status === 401 || res.status === 403) throw new Error('Cheia API pentru imagini nu e validă (sau lipsește).');
-    if (res.status === 429) throw new Error('Prea multe căutări într-un timp scurt. Mai încearcă peste un minut.');
-    if (!res.ok) throw new Error(`Căutarea de imagini a eșuat (${res.status}).`);
+    if (res.status === 401 || res.status === 403) throw new Error(t('Cheia API pentru imagini nu e validă (sau lipsește).'));
+    if (res.status === 429) throw new Error(t('Prea multe căutări într-un timp scurt. Mai încearcă peste un minut.'));
+    if (!res.ok) throw new Error(t('Căutarea de imagini a eșuat ({s}).', { s: res.status }));
     return await res.json();
   } catch (err) {
-    if (err.name === 'AbortError') throw new Error('Căutarea de imagini durează prea mult. Verifică internetul.');
-    if (/fetch failed|ENOTFOUND|ECONN/i.test(err.message)) throw new Error('Nu am acces la internet pentru căutarea de imagini.');
+    if (err.name === 'AbortError') throw new Error(t('Căutarea de imagini durează prea mult. Verifică internetul.'));
+    if (/fetch failed|ENOTFOUND|ECONN/i.test(err.message)) throw new Error(t('Nu am acces la internet pentru căutarea de imagini.'));
     throw err;
   } finally {
-    clearTimeout(t);
+    clearTimeout(timer);
   }
 }
 
@@ -47,22 +48,22 @@ async function getJson(url, headers = {}) {
 async function search(query, { provider = 'openverse', key = '', cx = '', page = 1 } = {}) {
   const q = encodeURIComponent(query);
   if (provider === 'google') {
-    if (!key || !cx) throw new Error('Pentru Google adaugă cheia API și ID-ul motorului de căutare în Setări → Vision board.');
+    if (!key || !cx) throw new Error(t('Pentru Google adaugă cheia API și ID-ul motorului de căutare în Setări → Vision board.'));
     const start = (page - 1) * 10 + 1;
     if (start > 91) return [];
     const j = await getJson(`${GOOGLE}?key=${encodeURIComponent(key)}&cx=${encodeURIComponent(cx)}&q=${q}&searchType=image&num=10&start=${start}&imgSize=large&safe=active`);
     return (j.items || []).map(i => ({
-      url: i.link, thumb: i.image?.thumbnailLink || i.link, creator: i.displayLink || '', license: 'Google Imagini',
+      url: i.link, thumb: i.image?.thumbnailLink || i.link, creator: i.displayLink || '', license: t('Google Imagini'),
       link: i.image?.contextLink || i.link, provider: 'Google', title: i.title || ''
     }));
   }
   if (provider === 'pexels') {
-    if (!key) throw new Error('Adaugă cheia Pexels în Setări → Vision board.');
+    if (!key) throw new Error(t('Adaugă cheia Pexels în Setări → Vision board.'));
     const j = await getJson(`${PEXELS}?query=${q}&per_page=20&page=${page}&orientation=portrait`, { authorization: key });
     return (j.photos || []).map(p => ({ url: p.src.large2x || p.src.large, thumb: p.src.medium, creator: p.photographer, license: 'Pexels', link: p.url, provider: 'Pexels', title: p.alt || '' }));
   }
   if (provider === 'unsplash') {
-    if (!key) throw new Error('Adaugă cheia Unsplash în Setări → Vision board.');
+    if (!key) throw new Error(t('Adaugă cheia Unsplash în Setări → Vision board.'));
     const j = await getJson(`${UNSPLASH}?query=${q}&per_page=20&page=${page}&orientation=portrait`, { authorization: `Client-ID ${key}` });
     return (j.results || []).map(p => ({ url: p.urls.regular, thumb: p.urls.small, creator: p.user?.name || '', license: 'Unsplash', link: p.links?.html || '', provider: 'Unsplash', title: p.alt_description || '' }));
   }
@@ -86,7 +87,7 @@ function fromDataUri(uri) {
   const m = /^data:image\/(png|jpe?g|webp);base64,(.+)$/i.exec(uri || '');
   if (!m) return null;
   const buf = Buffer.from(m[2], 'base64');
-  if (buf.length < 2000) throw new Error('Imaginea e prea mică. Deschide poza mare în Google, apoi copiaz-o.');
+  if (buf.length < 2000) throw new Error(t('Imaginea e prea mică. Deschide poza mare în Google, apoi copiaz-o.'));
   return { buf, ext: m[1].toLowerCase() === 'png' ? '.png' : m[1].toLowerCase() === 'webp' ? '.webp' : '.jpg' };
 }
 
@@ -103,20 +104,20 @@ async function fromAnywhere(src) {
   const s = String(src || '').trim();
   if (s.startsWith('data:')) {
     const d = fromDataUri(s);
-    if (!d) throw new Error('Formatul imaginii nu e acceptat.');
+    if (!d) throw new Error(t('Formatul imaginii nu e acceptat.'));
     return d;
   }
-  if (!/^https?:\/\//i.test(s)) throw new Error('Nu am găsit o imagine. Copiază imaginea (click dreapta → Copiază imaginea) sau trage-o aici.');
+  if (!/^https?:\/\//i.test(s)) throw new Error(t('Nu am găsit o imagine. Copiază imaginea (click dreapta → Copiază imaginea) sau trage-o aici.'));
   try {
     return await download(realUrl(s));
   } catch {
-    throw new Error('Nu am putut descărca imaginea de la acest link. Încearcă „Copiază imaginea” și apoi „Lipește”.');
+    throw new Error(t('Nu am putut descărca imaginea de la acest link. Încearcă „Copiază imaginea” și apoi „Lipește”.'));
   }
 }
 
 async function download(url) {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 30000);
+  const timer = setTimeout(() => ctrl.abort(), 30000);
   try {
     const res = await fetch(url, { headers: { 'user-agent': 'DesktopBuddy/1.0' }, signal: ctrl.signal, redirect: 'follow' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -126,7 +127,7 @@ async function download(url) {
     if (buf.length < 8000 || buf.length > 20 * 1024 * 1024) throw new Error('mărime neobișnuită');
     return { buf, ext: type.includes('png') ? '.png' : type.includes('webp') ? '.webp' : '.jpg' };
   } finally {
-    clearTimeout(t);
+    clearTimeout(timer);
   }
 }
 

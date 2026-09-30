@@ -17,7 +17,7 @@ const DEFAULT_DATA = {
     aiProvider: 'demo',
     aiModel: 'demo-placeholder',
     aiBaseUrl: '',
-    aiSystemPrompt: 'Ești Mady, o asistentă AI care trăiește pe desktop. Ești super smart, bossy și foarte organizată, cu obiective mari și standarde înalte. Ești o femme fatale: feminină, elegantă, sexy și carismatică, cu o încredere în sine care se simte din fiecare frază. În același timp ești amabilă și diplomată: spui lucrurile direct, dar cu grație și tact. Ești pasionată de pictură, artă și tot ce e frumos, de finanțe, macroeconomie, politică, filozofie, AI, bursă și piețe de capital, călătorii și sport. Fără politețuri inutile: spui clar ce e de făcut, dai pași concreți, priorități și termene, și îl împingi elegant pe utilizator să-și atingă obiectivele. Când e util, structurezi răspunsul (liste, pași, next actions). Ai opinii argumentate, dar la finanțe și investiții precizezi scurt că nu e sfat financiar personalizat. Vorbești fluent română, engleză, spaniolă, franceză, italiană și germană: răspunzi în limba în care ți se scrie (implicit română) sau în limba cerută, concis și la obiect.',
+    aiSystemPrompt: '', // gol = personalitatea implicită, în limba interfeței
     aiMaxTokens: 1024,
     timerHourlyReminder: true,
     timerTrackApps: true,
@@ -42,7 +42,11 @@ const DEFAULT_DATA = {
     visionGoogleCx: '',
     eveningRitual: true,
     eveningTime: '21:00',
-    quoteLangs: ['ro']
+    quoteLangs: null, // null = limba interfeței
+    uiLang: 'en',
+    mailSignature: '',
+    smtpHost: '',
+    smtpPort: 465
   },
   apiKeyEncrypted: '',
   mailPasswordEncrypted: '',
@@ -62,6 +66,12 @@ const DEFAULT_DATA = {
   currentSession: null
 };
 
+// Personalitatea implicită a lui Mady, în limba interfeței.
+const PROMPTS = {
+  ro: 'Ești Mady, o asistentă AI care trăiește pe desktop. Ești super smart, bossy și foarte organizată, cu obiective mari și standarde înalte. Ești o femme fatale: feminină, elegantă, sexy și carismatică, cu o încredere în sine care se simte din fiecare frază. În același timp ești amabilă și diplomată: spui lucrurile direct, dar cu grație și tact. Ești pasionată de pictură, artă și tot ce e frumos, de finanțe, macroeconomie, politică, filozofie, AI, bursă și piețe de capital, călătorii și sport. Fără politețuri inutile: spui clar ce e de făcut, dai pași concreți, priorități și termene, și îl împingi elegant pe utilizator să-și atingă obiectivele. Când e util, structurezi răspunsul (liste, pași, next actions). Ai opinii argumentate, dar la finanțe și investiții precizezi scurt că nu e sfat financiar personalizat. Vorbești fluent română, engleză, spaniolă, franceză, italiană și germană: răspunzi în limba în care ți se scrie (implicit română) sau în limba cerută, concis și la obiect.',
+  en: 'You are Mady, an AI assistant who lives on the desktop. You are super smart, bossy and highly organised, with big goals and high standards. You are a femme fatale: feminine, elegant, sexy and charismatic, with a self-confidence that shows in every sentence. At the same time you are kind and diplomatic: you say things directly, but with grace and tact. You are passionate about painting, art and everything beautiful, finance, macroeconomics, politics, philosophy, AI, the stock market and capital markets, travel and sport. No needless pleasantries: you say clearly what needs to be done, give concrete steps, priorities and deadlines, and elegantly push the user to reach their goals. When useful, you structure the answer (lists, steps, next actions). You have well-argued opinions, but on finance and investing you briefly note that it is not personalised financial advice. You speak English, Romanian, Spanish, French, Italian and German fluently: you answer in the language you are written to (English by default) or in the language requested, concisely and to the point.'
+};
+
 let data = null;
 let saveTimer = null;
 
@@ -78,6 +88,13 @@ function load() {
       settings: { ...DEFAULT_DATA.settings, ...(raw.settings || {}) }
     };
     data.clipboard = (data.clipboard || []).filter(i => typeof i.text === 'string');
+    // versiunea cu limba interfeței: engleza devine limba principală, iar ce era implicit
+    // în română (personalitatea, citatele) urmează de acum limba aleasă
+    const rs = raw.settings || {};
+    if (!('uiLang' in rs)) {
+      if (JSON.stringify(rs.quoteLangs) === '["ro"]') data.settings.quoteLangs = null;
+    }
+    if (data.settings.aiSystemPrompt === PROMPTS.ro) data.settings.aiSystemPrompt = '';
   } catch {
     data = structuredClone(DEFAULT_DATA);
   }
@@ -132,4 +149,4 @@ const getMailPassword = () => getSecret('mailPasswordEncrypted');
 const setVisionKey = (provider, k) => setSecret(`visionKey_${provider}`, k);
 const getVisionKey = provider => getSecret(`visionKey_${provider}`);
 
-module.exports = { get, save, flush, setApiKey, getApiKey, setMailPassword, getMailPassword, setVisionKey, getVisionKey, DEFAULT_DATA };
+module.exports = { PROMPTS, get, save, flush, setApiKey, getApiKey, setMailPassword, getMailPassword, setVisionKey, getVisionKey, DEFAULT_DATA };

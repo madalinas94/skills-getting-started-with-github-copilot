@@ -115,7 +115,7 @@ function start(title, mode) {
   const m = FOCUS_MODES[mode];
   const s = {
     id: crypto.randomUUID(),
-    title: String(title || '').trim() || 'Sesiune de lucru',
+    title: String(title || '').trim() || require('./i18n').t('Sesiune de lucru'),
     start: Date.now(),
     end: null,
     pausedMs: 0,

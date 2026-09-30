@@ -15,6 +15,8 @@ const mantra = require('./src/mantra');
 const vision = require('./src/vision');
 const goals = require('./src/goals');
 const evening = require('./src/evening');
+const sendmail = require('./src/sendmail');
+const { t, plural } = require('./src/i18n');
 
 const BUDDY_W = 170;
 const BUDDY_H = 210;
@@ -414,7 +416,7 @@ function openVision() {
     minWidth: 560, minHeight: 420,
     frame: false,
     backgroundColor: '#f4efe4',
-    title: 'Vision board',
+    title: t('Vision board'),
     webPreferences: { preload: path.join(__dirname, 'preload.js') }
   });
   visionWin.loadFile(path.join(__dirname, 'renderer', 'vision.html'));
@@ -438,7 +440,7 @@ function openGoals(opts = {}) {
     minWidth: 520, minHeight: 420,
     frame: false,
     backgroundColor: '#f4efe4',
-    title: 'Obiectivele mele',
+    title: t('Obiectivele mele'),
     webPreferences: { preload: path.join(__dirname, 'preload.js') }
   });
   goalsWin.loadFile(path.join(__dirname, 'renderer', 'goals.html'), opts.new ? { query: { new: '1' } } : undefined);
@@ -470,7 +472,7 @@ function openEvening() {
     minWidth: 560, minHeight: 520,
     frame: false,
     backgroundColor: '#1f3a2e',
-    title: 'Ritualul de seară',
+    title: t('Ritualul de seară'),
     webPreferences: { preload: path.join(__dirname, 'preload.js') }
   });
   eveningWin.loadFile(path.join(__dirname, 'renderer', 'evening.html'));
@@ -481,7 +483,7 @@ function checkEvening() {
   if (!evening.due()) return;
   evening.prompted();
   say(mood.line('eveningInvite'), { tab: 'evening', state: 'happy', ms: 20000 });
-  notify('Ritualul de seară', 'Cinci minute pentru tine: ce a mers bine, ce ai învățat și planul de mâine.', openEvening);
+  notify(t('Ritualul de seară'), t('Cinci minute pentru tine: ce a mers bine, ce ai învățat și planul de mâine.'), openEvening);
 }
 
 async function exportVision() {
@@ -583,23 +585,23 @@ function createTray() {
   tray = new Tray(img);
   tray.setToolTip('Desktop Buddy');
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Deschide panoul', click: () => togglePanel('clipboard') },
-    { label: 'Arată roboțelul', click: showBuddy },
-    { label: 'Ascunde roboțelul', click: () => buddyWin && buddyWin.hide() },
-    { label: `Întreab-o pe Mady (${hotkeyLabel(settings().quickHotkey)})`, click: () => openQuick() },
-    { label: 'Azi (planner)', click: () => togglePanel('today') },
-    { label: 'Mantra zilei', click: showMantra },
-    { label: 'Vision board', click: openVision },
-    { label: 'Obiectivele mele', click: () => openGoals() },
-    { label: 'Ritualul de seară', click: openEvening },
-    { label: 'Notiță nouă pe desktop', click: newSticky },
-    { label: 'Arată notițele lipite', click: showAllStickies },
-    { label: 'Timer și statistici', click: () => togglePanel('timer') },
-    { label: 'Arată timerul', click: showTimer },
-    { label: 'Inbox', click: () => togglePanel('inbox') },
-    { label: 'Setări', click: () => togglePanel('settings') },
+    { label: t('Deschide panoul'), click: () => togglePanel('clipboard') },
+    { label: t('Arată roboțelul'), click: showBuddy },
+    { label: t('Ascunde roboțelul'), click: () => buddyWin && buddyWin.hide() },
+    { label: t('Întreab-o pe Mady ({k})', { k: hotkeyLabel(settings().quickHotkey) }), click: () => openQuick() },
+    { label: t('Azi (planner)'), click: () => togglePanel('today') },
+    { label: t('Mantra zilei'), click: showMantra },
+    { label: t('Vision board'), click: openVision },
+    { label: t('Obiectivele mele'), click: () => openGoals() },
+    { label: t('Ritualul de seară'), click: openEvening },
+    { label: t('Notiță nouă pe desktop'), click: newSticky },
+    { label: t('Arată notițele lipite'), click: showAllStickies },
+    { label: t('Timer și statistici'), click: () => togglePanel('timer') },
+    { label: t('Arată timerul'), click: showTimer },
+    { label: t('Inbox'), click: () => togglePanel('inbox') },
+    { label: t('Setări'), click: () => togglePanel('settings') },
     { type: 'separator' },
-    { label: 'Ieșire', click: () => app.quit() }
+    { label: t('Ieșire'), click: () => app.quit() }
   ]));
   tray.on('click', () => togglePanel());
 }
@@ -681,13 +683,50 @@ function publicSettings() {
   return {
     ...settings(), hasApiKey: !!store.getApiKey(), hasMailPassword: !!store.getMailPassword(), hasVisionKey: !!store.getVisionKey(settings().visionProvider || 'openverse'),
     themeResolved: settings().theme === 'seasonal' ? seasonTheme() : settings().theme,
-    hotkeyActive: registeredHotkey === settings().quickHotkey, hotkeyLabel: hotkeyLabel(settings().quickHotkey)
+    hotkeyActive: registeredHotkey === settings().quickHotkey, hotkeyLabel: hotkeyLabel(settings().quickHotkey),
+    aiSystemPromptDefault: store.PROMPTS[settings().uiLang || 'en'] || store.PROMPTS.ro,
+    quoteLangsResolved: settings().quoteLangs || [settings().uiLang || 'en']
   };
+}
+
+// La schimbarea limbii: mantra de azi se refă, meniul din tray se reface, iar ferestrele
+// se reîncarcă (fiecare pagină își citește limba la pornire).
+function changeLanguage() {
+  if (!settings().quoteLangs) mantra.reset();
+  if (tray) { tray.destroy(); tray = null; createTray(); }
+  for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed() && !w.webContents.isOffscreen()) w.webContents.reloadIgnoringCache();
 }
 
 // ---------- IPC ----------
 
 function registerIpc() {
+  // limba interfeței, citită sincron de preload înainte ca pagina să se deseneze
+  ipcMain.on('i18n:lang', e => { e.returnValue = settings().uiLang || 'en'; });
+  ipcMain.handle('i18n:missing', () => [...require('./src/i18n').missing]);
+
+  // trimiterea de emailuri din notițe
+  ipcMain.handle('mail:draft', (_e, noteId) => {
+    const note = store.get().notes.find(n => n.id === noteId);
+    return { ...sendmail.fromNote(note), recents: sendmail.recents(), from: settings().mailAddress, signature: settings().mailSignature || '', ready: !!(settings().mailAddress && store.getMailPassword()) };
+  });
+  ipcMain.handle('mail:send', async (_e, draft) => {
+    try {
+      const rec = await sendmail.send(draft || {});
+      broadcast('notes:updated', store.get().notes);
+      say(plural(rec.to.length, 'Trimis către {who}. Bifat.', 'Trimis către {n} destinatari. Bifat.', { who: rec.to[0] }), { state: 'happy', ms: 6000 });
+      return { ok: true, sent: rec };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+  ipcMain.handle('mail:polish', async (_e, draft) => {
+    try {
+      return { ok: true, ...(await sendmail.polish(draft || {})) };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+
   // roboțel
   ipcMain.on('buddy:move', (_e, { x, y }) => {
     if (!buddyWin) return;
@@ -706,21 +745,21 @@ function registerIpc() {
   ipcMain.on('buddy:click', () => togglePanel());
   ipcMain.on('buddy:menu', () => {
     Menu.buildFromTemplate([
-      { label: 'Deschide panoul', click: () => togglePanel('clipboard') },
-      { label: 'Notițe', click: () => togglePanel('notes') },
-      { label: 'Notiță nouă pe desktop', click: newSticky },
-      { label: 'Mantra zilei', click: showMantra },
-      { label: 'Vision board', click: openVision },
-      { label: 'Obiectivele mele', click: () => openGoals() },
-      { label: 'Ritualul de seară', click: openEvening },
-      { label: `Întreab-o pe Mady (${hotkeyLabel(settings().quickHotkey)})`, click: () => openQuick() },
-      { label: 'Asistent AI', click: () => togglePanel('ai') },
-      { label: 'Timer și statistici', click: () => togglePanel('timer') },
-      { label: 'Inbox', click: () => togglePanel('inbox') },
-      { label: 'Setări', click: () => togglePanel('settings') },
+      { label: t('Deschide panoul'), click: () => togglePanel('clipboard') },
+      { label: t('Notițe'), click: () => togglePanel('notes') },
+      { label: t('Notiță nouă pe desktop'), click: newSticky },
+      { label: t('Mantra zilei'), click: showMantra },
+      { label: t('Vision board'), click: openVision },
+      { label: t('Obiectivele mele'), click: () => openGoals() },
+      { label: t('Ritualul de seară'), click: openEvening },
+      { label: t('Întreab-o pe Mady ({k})', { k: hotkeyLabel(settings().quickHotkey) }), click: () => openQuick() },
+      { label: t('Asistent AI'), click: () => togglePanel('ai') },
+      { label: t('Timer și statistici'), click: () => togglePanel('timer') },
+      { label: t('Inbox'), click: () => togglePanel('inbox') },
+      { label: t('Setări'), click: () => togglePanel('settings') },
       { type: 'separator' },
-      { label: 'Ascunde roboțelul', click: () => buddyWin && buddyWin.hide() },
-      { label: 'Ieșire', click: () => app.quit() }
+      { label: t('Ascunde roboțelul'), click: () => buddyWin && buddyWin.hide() },
+      { label: t('Ieșire'), click: () => app.quit() }
     ]).popup({ window: buddyWin });
   });
 
@@ -738,7 +777,7 @@ function registerIpc() {
       const old = settings().quickHotkey;
       if (!registerHotkey(patch.quickHotkey)) {
         registerHotkey(old);
-        return { ...publicSettings(), error: `Scurtătura „${hotkeyLabel(patch.quickHotkey)}” nu e validă sau e folosită de alt program.` };
+        return { ...publicSettings(), error: t('Scurtătura „{k}” nu e validă sau e folosită de alt program.', { k: hotkeyLabel(patch.quickHotkey) }) };
       }
     }
     const allowed = Object.keys(store.DEFAULT_DATA.settings);
@@ -748,6 +787,7 @@ function registerIpc() {
     if ('clipboardLimit' in patch) { trimClipboard(); broadcast('clipboard:updated', store.get().clipboard); }
     if (Object.keys(patch).some(k => k.startsWith('mail'))) broadcast('mail:scanState', mailscan.state());
     if ('quoteLangs' in patch) mantra.reset();
+    if ('uiLang' in patch) changeLanguage();
     if ('timerTrackApps' in patch) patch.timerTrackApps ? sessions.startTracking() : sessions.stopTracking();
     return publicSettings();
   });
@@ -823,12 +863,12 @@ function registerIpc() {
   });
   ipcMain.handle('session:feedback', async (_e, id) => {
     const prompt = sessions.feedbackPrompt(id);
-    if (!prompt) return { ok: false, error: 'Sesiunea nu mai există.' };
+    if (!prompt) return { ok: false, error: t('Sesiunea nu mai există.') };
     const r = sessions.report(sessions.getSession(id));
     try {
       const text = await ai.complete(prompt, settings(), store.getApiKey(),
-        `Sesiunea „${r.title}”: ${sessions.fmt(r.durationSec)}, din care activ ${sessions.fmt(r.activeSec)}. ` +
-        `Aplicația principală: ${r.apps[0]?.name || 'nedetectată'}. Continuă așa și pune-ți un obiectiv clar pentru mâine.`);
+        t('Sesiunea „{title}”: {dur}, din care activ {active}. Aplicația principală: {app}. Continuă așa și pune-ți un obiectiv clar pentru mâine.',
+          { title: r.title, dur: sessions.fmt(r.durationSec), active: sessions.fmt(r.activeSec), app: r.apps[0]?.name || t('nedetectată') }));
       sessions.setFeedback(id, text);
       return { ok: true, text };
     } catch (err) {
@@ -874,7 +914,7 @@ function registerIpc() {
   });
   ipcMain.handle('mail:summary', async (_e, uid) => {
     const m = mail.get(uid);
-    if (!m) return { ok: false, error: 'Emailul nu mai e în listă. Apasă Actualizează.' };
+    if (!m) return { ok: false, error: t('Emailul nu mai e în listă. Apasă Actualizează.') };
     try {
       return { ok: true, text: await ai.complete(mail.summaryPrompt(m), settings(), store.getApiKey(), mail.demoSummary(m)) };
     } catch (err) {
@@ -882,7 +922,7 @@ function registerIpc() {
     }
   });
   ipcMain.handle('mail:brief', async () => {
-    if (!mail.list().length) return { ok: false, error: 'Nu am emailuri încărcate. Apasă Actualizează.' };
+    if (!mail.list().length) return { ok: false, error: t('Nu am emailuri încărcate. Apasă Actualizează.') };
     try {
       return { ok: true, text: await ai.complete(mail.briefPrompt(), settings(), store.getApiKey(), mail.demoBrief()) };
     } catch (err) {
@@ -1024,7 +1064,7 @@ function registerIpc() {
       }
       const text = await clipboard.readText();
       if (text && /^(https?:|data:image)/i.test(text.trim())) return { ok: true, view: await vision.fromSource(text.trim(), itemId, category) };
-      throw new Error('În clipboard nu e o imagine. În Google: click dreapta pe poză → Copiază imaginea.');
+      throw new Error(t('În clipboard nu e o imagine. În Google: click dreapta pe poză → Copiază imaginea.'));
     } catch (err) {
       return { ok: false, error: err.message, view: vision.view() };
     }
@@ -1069,7 +1109,7 @@ function registerIpc() {
     if (settings().mantraOnStart) setTimeout(showMantra, 9000);
     broadcast('settings:updated', publicSettings());
     const n = settings().userName;
-    say(`${n ? `Încântată, ${n}.` : 'Încântată.'} De acum mă ocup eu de ordine, tu de strălucire.`, { state: 'celebrate', ms: 9000 });
+    say(n ? t('Încântată, {n}. De acum mă ocup eu de ordine, tu de strălucire.', { n }) : t('Încântată. De acum mă ocup eu de ordine, tu de strălucire.'), { state: 'celebrate', ms: 9000 });
     return publicSettings();
   });
 
@@ -1150,7 +1190,7 @@ function registerIpc() {
   ipcMain.handle('quick:ask', async (_e, question) => {
     try {
       return { ok: true, text: await ai.complete(String(question), settings(), store.getApiKey(),
-        `Întrebarea ta: „${String(question).slice(0, 200)}”. În modul demo nu pot răspunde cu adevărat.`) };
+        t('Întrebarea ta: „{q}”. În modul demo nu pot răspunde cu adevărat.', { q: String(question).slice(0, 200) })) };
     } catch (err) {
       return { ok: false, error: err.message };
     }
@@ -1190,7 +1230,7 @@ function registerIpc() {
     store.save();
     try {
       const reply = await ai.chat(d.chat.slice(-30), settings(), store.getApiKey());
-      d.chat.push({ role: 'assistant', content: reply || '(răspuns gol)', at: Date.now() });
+      d.chat.push({ role: 'assistant', content: reply || t('(răspuns gol)'), at: Date.now() });
       store.save();
       return { ok: true, chat: d.chat };
     } catch (err) {
@@ -1222,7 +1262,7 @@ function initSessions() {
     },
     onHour(hours, s) {
       const text = hours === 1 ? '1 Hour has passed' : `${hours} Hours have passed`;
-      notify(text, `„${s.title}” – ${hours === 1 ? 'o oră' : hours + ' ore'} de lucru. Ia o pauză scurtă și continuă.`);
+      notify(text, plural(hours, '„{title}” – o oră de lucru. Ia o pauză scurtă și continuă.', '„{title}” – {n} ore de lucru. Ia o pauză scurtă și continuă.', { title: s.title }));
       broadcast('session:hour', { hours, title: s.title });
       if (s.pomo) return; // în modul Pomodoro pauzele vin oricum la timp
       say(mood.line('hour'), { state: 'happy', ms: 9000 });
@@ -1232,16 +1272,16 @@ function initSessions() {
       if (phase === 'break') {
         const long = p.count % 4 === 0;
         const min = long ? p.longBreakMin : p.breakMin;
-        notify(`Pauză${long ? ' lungă' : ''}: ${min} minute`, `Runda ${p.count} de focus e gata. Ridică-te, respiră, bea apă.`);
+        notify(t(long ? 'Pauză lungă: {min} minute' : 'Pauză: {min} minute', { min }), t('Runda {n} de focus e gata. Ridică-te, respiră, bea apă.', { n: p.count }));
         say(mood.line(long ? 'longBreak' : 'breakStart', { min, n: p.count }), { state: 'celebrate', ms: 12000 });
       } else {
-        notify('Înapoi la focus', `Runda ${p.count + 1}: ${p.focusMin} minute pentru „${s.title}”.`);
+        notify(t('Înapoi la focus'), t('Runda {n}: {min} minute pentru „{title}”.', { n: p.count + 1, min: p.focusMin, title: s.title }));
         say(mood.line('focusBack', { min: p.focusMin }), { ms: 8000 });
       }
       broadcast('session:phase', { phase, pomo: { ...p } });
     },
     onEnd(rep) {
-      notify('Sesiune încheiată', `„${rep.title}”: ${sessions.fmt(rep.durationSec)} total, ${sessions.fmt(rep.activeSec)} activ.`);
+      notify(t('Sesiune încheiată'), t('„{title}”: {total} total, {active} activ.', { title: rep.title, total: sessions.fmt(rep.durationSec), active: sessions.fmt(rep.activeSec) }));
       togglePanel('timer');
       broadcast('session:ended', rep);
       const long = rep.durationSec >= 25 * 60;
@@ -1262,22 +1302,22 @@ function initMailScan() {
     onResult(r, manual) {
       broadcast('mail:scanState', mailscan.state());
       if (r.error) {
-        if (!manual) notify('Inbox: scanarea a eșuat', r.error, () => togglePanel('inbox'));
+        if (!manual) notify(t('Inbox: scanarea a eșuat'), r.error, () => togglePanel('inbox'));
         return;
       }
       if (!r.count && !manual && !settings().mailNotifyEmpty) return;
       const title = r.count
-        ? `${r.count} ${r.count === 1 ? 'email necitit' : 'emailuri necitite'} primite azi`
-        : 'Inbox curat: niciun email necitit azi';
+        ? plural(r.count, '{n} email necitit primit azi', '{n} emailuri necitite primite azi')
+        : t('Inbox curat: niciun email necitit azi');
       const body = r.important.length
-        ? 'Important: ' + r.important.map(m => `${m.from} – ${m.subject}`).join('; ')
-        : `${settings().buddyName} a verificat inboxul.`;
+        ? t('Important:') + ' ' + r.important.map(m => `${m.from} – ${m.subject}`).join('; ')
+        : t('{name} a verificat inboxul.', { name: settings().buddyName });
       notify(title, body, () => togglePanel('inbox'));
       broadcast('mail:scanToast', r.count);
       if (r.count) {
         const top = r.important[0];
-        say(`Ai ${r.count} ${r.count === 1 ? 'email necitit' : 'emailuri necitite'} azi.` +
-          (top ? ` Cel mai important: ${top.from} – „${top.subject}”.` : ''), { tab: 'inbox', state: 'alert', ms: 12000 });
+        say(plural(r.count, 'Ai {n} email necitit azi.', 'Ai {n} emailuri necitite azi.') +
+          (top ? ' ' + t('Cel mai important: {from} – „{subject}”.', { from: top.from, subject: top.subject }) : ''), { tab: 'inbox', state: 'alert', ms: 12000 });
       }
     }
   });
@@ -1302,8 +1342,8 @@ async function runBriefing(manual = false) {
   if (!r) return null;
   broadcast('ai:updated', store.get().chat);
   if (!manual) {
-    say(`${new Date().getHours() < 12 ? 'Bună dimineața' : 'Bună ziua'}! Ți-am pregătit briefingul zilei.` +
-      (r.emails ? ` Ai ${r.emails} ${r.emails === 1 ? 'email nou' : 'emailuri noi'}.` : ''), { tab: 'ai', state: 'celebrate', ms: 12000 });
+    say(t(new Date().getHours() < 12 ? 'Bună dimineața! Ți-am pregătit briefingul zilei.' : 'Bună ziua! Ți-am pregătit briefingul zilei.') +
+      (r.emails ? ' ' + plural(r.emails, 'Ai {n} email nou.', 'Ai {n} emailuri noi.') : ''), { tab: 'ai', state: 'celebrate', ms: 12000 });
   }
   if (settings().briefVoice && panelWin) panelWin.webContents.send('tts:speak', r.text);
   return r;
@@ -1350,7 +1390,7 @@ if (!app.requestSingleInstanceLock()) {
       if (!store.get().onboarded) {
         togglePanel('today');
         panelWin.webContents.send('onboarding:show');
-        say('Bună! Sunt Mady, noua ta asistentă. Hai să ne cunoaștem.', { state: 'happy', ms: 9000 });
+        say(t('Bună! Sunt Mady, noua ta asistentă. Hai să ne cunoaștem.'), { state: 'happy', ms: 9000 });
         return;
       }
       if (settings().mantraOnStart) showMantra();

@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const store = require('./store');
 const { AREAS, byId } = require('./lifeareas');
 const images = require('./imagesearch');
+const { t, locale, plural } = require('./i18n');
 
 const IMAGE_EXT = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
 const TAPES = ['gold', 'blush', 'sage', 'powder', 'champagne'];
@@ -26,6 +27,9 @@ function view() {
   const v = data();
   return {
     ...v,
+    // titlurile implicite apar în limba interfeței (cele scrise de utilizator rămân neschimbate)
+    title: v.title === 'Vision board' ? t('Vision board') : v.title,
+    subtitle: v.subtitle === 'Anul în care totul prinde formă' ? t('Anul în care totul prinde formă') : v.subtitle,
     areas: AREAS.map(a => ({ id: a.id, label: a.label, count: v.items.filter(i => i.category === a.id).length, query: queryFor(a.id) })),
     goals: require('./goals').byArea(),
     items: v.items
@@ -103,7 +107,7 @@ function nextAffirmation(id) {
 function addText(text, style) {
   const v = data();
   v.items.push({
-    id: crypto.randomUUID(), type: 'text', text: String(text || 'Scrie aici visul tău').slice(0, 200),
+    id: crypto.randomUUID(), type: 'text', text: String(text || t('Scrie aici visul tău')).slice(0, 200),
     style: ['noir', 'blush', 'ivory', 'sage'].includes(style) ? style : 'noir', tape: tape(v.items.length), tilt: +(Math.random() * 3 - 1.5).toFixed(2)
   });
   store.save();
@@ -176,7 +180,7 @@ async function results(query, opts, page) {
 async function webFill(itemId, opts, { next = false } = {}) {
   const v = data();
   const idx = v.items.findIndex(x => x.id === itemId);
-  if (idx < 0) throw new Error('Elementul nu mai există.');
+  if (idx < 0) throw new Error(t('Elementul nu mai există.'));
   const item = v.items[idx];
   const area = item.category;
   const query = queryFor(area);
@@ -208,7 +212,7 @@ async function webFill(itemId, opts, { next = false } = {}) {
       // imaginea nu se poate descărca: trecem la următoarea
     }
   }
-  throw new Error(`Nu am găsit imagini pentru „${query}”. Încearcă altă căutare.`);
+  throw new Error(t('Nu am găsit imagini pentru „{q}”. Încearcă altă căutare.', { q: query }));
 }
 
 // Pune pe board o imagine adusă de utilizator (link, „data:”, sau octeți din clipboard).
@@ -242,13 +246,13 @@ async function fromSource(src, itemId, category) {
     const real = images.realUrl(s);
     let host = '';
     try { host = new URL(real).hostname.replace(/^www\./, ''); } catch {}
-    source = { url: real, creator: host, license: 'din browser', link: real, provider: 'Web' };
+    source = { url: real, creator: host, license: t('din browser'), link: real, provider: 'Web' };
   }
   return saveBuffer(img, itemId, category, source);
 }
 
 function fromBuffer(buf, ext, itemId, category) {
-  if (!buf || buf.length < 2000) throw new Error('În clipboard nu e o imagine. În Google: click dreapta pe poză → Copiază imaginea.');
+  if (!buf || buf.length < 2000) throw new Error(t('În clipboard nu e o imagine. În Google: click dreapta pe poză → Copiază imaginea.'));
   return saveBuffer({ buf, ext }, itemId, category, null);
 }
 

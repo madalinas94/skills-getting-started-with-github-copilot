@@ -7,6 +7,7 @@ const on = channel => cb => {
 };
 
 contextBridge.exposeInMainWorld('buddy', {
+  i18n: { lang: ipcRenderer.sendSync('i18n:lang') },
   buddy: {
     move: (x, y) => ipcRenderer.send('buddy:move', { x, y }),
     moved: () => ipcRenderer.send('buddy:moved'),
@@ -188,6 +189,9 @@ contextBridge.exposeInMainWorld('buddy', {
     brief: () => ipcRenderer.invoke('mail:brief'),
     scanState: () => ipcRenderer.invoke('mail:scanState'),
     scanNow: () => ipcRenderer.invoke('mail:scanNow'),
+    draft: noteId => ipcRenderer.invoke('mail:draft', noteId),
+    send: draft => ipcRenderer.invoke('mail:send', draft),
+    polish: draft => ipcRenderer.invoke('mail:polish', draft),
     onScanState: on('mail:scanState'),
     onScanToast: on('mail:scanToast')
   },

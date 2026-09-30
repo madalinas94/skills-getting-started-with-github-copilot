@@ -144,7 +144,7 @@ function render() {
         tile.append(el('span', {
           className: 'credit',
           title: `${src.provider}${src.link ? ' · ' + src.link : ''}`,
-          textContent: `Foto: ${src.creator || 'autor necunoscut'} · ${src.license}`,
+          textContent: t('Foto: {c} · {l}', { c: src.creator || t('autor necunoscut'), l: src.license }),
           onclick: () => src.link && api.app.openExternal(src.link)
         }));
       }
@@ -166,7 +166,7 @@ function goalBadge(g) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.innerHTML = `<circle cx="12" cy="12" r="${r}" class="bg"/><circle cx="12" cy="12" r="${r}" class="fg" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - g.pct / 100)}"/>`;
-  return el('button', { className: 'goal-badge', title: `Obiectiv: ${g.title} – deschide obiectivele`, onclick: e => { e.stopPropagation(); api.goals.open(); } }, [
+  return el('button', { className: 'goal-badge', title: t('Obiectiv: {title} – deschide obiectivele', { title: g.title }), onclick: e => { e.stopPropagation(); api.goals.open(); } }, [
     svg, el('span', { textContent: `${g.pct}% · ${g.title}` })
   ]);
 }
@@ -244,7 +244,7 @@ $('#addText').addEventListener('click', async () => {
 });
 $('#export').addEventListener('click', async () => {
   const res = await api.vision.exportImage();
-  toast(res.ok ? 'Salvat în Imagini\\Desktop Buddy și copiat' : 'Nu am putut exporta: ' + res.error);
+  toast(res.ok ? t('Salvat în Imagini\\Desktop Buddy și copiat') : t('Nu am putut exporta: {e}', { e: res.error }));
 });
 $('#close').addEventListener('click', () => api.vision.close());
 for (const id of ['title', 'subtitle']) {

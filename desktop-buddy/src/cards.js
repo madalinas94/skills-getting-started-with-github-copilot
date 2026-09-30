@@ -19,7 +19,7 @@ function dayData() {
   if (cur && today.key(new Date(cur.start)) === k) totalSec += Math.round(sessions.elapsedMs(cur) / 1000);
   return {
     kind: 'day',
-    date: new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' }),
+    date: new Date().toLocaleDateString(require('./i18n').locale(), { weekday: 'long', day: 'numeric', month: 'long' }),
     focus: sessions.fmt(totalSec),
     sessions: h.sessions.length + (cur ? 1 : 0),
     pomodoros: h.pomodoros + (cur && cur.pomo ? cur.pomo.count : 0),
@@ -42,7 +42,7 @@ function fromKey(k) {
 function weekData() {
   const hist = sessions.history();
   const keys = today.weekDays();
-  const names = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+  const names = require('./i18n').lang() === 'en' ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
   const days = keys.map((k, i) => ({ label: names[i], sec: hist[k]?.totalSec || 0, today: k === today.key() }));
   const total = days.reduce((a, d) => a + d.sec, 0);
   const goal = Number(store.get().settings.weeklyGoalHours) || 0;
@@ -52,7 +52,7 @@ function weekData() {
   keys.forEach(k => (hist[k]?.topApps || []).forEach(a => { apps[a.name] = (apps[a.name] || 0) + a.sec; }));
   return {
     kind: 'week',
-    range: `${fromKey(keys[0]).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })} – ${fromKey(keys[6]).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })}`,
+    range: `${fromKey(keys[0]).toLocaleDateString(require('./i18n').locale(), { day: 'numeric', month: 'short' })} – ${fromKey(keys[6]).toLocaleDateString(require('./i18n').locale(), { day: 'numeric', month: 'short' })}`,
     focus: sessions.fmt(total),
     goal,
     pct: goal ? Math.round((total / (goal * 3600)) * 100) : 0,
@@ -93,7 +93,7 @@ function monthData(ref = new Date()) {
   });
   const favs = Object.values(d.mantras || {}).filter(x => x.fav && keys.includes(x.date));
   const mantraPick = favs[0] || d.mantras?.[today.key()] || null;
-  const monthName = new Date(y, m, 1).toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' });
+  const monthName = new Date(y, m, 1).toLocaleDateString(require('./i18n').locale(), { month: 'long', year: 'numeric' });
   return {
     kind: 'month',
     month: monthName[0].toUpperCase() + monthName.slice(1),
@@ -102,7 +102,7 @@ function monthData(ref = new Date()) {
     totalSec: total,
     daysWorked: worked.length,
     daysElapsed: upTo,
-    best: best ? { label: new Date(y, m, best.day).toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric' }), focus: sessions.fmt(best.sec) } : null,
+    best: best ? { label: new Date(y, m, best.day).toLocaleDateString(require('./i18n').locale(), { weekday: 'long', day: 'numeric' }), focus: sessions.fmt(best.sec) } : null,
     avg: worked.length ? sessions.fmt(Math.round(total / worked.length)) : '0m',
     sessions: elapsed.reduce((a, k) => a + (hist[k]?.sessions.length || 0), 0),
     pomodoros: elapsed.reduce((a, k) => a + (hist[k]?.pomodoros || 0), 0),
@@ -121,7 +121,7 @@ function monthData(ref = new Date()) {
 async function mantraData() {
   const mantra = require('./mantra');
   const mm = await mantra.today();
-  return { kind: 'mantra', date: new Date().toLocaleDateString(mm.locale || 'ro-RO', { weekday: 'long', day: 'numeric', month: 'long' }), mantra: mm };
+  return { kind: 'mantra', date: new Date().toLocaleDateString(mm.locale || require('./i18n').locale(), { weekday: 'long', day: 'numeric', month: 'long' }), mantra: mm };
 }
 
 function outDir() {
@@ -137,6 +137,7 @@ async function render(kind, format) {
   data.name = s.buddyName;
   data.user = s.userName || '';
   data.format = format;
+  data.lang = require('./i18n').lang();
   // offscreen + mărimea setată după creare: altfel Windows o limitează la mărimea ecranului
   const win = new BrowserWindow({
     width: size.width, height: size.height, show: false, useContentSize: true,

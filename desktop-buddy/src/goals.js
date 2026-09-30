@@ -76,7 +76,7 @@ function view() {
 
 function clean(patch) {
   const out = {};
-  if ('title' in patch) out.title = String(patch.title || '').trim().slice(0, 80) || 'Obiectiv';
+  if ('title' in patch) out.title = String(patch.title || '').trim().slice(0, 80) || require('./i18n').t('Obiectiv');
   if ('area' in patch) out.area = byId(patch.area) ? patch.area : '';
   if ('type' in patch) out.type = TYPES.includes(patch.type) ? patch.type : 'count';
   if ('target' in patch) out.target = Math.max(0, Number(patch.target) || 0);

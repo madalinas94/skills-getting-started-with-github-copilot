@@ -42,7 +42,7 @@ function go(i) {
   $('#steps').classList.toggle('hidden', page === PAGES);
   $('#nav').classList.toggle('hidden-nav', page === PAGES);
   $('#prev').disabled = page === 0;
-  $('#next').textContent = page === PAGES - 1 ? 'Închide ziua' : 'Mai departe';
+  $('#next').textContent = t(page === PAGES - 1 ? 'Închide ziua' : 'Mai departe');
   $('#dots').textContent = [...Array(PAGES)].map((_, n) => (n === page ? '●' : '○')).join('');
   const first = document.querySelector(`.page[data-page="${page}"] textarea, .page[data-page="${page}"] input:not([type=checkbox])`);
   if (first && prev !== page) setTimeout(() => first.focus(), 200);
@@ -51,7 +51,7 @@ function go(i) {
 function stars() {
   const labels = ['grea', 'așa și așa', 'bună', 'foarte bună', 'excelentă'];
   $('#stars').replaceChildren(...labels.map((l, i) => el('button', {
-    className: i < rating ? 'on' : '', textContent: '★', title: `Zi ${l}`,
+    className: i < rating ? 'on' : '', textContent: '★', title: t('Zi {l}', { l: t(l) }),
     onclick: () => { rating = rating === i + 1 ? 0 : i + 1; stars(); }
   })));
 }
@@ -60,13 +60,13 @@ function renderStats() {
   const s = ctx.stats;
   const chip = (v, label) => el('span', { className: 'stat' }, [el('b', { textContent: v }), label]);
   const list = [];
-  if (s.focus.sec >= 60) list.push(chip(fmtDur(s.focus.sec), `de focus (${s.focus.count} ${s.focus.count === 1 ? 'sesiune' : 'sesiuni'})`));
+  if (s.focus.sec >= 60) list.push(chip(fmtDur(s.focus.sec), t(s.focus.count === 1 ? 'de focus (o sesiune)' : 'de focus ({n} sesiuni)', { n: s.focus.count })));
   if (s.focus.pomodoros) list.push(chip(s.focus.pomodoros, 'pomodoro'));
   if (s.top3.total) list.push(chip(`${s.top3.done}/${s.top3.total}`, 'priorități'));
   if (s.habits.total) list.push(chip(`${s.habits.done}/${s.habits.total}`, 'ritualuri'));
   if (s.water) list.push(chip(s.water, s.water === 1 ? 'pahar de apă' : 'pahare de apă'));
   if (s.stepsToday.length) list.push(chip(s.stepsToday.length, s.stepsToday.length === 1 ? 'pas spre obiective' : 'pași spre obiective'));
-  for (const c of s.contribToday) list.push(chip(`+${new Intl.NumberFormat('ro-RO').format(c.amount)}${c.unit ? ' ' + c.unit : ''}`, c.title));
+  for (const c of s.contribToday) list.push(chip(`+${new Intl.NumberFormat(I18N.locale).format(c.amount)}${c.unit ? ' ' + c.unit : ''}`, c.title));
   if (!list.length) list.push(el('span', { className: 'stat' }, ['O zi liniștită. Și acestea contează.']));
   $('#stats').replaceChildren(...list);
 }
@@ -93,7 +93,7 @@ function fill() {
   $('#tIntention').value = ctx.tomorrow.intention || '';
   ctx.tomorrow.top3.forEach((t, i) => { $('#t' + i).value = t || ''; });
   const carried = ctx.stats.top3.items.filter(t => !t.done).length;
-  $('#carry').textContent = carried && !e ? `Am mutat pe mâine ${carried === 1 ? 'prioritatea nebifată' : `cele ${carried} priorități nebifate`} de azi. Schimbă-le liniștit.` : '';
+  $('#carry').textContent = carried && !e ? t(carried === 1 ? 'Am mutat pe mâine prioritatea nebifată de azi. Schimbă-o liniștit.' : 'Am mutat pe mâine cele {n} priorități nebifate de azi. Schimbă-le liniștit.', { n: carried }) : '';
   document.querySelectorAll('textarea').forEach(autoGrow);
   if (e) {
     $('#note').textContent = e.note;
@@ -124,11 +124,11 @@ const LEARN = [
 $('#learnChips').replaceChildren(...LEARN.map(([label, start]) => el('button', {
   textContent: label,
   onclick: () => {
-    const t = $('#learned');
-    t.value = (t.value.trim() ? t.value.trimEnd() + '\n' : '') + start;
-    autoGrow(t);
-    t.focus();
-    t.setSelectionRange(t.value.length, t.value.length);
+    const box = $('#learned');
+    box.value = (box.value.trim() ? box.value.trimEnd() + '\n' : '') + t(start.trim()) + ' ';
+    autoGrow(box);
+    box.focus();
+    box.setSelectionRange(box.value.length, box.value.length);
   }
 })));
 
@@ -141,7 +141,7 @@ $('#done').addEventListener('click', () => api.evening.close());
 $('#close').addEventListener('click', () => api.evening.close());
 $('#dayCard').addEventListener('click', async () => {
   const r = await api.card.make('day', 'post');
-  if (!r.ok) return toast('Nu am putut crea cardul: ' + r.error);
+  if (!r.ok) return toast(t('Nu am putut crea cardul: {e}', { e: r.error }));
   await api.card.copy();
   toast('Cardul zilei e salvat în Imagini și copiat');
 });

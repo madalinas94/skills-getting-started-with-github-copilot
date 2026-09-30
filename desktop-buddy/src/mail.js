@@ -2,6 +2,7 @@
 // Deschide căsuța doar pentru citire, deci emailurile NU sunt marcate ca citite.
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
+const { t, lang, plural } = require('./i18n');
 
 const MAX_FULL_BYTES = 1024 * 1024; // mesajele mai mari (atașamente) sunt citite doar parțial
 const MAX_SOURCE_BYTES = 200000;
@@ -33,7 +34,7 @@ function htmlToText(html) {
 }
 
 async function fetchMessages({ host, port, user, pass, count, unreadOnly, since }) {
-  if (!user || !pass) throw new Error('Completează adresa de email și parola de aplicație în Setări → Inbox.');
+  if (!user || !pass) throw new Error(t('Completează adresa de email și parola de aplicație în Setări → Inbox.'));
   const client = new ImapFlow({
     host: host || 'imap.gmail.com',
     port: Number(port) || 993,
@@ -47,8 +48,8 @@ async function fetchMessages({ host, port, user, pass, count, unreadOnly, since 
     await client.connect();
   } catch (err) {
     const msg = err.authenticationFailed || /auth/i.test(err.responseText || err.message)
-      ? 'Autentificare eșuată. Verifică adresa și parola de aplicație (nu parola obișnuită de Gmail).'
-      : `Nu mă pot conecta la serverul de email: ${err.message}`;
+      ? t('Autentificare eșuată. Verifică adresa și parola de aplicație (nu parola obișnuită de Gmail).')
+      : t('Nu mă pot conecta la serverul de email: {e}', { e: err.message });
     throw new Error(msg);
   }
 
@@ -104,7 +105,7 @@ async function fetchMessages({ host, port, user, pass, count, unreadOnly, since 
         uid: msg.uid,
         from: from.name || from.address || 'Necunoscut',
         fromAddress: from.address || '',
-        subject: msg.envelope.subject || '(fără subiect)',
+        subject: msg.envelope.subject || t('(fără subiect)'),
         date: (msg.envelope.date || new Date()).getTime(),
         unread: !msg.flags?.has('\\Seen'),
         text: cleanText(text)
@@ -144,7 +145,7 @@ function get(uid) {
 function summaryPrompt(m) {
   return [
     'Rezumă emailul de mai jos în 2-4 puncte scurte. La final scrie „Acțiune necesară:” și ce trebuie să fac (sau „nimic”).',
-    'Răspunde în limba în care e scris emailul, dacă nu e română, altfel în română.',
+    lang() === 'en' ? 'Answer in English.' : 'Răspunde în limba în care e scris emailul, dacă nu e română, altfel în română.',
     '',
     `De la: ${m.from} <${m.fromAddress}>`,
     `Subiect: ${m.subject}`,
@@ -202,17 +203,17 @@ function rankImportant(msgs) {
 
 function demoImportant(msgs) {
   const top = rankImportant(msgs).slice(0, 5);
-  return 'Cele mai importante (ordonare simplă, fără AI):\n' +
+  return t('Cele mai importante (ordonare simplă, fără AI):') + '\n' +
     top.map((m, i) => `#${i + 1} ${m.from} – ${m.subject}`).join('\n');
 }
 
 function demoSummary(m) {
-  return `Email de la ${m.from}, subiect „${m.subject}”.\nÎnceput: ${m.text.slice(0, 160)}…`;
+  return t('Email de la {from}, subiect „{subject}”.', { from: m.from, subject: m.subject }) + '\n' + t('Început: {text}…', { text: m.text.slice(0, 160) });
 }
 
 function demoBrief() {
   const unread = cache.filter(m => m.unread).length;
-  return `Ai ${cache.length} emailuri, din care ${unread} necitite.\n` +
+  return t('Ai {n} emailuri, din care {u} necitite.', { n: cache.length, u: unread }) + '\n' +
     cache.slice(0, 5).map((m, i) => `#${i + 1} ${m.from}: ${m.subject}`).join('\n');
 }
 

@@ -27,10 +27,10 @@ function el(tag, props = {}, children = []) {
 
 function timeAgo(ts) {
   const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 60) return 'acum';
-  if (s < 3600) return `acum ${Math.floor(s / 60)} min`;
-  if (s < 86400) return `acum ${Math.floor(s / 3600)} h`;
-  return new Date(ts).toLocaleDateString('ro-RO');
+  if (s < 60) return t('acum');
+  if (s < 3600) return t('acum {n} min', { n: Math.floor(s / 60) });
+  if (s < 86400) return t('acum {n} h', { n: Math.floor(s / 3600) });
+  return new Date(ts).toLocaleDateString(I18N.locale);
 }
 
 let toastTimer;
@@ -93,7 +93,7 @@ function renderClipboard() {
         clipItems = await api.clipboard.pin(item.id);
         renderClipboard();
       } }, icon('pin')),
-      el('button', { title: `Cere-i lui ${settings.buddyName}: corectează / rezumă / traduce`, onclick: e => {
+      el('button', { title: t('Cere-i lui {name}: corectează / rezumă / traduce', { name: settings.buddyName }), onclick: e => {
         e.stopPropagation();
         api.quick.openFor(item.text);
       } }, icon('spark')),
@@ -141,6 +141,7 @@ function renderNotes() {
       const tag = el('span', { className: 'sticky-tag', title: 'Lipită pe desktop' }, [icon('sticky')]);
       title.append(tag);
     }
+    if (n.sent?.length) title.append(el('span', { className: 'sticky-tag', title: t('Trimisă pe email') }, [icon('mail')]));
     list.append(el('li', { className: 'item', onclick: () => openNote(n.id) }, [
       title,
       el('div', { className: 'text muted', textContent: n.body.slice(0, 200) || '…' }),
@@ -157,6 +158,7 @@ function openNote(id) {
   $('#noteBody').value = n ? n.body : '';
   $('#noteStatus').textContent = '';
   renderPinButton();
+  renderSentInfo();
   $('#notesListView').classList.add('hidden');
   $('#noteEditView').classList.remove('hidden');
   $(n ? '#noteBody' : '#noteTitle').focus();
@@ -216,6 +218,124 @@ $('#notePin').addEventListener('click', async () => {
   }
 });
 $('#noteBack').addEventListener('click', closeNote);
+
+// ---------- email din notiță ----------
+const SEND_DELAY = 5;
+let sendQueue = null;
+
+function renderSentInfo() {
+  const n = notes.find(x => x.id === currentNoteId);
+  const last = n?.sent?.[n.sent.length - 1];
+  $('#noteSentInfo').textContent = last
+    ? t('✉ Trimis către {to} · {when}', { to: last.to.join(', '), when: timeAgo(last.at) })
+    : '';
+}
+
+async function noteDraft() {
+  await flushNote();
+  if (!currentNoteId && !$('#noteBody').value.trim()) return null;
+  const d = await api.mail.draft(currentNoteId);
+  if (!d.ready) {
+    toast(t('Conectează întâi Gmail în Setări → Inbox'));
+    return null;
+  }
+  if (!d.body.trim()) {
+    toast(t('Notița e goală. Scrie mesajul întâi.'));
+    return null;
+  }
+  return d;
+}
+
+function openCompose(d, focus) {
+  $('#cFrom').textContent = d.from ? t('de la {from}', { from: d.from }) : '';
+  $('#cTo').value = d.to || '';
+  $('#cCc').value = d.cc || '';
+  $('#cSubject').value = d.subject || '';
+  $('#cBody').value = d.body || '';
+  $('#cSign').textContent = d.signature || '';
+  $('#cRecents').replaceChildren(...(d.recents || []).map(r => el('option', { value: r })));
+  $('#compose').classList.remove('hidden');
+  $(focus || (d.to ? '#cBody' : '#cTo')).focus();
+}
+const closeCompose = () => $('#compose').classList.add('hidden');
+const composeDraft = () => ({ to: $('#cTo').value, cc: $('#cCc').value, subject: $('#cSubject').value, body: $('#cBody').value, noteId: currentNoteId });
+
+// Trimiterea așteaptă 5 secunde, cu „Anulează”, ca în Gmail.
+function queueSend(draft) {
+  if (sendQueue) clearInterval(sendQueue.timer);
+  let left = SEND_DELAY;
+  const who = draft.to.split(/[,;]/)[0].trim() + (draft.to.split(/[,;]/).filter(x => x.trim()).length > 1 ? ' +' : '');
+  const show = () => { $('#sendbarText').textContent = t('Trimit către {who} în {n} s…', { who, n: left }); };
+  $('#sendbar').classList.remove('hidden');
+  $('#sendUndo').classList.remove('hidden');
+  show();
+  sendQueue = { draft, timer: setInterval(async () => {
+    left--;
+    if (left > 0) return show();
+    clearInterval(sendQueue.timer);
+    sendQueue = null;
+    $('#sendbarText').textContent = t('Se trimite…');
+    $('#sendUndo').classList.add('hidden');
+    const r = await api.mail.send(draft);
+    $('#sendbar').classList.add('hidden');
+    if (r.ok) {
+      toast(t('Trimis ✓'));
+      renderSentInfo();
+    } else {
+      toast('⚠ ' + r.error);
+      openCompose({ ...draft, recents: [], signature: $('#cSign').textContent, from: '' });
+    }
+  }, 1000) };
+}
+$('#sendUndo').addEventListener('click', () => {
+  if (!sendQueue) return;
+  clearInterval(sendQueue.timer);
+  const d = sendQueue.draft;
+  sendQueue = null;
+  $('#sendbar').classList.add('hidden');
+  toast(t('Trimitere anulată'));
+  openCompose({ ...d, recents: [], signature: $('#cSign').textContent, from: '' });
+});
+
+// „Trimite email”: pleacă direct dacă notița știe destinatarul; altfel îl cere.
+$('#noteSend').addEventListener('click', async () => {
+  const d = await noteDraft();
+  if (!d) return;
+  if (!d.to) {
+    openCompose(d, '#cTo');
+    toast(t('Cui trimit? Scrie adresa și apasă Trimite.'));
+    return;
+  }
+  queueSend({ ...d, noteId: currentNoteId });
+});
+$('#noteCompose').addEventListener('click', async () => {
+  const d = await noteDraft();
+  if (d) openCompose(d);
+});
+$('#cSend').addEventListener('click', () => {
+  const d = composeDraft();
+  if (!d.to.trim()) { toast(t('Adaugă cel puțin un destinatar.')); return $('#cTo').focus(); }
+  closeCompose();
+  queueSend(d);
+});
+$('#cPolish').addEventListener('click', async () => {
+  const b = $('#cPolish');
+  b.disabled = true;
+  b.classList.add('loading');
+  const r = await api.mail.polish(composeDraft());
+  b.disabled = false;
+  b.classList.remove('loading');
+  if (!r.ok) return toast('⚠ ' + r.error);
+  $('#cSubject').value = r.subject;
+  $('#cBody').value = r.body;
+  if (r.demo) toast(t('Variantă simplă (mod demo). Cu un model AI, Mady rescrie tot emailul.'));
+});
+$('#cCancel').addEventListener('click', closeCompose);
+$('#cClose').addEventListener('click', closeCompose);
+$('#compose').addEventListener('keydown', e => {
+  if (e.key === 'Escape') { e.stopPropagation(); closeCompose(); }
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('#cSend').click();
+});
 $('#noteTitle').addEventListener('input', scheduleNoteSave);
 $('#noteBody').addEventListener('input', scheduleNoteSave);
 $('#noteSearch').addEventListener('input', renderNotes);
@@ -234,6 +354,7 @@ api.notes.onUpdate(list => {
   if (!currentNoteId) renderNotes();
   else {
     renderPinButton();
+    renderSentInfo();
     // editată între timp pe desktop: actualizăm câmpurile care nu sunt în lucru
     const n = list.find(x => x.id === currentNoteId);
     if (!n) {
@@ -273,14 +394,14 @@ function renderChat(chat, { error, typing } = {}) {
     }
     box.append(bubble);
   }
-  if (typing) box.append(el('div', { className: 'msg assistant typing', textContent: `${settings.buddyName} scrie…` }));
+  if (typing) box.append(el('div', { className: 'msg assistant typing', textContent: t('{name} scrie…', { name: settings.buddyName }) }));
   if (error) box.append(el('div', { className: 'msg error', textContent: '⚠️ ' + error }));
   box.scrollTop = box.scrollHeight;
 }
 
 function renderModelChip() {
   const p = providers[settings.aiProvider];
-  $('#aiModelChip').textContent = `${p ? p.label : settings.aiProvider} · ${settings.aiModel || 'fără model'}`;
+  $('#aiModelChip').textContent = `${t(p ? p.label : settings.aiProvider)} · ${settings.aiModel || t('fără model')}`;
   $('#aiModelChip').title = 'Schimbă din Setări';
 }
 
@@ -321,9 +442,10 @@ function speak(text) {
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text.replace(/[•–#*]/g, ' '));
   const voices = speechSynthesis.getVoices();
-  const ro = voices.filter(v => /^ro/i.test(v.lang));
-  u.voice = ro.find(v => /female|ioana|carmen|alina|elena/i.test(v.name)) || ro[0] || null;
-  u.lang = u.voice ? u.voice.lang : 'ro-RO';
+  const pref = I18N.lang === 'en' ? /^en/i : /^ro/i;
+  const own = voices.filter(v => pref.test(v.lang));
+  u.voice = own.find(v => /female|ioana|carmen|alina|elena|zira|hazel|susan|libby|sonia|jenny|aria/i.test(v.name)) || own[0] || null;
+  u.lang = u.voice ? u.voice.lang : I18N.locale;
   u.rate = 1;
   speechSynthesis.speak(u);
 }
@@ -332,7 +454,8 @@ $('#aiModelChip').addEventListener('click', () => showTab('settings'));
 
 // ---------- timer & sesiuni ----------
 
-const DAY_NAMES = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+// inițialele zilelor (duminică primul, ca getDay())
+const DAY_NAMES = I18N.lang === 'en' ? ['S', 'M', 'T', 'W', 'T', 'F', 'S'] : ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 let session = null;
 let sessOffset = 0;
 let workHistory = {};
@@ -397,15 +520,15 @@ function renderPomo() {
   $('#pomoFill').style.strokeDashoffset = (326.7 * (1 - left / total)).toFixed(1);
   const rounds = Math.max(4, Math.ceil((p.count + 1) / 4) * 4);
   $('#pomoDots').replaceChildren(...[...Array(rounds)].map((_, i) => el('i', { className: i < p.count ? 'on' : '' })));
-  $('#pomoNext').textContent = `${p.label} · ${p.focusMin}/${p.breakMin} min · ${p.count} ${p.count === 1 ? 'rundă' : 'runde'}`;
+  $('#pomoNext').textContent = `${p.label} · ${p.focusMin}/${p.breakMin} min · ` + t(p.count === 1 ? '{n} rundă' : '{n} runde', { n: p.count });
 }
 
 function tickSession() {
   renderPomo();
   if (!session) return;
   $('#sessElapsed').textContent = fmtClock(sessElapsed());
-  $('#sessMeta').textContent = (session.pausedAt ? 'În pauză · ' : 'Început la ') +
-    new Date(session.start).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+  $('#sessMeta').textContent = t(session.pausedAt ? 'În pauză · {time}' : 'Început la {time}',
+    { time: new Date(session.start).toLocaleTimeString(I18N.locale, { hour: '2-digit', minute: '2-digit' }) });
 }
 
 function renderReport(rep) {
@@ -421,12 +544,12 @@ function renderReport(rep) {
       ]))
     : [el('p', { className: 'muted', textContent: 'Nu am detectat aplicații (sesiune scurtă sau urmărirea e oprită).' })];
   const fb = el('div', { className: 'feedback' + (rep.feedback ? '' : ' hidden'), textContent: rep.feedback });
-  const fbBtn = el('button', { className: 'btn', textContent: rep.feedback ? 'Feedback nou' : `Feedback de la ${settings.buddyName}` });
+  const fbBtn = el('button', { className: 'btn', textContent: rep.feedback ? t('Feedback nou') : t('Feedback de la {name}', { name: settings.buddyName }) });
   fbBtn.prepend(icon('spark'));
   fbBtn.onclick = async () => {
     fbBtn.disabled = true;
     fb.classList.remove('hidden');
-    fb.textContent = `${settings.buddyName} analizează…`;
+    fb.textContent = t('{name} analizează…', { name: settings.buddyName });
     const res = await api.session.feedback(rep.id);
     fb.textContent = res.ok ? res.text : '⚠ ' + res.error;
     if (res.ok) rep.feedback = res.text;
@@ -435,7 +558,7 @@ function renderReport(rep) {
   box.replaceChildren(
     el('div', { className: 'kicker', textContent: 'Raport sesiune' }),
     el('div', { className: 'sess-title', textContent: rep.title }),
-    el('div', { className: 'muted', textContent: `${new Date(rep.start).toLocaleString('ro-RO', { dateStyle: 'medium', timeStyle: 'short' })} – ${new Date(rep.end).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}` }),
+    el('div', { className: 'muted', textContent: `${new Date(rep.start).toLocaleString(I18N.locale, { dateStyle: 'medium', timeStyle: 'short' })} – ${new Date(rep.end).toLocaleTimeString(I18N.locale, { hour: '2-digit', minute: '2-digit' })}` }),
     el('div', { className: 'stats' }, [
       el('div', { className: 'stat' }, [el('b', { textContent: fmtDur(rep.durationSec) }), el('span', { textContent: 'Total' })]),
       el('div', { className: 'stat' }, [el('b', { textContent: fmtDur(rep.activeSec) }), el('span', { textContent: 'Activ' })]),
@@ -470,7 +593,7 @@ function renderWeek() {
   const delta = total - lastWeek;
   $('#weekSum').replaceChildren(
     el('b', { textContent: fmtDur(total) }),
-    ` săptămâna aceasta · ${fmtDur(lastWeek)} săptămâna trecută` +
+    ' ' + t('săptămâna aceasta · {last} săptămâna trecută', { last: fmtDur(lastWeek) }) +
       (lastWeek ? ` (${delta >= 0 ? '+' : '−'}${fmtDur(Math.abs(delta))})` : '')
   );
   const goalH = Number(settings.weeklyGoalHours) || 0;
@@ -478,11 +601,11 @@ function renderWeek() {
   if (goalH) {
     const pct = Math.round((total / (goalH * 3600)) * 100);
     $('#weekGoalFill').style.width = Math.min(100, pct) + '%';
-    $('#weekGoalText').textContent = `Obiectiv: ${goalH}h · ${pct}% atins` + (pct >= 100 ? ' — bravo!' : '');
+    $('#weekGoalText').textContent = t('Obiectiv: {h}h · {pct}% atins', { h: goalH, pct }) + (pct >= 100 ? ' — ' + t('bravo!') : '');
   }
   $('#weekBars').replaceChildren(...days.map((d, i) => el('div', {
     className: 'b' + (dayKey(d) === dayKey(today) ? ' today' : ''),
-    title: `${d.toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'short' })}: ${fmtDur(secs[i])}`
+    title: `${d.toLocaleDateString(I18N.locale, { weekday: 'long', day: 'numeric', month: 'short' })}: ${fmtDur(secs[i])}`
   }, [
     el('em', { textContent: secs[i] ? (secs[i] / 3600).toFixed(1) : '' }),
     el('i', { style: `height:${Math.round((secs[i] / max) * 70)}%` }),
@@ -503,7 +626,7 @@ function renderCalendar() {
     const lvl = info ? Math.min(1, info.totalSec / max) : 0;
     const cell = el('div', {
       className: 'day' + (key === dayKey(today) ? ' today' : '') + (key === selectedDay ? ' sel' : '') + (lvl > 0.55 ? ' dark' : ''),
-      title: d.toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' }) + (info ? ` · ${fmtDur(info.totalSec)}` : ''),
+      title: d.toLocaleDateString(I18N.locale, { weekday: 'long', day: 'numeric', month: 'long' }) + (info ? ` · ${fmtDur(info.totalSec)}` : ''),
       onclick: () => renderDay(key)
     }, [
       el('span', { textContent: d.getDate() }),
@@ -525,7 +648,7 @@ function renderDay(key) {
   const box = $('#dayDetail');
   box.classList.remove('hidden');
   const head = [
-    el('div', { className: 'kicker', textContent: date.toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' }) })
+    el('div', { className: 'kicker', textContent: date.toLocaleDateString(I18N.locale, { weekday: 'long', day: 'numeric', month: 'long' }) })
   ];
   if (!info) {
     box.replaceChildren(...head, el('p', { className: 'muted', textContent: 'Nicio sesiune în această zi.' }));
@@ -542,7 +665,7 @@ function renderDay(key) {
     el('div', { className: 'sess-list' }, info.sessions.map(s => el('button', {
       onclick: async () => { renderReport(await api.session.report(s.id)); $('#tab-timer .scroll').scrollTop = 0; }
     }, [
-      el('span', { textContent: `${new Date(s.start).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })} · ${s.title}` }),
+      el('span', { textContent: `${new Date(s.start).toLocaleTimeString(I18N.locale, { hour: '2-digit', minute: '2-digit' })} · ${s.title}` }),
       el('span', { className: 'muted', textContent: fmtDur(s.durationSec) })
     ]))),
     el('div', { className: 'kicker', textContent: 'Cele mai folosite aplicații' }),
@@ -596,8 +719,8 @@ function fmtMailDate(ts) {
   const d = new Date(ts);
   const today = new Date();
   return dayKey(d) === dayKey(today)
-    ? d.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })
-    : d.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' });
+    ? d.toLocaleTimeString(I18N.locale, { hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleDateString(I18N.locale, { day: 'numeric', month: 'short' });
 }
 
 function renderMails() {
@@ -610,7 +733,7 @@ function renderMails() {
       e.stopPropagation();
       btn.disabled = true;
       summary.className = 'summary loading';
-      summary.textContent = `${settings.buddyName} citește…`;
+      summary.textContent = t('{name} citește…', { name: settings.buddyName });
       const res = await api.mail.summary(m.uid);
       summary.className = 'summary' + (res.ok ? '' : ' error');
       summary.textContent = res.ok ? res.text : res.error;
@@ -639,7 +762,7 @@ async function refreshMail() {
   mails = res.messages;
   const unread = mails.filter(m => m.unread).length;
   $('#mailStatus').textContent = res.ok
-    ? `${mails.length} emailuri · ${unread} necitite · ${new Date().toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}`
+    ? t('{n} emailuri · {u} necitite · {time}', { n: mails.length, u: unread, time: new Date().toLocaleTimeString(I18N.locale, { hour: '2-digit', minute: '2-digit' }) })
     : '⚠ ' + res.error;
   $('#mailStatus').title = $('#mailStatus').textContent;
   renderMails();
@@ -647,7 +770,7 @@ async function refreshMail() {
 }
 
 function fmtTime(ts) {
-  return new Date(ts).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+  return new Date(ts).toLocaleTimeString(I18N.locale, { hour: '2-digit', minute: '2-digit' });
 }
 
 function renderScan(st) {
@@ -659,21 +782,21 @@ function renderScan(st) {
   $('#scanNow').disabled = st.running;
   $('#scanTitle').textContent = settings.mailAutoScan ? 'Scanare automată' : 'Scanare (automată oprită)';
   if (st.running) {
-    $('#scanCount').textContent = `${settings.buddyName} verifică inboxul…`;
+    $('#scanCount').textContent = t('{name} verifică inboxul…', { name: settings.buddyName });
   } else if (!last) {
     $('#scanCount').textContent = 'Încă nu am scanat inboxul azi.';
   } else if (last.error) {
     $('#scanCount').textContent = '⚠ ' + last.error;
   } else {
     const n = last.count;
-    $('#scanCount').replaceChildren(el('b', { textContent: n }), ` ${n === 1 ? 'email necitit primit' : 'emailuri necitite primite'} azi`);
+    $('#scanCount').replaceChildren(el('b', { textContent: n }), ' ' + t(n === 1 ? 'email necitit primit azi' : 'emailuri necitite primite azi'));
   }
   $('#scanMeta').textContent = [
-    last ? `Ultima scanare: ${fmtTime(last.at)}` : '',
-    st.next ? `următoarea: ${fmtTime(st.next)}` : ''
+    last ? t('Ultima scanare: {time}', { time: fmtTime(last.at) }) : '',
+    st.next ? t('următoarea: {time}', { time: fmtTime(st.next) }) : ''
   ].filter(Boolean).join(' · ');
   const sum = $('#scanSummary');
-  const text = last && !last.error ? (last.summary || (last.summaryError ? '⚠ Rezumat indisponibil: ' + last.summaryError : '')) : '';
+  const text = last && !last.error ? (last.summary || (last.summaryError ? '⚠ ' + t('Rezumat indisponibil: {e}', { e: last.summaryError }) : '')) : '';
   sum.textContent = text;
   sum.classList.toggle('hidden', !text || st.running);
 }
@@ -693,10 +816,10 @@ $('#mailBrief').addEventListener('click', async () => {
   $('#mailBrief').disabled = true;
   box.classList.remove('hidden');
   box.replaceChildren(el('div', { className: 'kicker', textContent: 'Quick brief' }),
-    el('div', { className: 'summary loading', textContent: `${settings.buddyName} îți pregătește brief-ul…` }));
+    el('div', { className: 'summary loading', textContent: t('{name} îți pregătește brief-ul…', { name: settings.buddyName }) }));
   const res = await api.mail.brief();
   box.replaceChildren(
-    el('div', { className: 'kicker', textContent: `Quick brief · ${mails.length} emailuri` }),
+    el('div', { className: 'kicker', textContent: t('Quick brief · {n} emailuri', { n: mails.length }) }),
     el('div', { className: 'feedback' + (res.ok ? '' : ' summary error'), textContent: res.ok ? res.text : res.error }),
     el('div', { className: 'row' }, [el('button', { className: 'btn small ghost', textContent: 'Închide', onclick: () => box.classList.add('hidden') })])
   );
@@ -706,20 +829,21 @@ $('#mailBrief').addEventListener('click', async () => {
 // ---------- Azi (planner) ----------
 
 const MOODS = [['radiant', 'Radiantă'], ['bine', 'Bine'], ['ok', 'Ok'], ['obosit', 'Obosită'], ['stresat', 'Stresată']];
-const WEEK_LETTERS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+const WEEK_LETTERS = I18N.lang === 'en' ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+$('#calHead').replaceChildren(...WEEK_LETTERS.map(l => el('span', { textContent: l })));
 let td = null;
 let tdSaveTimer = null;
 
 function greetingLine() {
   const h = new Date().getHours();
-  const g = h < 12 ? 'Bună dimineața' : h < 18 ? 'Bună ziua' : 'Bună seara';
+  const g = t(h < 12 ? 'Bună dimineața' : h < 18 ? 'Bună ziua' : 'Bună seara');
   return settings.userName ? `${g}, ${settings.userName}.` : `${g}.`;
 }
 
 function renderToday() {
   if (!td) return;
   const day = td.day;
-  $('#tdDate').textContent = new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' });
+  $('#tdDate').textContent = new Date().toLocaleDateString(I18N.locale, { weekday: 'long', day: 'numeric', month: 'long' });
   $('#tdHello').textContent = greetingLine();
   if (document.activeElement !== $('#tdIntention')) $('#tdIntention').value = day.intention;
   if (document.activeElement !== $('#tdGratitude')) $('#tdGratitude').value = day.gratitude;
@@ -761,9 +885,9 @@ function renderToday() {
       onclick: async () => { td = await api.today.toggleHabit(hb.id, td.weekKeys[i]); renderToday(); }
     }))),
     el('span', { className: 'meta' }, [
-      hb.streak > 1 ? `${hb.streak} zile` : '',
+      hb.streak > 1 ? t('{n} zile', { n: hb.streak }) : '',
       el('button', { className: 'del', textContent: '×', title: 'Șterge ritualul', onclick: async () => {
-        if (!await askConfirm(`Ștergi ritualul „${hb.name}”?`)) return;
+        if (!await askConfirm(t('Ștergi ritualul „{name}”?', { name: hb.name }))) return;
         td = await api.today.removeHabit(hb.id);
         renderToday();
       } })
@@ -773,10 +897,10 @@ function renderToday() {
   // apă
   $('#tdWater').replaceChildren(...[...Array(8)].map((_, i) => el('button', {
     className: i < day.water ? 'on' : '',
-    title: `${i + 1} ${i ? 'pahare' : 'pahar'}`,
+    title: t(i ? '{n} pahare' : '{n} pahar', { n: i + 1 }),
     onclick: () => saveToday({ water: day.water === i + 1 ? i : i + 1 }, true)
   })));
-  $('#tdWaterText').textContent = `${day.water}/8 pahare`;
+  $('#tdWaterText').textContent = t('{n}/8 pahare', { n: day.water });
 
   // stare
   $('#tdMoods').replaceChildren(...MOODS.map(([k, label]) => el('button', {
@@ -821,8 +945,8 @@ function renderGoals(v) {
       ? [el('button', { className: 'check-round', title: 'Bifează pasul', onclick: async e => {
           e.stopPropagation();
           renderGoals((await api.goals.toggleStep(g.id, next.id)).view);
-        } }), `Următorul pas: ${next.text}`]
-      : [g.stats.perMonth ? `Ritm necesar: ${new Intl.NumberFormat('ro-RO').format(g.stats.perMonth)}${g.unit ? ' ' + g.unit : ''}/lună` : g.areaLabel || 'Adaugă un prim pas'];
+        } }), t('Următorul pas: {s}', { s: next.text })]
+      : [g.stats.perMonth ? t('Ritm necesar: {v}/lună', { v: new Intl.NumberFormat(I18N.locale).format(g.stats.perMonth) + (g.unit ? ' ' + g.unit : '') }) : g.areaLabel || t('Adaugă un prim pas')];
     return el('div', { className: 'gm', title: 'Deschide obiectivele', onclick: open }, [
       el('b', { textContent: g.title }),
       el('span', { className: 'pct', textContent: g.stats.pct + '%' }),
@@ -830,11 +954,11 @@ function renderGoals(v) {
       el('div', { className: 'sub' }, sub)
     ]);
   });
-  const done = v.summary.done ? ` · ${v.summary.done} atinse` : '';
+  const done = v.summary.done ? ' · ' + t('{n} atinse', { n: v.summary.done }) : '';
   box.replaceChildren(
-    ...(rows.length ? rows : [el('div', { className: 'goals-empty', textContent: v.goals.length ? `Toate obiectivele sunt atinse${done}. Timpul pentru un vis nou.` : 'Transformă vision board-ul în planuri: fonduri, cărți, călătorii, cu progres și termene.' })]),
+    ...(rows.length ? rows : [el('div', { className: 'goals-empty', textContent: v.goals.length ? t('Toate obiectivele sunt atinse{done}. Timpul pentru un vis nou.', { done }) : t('Transformă vision board-ul în planuri: fonduri, cărți, călătorii, cu progres și termene.') })]),
     el('div', { className: 'goals-actions' }, [
-      el('button', { className: 'btn small', textContent: v.goals.length ? `Toate obiectivele${done}` : 'Primul obiectiv', onclick: () => { api.goals.open(v.goals.length ? {} : { new: true }); api.panel.hide(); } }),
+      el('button', { className: 'btn small', textContent: v.goals.length ? t('Toate obiectivele') + done : t('Primul obiectiv'), onclick: () => { api.goals.open(v.goals.length ? {} : { new: true }); api.panel.hide(); } }),
       v.goals.length ? el('button', { className: 'btn small ghost', textContent: '+ Obiectiv', onclick: () => { api.goals.open({ new: true }); api.panel.hide(); } }) : null
     ])
   );
@@ -847,8 +971,8 @@ function renderEvening() {
   const ev = td?.day?.evening;
   $('#openEvening').classList.toggle('done', !!ev);
   $('#eveningStatus').textContent = ev
-    ? `Jurnalul de azi e scris${ev.rating ? ' · ' + '★'.repeat(ev.rating) : ''}. Planul de mâine te așteaptă.`
-    : `Ce a mers bine, ce ai învățat, recunoștință și planul de mâine${settings.eveningTime ? ` · la ${settings.eveningTime}` : ''}`;
+    ? t('Jurnalul de azi e scris{stars}. Planul de mâine te așteaptă.', { stars: ev.rating ? ' · ' + '★'.repeat(ev.rating) : '' })
+    : t('Ce a mers bine, ce ai învățat, recunoștință și planul de mâine') + (settings.eveningTime ? ' · ' + t('la {time}', { time: settings.eveningTime }) : '');
 }
 $('#openEvening').addEventListener('click', () => { api.evening.open(); api.panel.hide(); });
 api.today.onChange(state => { td = state; renderToday(); });
@@ -862,8 +986,8 @@ async function loadMonth() {
     el('div', { className: 'stat' }, [el('b', { textContent: d.avg }), el('span', { textContent: 'Medie/zi' })]),
     el('div', { className: 'wide', textContent: [
       d.month,
-      d.best ? `cea mai bună zi: ${d.best.label} (${d.best.focus})` : '',
-      d.prioritiesTotal ? `priorități ${d.prioritiesDone}/${d.prioritiesTotal}` : '',
+      d.best ? t('cea mai bună zi: {label} ({focus})', d.best) : '',
+      d.prioritiesTotal ? t('priorități {d}/{t}', { d: d.prioritiesDone, t: d.prioritiesTotal }) : '',
       d.pomodoros ? `${d.pomodoros} pomodoro` : ''
     ].filter(Boolean).join(' · ') })
   );
@@ -1098,7 +1222,9 @@ function renderSettings() {
   $('#sBaseUrl').value = settings.aiBaseUrl || '';
   $('#baseUrlRow').classList.toggle('hidden', settings.aiProvider !== 'custom');
   $('#sApiKeyStatus').textContent = settings.hasApiKey ? 'Cheie salvată · criptată' : 'Nicio cheie salvată';
-  $('#sSystemPrompt').value = settings.aiSystemPrompt;
+  if (document.activeElement !== $('#sSystemPrompt')) $('#sSystemPrompt').value = settings.aiSystemPrompt || settings.aiSystemPromptDefault || '';
+  $('#sUiLang').value = settings.uiLang || 'en';
+  if (document.activeElement !== $('#sMailSignature')) $('#sMailSignature').value = settings.mailSignature || '';
   $('#sMaxTokens').value = settings.aiMaxTokens;
   $('#sName').value = settings.buddyName;
   if (document.activeElement !== $('#sUserName')) $('#sUserName').value = settings.userName || '';
@@ -1118,7 +1244,7 @@ function renderSettings() {
   $('#sBriefVoice').checked = settings.briefVoice;
   $('#sMantraStart').checked = settings.mantraOnStart;
   $('#sEvening').checked = settings.eveningRitual;
-  const ql = settings.quoteLangs || ['ro'];
+  const ql = settings.quoteLangsResolved || settings.quoteLangs || ['en'];
   for (const b of $('#sQuoteLangs').children) b.classList.toggle('on', ql.includes(b.dataset.v));
   if (document.activeElement !== $('#sEveningTime')) $('#sEveningTime').value = settings.eveningTime || '21:00';
   $('#sHair').value = settings.buddyHair || 'coc';
@@ -1137,7 +1263,7 @@ function renderSettings() {
   $('#sMantraSec').value = settings.mantraSeconds || 30;
   if (document.activeElement !== $('#sHotkey')) $('#sHotkey').value = settings.quickHotkey || '';
   $('#sHotkeyStatus').textContent = settings.hotkeyActive
-    ? `Activă: ${settings.hotkeyLabel}`
+    ? t('Activă: {k}', { k: settings.hotkeyLabel })
     : 'Inactivă (scurtătura e folosită de alt program sau nu e validă)';
   $('#sTrackApps').checked = settings.timerTrackApps;
   $('#sMailAddress').value = settings.mailAddress || '';
@@ -1175,7 +1301,12 @@ $('#sModelSelect').addEventListener('change', e => {
 });
 $('#sModel').addEventListener('change', e => update({ aiModel: e.target.value.trim() }));
 $('#sBaseUrl').addEventListener('change', e => update({ aiBaseUrl: e.target.value.trim() }));
-$('#sSystemPrompt').addEventListener('change', e => update({ aiSystemPrompt: e.target.value }));
+$('#sSystemPrompt').addEventListener('change', e => {
+  const v = e.target.value.trim();
+  update({ aiSystemPrompt: !v || v === (settings.aiSystemPromptDefault || '').trim() ? '' : e.target.value });
+});
+$('#sUiLang').addEventListener('change', e => update({ uiLang: e.target.value }));
+$('#sMailSignature').addEventListener('change', e => update({ mailSignature: e.target.value }));
 $('#sMaxTokens').addEventListener('change', e => update({ aiMaxTokens: Number(e.target.value) || 1024 }));
 
 $('#sApiKeyToggle').addEventListener('click', () => {
@@ -1236,7 +1367,7 @@ $('#sMantraStart').addEventListener('change', e => update({ mantraOnStart: e.tar
 $('#sQuoteLangs').addEventListener('click', async e => {
   const b = e.target.closest('button');
   if (!b) return;
-  const cur = new Set(settings.quoteLangs || ['ro']);
+  const cur = new Set(settings.quoteLangsResolved || settings.quoteLangs || ['en']);
   cur.has(b.dataset.v) ? cur.delete(b.dataset.v) : cur.add(b.dataset.v);
   if (!cur.size) return toast('Alege cel puțin o limbă');
   const order = ['ro', 'en', 'fr', 'es', 'it', 'de'];

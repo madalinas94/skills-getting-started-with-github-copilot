@@ -12,7 +12,7 @@ function h(tag, attrs = {}, children = []) {
   return n;
 }
 
-const cap = t => (t ? t[0].toUpperCase() + t.slice(1) : t);
+const cap = s => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
 function header(d, title) {
   return h('div', { class: 'head' }, [
@@ -47,7 +47,7 @@ function renderDay(d) {
     h('div', { class: 'list' }, d.habits.slice(0, 5).map(x => h('div', { class: 'row' }, [
       h('span', { class: 'chk' + (x.done ? ' on' : '') }),
       h('span', { text: x.name }),
-      x.streak > 1 ? h('span', { class: 'streak', text: `${x.streak} zile` }) : null
+      x.streak > 1 ? h('span', { class: 'streak', text: t('{n} zile', { n: x.streak }) }) : null
     ])))
   ]);
   const extra = h('div', { class: 'cols' }, [
@@ -73,7 +73,7 @@ function renderDay(d) {
     h('div', { class: 'rule' }),
     h('div', { class: 'cols' }, [left, right]),
     extra,
-    d.gratitude ? h('div', { class: 'grat', text: `Recunoscătoare pentru: ${d.gratitude}` }) : null,
+    d.gratitude ? h('div', { class: 'grat', text: t('Recunoscătoare pentru: {g}', { g: d.gratitude }) }) : null,
     quote(d),
     foot(d)
   );
@@ -93,7 +93,7 @@ function renderWeek(d) {
       ring,
       h('div', {}, [
         h('div', { class: 'big', text: d.focus }),
-        h('div', { class: 'big-label', text: d.goal ? `de focus · obiectiv ${d.goal}h` : 'de focus' })
+        h('div', { class: 'big-label', text: d.goal ? t('de focus · obiectiv {h}h', { h: d.goal }) : t('de focus') })
       ])
     ]),
     h('div', { class: 'bars' }, d.days.map(x => h('div', { class: 'bar' + (x.today ? ' today' : '') }, [
@@ -128,7 +128,7 @@ function renderMonth(d) {
   const card = document.getElementById('card');
   const max = Math.max(4 * 3600, ...d.days.map(x => x.sec));
   const cal = h('div', { class: 'mcal' }, [
-    ...['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(l => h('span', { class: 'mh', text: l })),
+    ...(I18N.lang === 'en' ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['L', 'M', 'M', 'J', 'V', 'S', 'D']).map(l => h('span', { class: 'mh', text: l })),
     ...[...Array(d.firstWeekday)].map(() => h('i', { class: 'blank' })),
     ...d.days.map(x => {
       const c = h('i', { class: (x.future ? 'future' : '') + (x.today ? ' today' : ''), text: x.day });
@@ -142,7 +142,7 @@ function renderMonth(d) {
     h('div', { class: 'stats' }, [
       h('div', {}, [h('div', { class: 'big', text: d.focus }), h('div', { class: 'big-label', text: 'de focus' })]),
       h('div', { class: 'mini' }, [
-        h('div', {}, [h('b', { text: d.daysWorked }), `zile lucrate din ${d.daysElapsed}`]),
+        h('div', {}, [h('b', { text: d.daysWorked }), t('zile lucrate din {n}', { n: d.daysElapsed })]),
         h('div', {}, [h('b', { text: d.avg }), 'în medie pe zi']),
         h('div', {}, [h('b', { text: d.pomodoros }), 'pomodoro'])
       ])
@@ -162,9 +162,9 @@ function renderMonth(d) {
         h('h3', { text: 'Repere' }),
         h('div', { class: 'list small' }, [
           d.best ? h('div', {}, [h('b', { text: 'Cea mai bună zi: ' }), `${d.best.label}, ${d.best.focus}`]) : null,
-          d.prioritiesTotal ? h('div', {}, [h('b', { text: 'Priorități: ' }), `${d.prioritiesDone}/${d.prioritiesTotal} bifate`]) : null,
+          d.prioritiesTotal ? h('div', {}, [h('b', { text: 'Priorități: ' }), t('{d}/{n} bifate', { d: d.prioritiesDone, n: d.prioritiesTotal })]) : null,
           d.topApps.length ? h('div', {}, [h('b', { text: 'Top: ' }), d.topApps.join(', ')]) : null,
-          d.water ? h('div', {}, [h('b', { text: 'Apă: ' }), `${d.water} pahare/zi`]) : null
+          d.water ? h('div', {}, [h('b', { text: 'Apă: ' }), t('{n} pahare/zi', { n: d.water })]) : null
         ])
       ]),
       h('div', { class: 'section' }, [
@@ -185,7 +185,7 @@ function renderMantra(d) {
   card.replaceChildren(
     h('div', { class: 'mantra' }, [
       h('img', { class: 'medal', src: '../assets/icon.svg' }),
-      h('div', { class: 'kicker', text: `${m.kicker || 'Mantra zilei'} · ${d.date}` }),
+      h('div', { class: 'kicker', text: `${m.kicker || t('Mantra zilei')} · ${d.date}` }),
       h('div', { class: 'mlabel', text: m.label }),
       m.title ? h('div', { class: 'mtitle', text: m.title }) : null,
       h('div', { class: 'mtext', text }),
@@ -213,6 +213,7 @@ function fit() {
 }
 
 function render(d) {
+  I18N.setLang(d.lang);
   document.body.className = d.format === 'story' ? 'story' : '';
   if (d.kind === 'week') renderWeek(d);
   else if (d.kind === 'month') renderMonth(d);

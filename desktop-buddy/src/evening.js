@@ -7,6 +7,7 @@ const sessions = require('./sessions');
 const goals = require('./goals');
 const ai = require('./ai');
 const { byId } = require('./lifeareas');
+const { t, locale, plural } = require('./i18n');
 
 const settings = () => store.get().settings;
 
@@ -74,7 +75,7 @@ function context() {
   const plannedTomorrow = tomorrow.top3.filter(t => t.text).map(t => t.text);
   return {
     date: k,
-    dateLabel: new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' }),
+    dateLabel: new Date().toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' }),
     name: settings().userName || '',
     buddyName: settings().buddyName,
     stats: {
@@ -105,14 +106,14 @@ function templateNote(e, c) {
   const name = c.name ? `, ${c.name}` : '';
   const parts = [];
   const win = e.wins.split('\n').map(l => l.replace(/^[\s•*-]+/, '').trim()).find(Boolean);
-  if (win) parts.push(`Ai avut o zi cu merite reale: „${clip(win, 90)}”. Păstrează sentimentul acesta.`);
-  else if (c.stats.focus.sec >= 3600) parts.push(`${sessions.fmt(c.stats.focus.sec)} de focus azi. Asta e disciplină, nu noroc.`);
-  else parts.push('Nu toate zilele sunt spectaculoase; contează că ai rămas pe drum.');
-  if (e.learned) parts.push('Ce ai învățat azi e o investiție cu dobândă compusă.');
+  if (win) parts.push(t('Ai avut o zi cu merite reale: „{w}”. Păstrează sentimentul acesta.', { w: clip(win, 90) }));
+  else if (c.stats.focus.sec >= 3600) parts.push(t('{d} de focus azi. Asta e disciplină, nu noroc.', { d: sessions.fmt(c.stats.focus.sec) }));
+  else parts.push(t('Nu toate zilele sunt spectaculoase; contează că ai rămas pe drum.'));
+  if (e.learned) parts.push(t('Ce ai învățat azi e o investiție cu dobândă compusă.'));
   const first = e.tomorrowTop3.find(Boolean);
-  if (first) parts.push(`Mâine începem cu „${first}”. Primele două ore sunt ale lui.`);
-  parts.push(e.prayed ? 'Ai încheiat ziua cu rugăciune; dormi liniștită, ești în mâini bune.' : 'Lasă ziua să plece. Mâine e o pagină nouă.');
-  return `Noapte bună${name}. ${parts.join(' ')}`;
+  if (first) parts.push(t('Mâine începem cu „{f}”. Primele două ore sunt ale lui.', { f: first }));
+  parts.push(t(e.prayed ? 'Ai încheiat ziua cu rugăciune; dormi liniștită, ești în mâini bune.' : 'Lasă ziua să plece. Mâine e o pagină nouă.'));
+  return `${t('Noapte bună')}${name}. ${parts.join(' ')}`;
 }
 
 function aiPrompt(e, c) {
@@ -176,7 +177,7 @@ function history(limit = 30) {
     .slice(0, limit)
     .map(k => ({
       date: k,
-      label: new Date(k + 'T12:00:00').toLocaleDateString('ro-RO', { weekday: 'short', day: 'numeric', month: 'short' }),
+      label: new Date(k + 'T12:00:00').toLocaleDateString(locale(), { weekday: 'short', day: 'numeric', month: 'short' }),
       ...days[k].evening
     }));
 }

@@ -429,7 +429,8 @@ function dayIndex(k) {
 }
 
 function chosen() {
-  const l = (store.get().settings.quoteLangs || ['ro']).filter(x => LANGS.includes(x));
+  const s = store.get().settings;
+  const l = (s.quoteLangs || [s.uiLang || 'en']).filter(x => LANGS.includes(x));
   return l.length ? l : ['ro'];
 }
 

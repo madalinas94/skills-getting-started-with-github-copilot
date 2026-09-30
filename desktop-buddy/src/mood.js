@@ -92,9 +92,97 @@ const LINES = {
   ]
 };
 
+// Aceleași replici, în engleză (limba interfeței).
+const LINES_EN = {
+  welcome: [
+    'Welcome back. What are we conquering today?',
+    'I’m here. Tell me what’s on the agenda.',
+    'I like it when you come back. Let’s make today memorable.'
+  ],
+  sessionStart: [
+    'Focus mode. I’ll let you shine.',
+    'Perfect. Phone away, goal in front.',
+    'Here we go. Elegant, focused, no excuses.'
+  ],
+  hour: [
+    'One hour of focus. Impressive. Stand up, drink some water, come back.',
+    'Another hour done. Shoulders down, back straight, let’s keep going.',
+    'Your pace is enviable. Five minutes of rest and we’re back.'
+  ],
+  sessionEndLong: [
+    'Session done: {dur}. Now that’s discipline.',
+    '{dur} of serious work. I’m proud of you.',
+    'Done, {dur}. This is how big things get built.'
+  ],
+  sessionEndShort: [
+    'Short session ({dur}). Small steps count too.',
+    'Short session ({dur}). A start. Next time we go further.'
+  ],
+  wake: [
+    'Ah, you’re back. Let’s finish what we started.',
+    'That break was well deserved. Now, back to work.',
+    'I was waiting for you. Shall we continue?'
+  ],
+  breakStart: [
+    'Round {n} done. {min} minutes of rest: stand up, breathe, drink water.',
+    'Excellent. A {min}-minute break, no phone if you can.',
+    'Focus done. Now {min} minutes just for you.'
+  ],
+  longBreak: [
+    'Four rounds! You deserve a long {min}-minute break. A proper coffee?',
+    'Impressive. {min} minutes of long break. Take a little walk.'
+  ],
+  focusBack: [
+    'Break’s over. {min} more minutes of focus, elegant and sharp.',
+    'Back to work. The next {min} minutes belong to your goal.'
+  ],
+  top3Done: [
+    'All three priorities done. A textbook day.',
+    'Top 3 complete. The rest of the day is a bonus. I’m proud of you.'
+  ],
+  waterDone: [
+    'Eight glasses. Hydrated and glowing.',
+    'Water goal reached. Your skin thanks you.'
+  ],
+  streak: [
+    '{n} days in a row: “{name}”. That’s how a lifestyle is built.',
+    'The streak goes on: {n} days of “{name}”. Don’t break it.'
+  ],
+  goalMilestone: [
+    '{pct}% of “{title}”. See? The plan works.',
+    'You’re past {pct}% on “{title}”. Same pace, elegant and steady.'
+  ],
+  goalDone: [
+    '“{title}”: achieved. Brava! Celebrate it, then on to the next dream.',
+    'Goal reached: “{title}”. I knew you could.'
+  ],
+  goalStep: [
+    'One step closer to “{title}”. That’s how it’s built.',
+    'Step ticked on “{title}”. Small today, big a year from now.'
+  ],
+  eveningInvite: [
+    'It’s evening. Five minutes for your journal: what went well, what you learned and tomorrow’s plan?',
+    'Let’s close the day beautifully. I’ll be waiting in your evening journal.',
+    'Before bed: gratitude, a prayer and a Top 3 for tomorrow. Shall I open the journal?'
+  ],
+  spontaneous: [
+    'Monet said he painted the way a bird sings. Are you working that naturally today?',
+    'Compound interest is the eighth wonder of the world. It works for habits too.',
+    'Seneca: “It is not because things are difficult that we do not dare; it is because we do not dare that they are difficult.”',
+    'A good portfolio is like a good wardrobe: a few solid pieces, nothing impulsive.',
+    'Have you had water in the last hour? Elegance starts with hydration.',
+    'Markets reward patience. So do your projects.',
+    'Florence, the Louvre, the Prado… What’s the next destination on your list?',
+    'Is today’s number one priority still number one?',
+    'A postponed email is a postponed decision. Shall we take a look at the inbox?',
+    'Posture, please. An elegant woman sits up straight, and so does a productive one.'
+  ]
+};
+
 let lastPick = {};
 function line(kind, vars = {}) {
-  const list = LINES[kind] || [''];
+  const en = require('./i18n').lang() === 'en';
+  const list = (en ? LINES_EN[kind] : null) || LINES[kind] || [''];
   let i = Math.floor(Math.random() * list.length);
   if (list.length > 1 && i === lastPick[kind]) i = (i + 1) % list.length;
   lastPick[kind] = i;

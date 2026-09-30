@@ -4,24 +4,25 @@ let data = null;
 let editing = null; // id-ul obiectivului editat, sau null pentru unul nou
 let form = { type: 'money', area: '' };
 
-const fmtNum = n => new Intl.NumberFormat('ro-RO', { maximumFractionDigits: 0 }).format(Math.round(Number(n) || 0));
+const fmtNum = n => new Intl.NumberFormat(I18N.locale, { maximumFractionDigits: 0 }).format(Math.round(Number(n) || 0));
 const fmt = (n, unit) => `${fmtNum(n)}${unit ? ' ' + unit : ''}`;
 const monthLabel = ym => {
   if (!ym) return '';
   const [y, m] = ym.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' });
+  return new Date(y, m - 1, 1).toLocaleDateString(I18N.locale, { month: 'long', year: 'numeric' });
 };
 const plusYears = (n, month = new Date().getMonth()) => `${new Date().getFullYear() + n}-${String(month + 1).padStart(2, '0')}`;
 
+// titlurile și unitățile ajung în câmpuri de formular, deci le traducem aici
 const TEMPLATES = [
-  { title: 'Fondul de libertate financiară', area: 'bani', type: 'money', target: 750000, unit: '€', deadline: () => plusYears(15) },
-  { title: 'Fond de siguranță (6 luni)', area: 'bani', type: 'money', target: 15000, unit: '€', deadline: () => plusYears(1) },
-  { title: 'Avans pentru casa mea', area: 'casa', type: 'money', target: 40000, unit: '€', deadline: () => plusYears(3) },
-  { title: 'Mașina visurilor', area: 'masina', type: 'money', target: 45000, unit: '€', deadline: () => plusYears(2) },
-  { title: 'Fondul de călătorii', area: 'calatorii', type: 'money', target: 6000, unit: '€', deadline: () => plusYears(1) },
-  { title: '24 de cărți anul acesta', area: 'carti', type: 'count', target: 24, unit: 'cărți', deadline: () => plusYears(0, 11) },
-  { title: '150 de antrenamente', area: 'fit', type: 'count', target: 150, unit: 'antrenamente', deadline: () => plusYears(0, 11) },
-  { title: 'Vacanță cu toată familia', area: 'familie', type: 'milestone', deadline: () => plusYears(1) }
+  { title: t('Fondul de libertate financiară'), area: 'bani', type: 'money', target: 750000, unit: '€', deadline: () => plusYears(15) },
+  { title: t('Fond de siguranță (6 luni)'), area: 'bani', type: 'money', target: 15000, unit: '€', deadline: () => plusYears(1) },
+  { title: t('Avans pentru casa mea'), area: 'casa', type: 'money', target: 40000, unit: '€', deadline: () => plusYears(3) },
+  { title: t('Mașina visurilor'), area: 'masina', type: 'money', target: 45000, unit: '€', deadline: () => plusYears(2) },
+  { title: t('Fondul de călătorii'), area: 'calatorii', type: 'money', target: 6000, unit: '€', deadline: () => plusYears(1) },
+  { title: t('24 de cărți anul acesta'), area: 'carti', type: 'count', target: 24, unit: t('cărți'), deadline: () => plusYears(0, 11) },
+  { title: t('150 de antrenamente'), area: 'fit', type: 'count', target: 150, unit: t('antrenamente'), deadline: () => plusYears(0, 11) },
+  { title: t('Vacanță cu toată familia'), area: 'familie', type: 'milestone', deadline: () => plusYears(1) }
 ];
 
 function svgUse(id, cls) {
@@ -70,19 +71,19 @@ function paceLine(g) {
   }
   const parts = [];
   if (g.deadline) {
-    if (s.overdue) parts.push(el('span', { className: 'warn', textContent: `Termenul (${monthLabel(g.deadline)}) a trecut. ` }));
-    else parts.push(`Termen: ${monthLabel(g.deadline)}, încă ${s.monthsLeft} ${s.monthsLeft === 1 ? 'lună' : 'luni'}. `);
+    if (s.overdue) parts.push(el('span', { className: 'warn', textContent: t('Termenul ({d}) a trecut.', { d: monthLabel(g.deadline) }) + ' ' }));
+    else parts.push(t(s.monthsLeft === 1 ? 'Termen: {d}, încă o lună.' : 'Termen: {d}, încă {n} luni.', { d: monthLabel(g.deadline), n: s.monthsLeft }) + ' ');
   }
-  if (s.perMonth && !s.overdue) parts.push('Ritm necesar: ', el('b', { textContent: `${fmt(s.perMonth, g.unit)}/lună` }), '. ');
+  if (s.perMonth && !s.overdue) parts.push(t('Ritm necesar:') + ' ', el('b', { textContent: t('{v}/lună', { v: fmt(s.perMonth, g.unit) }) }), '. ');
   if (g.type === 'money') {
     if (s.eta) {
-      parts.push(`În ritmul ultimelor 3 luni (${fmt(s.monthlyPace, g.unit)}/lună) ajungi în ${monthLabel(s.eta)}`);
+      parts.push(t('În ritmul ultimelor 3 luni ({v}/lună) ajungi în {d}', { v: fmt(s.monthlyPace, g.unit), d: monthLabel(s.eta) }));
       if (s.onTrack === true) parts.push(el('span', { className: 'ok', textContent: ' ✓ la timp' }));
       else if (s.onTrack === false) parts.push(el('span', { className: 'warn', textContent: ' – mărește puțin contribuția' }));
       parts.push('.');
     } else if (s.remaining > 0) parts.push('Adaugă prima contribuție și îți calculez data la care ajungi.');
   }
-  if (g.type === 'milestone' && g.steps.length) parts.push(`${g.steps.filter(x => x.done).length} din ${g.steps.length} pași făcuți.`);
+  if (g.type === 'milestone' && g.steps.length) parts.push(t('{d} din {n} pași făcuți.', { d: g.steps.filter(x => x.done).length, n: g.steps.length }));
   if (!parts.length) parts.push('Împarte-l în pași mici; bifează-i pe rând.');
   box.append(...parts);
   return box;
@@ -95,7 +96,7 @@ function contribution(g) {
     ]);
   }
   const quick = g.type === 'money' ? [50, 100, 250, 500] : [1, 5];
-  const input = el('input', { type: 'number', step: 'any', placeholder: g.type === 'money' ? `Contribuție (${g.unit || '€'})` : `Progres (+ ${g.unit || 'unități'})` });
+  const input = el('input', { type: 'number', step: 'any', placeholder: g.type === 'money' ? t('Contribuție ({u})', { u: g.unit || '€' }) : t('Progres (+ {u})', { u: g.unit || t('unități') }) });
   const add = async v => {
     const n = Number(v);
     if (!n) return;
@@ -124,7 +125,7 @@ function steps(g) {
       const cb = el('input', { type: 'checkbox', checked: s.done, onchange: async () => handle(await api.goals.toggleStep(g.id, s.id), g.id) });
       return el('label', { className: 'step' + (s.done ? ' done' : '') }, [
         cb, el('span', { textContent: s.text }),
-        el('button', { title: 'Șterge pasul', textContent: '×', onclick: async e => { e.preventDefault(); set((await api.goals.removeStep(g.id, s.id)).view); } })
+        el('button', { title: t('Șterge pasul'), textContent: '×', onclick: async e => { e.preventDefault(); set((await api.goals.removeStep(g.id, s.id)).view); } })
       ]);
     }),
     el('div', { className: 'step-add' }, [addInput])
@@ -132,7 +133,7 @@ function steps(g) {
 }
 
 function card(g) {
-  const del = el('button', { title: 'Șterge obiectivul' }, [icon('trash')]);
+  const del = el('button', { title: t('Șterge obiectivul') }, [icon('trash')]);
   del.addEventListener('click', async () => {
     if (!del.classList.contains('confirm')) {
       del.classList.add('confirm');
@@ -144,12 +145,12 @@ function card(g) {
   });
   const amount = g.type === 'milestone'
     ? null
-    : el('div', { className: 'g-amount' }, [fmt(g.current, g.unit), el('small', { textContent: ` din ${fmt(g.target, g.unit)}` })]);
+    : el('div', { className: 'g-amount' }, [fmt(g.current, g.unit), el('small', { textContent: ' ' + t('din {v}', { v: fmt(g.target, g.unit) }) })]);
   return el('article', { className: 'goal' + (g.stats.pct >= 100 ? ' done' : '') }, [
     el('div', { className: 'g-head' }, [
       ring(g),
-      el('div', { className: 'g-title' }, [el('b', { textContent: g.title }), el('span', { textContent: [g.areaLabel, g.type === 'money' ? 'fond' : ''].filter(Boolean).join(' · ') })]),
-      el('div', { className: 'g-ops' }, [el('button', { title: 'Editează', onclick: () => openForm(g) }, [icon('edit')]), del])
+      el('div', { className: 'g-title' }, [el('b', { textContent: g.title }), el('span', { textContent: [g.areaLabel, g.type === 'money' ? t('fond') : ''].filter(Boolean).join(' · ') })]),
+      el('div', { className: 'g-ops' }, [el('button', { title: t('Editează'), onclick: () => openForm(g) }, [icon('edit')]), del])
     ]),
     amount,
     paceLine(g),
@@ -202,11 +203,11 @@ function handle(r, id, amount) {
   if (r.milestone) {
     confetti();
     c?.classList.add('pulse');
-    toast(r.milestone >= 100 ? `„${r.goal.title}” e atins. Brava!` : `${r.milestone}% din „${r.goal.title}”. Continuă așa.`, 4000);
+    toast(r.milestone >= 100 ? t('„{title}” e atins. Brava!', { title: r.goal.title }) : t('{pct}% din „{title}”. Continuă așa.', { pct: r.milestone, title: r.goal.title }), 4000);
   } else if (r.stepDone) {
     toast('Pas bifat. Încă unul mai aproape.');
   } else if (amount) {
-    toast(amount > 0 ? `+${fmt(amount, r.goal?.unit)} adăugat` : 'Corecție salvată');
+    toast(amount > 0 ? t('+{v} adăugat', { v: fmt(amount, r.goal?.unit) }) : t('Corecție salvată'));
   }
 }
 
@@ -235,7 +236,7 @@ function syncForm() {
 
 function openForm(g) {
   editing = g?.id || null;
-  $('#formTitle').textContent = editing ? 'Editează obiectivul' : 'Obiectiv nou';
+  $('#formTitle').textContent = t(editing ? 'Editează obiectivul' : 'Obiectiv nou');
   $('#templates').classList.toggle('hidden', !!editing);
   fillForm(g || { type: 'money', area: '' });
   $('#modal').classList.remove('hidden');

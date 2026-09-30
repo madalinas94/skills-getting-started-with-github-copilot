@@ -21,7 +21,7 @@ function applyStyle() {
 function applyText() {
   if (document.activeElement !== $('#title')) $('#title').value = note.title;
   if (document.activeElement !== $('#body')) $('#body').value = note.body;
-  $('#date').textContent = new Date(note.updatedAt || Date.now()).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' });
+  $('#date').textContent = new Date(note.updatedAt || Date.now()).toLocaleDateString(I18N.locale, { day: 'numeric', month: 'short' });
   document.title = note.title || 'Notiță';
 }
 

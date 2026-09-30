@@ -26,7 +26,7 @@ function render() {
     const now = Date.now() + offset;
     const left = p.phaseEndsAt ? Math.max(0, p.phaseEndsAt - now) : (p.remainingMs ?? 0);
     const m = Math.floor(left / 60000), sec = Math.floor((left % 60000) / 1000);
-    $('#title').textContent = p.phase === 'focus' ? `Focus · runda ${p.count + 1} · ${state.title}` : `Pauză · ${state.title}`;
+    $('#title').textContent = p.phase === 'focus' ? t('Focus · runda {n} · {title}', { n: p.count + 1, title: state.title }) : t('Pauză · {title}', { title: state.title });
     $('#time').textContent = `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
     $('#pill').classList.toggle('break', p.phase === 'break');
   } else {

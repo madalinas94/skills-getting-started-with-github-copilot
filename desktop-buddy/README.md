@@ -230,6 +230,32 @@ butonul „Scanează acum”. Click pe notificare deschide direct Inbox-ul.
 Parola se păstrează criptat. Emailurile sunt ținute doar în memorie. Pentru rezumate, textul
 emailurilor e trimis providerului AI ales în Setări (în modul Demo nu pleacă nicăieri).
 
+### Email din notițe
+
+În editorul unei notițe, jos, sunt două butoane:
+- **Trimite email** (Send email): pleacă direct. Subiectul e titlul notiței (sau primul rând), iar
+  destinatarul îl alegi scriind la începutul notiței un rând `Către: ana@exemplu.com`
+  (merge și `To:`). Dacă notița nu are destinatar, se deschide previzualizarea ca să-l scrii.
+- **Previzualizează** (Preview): fereastra de email, cu Către (cu sugestii din destinatarii recenți),
+  Cc, Subiect și Mesaj, toate editabile. **Mady îl face elegant** rescrie notița ca email profesionist
+  (cu modelul AI; în modul demo adaugă salutul și încheierea). **Ctrl+Enter** trimite.
+
+Înainte de plecare ai **5 secunde pentru „Anulează”** (Undo), ca în Gmail. Emailul pleacă prin Gmail
+(`smtp.gmail.com`, port 465) de pe adresa ta, cu aceeași parolă de aplicație ca inboxul, în format text
+și HTML, cu **semnătura** din Setări → Inbox (opțional). Notița ține minte cui a fost trimisă și când
+(„✉ Trimis către …”), iar în listă primește un plic.
+
+## Limba aplicației
+
+Setări → Aspect → **Limba aplicației: English / Română**. Engleza e limba principală: meniurile,
+butoanele, notificările, meniul din tray, replicile lui Mady, briefingul, jurnalul de seară și
+răspunsurile AI urmează limba aleasă; ferestrele se reîncarcă imediat în noua limbă. Personalitatea
+implicită a lui Mady are și ea variantă în engleză (dacă ai scris una proprie, rămâne a ta).
+Citatele și mantra au limba lor (Setări → Mady → Limba citatelor); implicit urmează limba aplicației.
+
+Traducerile stau în `renderer/i18n-en.js` (textul românesc este cheia). Paginile se traduc automat
+la afișare (`renderer/i18n.js`), iar textele construite în cod trec prin `t('…', { variabile })`.
+
 ## Timer: cum se detectează aplicațiile
 
 Pe Windows, în timpul unei sesiuni, aplicația citește la 5 secunde numele programului din
@@ -266,6 +292,9 @@ desktop-buddy/
 ├── src/sessions.js    # sesiuni, reminder orar, rapoarte, istoric 30 zile
 ├── src/activity.js    # detectarea aplicației din prim-plan
 ├── src/mail.js        # citire inbox prin IMAP + prompturi pentru rezumat/brief
+├── src/sendmail.js    # trimiterea emailurilor din notițe (SMTP Gmail)
+├── src/i18n.js        # limba interfeței în procesul principal
+├── renderer/i18n*.js  # traducerea interfeței (dicționarul română → engleză)
 ├── src/mailscan.js    # scanarea automată orară + notificarea
 ├── src/mood.js        # stările lui Mady și replicile ei
 ├── src/briefing.js    # briefingul de dimineață

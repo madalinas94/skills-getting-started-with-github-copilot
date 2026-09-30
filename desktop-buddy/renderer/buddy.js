@@ -52,8 +52,9 @@ function toast(text, ms = 1600) {
 
 window.buddy.clipboard.onUpdate(() => toast('Salvat'));
 
-window.buddy.settings.get().then(s => { el.title = `${s.buddyName} — click pentru meniu, trage ca să mă muți`; });
-window.buddy.settings.onUpdate(s => { el.title = `${s.buddyName} — click pentru meniu, trage ca să mă muți`; });
+const tip = s => t('{name} — click pentru meniu, trage ca să mă muți', { name: s.buddyName });
+window.buddy.settings.get().then(s => { el.title = tip(s); });
+window.buddy.settings.onUpdate(s => { el.title = tip(s); });
 
 function applyTheme(s) {
   document.documentElement.dataset.theme = s.themeResolved || s.theme;
@@ -63,7 +64,7 @@ window.buddy.settings.get().then(applyTheme);
 window.buddy.settings.onUpdate(applyTheme);
 
 window.buddy.session.onHour(({ hours }) => speechOn || toast(hours === 1 ? '1 Hour has passed' : `${hours} Hours have passed`, 8000));
-window.buddy.mail.onScanToast(n => { if (n && !speechOn) toast(`✉ ${n} ${n === 1 ? 'email nou' : 'emailuri noi'}`, 8000); });
+window.buddy.mail.onScanToast(n => { if (n && !speechOn) toast('✉ ' + t(n === 1 ? '{n} email nou' : '{n} emailuri noi', { n }), 8000); });
 
 function setState(state) { el.dataset.state = state || 'idle'; }
 window.buddy.buddy.state().then(setState);

@@ -91,10 +91,10 @@ function affirmationFor(k, lang = 'ro') {
   const areas = (ids.length ? ids.map(byId).filter(Boolean) : AREAS);
   const n = Math.floor(dayIndex(k) / ORDER.length);
   const area = areas[n % areas.length];
-  const i = Math.floor(n / areas.length) % area.affirmations.length;
+  const i = Math.floor(n / areas.length) % area.affirmationsRo.length;
   const tr = i18n.AREAS[lang]?.[area.id];
-  const text = tr ? tr[1][i] : area.affirmations[i];
-  return decorate({ type: 'afirmatie', title: tr ? tr[0] : area.label, text, author: '', note: i18n.META[lang].affNote, source: 'library', area: area.id }, lang);
+  const text = tr ? tr[1][i] : area.affirmationsRo[i];
+  return decorate({ type: 'afirmatie', title: tr ? tr[0] : area.labelRo, text, author: '', note: i18n.META[lang].affNote, source: 'library', area: area.id }, lang);
 }
 
 function fromLibrary(type, k, lang = i18n.langFor(k)) {
