@@ -41,7 +41,8 @@ const DEFAULT_DATA = {
     visionProvider: 'openverse',
     visionGoogleCx: '',
     eveningRitual: true,
-    eveningTime: '21:00'
+    eveningTime: '21:00',
+    quoteLangs: ['ro']
   },
   apiKeyEncrypted: '',
   mailPasswordEncrypted: '',

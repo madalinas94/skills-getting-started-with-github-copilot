@@ -25,7 +25,8 @@ function header(d, title) {
 }
 
 function quote(d) {
-  return h('div', { class: 'quote' }, [`„${d.quote.text}”`, h('span', { text: d.quote.author })]);
+  const [qo, qc] = d.quote.q || ['„', '”'];
+  return h('div', { class: 'quote' }, [`${qo}${d.quote.text}${qc}`, h('span', { text: d.quote.author })]);
 }
 
 function foot(d) {
@@ -171,7 +172,7 @@ function renderMonth(d) {
         h('div', { class: 'moods-l' }, d.moods.length ? d.moods.slice(0, 4).map(x => h('span', {}, [x.label, h('b', { text: ` ×${x.n}` })])) : [h('span', { text: '—' })])
       ])
     ]),
-    d.mantra ? h('div', { class: 'quote' }, [`„${d.mantra.text}”`, h('span', { text: d.mantra.author || d.mantra.label })]) : quote(d),
+    d.mantra ? h('div', { class: 'quote' }, [`${(d.mantra.q || ['„'])[0]}${d.mantra.text}${(d.mantra.q || ['„', '”'])[1]}`, h('span', { text: d.mantra.author || d.mantra.label })]) : quote(d),
     foot(d)
   );
 }
@@ -179,11 +180,12 @@ function renderMonth(d) {
 function renderMantra(d) {
   const card = document.getElementById('card');
   const m = d.mantra;
-  const text = m.type === 'citat' || m.type === 'vorba' ? `„${m.text}”` : m.text;
+  const [qo, qc] = m.q || ['„', '”'];
+  const text = m.type === 'citat' || m.type === 'vorba' ? `${qo}${m.text}${qc}` : m.text;
   card.replaceChildren(
     h('div', { class: 'mantra' }, [
       h('img', { class: 'medal', src: '../assets/icon.svg' }),
-      h('div', { class: 'kicker', text: `Mantra zilei · ${d.date}` }),
+      h('div', { class: 'kicker', text: `${m.kicker || 'Mantra zilei'} · ${d.date}` }),
       h('div', { class: 'mlabel', text: m.label }),
       m.title ? h('div', { class: 'mtitle', text: m.title }) : null,
       h('div', { class: 'mtext', text }),

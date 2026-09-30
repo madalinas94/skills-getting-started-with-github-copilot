@@ -40,6 +40,13 @@ La fiecare pornire, un card elegant apare separat, în colțul din dreapta-sus, 
 Din card: ♡ favorită, **Imagine** (story 9:16 salvat și copiat), **Azi**. O găsești și în tab-ul Azi
 („Pe desktop” o readuce), în meniul lui Mady și în tray.
 
+**Limba citatelor:** Setări → Mady → „Limba citatelor și a mantrei zilei”: **Română, English, Français,
+Español, Italiano, Deutsch**. Alegi una sau mai multe; cu mai multe, mantra, citatul zilei și afirmațiile
+alternează zilnic între ele (tipurile se rotesc separat, ca fiecare limbă să primească de toate).
+Colecția e tradusă integral, cu formulările consacrate ale citatelor și ghilimelele fiecărei limbi
+(„…”, “…”, « … », «…», „…“). Cu un model AI conectat, Mady scrie mantra direct în limba zilei.
+La schimbarea limbii, mantra de azi se refă (în afară de cazul în care e deja favorită).
+
 ## Vision board
 
 Fereastră separată în stil Pinterest: fotografiile tale ca polaroid-uri cu bandă washi și legendă,
@@ -265,6 +272,7 @@ desktop-buddy/
 ├── src/today.js       # planner-ul zilei: Top 3, ritualuri, apă, stare, citate
 ├── src/cards.js       # cardurile de Instagram (zi, săptămână, lună, mantra), randate offscreen în PNG
 ├── src/mantra.js      # mantra zilei (AI sau colecție), favorite
+├── src/quotes-i18n.js # citate, mantre și afirmații în EN / FR / ES / IT / DE
 ├── src/vision.js      # vision board: imagini, carduri de text, ariile vieții
 ├── src/lifeareas.js   # ariile vieții și afirmațiile lor
 ├── src/goals.js       # obiective cu progres: fonduri, număr, etape, ritm și dată estimată

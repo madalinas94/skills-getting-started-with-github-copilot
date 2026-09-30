@@ -1,6 +1,7 @@
 // Planner-ul zilei: intenție, Top 3 priorități, obiceiuri (habit tracker), apă, stare și recunoștință.
 const crypto = require('crypto');
 const store = require('./store');
+const i18n = require('./quotes-i18n');
 
 const QUOTES = [
   ['Disciplina este podul dintre obiective și realizări.', 'Jim Rohn'],
@@ -109,8 +110,10 @@ function removeHabit(id) {
 
 function quote(k = key()) {
   const n = [...k].reduce((a, c) => a + c.charCodeAt(0), 0);
-  const [text, author] = QUOTES[n % QUOTES.length];
-  return { text, author };
+  const lang = i18n.langFor(k);
+  const list = i18n.QUOTES[lang] || QUOTES;
+  const [text, author] = list[n % list.length];
+  return { text, author, lang, q: i18n.META[lang].q };
 }
 
 function state() {

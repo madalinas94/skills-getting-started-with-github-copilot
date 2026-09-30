@@ -121,7 +121,7 @@ function monthData(ref = new Date()) {
 async function mantraData() {
   const mantra = require('./mantra');
   const mm = await mantra.today();
-  return { kind: 'mantra', date: new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' }), mantra: mm };
+  return { kind: 'mantra', date: new Date().toLocaleDateString(mm.locale || 'ro-RO', { weekday: 'long', day: 'numeric', month: 'long' }), mantra: mm };
 }
 
 function outDir() {

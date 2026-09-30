@@ -1023,3 +1023,14 @@ textarea { resize: none; }
 :root[data-theme="bordeaux"] .evening-cta { background: radial-gradient(120% 140% at 0% 0%, #7a1730, #3e0816); }
 :root[data-theme="bordeaux"] .vision-cta b { color: #6b1228; }
 :root[data-theme="bordeaux"] .gm .line i { background: linear-gradient(90deg, #6b1228, #c9a35a); }
+
+/* limba citatelor */
+.settings .field-label { font-size: 11px; text-transform: uppercase; letter-spacing: var(--caps); color: var(--muted); margin-top: 4px; }
+.lang-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.lang-chips button {
+  padding: 4px 11px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); color: var(--text);
+  font: 13px var(--font-text); cursor: pointer; transition: background .15s, border-color .15s;
+}
+.lang-chips button:hover { border-color: var(--gold); }
+.lang-chips button.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+:root[data-theme="evening"] .lang-chips button.on { background: var(--gold); color: #121c17; border-color: var(--gold); }

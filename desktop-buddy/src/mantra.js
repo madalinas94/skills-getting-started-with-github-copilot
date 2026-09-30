@@ -4,6 +4,7 @@
 const store = require('./store');
 const ai = require('./ai');
 const { AREAS, byId } = require('./lifeareas');
+const i18n = require('./quotes-i18n');
 
 const TYPES = {
   citat: 'Citatul zilei',
@@ -77,25 +78,42 @@ function typeFor(k) {
   return ORDER[dayIndex(k) % ORDER.length];
 }
 
+// Eticheta, ghilimelele și data cardului, în limba zilei.
+function decorate(m, lang) {
+  const meta = i18n.META[lang];
+  return { ...m, label: meta.labels[m.type], lang, q: meta.q, kicker: meta.kicker, locale: meta.locale };
+}
+
 // Afirmația zilei vine din ariile de pe vision board (sau din toate, dacă board-ul e gol).
-function affirmationFor(k) {
+function affirmationFor(k, lang = 'ro') {
   let ids = [];
   try { ids = require('./vision').boardAreas(); } catch { ids = []; }
   const areas = (ids.length ? ids.map(byId).filter(Boolean) : AREAS);
   const n = Math.floor(dayIndex(k) / ORDER.length);
   const area = areas[n % areas.length];
-  const text = area.affirmations[Math.floor(n / areas.length) % area.affirmations.length];
-  return { type: 'afirmatie', label: TYPES.afirmatie, title: area.label, text, author: '', note: 'Spune-o cu voce tare, de trei ori, și crede-o.', source: 'library', area: area.id };
+  const i = Math.floor(n / areas.length) % area.affirmations.length;
+  const tr = i18n.AREAS[lang]?.[area.id];
+  const text = tr ? tr[1][i] : area.affirmations[i];
+  return decorate({ type: 'afirmatie', title: tr ? tr[0] : area.label, text, author: '', note: i18n.META[lang].affNote, source: 'library', area: area.id }, lang);
 }
 
-function fromLibrary(type, k) {
-  if (type === 'afirmatie') return affirmationFor(k);
+function fromLibrary(type, k, lang = i18n.langFor(k)) {
+  if (type === 'afirmatie') return affirmationFor(k, lang);
   const list = LIBRARY[type];
-  const item = list[Math.floor(dayIndex(k) / ORDER.length) % list.length];
-  return { type, label: TYPES[type], title: item.title || '', text: item.text, author: item.author || '', note: item.note || '', source: 'library' };
+  const idx = Math.floor(dayIndex(k) / ORDER.length) % list.length;
+  const item = list[idx];
+  let m = { type, title: item.title || '', text: item.text, author: item.author || '', note: item.note || '', source: 'library' };
+  const tr = i18n.LIBRARY[lang]?.[type]?.[idx];
+  if (tr) {
+    if (type === 'citat') m = { ...m, text: tr[0], author: tr[1] };
+    else if (type === 'vorba' || type === 'motivatie') m = { ...m, text: tr };
+    else if (type === 'cuvant') m = { ...m, text: tr[0], note: tr[1] };
+    else if (type === 'filozofie') m = { ...m, title: tr[0], text: tr[1], author: tr[2], note: tr[3] };
+  }
+  return decorate(m, lang);
 }
 
-function aiPrompt(type) {
+function aiPrompt(type, lang = 'ro') {
   const what = {
     citat: 'un citat real și verificabil al unei personalități (artă, filozofie, business, modă, finanțe), cu autorul corect',
     vorba: 'o vorbă de duh originală, scurtă, spirituală și elegantă, în stilul tău',
@@ -103,7 +121,8 @@ function aiPrompt(type) {
     motivatie: 'o idee de motivație scurtă și puternică, fără clișee',
     filozofie: 'o idee filozofică (stoici, Aristotel, filozofie orientală etc.), cu autorul/școala și cum o aplic azi'
   }[type];
-  return `Scrie mantra mea de azi: ${what}. Maximum 25 de cuvinte pentru text.
+  const inLang = lang === 'ro' ? '' : ` Scrie totul (text, notă, titlu) în limba ${i18n.AI_NAMES[lang]}; pentru citat folosește formularea consacrată în această limbă. Nota începe cu „Azi:” tradus în această limbă.`;
+  return `Scrie mantra mea de azi: ${what}. Maximum 25 de cuvinte pentru text.${inLang}
 Răspunde DOAR cu JSON valid, fără alt text: {"titlu": "", "text": "", "autor": "", "nota": ""}
 - „titlu”: doar pentru cuvântul zilei sau ideea filozofică (altfel gol)
 - „nota”: o frază scurtă „Azi: …” despre cum o aplic (opțional)`;
@@ -132,12 +151,13 @@ async function today() {
   if (pending) return pending;
   pending = (async () => {
     const type = typeFor(k);
-    let m = fromLibrary(type, k);
+    const lang = i18n.langFor(k);
+    let m = fromLibrary(type, k, lang);
     const s = d.settings;
     if (type !== 'afirmatie' && (s.aiProvider || 'demo') !== 'demo') {
       try {
-        const j = parseJson(await ai.complete(aiPrompt(type), s, store.getApiKey()));
-        if (j) m = { type, label: TYPES[type], title: j.titlu || '', text: j.text, author: j.autor || '', note: j.nota || '', source: 'ai' };
+        const j = parseJson(await ai.complete(aiPrompt(type, lang), s, store.getApiKey()));
+        if (j) m = decorate({ type, title: j.titlu || '', text: j.text, author: j.autor || '', note: j.nota || '', source: 'ai' }, lang);
       } catch {
         // fără conexiune sau cheie invalidă: rămâne varianta din colecție
       }
@@ -160,6 +180,16 @@ async function today() {
   }
 }
 
+// La schimbarea limbii, mantra de azi se refă (dacă nu e deja favorită).
+function reset() {
+  const d = store.get();
+  const k = key();
+  if (d.mantras?.[k] && !d.mantras[k].fav) {
+    delete d.mantras[k];
+    store.save();
+  }
+}
+
 function setFav(k, fav) {
   const m = store.get().mantras?.[k];
   if (m) {
@@ -173,4 +203,4 @@ function favorites() {
   return Object.values(store.get().mantras || {}).filter(m => m.fav).sort((a, b) => b.date.localeCompare(a.date));
 }
 
-module.exports = { today, setFav, favorites, key, TYPES, fromLibrary, typeFor };
+module.exports = { today, setFav, favorites, reset, key, TYPES, fromLibrary, typeFor, aiPrompt };

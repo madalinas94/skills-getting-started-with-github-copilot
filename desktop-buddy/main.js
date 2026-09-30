@@ -747,6 +747,7 @@ function registerIpc() {
     applySettings();
     if ('clipboardLimit' in patch) { trimClipboard(); broadcast('clipboard:updated', store.get().clipboard); }
     if (Object.keys(patch).some(k => k.startsWith('mail'))) broadcast('mail:scanState', mailscan.state());
+    if ('quoteLangs' in patch) mantra.reset();
     if ('timerTrackApps' in patch) patch.timerTrackApps ? sessions.startTracking() : sessions.stopTracking();
     return publicSettings();
   });

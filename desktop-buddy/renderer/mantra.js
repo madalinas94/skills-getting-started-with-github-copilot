@@ -12,11 +12,12 @@ function fit() {
 }
 
 function render() {
-  const date = new Date().toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long' });
-  $('#kicker').textContent = `Mantra zilei · ${date}`;
+  const date = new Date().toLocaleDateString(m.locale || 'ro-RO', { weekday: 'long', day: 'numeric', month: 'long' });
+  const [qo, qc] = m.q || ['„', '”'];
+  $('#kicker').textContent = `${m.kicker || 'Mantra zilei'} · ${date}`;
   $('#label').textContent = m.label;
   $('#title').textContent = m.title || '';
-  $('#text').textContent = m.type === 'citat' || m.type === 'vorba' ? `„${m.text}”` : m.text;
+  $('#text').textContent = m.type === 'citat' || m.type === 'vorba' ? `${qo}${m.text}${qc}` : m.text;
   $('#author').textContent = m.author ? `— ${m.author}` : '';
   $('#note').textContent = m.note || '';
   $('#fav').classList.toggle('on', !!m.fav);

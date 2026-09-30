@@ -795,7 +795,8 @@ async function loadMantra() {
   const m = mantraToday;
   $('#mLabel').textContent = m.label;
   $('#mTitle').textContent = m.title || '';
-  $('#mText').textContent = m.type === 'citat' || m.type === 'vorba' ? `„${m.text}”` : m.text;
+  const [qo, qc] = m.q || ['„', '”'];
+  $('#mText').textContent = m.type === 'citat' || m.type === 'vorba' ? `${qo}${m.text}${qc}` : m.text;
   $('#mAuthor').textContent = m.author || '';
   $('#mNote').textContent = m.note || '';
   $('#mFav').textContent = m.fav ? '♥ Favorită' : '♡';
@@ -1117,6 +1118,8 @@ function renderSettings() {
   $('#sBriefVoice').checked = settings.briefVoice;
   $('#sMantraStart').checked = settings.mantraOnStart;
   $('#sEvening').checked = settings.eveningRitual;
+  const ql = settings.quoteLangs || ['ro'];
+  for (const b of $('#sQuoteLangs').children) b.classList.toggle('on', ql.includes(b.dataset.v));
   if (document.activeElement !== $('#sEveningTime')) $('#sEveningTime').value = settings.eveningTime || '21:00';
   $('#sHair').value = settings.buddyHair || 'coc';
   $('#sVisionProvider').value = settings.visionProvider || 'openverse';
@@ -1230,6 +1233,16 @@ $('#sVisionKeySave').addEventListener('click', async () => {
   toast('Cheia pentru imagini a fost salvată');
 });
 $('#sMantraStart').addEventListener('change', e => update({ mantraOnStart: e.target.checked }));
+$('#sQuoteLangs').addEventListener('click', async e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  const cur = new Set(settings.quoteLangs || ['ro']);
+  cur.has(b.dataset.v) ? cur.delete(b.dataset.v) : cur.add(b.dataset.v);
+  if (!cur.size) return toast('Alege cel puțin o limbă');
+  const order = ['ro', 'en', 'fr', 'es', 'it', 'de'];
+  await update({ quoteLangs: order.filter(l => cur.has(l)) }, 'Limba citatelor a fost salvată');
+  loadMantra();
+});
 $('#sEvening').addEventListener('change', e => update({ eveningRitual: e.target.checked }));
 $('#sEveningTime').addEventListener('change', e => update({ eveningTime: /^\d{2}:\d{2}$/.test(e.target.value) ? e.target.value : '21:00' }));
 $('#sMantraSec').addEventListener('change', e => update({ mantraSeconds: Math.max(5, Math.min(300, Number(e.target.value) || 30)) }));
