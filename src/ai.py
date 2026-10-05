@@ -101,12 +101,11 @@ LOCAL_QUESTIONS = {
 
 def _understood_local(p: dict) -> str:
     """Rezumat simplu „ce am înțeles”, compus din câmpurile completate."""
-    name = f"„{p['title']}”" if p["title"] else "Aplicația"
     parts = []
+    if p["title"]:
+        parts.append(f"Propui „{p['title']}”.")
     if p["description"]:
-        parts.append(f"{name} {p['description'][0].lower()}{p['description'][1:]}")
-    elif p["title"]:
-        parts.append(f"{name} (încă nu știu ce face).")
+        parts.append(f"Ideea: {p['description']}")
     if p["audience"]:
         parts.append(f"O folosesc: {p['audience'][0].lower()}{p['audience'][1:]}.")
     return " ".join(parts)

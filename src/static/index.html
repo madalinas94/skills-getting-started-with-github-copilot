@@ -1,73 +1,116 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="ro" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cutia Clasei</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script>
+    try { const t = localStorage.getItem("cutia-theme"); if (t) document.documentElement.dataset.theme = t; } catch (_) {}
+  </script>
 </head>
 <body>
+  <div class="bg" aria-hidden="true">
+    <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+    <div class="grid"></div>
+  </div>
+  <canvas id="confetti" aria-hidden="true"></canvas>
+
   <header class="topbar">
     <div class="brand">
-      <span class="logo" aria-hidden="true">▣</span>
-      <span>Cutia Clasei</span>
+      <span class="logo" aria-hidden="true">{▣}</span>
+      <span class="brand-name">Cutia <span class="grad">Clasei</span></span>
+      <span class="course mono">vibe coding</span>
     </div>
-    <div id="user-box" class="user-box hidden">
-      <span id="user-name"></span>
-      <span id="user-role" class="pill"></span>
-      <button id="logout-btn" class="ghost">Ieși</button>
+    <div class="top-actions">
+      <button id="theme-btn" class="icon-btn" title="Schimbă tema" aria-label="Schimbă tema">◐</button>
+      <div id="user-box" class="user-box hidden">
+        <span id="user-avatar" class="avatar"></span>
+        <span id="user-name" class="user-name"></span>
+        <span id="user-role" class="pill"></span>
+        <button id="logout-btn" class="ghost small">Ieși</button>
+      </div>
     </div>
   </header>
 
-  <!-- Login -->
-  <main id="login-view" class="center">
-    <form id="login-form" class="card login">
-      <h1>Cutia Clasei</h1>
-      <p class="muted">Pune întrebări trainerului și propune proiecte pentru ora următoare.</p>
-      <div class="role-switch" role="radiogroup">
-        <label><input type="radio" name="role" value="student" checked> Student</label>
-        <label><input type="radio" name="role" value="trainer"> Trainer</label>
+  <!-- ============================== Login -->
+  <main id="login-view" class="login-view">
+    <section class="hero">
+      <p class="eyebrow mono">// curs vibe coding · construiești cu Claude</p>
+      <h1>Întrebi. Propui.<br><span class="grad">Construim împreună.</span></h1>
+      <p class="lead">Cutia clasei: pui întrebări trainerului, iar ideile tale de proiect trec prin AI înainte să ajungă la ora următoare.</p>
+      <div class="terminal">
+        <div class="term-bar"><i></i><i></i><i></i><span class="mono">~/cutia-clasei</span></div>
+        <pre id="term-body" class="mono"></pre>
+      </div>
+    </section>
+
+    <form id="login-form" class="card glass login">
+      <h2>Intră în clasă</h2>
+      <div class="role-switch" role="radiogroup" aria-label="Rol">
+        <label><input type="radio" name="role" value="student" checked><span>🎓 Student</span></label>
+        <label><input type="radio" name="role" value="trainer"><span>🧑‍🏫 Trainer</span></label>
       </div>
       <label>Numele tău
-        <input id="login-name" required maxlength="60" placeholder="ex. Ana Popescu">
+        <input id="login-name" required maxlength="60" autocomplete="username" placeholder="ex. Ana Popescu">
       </label>
       <label id="password-field">Parola
-        <input id="login-password" type="password" minlength="4" autocomplete="current-password"
-          placeholder="minim 4 caractere">
+        <input id="login-password" type="password" minlength="4" autocomplete="current-password" placeholder="minim 4 caractere">
         <span class="hint">Prima dată îți creezi contul cu parola aleasă. Data viitoare intri cu aceeași parolă.</span>
       </label>
       <label id="code-field" class="hidden">Cod trainer
         <input id="login-code" type="password" placeholder="codul primit">
       </label>
-      <button type="submit" class="primary">Intră</button>
-      <p id="login-error" class="error"></p>
+      <button type="submit" class="primary big">Intră <span class="kbd">↵</span></button>
+      <p id="login-error" class="error" role="alert"></p>
     </form>
   </main>
 
-  <!-- App -->
-  <main id="app-view" class="hidden">
+  <!-- ============================== App -->
+  <main id="app-view" class="app hidden">
+    <section class="welcome">
+      <div>
+        <p id="greet-eyebrow" class="eyebrow mono"></p>
+        <h1 id="greet-title"></h1>
+      </div>
+      <div id="stats" class="stats"></div>
+    </section>
+
     <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="questions">Întrebări <span id="q-badge" class="badge hidden"></span></button>
-      <button class="tab" data-tab="proposals">Propuneri</button>
+      <button class="tab active" data-tab="questions" role="tab">
+        <span class="file-ico q">?</span><span class="mono">intrebari.md</span>
+        <span id="q-badge" class="badge hidden"></span>
+      </button>
+      <button class="tab" data-tab="proposals" role="tab">
+        <span class="file-ico p">✦</span><span class="mono">propuneri.json</span>
+        <span id="p-badge" class="badge soft hidden"></span>
+      </button>
     </nav>
 
-    <!-- Întrebări -->
+    <!-- ------------------------- Întrebări -->
     <section id="tab-questions" class="tab-panel">
-      <form id="question-form" class="card student-only">
-        <h2>Ce n-ai înțeles?</h2>
+      <form id="question-form" class="card composer student-only">
+        <div class="composer-head">
+          <span class="prompt mono">❯</span>
+          <h2>Ce n-ai înțeles?</h2>
+          <span class="muted small">o vezi doar tu și trainerul</span>
+        </div>
         <textarea id="question-text" rows="3" maxlength="2000" required
-          placeholder="Scrie întrebarea ta. O vezi doar tu și trainerul."></textarea>
+          placeholder="ex. De ce Claude îmi rescrie tot fișierul când îi cer o modificare mică?"></textarea>
         <div class="row">
-          <select id="question-category"></select>
+          <select id="question-category" aria-label="Categorie"></select>
           <label class="check"><input type="checkbox" id="question-anon"> Anonim pentru trainer</label>
-          <button type="submit" class="primary">Trimite întrebarea</button>
+          <button type="submit" class="primary">Trimite <span class="kbd">Ctrl ↵</span></button>
         </div>
       </form>
 
       <div class="toolbar">
         <h2 id="questions-title">Întrebările mele</h2>
-        <input id="question-search" type="search" placeholder="Caută…">
-        <select id="question-filter">
+        <input id="question-search" type="search" placeholder="Caută…  /" aria-label="Caută întrebări">
+        <select id="question-filter" aria-label="Filtru">
           <option value="all">Toate</option>
           <option value="open">Fără răspuns</option>
           <option value="answered">Cu răspuns</option>
@@ -76,64 +119,78 @@
       <div id="questions-list" class="list"></div>
     </section>
 
-    <!-- Propuneri -->
+    <!-- ------------------------- Propuneri -->
     <section id="tab-proposals" class="tab-panel hidden">
-      <div id="proposal-wizard" class="card student-only">
-        <h2>Propune un proiect</h2>
-        <ol class="steps">
-          <li data-step="1" class="active">Scrie</li>
-          <li data-step="2">AI-ul citește și întreabă</li>
-          <li data-step="3">Aprobă și trimite</li>
+      <div id="proposal-wizard" class="card wizard student-only">
+        <div class="composer-head">
+          <span class="prompt mono">✦</span>
+          <h2>Propune un proiect pentru ora următoare</h2>
+        </div>
+        <p class="muted small">AI-ul nu decide în locul tău. Îți arată ce a înțeles, îți spune ce lipsește, iar tu alegi ce versiune trimiți.</p>
+
+        <ol class="pipeline" id="pipeline">
+          <li data-step="1"><b>Ciorna</b><span>Scrii ideea cum îți vine</span></li>
+          <li data-step="2"><b>AI citește</b><span>Verifică ce lipsește</span></li>
+          <li data-step="3"><b>Retuș + întrebări</b><span>Text mai clar, max 3 întrebări</span></li>
+          <li data-step="4"><b>Tu răspunzi</b><span>Completezi detaliile</span></li>
+          <li data-step="5"><b>Trimiți</b><span>Varianta finală, aprobată de tine</span></li>
         </ol>
 
-        <form id="proposal-form">
+        <form id="proposal-form" class="stage">
           <label>Titlu
             <input id="p-title" maxlength="200" placeholder="ex. Calendarul clasei">
           </label>
           <label>Ce face aplicația
             <textarea id="p-description" rows="3" maxlength="4000"
-              placeholder="Ce poate face un utilizator în ea?"></textarea>
+              placeholder="Scrie ideea cum îți vine. Ce problemă rezolvă? Ce poate face cineva în ea?"></textarea>
           </label>
           <label>Cine o folosește
             <input id="p-audience" maxlength="500" placeholder="ex. studenții și trainerul">
           </label>
           <div class="row end">
-            <button type="submit" class="primary">✨ Retușează cu AI</button>
+            <button type="submit" class="primary glow">✨ Trimite la AI</button>
           </div>
         </form>
 
-        <div id="refine-result" class="hidden">
-          <div id="understood-box" class="understood">
-            <h3>Ce a înțeles AI-ul</h3>
+        <div id="ai-thinking" class="stage terminal hidden" aria-live="polite">
+          <div class="term-bar"><i></i><i></i><i></i><span class="mono">claude · citește propunerea</span></div>
+          <pre id="ai-log" class="mono"></pre>
+        </div>
+
+        <div id="refine-result" class="stage hidden">
+          <div class="understood">
+            <div class="ai-tag mono">🤖 AI-ul a înțeles</div>
             <p id="understood-text"></p>
+            <p id="refine-notes" class="muted small"></p>
           </div>
-          <p id="refine-notes" class="muted small"></p>
+
           <div id="missing-box" class="missing hidden">
-            <h3>AI-ul are nevoie de câteva detalii</h3>
+            <div class="ai-tag mono">❓ Îi mai trebuie câteva detalii</div>
             <div id="missing-list"></div>
             <div class="row end">
-              <button id="apply-answers" class="primary">Adaugă detaliile și retușează din nou</button>
+              <button id="apply-answers" class="primary">↻ Completează și retușează din nou</button>
             </div>
           </div>
+
           <h3>Varianta finală <span class="muted small">(o poți edita)</span></h3>
           <label>Titlu <input id="f-title" maxlength="200"></label>
           <label>Ce face aplicația <textarea id="f-description" rows="4" maxlength="4000"></textarea></label>
           <label>Cine o folosește <input id="f-audience" maxlength="500"></label>
           <label class="check approve"><input type="checkbox" id="approve"> Am citit și aprob varianta finală</label>
           <div class="row end">
-            <button id="back-edit" class="ghost">Înapoi la ciornă</button>
-            <button id="submit-proposal" class="primary" disabled>Trimite propunerea</button>
+            <button id="back-edit" class="ghost">← Înapoi la ciornă</button>
+            <button id="submit-proposal" class="primary glow" disabled>🚀 Trimite propunerea</button>
           </div>
         </div>
-        <p id="proposal-error" class="error"></p>
+        <p id="proposal-error" class="error" role="alert"></p>
       </div>
 
       <div class="toolbar">
         <h2>Propunerile clasei</h2>
-        <input id="proposal-search" type="search" placeholder="Caută…">
-        <select id="proposal-sort">
-          <option value="new">Cele mai noi</option>
+        <input id="proposal-search" type="search" placeholder="Caută…  /" aria-label="Caută propuneri">
+        <select id="proposal-sort" aria-label="Sortare">
           <option value="votes">Cele mai votate</option>
+          <option value="new">Cele mai noi</option>
           <option value="chosen">Alese întâi</option>
         </select>
       </div>
@@ -141,7 +198,7 @@
     </section>
   </main>
 
-  <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast hidden" role="status"></div>
   <script src="app.js"></script>
 </body>
 </html>
