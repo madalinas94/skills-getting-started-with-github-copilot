@@ -27,10 +27,14 @@ MIN_LEN = {"title": 3, "description": 25, "audience": 4}
 
 MAX_QUESTIONS = 3
 
+# Ce verifică AI-ul la fiecare propunere (din fișa trainerului).
+# Răspunsurile la problem/features/data/size se adaugă la descriere.
+CHECKS = ("problem", "features", "data", "size")
+
 REFINE_PROMPT = """Ești asistentul din „Cutia Clasei", aplicația unei clase de \
 vibe coding (programare cu AI), în care studenții propun proiecte pentru ora \
-următoare. Primești o propunere cu trei câmpuri: titlu, ce face aplicația \
-(description) și cine o folosește (audience).
+următoare. Primești o propunere cu trei câmpuri obligatorii: titlu, ce face \
+aplicația (description) și cine o folosește (audience).
 
 Nu decizi în locul studentului: îi arăți ce ai înțeles, îi spui ce lipsește, \
 iar el alege ce versiune trimite.
@@ -38,14 +42,18 @@ iar el alege ce versiune trimite.
 Sarcina ta:
 1. În "understood" rezumă în 1-2 propoziții ce ai înțeles: ce problemă rezolvă \
 aplicația, pentru cine și ce face.
-2. Retușează fiecare câmp: corectează gramatica și diacriticele, fă textul clar \
-și concis, păstrează ideea și vocea studentului. Nu inventa funcții sau detalii noi.
+2. Retușează cele trei câmpuri: corectează gramatica și diacriticele, fă textul \
+clar și concis, păstrează ideea și vocea studentului. Nu inventa funcții sau detalii noi.
 3. Verifică propunerea și, DOAR pentru ce lipsește sau e prea vag, adaugă în \
-"missing" o întrebare scurtă și concretă. Ce verifici:
-   - title: are un nume? („Cum se numește aplicația?")
-   - problem: e clar ce problemă rezolvă? („Ce problemă rezolvă aplicația și pentru cine?")
-   - description: e clar ce face concret? („Ce poate face un utilizator în aplicație?")
-   - audience: e clar cine o folosește? („Cine o va folosi?")
+"missing" o întrebare scurtă și concretă:
+   - title: lipsește titlul? („Cum se numește aplicația?")
+   - audience: nu e clar cine o folosește? („Cine o va folosi?")
+   - problem: nu e clară problema? („Ce problemă rezolvă aplicația și pentru cine?")
+   - features: nu sunt clare funcțiile? („Care sunt cele 3 lucruri pe care trebuie să le facă sigur?")
+   - data: nu e clar de unde vin datele? („De unde vin datele: le introduce \
+utilizatorul sau vin din alt serviciu?")
+   - size: pare prea mare pentru o oră? („Se poate construi într-o oră? Dacă nu, \
+ce parte facem prima?")
    Pune cel mult 3 întrebări, cele mai importante primele. Dacă un aspect e \
 suficient de clar, NU întreba despre el. Dacă totul e clar, "missing" e o listă goală.
 4. Dacă un câmp lipsește complet, lasă-l gol în varianta retușată.
@@ -82,7 +90,7 @@ REFINE_SCHEMA = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "field": {"type": "string", "enum": [*FIELDS, "problem"]},
+                    "field": {"type": "string", "enum": [*FIELDS, *CHECKS]},
                     "question": {"type": "string"},
                 },
                 "required": ["field", "question"],
@@ -231,7 +239,7 @@ def refine(title: str, description: str, audience: str, lang: str = "ro") -> dic
         return refine_local(title, description, audience, lang)
 
     data["missing"] = [
-        m for m in data.get("missing", []) if m.get("field") in (*FIELDS, "problem")
+        m for m in data.get("missing", []) if m.get("field") in (*FIELDS, *CHECKS)
     ][:MAX_QUESTIONS]
     data["engine"] = "claude"
     return data

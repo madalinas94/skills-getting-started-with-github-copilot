@@ -1,8 +1,10 @@
 import os
+import tempfile
 
 os.environ["CUTIA_PERSIST"] = "0"
 os.environ["CUTIA_AI"] = "off"
 os.environ["TRAINER_CODE"] = "secret"
+os.environ["CUTIA_UPLOADS"] = tempfile.mkdtemp()
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,7 +16,7 @@ client = TestClient(app_module.app)
 
 @pytest.fixture(autouse=True)
 def reset_db():
-    app_module.db.update({"users": {}, "questions": [], "proposals": [], "next_id": 1})
+    app_module.db.update({"users": {}, "questions": [], "proposals": [], "submissions": [], "next_id": 1})
     app_module.sessions.clear()
 
 
@@ -186,3 +188,55 @@ def test_local_refine_in_english():
     ana = login("Ana")
     r = client.post("/api/proposals/refine", json={"title": "quiz"}, headers={**ana, "X-Lang": "en"}).json()
     assert r["missing"][0]["question"].startswith("Briefly describe")
+
+
+# ---------------------------------------------------------------- teme & proiecte
+
+def submit(headers, files=None, **data):
+    form = {"kind": "homework", "title": "Tema 1", **data}
+    return client.post("/api/submissions", data=form, files=files or [], headers=headers)
+
+
+def test_submission_private_to_author_and_trainer():
+    ana, bob = login("Ana"), login("Bob")
+    trainer = login("Radu", "trainer", "secret")
+    r = submit(ana, files=[("files", ("tema.md", b"# Tema mea", "text/markdown"))],
+               link="https://github.com/ana/cutia-clasei-ana", checklist=["no_keys", "nope"])
+    assert r.status_code == 201, r.text
+    sub = r.json()
+    assert sub["checklist"] == ["no_keys"]
+    assert "stored" not in sub["files"][0]
+    fid = sub["files"][0]["id"]
+
+    assert client.get("/api/submissions", headers=bob).json() == []
+    assert len(client.get("/api/submissions", headers=trainer).json()) == 1
+    # B nu poate descărca fișierul lui A
+    assert client.get(f"/api/submissions/{sub['id']}/files/{fid}", headers=bob).status_code == 404
+    d = client.get(f"/api/submissions/{sub['id']}/files/{fid}", headers=trainer)
+    assert d.status_code == 200 and d.content == b"# Tema mea"
+    assert d.headers["content-type"] == "application/octet-stream"
+    assert "attachment" in d.headers["content-disposition"]
+
+
+def test_submission_validation():
+    ana = login("Ana")
+    assert submit(ana, title="").status_code == 400
+    assert submit(ana, link="javascript:alert(1)").status_code == 400
+    assert submit(ana).status_code == 400  # nimic de predat
+    bad = submit(ana, files=[("files", ("virus.exe", b"x", "application/octet-stream"))])
+    assert bad.status_code == 400
+    big = submit(ana, files=[("files", ("mare.pdf", b"x" * (10 * 1024 * 1024 + 1), "application/pdf"))])
+    assert big.status_code == 400
+    many = submit(ana, files=[("files", (f"f{i}.txt", b"x", "text/plain")) for i in range(6)])
+    assert many.status_code == 400
+
+
+def test_trainer_reviews_submission():
+    ana, bob = login("Ana"), login("Bob")
+    trainer = login("Radu", "trainer", "secret")
+    sid = submit(ana, note="Am terminat!").json()["id"]
+    body = {"status": "reviewed", "feedback": "Super, adaugă README."}
+    assert client.post(f"/api/submissions/{sid}/review", json=body, headers=bob).status_code == 403
+    r = client.post(f"/api/submissions/{sid}/review", json=body, headers=trainer)
+    assert r.json()["status"] == "reviewed"
+    assert client.get("/api/submissions", headers=ana).json()[0]["feedback"] == "Super, adaugă README."

@@ -14,13 +14,15 @@ import hmac
 import json
 import os
 import secrets
+import re
 import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -48,6 +50,7 @@ except ImportError:  # rulare directă: python app.py
     import ai
 
 DATA_FILE = Path(os.environ.get("CUTIA_DATA", current_dir.parent / "data" / "cutia.json"))
+UPLOAD_DIR = Path(os.environ.get("CUTIA_UPLOADS", DATA_FILE.parent / "uploads"))
 TRAINER_CODE = os.environ.get("TRAINER_CODE", "trainer")
 
 app = FastAPI(title="Cutia Clasei API",
@@ -77,6 +80,13 @@ MESSAGES = {
     "approve_first": ("Aprobă varianta finală înainte să o trimiți.", "Approve the final version before submitting it."),
     "missing": ("Lipsește: {}.", "Missing: {}."),
     "no_proposal": ("Propunerea nu există.", "Proposal not found."),
+    "no_submission": ("Predarea nu există.", "Submission not found."),
+    "need_title": ("Scrie un titlu.", "Add a title."),
+    "bad_link": ("Linkul trebuie să înceapă cu https:// sau http://.", "The link must start with https:// or http://."),
+    "too_many_files": ("Poți încărca maxim {} fișiere.", "You can upload at most {} files."),
+    "file_too_big": ("Fișierul {} e prea mare (maxim 10 MB).", "File {} is too big (max 10 MB)."),
+    "bad_file_type": ("Tipul fișierului {} nu e acceptat.", "File type of {} is not allowed."),
+    "empty_submission": ("Adaugă un fișier, un link sau un mesaj.", "Add a file, a link or a message."),
 }
 FIELD_NAMES = {
     "title": ("titlu", "title"),
@@ -109,7 +119,7 @@ app.mount("/static", StaticFiles(directory=current_dir / "static"), name="static
 # ---------------------------------------------------------------------------
 
 _lock = threading.Lock()
-db = {"users": {}, "questions": [], "proposals": [], "next_id": 1}
+db = {"users": {}, "questions": [], "proposals": [], "submissions": [], "next_id": 1}
 sessions: dict[str, dict] = {}
 
 
@@ -328,6 +338,142 @@ def ai_answer_question(question_id: int, user: dict = Depends(current_user)):
         q["ai_answered_at"] = now()
         save_db()
     return question_view(q, user)
+
+
+# ---------------------------------------------------------------------------
+# Teme & proiecte: spațiul privat student ↔ trainer.
+# Fișierele stau pe server cu nume aleatorii și se descarcă doar prin API,
+# după verificarea accesului (autorul sau trainerul).
+# ---------------------------------------------------------------------------
+
+SUBMISSION_KINDS = ["homework", "project", "other"]
+REVIEW_STATUSES = ["sent", "received", "reviewed", "redo"]
+# „Gata când” din fișa temei
+CHECKLIST = ["features", "privacy", "ai_consent", "github_readme", "no_keys", "trainer_access"]
+MAX_FILES = 5
+MAX_FILE_BYTES = 10 * 1024 * 1024
+ALLOWED_EXTENSIONS = {
+    ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".zip", ".txt", ".md",
+    ".py", ".js", ".ts", ".html", ".css", ".json", ".csv", ".ipynb",
+    ".docx", ".pptx", ".xlsx",
+}
+
+
+class ReviewIn(BaseModel):
+    status: str = Field(pattern="^(received|reviewed|redo)$")
+    feedback: str = Field("", max_length=4000)
+
+
+def safe_filename(name: str) -> str:
+    name = Path(name or "fisier").name
+    name = re.sub(r"[^\w.\- ]", "_", name).strip() or "fisier"
+    return name[-120:]
+
+
+def submission_view(sub: dict, user: dict) -> dict:
+    view = {k: v for k, v in sub.items() if k not in ("author_key", "files")}
+    view["files"] = [{k: f[k] for k in ("id", "name", "size")} for f in sub["files"]]
+    view["mine"] = sub["author_key"] == user["key"]
+    return view
+
+
+def find_submission(submission_id: int, user: dict) -> dict:
+    sub = next((x for x in db["submissions"] if x["id"] == submission_id), None)
+    # Pentru altcineva, o predare străină „nu există”: nu confirmăm nici că există
+    if not sub or (user["role"] != "trainer" and sub["author_key"] != user["key"]):
+        fail(404, "no_submission")
+    return sub
+
+
+@app.get("/api/submissions")
+def list_submissions(user: dict = Depends(current_user)):
+    items = db["submissions"]
+    if user["role"] != "trainer":
+        items = [x for x in items if x["author_key"] == user["key"]]
+    return [submission_view(x, user) for x in reversed(items)]
+
+
+@app.post("/api/submissions", status_code=201)
+async def create_submission(
+    kind: str = Form("homework"),
+    title: str = Form("", max_length=200),
+    note: str = Form("", max_length=4000),
+    link: str = Form("", max_length=500),
+    checklist: list[str] = Form([]),
+    files: list[UploadFile] = File([]),
+    user: dict = Depends(require_student),
+):
+    title, note, link = title.strip(), note.strip(), link.strip()
+    if not title:
+        fail(400, "need_title")
+    if link and not re.match(r"^https?://", link, re.IGNORECASE):
+        fail(400, "bad_link")
+    files = [f for f in files if f.filename]
+    if len(files) > MAX_FILES:
+        fail(400, "too_many_files", MAX_FILES)
+    if not (files or link or note):
+        fail(400, "empty_submission")
+
+    # Validăm tot înainte să scriem ceva pe disc
+    accepted = []
+    for f in files:
+        name = safe_filename(f.filename)
+        if Path(name).suffix.lower() not in ALLOWED_EXTENSIONS:
+            fail(400, "bad_file_type", name)
+        content = await f.read(MAX_FILE_BYTES + 1)
+        if len(content) > MAX_FILE_BYTES:
+            fail(400, "file_too_big", name)
+        accepted.append((name, content))
+
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    stored_files = []
+    for name, content in accepted:
+        stored = uuid.uuid4().hex
+        (UPLOAD_DIR / stored).write_bytes(content)
+        stored_files.append({"id": uuid.uuid4().hex[:12], "name": name, "size": len(content), "stored": stored})
+
+    with _lock:
+        sub = {
+            "id": next_id(),
+            "kind": kind if kind in SUBMISSION_KINDS else "other",
+            "title": title,
+            "note": note,
+            "link": link,
+            "checklist": [c for c in CHECKLIST if c in checklist],
+            "files": stored_files,
+            "author": user["name"],
+            "author_key": user["key"],
+            "created_at": now(),
+            "status": "sent",
+            "feedback": None,
+            "reviewed_at": None,
+        }
+        db["submissions"].append(sub)
+        save_db()
+    return submission_view(sub, user)
+
+
+@app.get("/api/submissions/{submission_id}/files/{file_id}")
+def download_file(submission_id: int, file_id: str, user: dict = Depends(current_user)):
+    sub = find_submission(submission_id, user)
+    f = next((f for f in sub["files"] if f["id"] == file_id), None)
+    path = UPLOAD_DIR / f["stored"] if f else None
+    if not path or not path.exists():
+        fail(404, "no_submission")
+    # Mereu descărcare, niciodată afișat în pagină (un .html încărcat nu poate rula cod)
+    return FileResponse(path, filename=f["name"], media_type="application/octet-stream",
+                        headers={"X-Content-Type-Options": "nosniff"})
+
+
+@app.post("/api/submissions/{submission_id}/review")
+def review_submission(submission_id: int, body: ReviewIn, user: dict = Depends(require_trainer)):
+    with _lock:
+        sub = find_submission(submission_id, user)
+        sub["status"] = body.status
+        sub["feedback"] = body.feedback.strip() or None
+        sub["reviewed_at"] = now()
+        save_db()
+    return submission_view(sub, user)
 
 
 # ---------------------------------------------------------------------------

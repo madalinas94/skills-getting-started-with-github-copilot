@@ -1,6 +1,6 @@
 const $ = (sel) => document.querySelector(sel);
 // Răspunsul despre „problema” rezolvată se adaugă la descriere
-const TARGET_FIELD = { problem: "description" };
+const TARGET_FIELD = { problem: "description", features: "description", data: "description", size: "description" };
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 let auth = null;
@@ -10,6 +10,11 @@ let lang = document.documentElement.lang === "en" ? "en" : "ro";
 let cfg = { ai: false, topics: Object.keys(TOPICS) };
 let questions = [];
 let proposals = [];
+let submissions = [];
+let currentView = "home";
+let selectedKind = "homework";
+let pendingFiles = [];
+const CHECKLIST = ["features", "privacy", "ai_consent", "github_readme", "no_keys", "trainer_access"];
 let lastMissing = [];
 let lastStats = {};
 let selectedTopic = "prompting";
@@ -50,10 +55,12 @@ function setLang(next) {
     renderHeader();
     renderChips();
     renderTopicFilter();
+    renderSubmissionForm();
     renderQuestions();
+    renderSubmissions();
     renderProposals();
     renderGuide();
-    renderStats(true);
+    renderHome(true);
     if (!$("#drawer").classList.contains("hidden")) openTopic($("#drawer").dataset.topic);
   }
 }
@@ -315,6 +322,21 @@ function renderHeader() {
   $("#greet-eyebrow").textContent = t(isTrainer() ? "greet.trainer" : "greet.student");
   $("#greet-title").textContent = `${hello}, ${auth.name.split(/\s+/)[0]} 👋`;
   $("#questions-title").textContent = t(isTrainer() ? "q.class" : "q.mine");
+  $("#submissions-title").textContent = t(isTrainer() ? "s.all" : "s.mine");
+  $("#nav-private-label").textContent = t(isTrainer() ? "nav.privateT" : "nav.private");
+  $("#home-lead").textContent = t(isTrainer() ? "home.leadT" : "home.lead");
+  $("#home-recent-title").textContent = t(isTrainer() ? "home.recentT" : "home.recent");
+  $("#q-lead").textContent = t(isTrainer() ? "q.leadT" : "q.lead");
+  $("#s-lead").textContent = t(isTrainer() ? "s.viewLeadT" : "s.viewLead");
+  document.querySelectorAll("[data-space]").forEach((n) => {
+    n.textContent = n.dataset.space === "public" ? t("space.public") : t(isTrainer() ? "space.privateT" : "space.private");
+  });
+  const ai = t(cfg.ai ? "status.aiOn" : "status.aiOff");
+  $("#ai-status").textContent = (cfg.ai ? "● " : "○ ") + ai;
+  $("#sb-ai").textContent = ai;
+  $("#sb-online").textContent = t("status.online");
+  $("#sb-lang").textContent = `${lang.toUpperCase()} · vibe coding · ${auth.name}`;
+  updateStatusSpace();
 }
 
 async function start() {
@@ -333,27 +355,39 @@ async function start() {
   $("#user-avatar").replaceWith(av);
   renderHeader();
   document.querySelectorAll(".student-only").forEach((n) => n.classList.toggle("hidden", isTrainer()));
-  document.querySelector('.tab[data-tab="questions"]').click();
   lastStats = {};
   renderChips();
   renderTopicFilter();
+  renderSubmissionForm();
+  showView("home");
   refresh();
 }
 
 // ================================================================ tabs & shortcuts
 
-function showTab(name) {
-  document.querySelectorAll(".tab").forEach((tb) => tb.classList.toggle("active", tb.dataset.tab === name));
-  document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.id !== `tab-${name}`));
+const VIEW_SPACE = { home: null, questions: "private", submissions: "private", box: "public", guide: "public" };
+
+function showView(name) {
+  currentView = name;
+  document.querySelectorAll(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
+  document.querySelectorAll(".view").forEach((v) => v.classList.toggle("hidden", v.id !== `view-${name}`));
+  updateStatusSpace();
+  window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
 }
 
-document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => showTab(tab.dataset.tab)));
+function updateStatusSpace() {
+  const space = VIEW_SPACE[currentView];
+  $("#sb-space").textContent = space ? t(space === "public" ? "space.public" : "space.private") : "⌂ " + t("nav.home");
+}
+
+document.querySelectorAll(".nav-item").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
+document.querySelectorAll("[data-goto]").forEach((b) => b.addEventListener("click", () => showView(b.dataset.goto)));
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeTopic();
   const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
   if (e.key === "/" && !typing && auth) {
-    const search = document.querySelector('.tab-panel:not(.hidden) input[type="search"]');
+    const search = document.querySelector('.view:not(.hidden) input[type="search"]');
     if (search) { e.preventDefault(); search.focus(); }
   }
   // Ctrl/Cmd + Enter trimite formularul în care scrii
@@ -370,15 +404,15 @@ function renderStats(instant = false) {
   const stats = isTrainer()
     ? [
         ["open", questions.length - answered, "stat.open", true],
-        ["answered", answered, "stat.answeredT"],
+        ["toReview", submissions.filter((x) => x.status === "sent").length, "act.reviewT", true],
         ["proposals", proposals.length, "stat.proposalsT"],
         ["chosen", proposals.filter((p) => p.chosen).length, "stat.chosen"],
       ]
     : [
         ["mine", questions.length, "stat.mine"],
         ["answered", answered, "stat.answered", answered > 0],
+        ["subs", submissions.length, "nav.submissions"],
         ["proposals", proposals.length, "stat.proposals"],
-        ["votes", proposals.filter((p) => p.voted).length, "stat.votes"],
       ];
 
   $("#stats").replaceChildren(...stats.map(([key, value, label, hl]) => {
@@ -386,7 +420,7 @@ function renderStats(instant = false) {
     const b = el("b", {}, String(from));
     countUp(b, from, value);
     lastStats[key] = value;
-    return el("div", { class: `stat ${hl ? "hl" : ""}` }, b, el("span", {}, t(label)));
+    return el("div", { class: `stat ${hl && value ? "hl" : ""}` }, b, el("span", {}, t(label)));
   }));
 }
 
@@ -461,8 +495,8 @@ $("#question-topic").addEventListener("change", renderQuestions);
 async function loadQuestions() {
   questions = await api("/api/questions");
   renderQuestions();
-  renderStats();
   renderGuide();
+  renderHome();
 }
 
 function renderQuestions() {
@@ -633,7 +667,7 @@ function openTopic(key) {
         selectedTopic = cfg.topics.includes(key) ? key : "other";
         renderChips();
         closeTopic();
-        showTab("questions");
+        showView("questions");
         $("#question-text").focus();
       },
     }, t("g.ask")));
@@ -818,7 +852,7 @@ $("#proposal-sort").addEventListener("change", renderProposals);
 async function loadProposals() {
   proposals = await api("/api/proposals");
   renderProposals();
-  renderStats();
+  renderHome();
 }
 
 function renderProposals() {
@@ -888,11 +922,275 @@ async function act(path) {
   }
 }
 
+// ================================================================ home
+
+function renderHome(instant = false) {
+  if (!auth) return;
+  renderStats(instant);
+  const open = questions.filter((q) => !q.answer).length;
+  const toReview = submissions.filter((x) => x.status === "sent").length;
+  const actions = isTrainer()
+    ? [
+        ["questions", 330, open, "act.answerT", "nav.questions"],
+        ["submissions", 190, toReview, "act.reviewT", "nav.submissions"],
+        ["box", 265, proposals.length, "act.ideasT", "nav.box"],
+        ["guide", 150, "#", "act.guideT", "nav.guide"],
+      ].map(([view, h, num, label, title]) => el("button", { class: "action-card", style: `--h:${h}`, onclick: () => showView(view) },
+        el("span", { class: "big-num" }, String(num)), el("b", {}, t(title)), el("span", { class: "d" }, t(label))))
+    : [
+        ["questions", 330, "?", "act.ask", "act.askD", () => $("#question-text").focus()],
+        ["submissions", 190, "⇪", "act.submit", "act.submitD", () => $("#s-title").focus()],
+        ["box", 265, "✦", "act.idea", "act.ideaD", () => $("#p-description").focus()],
+        ["guide", 150, "#", "act.learn", "act.learnD", null],
+      ].map(([view, h, ico, title, desc, focus]) => el("button", {
+        class: "action-card", style: `--h:${h}`,
+        onclick: () => { showView(view); if (focus) setTimeout(focus, 50); },
+      }, el("span", { class: "ico mono" }, ico), el("b", {}, t(title)), el("span", { class: "d" }, t(desc))));
+  actions.forEach((a, i) => (a.style.animationDelay = `${i * 60}ms`));
+  $("#actions").replaceChildren(...actions);
+
+  // Privat: ultimele întrebări și predări, amestecate după dată
+  const recent = [
+    ...questions.map((q) => ({ at: q.created_at, view: "questions", k: topic(q.category).icon, text: q.text,
+      status: el("span", { class: `status ${q.answer ? "ok" : "open"}` }, t(q.answer ? "q.statusOk" : "q.statusOpen")) })),
+    ...submissions.map((x) => ({ at: x.created_at, view: "submissions", k: t("kind." + x.kind).split(" ")[0], text: x.title,
+      status: el("span", { class: `status ${x.status}` }, t("st." + x.status)) })),
+  ].sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, 5);
+  $("#home-recent").replaceChildren(...(recent.length ? recent.map((it) =>
+    el("button", { class: "mini", onclick: () => showView(it.view) },
+      el("span", { class: "k" }, it.k), el("span", { class: "t" }, it.text), it.status))
+    : [el("div", { class: "empty" }, t("home.nothing"))]));
+
+  const top = [...proposals].sort((a, b) => b.votes - a.votes || b.id - a.id).slice(0, 5);
+  $("#home-top").replaceChildren(...(top.length ? top.map((p) =>
+    el("button", { class: "mini", onclick: () => showView("box") },
+      el("span", { class: "k" }, p.chosen ? "★" : "✦"), el("span", { class: "t" }, p.title),
+      el("span", { class: "votes" }, `▲ ${p.votes}`)))
+    : [el("div", { class: "empty" }, t("home.nothing"))]));
+}
+
+// ================================================================ teme & proiecte (privat)
+
+function richText(src) {
+  // Textele pașilor au <b>…</b>; le transformăm în noduri, fără innerHTML
+  return src.split(/(<b>.*?<\/b>)/).filter(Boolean).map((part) =>
+    part.startsWith("<b>") ? el("b", {}, part.slice(3, -4)) : part);
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function renderSubmissionForm() {
+  $("#kind-chips").replaceChildren(...["homework", "project", "other"].map((k, i) =>
+    el("button", {
+      type: "button", class: `chip ${k === selectedKind ? "on" : ""}`, style: `--h:${[190, 265, 330][i]}`,
+      onclick: () => { selectedKind = k; renderSubmissionForm(); },
+    }, t("kind." + k))));
+  const ticked = new Set([...document.querySelectorAll("#checklist input:checked")].map((c) => c.value));
+  $("#checklist").replaceChildren(...CHECKLIST.map((key) => {
+    const box = el("input", { type: "checkbox", value: key });
+    box.checked = ticked.has(key);
+    return el("label", { class: "ck" }, box, el("span", {}, t("s.ck." + key)));
+  }));
+  $("#checklist-box").classList.toggle("hidden", selectedKind === "other");
+  $("#howto-steps").replaceChildren(...[1, 2, 3, 4, 5].map((n) => el("li", {}, richText(t("s.step" + n)))));
+  renderPendingFiles();
+  renderStatusFilter();
+}
+
+function renderPendingFiles() {
+  $("#file-list").replaceChildren(...pendingFiles.map((f, i) =>
+    el("span", { class: "file-chip" }, "📄 ", el("span", { class: "n" }, f.name), el("span", { class: "sz" }, formatSize(f.size)),
+      el("button", { type: "button", class: "ghost", title: t("s.remove"), onclick: () => { pendingFiles.splice(i, 1); renderPendingFiles(); } }, "✕"))));
+}
+
+function addFiles(list) {
+  for (const f of list) {
+    if (pendingFiles.length >= 5) break;
+    if (!pendingFiles.some((p) => p.name === f.name && p.size === f.size)) pendingFiles.push(f);
+  }
+  renderPendingFiles();
+}
+
+const dz = $("#dropzone");
+dz.addEventListener("click", () => $("#s-files").click());
+dz.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("#s-files").click(); } });
+$("#s-files").addEventListener("change", (e) => { addFiles(e.target.files); e.target.value = ""; });
+["dragenter", "dragover"].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add("over"); }));
+["dragleave", "drop"].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove("over"); }));
+dz.addEventListener("drop", (e) => addFiles(e.dataTransfer.files));
+
+// XHR în loc de fetch, ca să avem bară de progres la încărcare
+function uploadForm(form, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/submissions");
+    xhr.setRequestHeader("Authorization", `Bearer ${auth.token}`);
+    xhr.setRequestHeader("X-Lang", lang);
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
+    xhr.onload = () => {
+      let data = {};
+      try { data = JSON.parse(xhr.responseText); } catch (_) {}
+      if (xhr.status === 401) logout();
+      if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+      else reject(new Error(Array.isArray(data.detail) ? t("err.check") : data.detail || t("err.generic")));
+    };
+    xhr.onerror = () => reject(new Error(t("err.generic")));
+    xhr.send(form);
+  });
+}
+
+$("#submission-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("#submission-error").textContent = "";
+  const form = new FormData();
+  form.append("kind", selectedKind);
+  form.append("title", $("#s-title").value);
+  form.append("link", $("#s-link").value);
+  form.append("note", $("#s-note").value);
+  if (selectedKind !== "other") {
+    document.querySelectorAll("#checklist input:checked").forEach((c) => form.append("checklist", c.value));
+  }
+  pendingFiles.forEach((f) => form.append("files", f, f.name));
+
+  const btn = $("#s-send");
+  const bar = $("#upload-progress");
+  btn.disabled = true;
+  btn.textContent = t("s.uploading");
+  bar.classList.remove("hidden");
+  bar.firstElementChild.style.width = "0";
+  try {
+    await uploadForm(form, (k) => (bar.firstElementChild.style.width = `${Math.round(k * 100)}%`));
+    ["#s-title", "#s-link", "#s-note"].forEach((id) => ($(id).value = ""));
+    pendingFiles = [];
+    document.querySelectorAll("#checklist input").forEach((c) => (c.checked = false));
+    renderPendingFiles();
+    confetti();
+    toast(t("s.sent"));
+    loadSubmissions();
+  } catch (err) {
+    $("#submission-error").textContent = err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t("s.send");
+    setTimeout(() => bar.classList.add("hidden"), 600);
+  }
+});
+
+async function downloadFile(sub, file) {
+  try {
+    const res = await fetch(`/api/submissions/${sub.id}/files/${file.id}`, {
+      headers: { Authorization: `Bearer ${auth.token}`, "X-Lang": lang },
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || t("err.generic"));
+    const url = URL.createObjectURL(await res.blob());
+    const a = el("a", { href: url, download: file.name });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (err) { toast(err.message); }
+}
+
+function renderStatusFilter() {
+  const select = $("#submission-status");
+  const current = select.value || "all";
+  select.replaceChildren(el("option", { value: "all" }, t("s.allStatus")),
+    ...["sent", "received", "reviewed", "redo"].map((st) => el("option", { value: st }, t("st." + st))));
+  select.value = current;
+}
+
+$("#submission-search").addEventListener("input", renderSubmissions);
+$("#submission-status").addEventListener("change", renderSubmissions);
+
+async function loadSubmissions() {
+  submissions = await api("/api/submissions");
+  renderSubmissions();
+  renderHome();
+}
+
+function renderSubmissions() {
+  const term = $("#submission-search").value.trim().toLowerCase();
+  const status = $("#submission-status").value || "all";
+  const shown = submissions.filter((x) =>
+    (status === "all" || x.status === status) &&
+    (!term || `${x.title} ${x.note} ${x.link} ${x.author}`.toLowerCase().includes(term)));
+
+  const pending = submissions.filter((x) => x.status === "sent").length;
+  $("#s-badge").textContent = pending;
+  $("#s-badge").classList.toggle("hidden", !isTrainer() || pending === 0);
+
+  const list = $("#submissions-list");
+  if (!shown.length) {
+    list.replaceChildren(el("div", { class: "empty" }, t(submissions.length ? "q.emptyFilter" : isTrainer() ? "s.emptyT" : "s.empty")));
+    return;
+  }
+  list.replaceChildren(...shown.map((x, i) => {
+    const card = submissionCard(x);
+    card.style.animationDelay = `${Math.min(i, 8) * 40}ms`;
+    return card;
+  }));
+}
+
+function submissionCard(x) {
+  const card = el("article", { class: "item" },
+    el("div", { class: "item-head" },
+      isTrainer() ? avatar(x.author) : null,
+      isTrainer() ? el("strong", {}, x.author) : null,
+      el("span", { class: "tag" }, t("kind." + x.kind)),
+      el("span", {}, timeAgo(x.created_at)),
+      x.kind !== "other" ? el("span", { class: "ck-meter" }, `${t("s.check")} `, el("b", {}, `${x.checklist.length}/${CHECKLIST.length}`)) : null,
+      el("span", { class: `right status ${x.status}` }, t("st." + x.status))),
+    el("h3", {}, x.title));
+
+  if (x.note) card.append(el("p", { class: "item-text" }, x.note));
+  // Serverul acceptă doar linkuri http(s); verificăm și aici înainte să-l facem clicabil
+  if (x.link && /^https?:\/\//i.test(x.link)) {
+    card.append(el("a", { class: "sub-link", href: x.link, target: "_blank", rel: "noopener noreferrer" }, "↗ ", x.link));
+  }
+  if (x.files.length) {
+    card.append(el("div", { class: "file-list" }, x.files.map((f) =>
+      el("span", { class: "file-chip" }, "📄 ", el("span", { class: "n" }, f.name), el("span", { class: "sz" }, formatSize(f.size)),
+        el("button", { type: "button", class: "small", onclick: () => downloadFile(x, f) }, "↓ ", t("s.download"))))));
+  }
+  if (x.feedback) {
+    card.append(el("div", { class: "answer" },
+      el("div", { class: "label" }, t("s.feedback"), el("span", { class: "muted" }, ` · ${timeAgo(x.reviewed_at)}`)),
+      renderMd(x.feedback)));
+  }
+
+  if (isTrainer()) {
+    let chosen = x.status === "sent" ? "received" : x.status;
+    const area = el("textarea", { rows: 3, placeholder: t("s.feedbackPh") });
+    area.value = x.feedback || "";
+    const seg = el("div", { class: "seg" });
+    const drawSeg = () => seg.replaceChildren(...["received", "reviewed", "redo"].map((st) =>
+      el("button", { type: "button", class: `small ${st === chosen ? "on" : ""}`, onclick: () => { chosen = st; drawSeg(); } }, t("st." + st))));
+    drawSeg();
+    const form = el("form", { class: "review-form hidden" }, seg, area,
+      el("div", { class: "row end" }, el("button", { type: "submit", class: "primary small" }, t("s.saveReview"))));
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        await api(`/api/submissions/${x.id}/review`, { method: "POST", body: { status: chosen, feedback: area.value } });
+        toast(t("s.reviewed"));
+        loadSubmissions();
+      } catch (err) { toast(err.message); }
+    });
+    card.append(el("div", { class: "actions" },
+      el("button", { class: "small", onclick: () => { form.classList.toggle("hidden"); area.focus(); } }, "✎ ", t("s.review"))), form);
+  }
+  return card;
+}
+
 // ================================================================ boot
 
 async function refresh() {
   try {
-    await Promise.all([loadQuestions(), loadProposals()]);
+    await Promise.all([loadQuestions(), loadProposals(), loadSubmissions()]);
   } catch (err) { toast(err.message); }
 }
 
@@ -901,6 +1199,7 @@ setInterval(() => {
   if (!auth || document.hidden || $("#app-view").classList.contains("hidden")) return;
   // Nu redesenăm întrebările cât timp cineva scrie un răspuns sau așteaptă AI-ul
   if (!document.querySelector(".answer-form:not(.hidden)") && aiPending.size === 0) loadQuestions().catch(() => {});
+  if (!document.querySelector(".review-form:not(.hidden)")) loadSubmissions().catch(() => {});
   loadProposals().catch(() => {});
 }, 15000);
 
