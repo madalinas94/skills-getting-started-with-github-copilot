@@ -27,7 +27,8 @@
 - **Robotul de bun venit (3D):** un robot construit în Three.js urcă pe ecran, îți face cu mâna, te urmărește cu privirea și îți spune „Salut, Madalina!”. După 7 secunde se deschide interfața (sau apeși „Sari peste”). Se poate opri din Setări și nu apare dacă ai animațiile oprite.
 - **Propunerile mele:** trimiți câte propuneri vrei și le vezi pe toate într-un loc. O propunere se poate **retrage** (de exemplu „✓ Am rezolvat problema”, cu un mesaj opțional): iese din cutia publică, dar autorul și trainerul o văd în continuare, iar autorul o poate pune înapoi oricând.
 - **Ciorne:** propunerile la care lucrezi se salvează automat pe server (cel mult 20 per student), le continui oricând din „Ciornele mele”. Textul nescris din întrebări, mesaje și teme rămâne în browser până îl trimiți și se șterge la „Ieși”, ca să nu-l vadă următorul pe un calculator comun.
-- **Conturi cu email + parolă** (sau **Google**, dacă e configurat). Trainerul e recunoscut după email. Cod de clasă opțional, ca doar colegii tăi să-și poată face cont.
+- **Conturi prin Supabase Auth** (recomandat): confirmare pe email la cont nou, „Ai uitat parola?” cu link pe email, „Continuă cu Google” și parole păstrate de Supabase, nu de noi. Serverul verifică la Supabase fiecare token înainte să te lase să intri.
+- **Fără Supabase:** conturi cu email + parolă (sau **Google**, dacă e configurat). Trainerul e recunoscut după email. Cod de clasă opțional, ca doar colegii tăi să-și poată face cont.
 - **Numele tău, automat:** sesiunea rămâne activă (și după repornirea serverului). Aplicația te salută pe nume peste tot, iar la revenire îți spune „Bine ai revenit, Madalina!”.
 - **Mesaje directe** student ↔ trainer, cu mesaje necitite și notificări.
 - **Teme anunțate de trainer** cu termen, puncte și numărătoare inversă; **anunțuri** fixate pe pagina de acasă.
@@ -59,7 +60,7 @@ Deschide http://localhost:8000.
 - **Cum intri:** cu **emailul tău personal și o parolă** (minim 8 caractere). Prima dată alegi „Cont nou”. Dacă serverul are `GOOGLE_CLIENT_ID`, apare și butonul **„Continuă cu Google”**.
 - **Trainerul:** emailul lui e în `TRAINER_EMAILS`, așa că intră direct ca trainer. Alternativ, își face cont cu codul de trainer (`TRAINER_CODE`).
 - **Doar clasa ta:** dacă setezi `CLASS_CODE`, un student își poate face cont doar cu codul clasei, primit de la trainer.
-- **Ai uitat parola?** Trainerul îți generează o parolă temporară (Puncte → „Parolă temporară”), iar tu o schimbi din Setări.
+- **Ai uitat parola?** Cu Supabase: „Ai uitat parola? Primești un link pe email.” (sau trainerul îți trimite linkul din Puncte). Fără Supabase: trainerul îți generează o parolă temporară, iar tu o schimbi din Setări.
 - **Fără cheie API** aplicația merge complet: propunerile se retușează local, la întrebări apar sfaturi din ghid, iar știrile sunt filtrate automat (fără explicațiile lui Claude).
 - **AI News** are nevoie de acces la internet pe server, ca să citească sursele.
 
@@ -69,13 +70,26 @@ Deschide http://localhost:8000.
 | `TRAINER_EMAILS` | – | Emailurile trainerilor, separate prin virgulă. |
 | `TRAINER_CODE` | `trainer` | Codul cu care un trainer își poate face cont. Schimbă-l! |
 | `CLASS_CODE` | – | Dacă e setat, studenții au nevoie de el ca să-și facă cont. |
-| `GOOGLE_CLIENT_ID` | – | Activează „Continuă cu Google” (Client ID din Google Cloud Console). |
+| `SUPABASE_URL` | – | Adresa proiectului Supabase (`https://xxxx.supabase.co`). Împreună cu cheia de mai jos, pornește conturile prin Supabase. |
+| `SUPABASE_ANON_KEY` | – | Cheia **anon / publishable** a proiectului. Niciodată `service_role`. |
+| `GOOGLE_CLIENT_ID` | – | Fără Supabase: activează „Continuă cu Google” (Client ID din Google Cloud Console). |
 | `CUTIA_AI` | `auto` | `auto` / `on` / `off` |
 | `CUTIA_MODEL` | `claude-opus-5-5` | Modelul Claude. |
 | `CUTIA_DATA` | `data/cutia.json` | Unde se salvează datele. |
 | `CUTIA_UPLOADS` | `data/uploads` | Unde se salvează fișierele încărcate. |
 | `CUTIA_NEWS_FEEDS` | sursele de mai sus | Alte surse: `Nume\|https://...,Nume\|https://...` |
 | `CUTIA_NEWS_CACHE` | `7200` | Cât timp (secunde) păstrăm știrile înainte să le recitim. |
+
+### Conturi prin Supabase (pas cu pas)
+
+1. Fă-ți cont gratuit pe [supabase.com](https://supabase.com) și creează un proiect nou.
+2. **Project Settings → API**: copiază *Project URL* în `SUPABASE_URL` și cheia *anon public* în `SUPABASE_ANON_KEY` (în `.env` sau la serverul de hosting).
+3. **Authentication → Sign In / Providers → Email**: lasă **Confirm email** pornit. Doar așa știm că emailul chiar e al tău (altfel oricine s-ar putea înscrie cu emailul trainerului).
+4. **Authentication → URL Configuration**: pune la *Site URL* adresa aplicației (de exemplu `http://localhost:8000/static/index.html`, apoi linkul live) și adaug-o și la *Redirect URLs*. Acolo te întorc linkurile din email.
+5. (opțional) **Google**: în *Sign In / Providers → Google* pui Client ID și Secret din Google Cloud Console; butonul „Continuă cu Google” apare singur.
+6. Repornește serverul. Pe pagina de intrare apare „🔐 conturi securizate prin Supabase”.
+
+Datele (întrebări, teme, idei) rămân tot în `data/cutia.json`, legate de email; dacă aveai deja cont cu același email, îți păstrezi tot.
 
 **Teste:** `pytest` (acces cu două conturi, mesaje private, puncte, upload, știri, AI și toate cele 6 limbi).
 
@@ -87,6 +101,7 @@ Deschide http://localhost:8000.
 - Toate regulile de acces se verifică pe server și sunt testate cu două conturi: studentul B nu vede întrebările, temele, fișierele sau mesajele studentului A.
 - Sesiunile se salvează doar ca hash, iar parolele ca hash PBKDF2. „Ieși” închide sesiunea pe server.
 - După 5 parole greșite, contul se blochează 10 minute. Același mesaj pentru email greșit și parolă greșită, ca să nu se poată afla cine are cont.
+- Supabase: parolele stau la Supabase, nu la noi. Orice token venit din browser (linkul din email, Google) e verificat de server la Supabase înainte de a deschide o sesiune, iar din bara de adrese e șters imediat. Pe server stă doar anon key, niciodată `service_role`. Emailul din `TRAINER_EMAILS` dă rol de trainer doar dacă emailul e dovedit (confirmare pe email sau Google).
 - Google: tokenul semnat de Google se verifică pe server (cu biblioteca oficială `google-auth`), doar pentru emailuri verificate.
 - Punctele se calculează pe server din activitatea reală, nu pot fi modificate din browser; nu îți poți vota propria idee.
 - Fișierele se salvează cu nume aleatorii și se descarcă doar ca atașament, după verificarea accesului.
@@ -101,6 +116,7 @@ Deschide http://localhost:8000.
 - **Aplicația trebuie să meargă și fără AI** → mod local pentru retușare, sfaturi din ghid și filtru automat de știri.
 - **AI-ul nu decide în locul studentului** → răspuns structurat (JSON), maxim 3 întrebări, trimitere doar cu aprobare verificată pe server.
 - **Clasa e internațională** → toate textele în `src/static/i18n/<limbă>.js`; se încarcă doar limba aleasă; un test verifică să nu lipsească nicio traducere.
+- **Parolele și emailurile de resetare sunt greu de făcut bine singur** → Supabase Auth (opțional), apelat de pe server prin API-ul REST, fără supabase-js (fără build, fără dependențe noi).
 - **Simplu de rulat la curs** → FastAPI + HTML/CSS/JS fără build; datele într-un fișier JSON.
 - **Robotul 3D trebuie să meargă oriunde, fără CDN** → Three.js și fonturile sunt incluse local (`src/static/vendor/`, `src/static/fonts/`); fără WebGL sau cu animațiile oprite, intri direct în aplicație.
 - **Design elegant, nu încărcat** → puține culori (lavandă, cer, roz, piersică), mult spațiu, fără strălucire neon; serif pentru titluri, sans pentru text.
@@ -112,6 +128,7 @@ src/app.py               API (FastAPI): conturi, mesaje, întrebări, teme, idei
 src/ai.py                Modulul AI (Claude): retușarea ideilor + tutorul pentru întrebări
 src/news.py              AI News: surse RSS/Atom, filtrare, cache, alegere cu Claude
 src/points.py            Puncte, niveluri și badge-uri
+src/supa.py              Conturi prin Supabase Auth (opțional): verificare token, resetare parolă
 src/static/              Interfața: index.html, app.js, styles.css
 src/static/i18n/         Textele în 6 limbi (ro, en, fr, it, es, de)
 src/static/intro.js      Robotul 3D de bun venit (Three.js)

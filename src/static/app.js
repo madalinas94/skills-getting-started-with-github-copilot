@@ -106,7 +106,7 @@ async function api(path, options = {}) {
   if (res.status === 401 && auth) logout(true);
   if (!res.ok) {
     const detail = Array.isArray(data.detail) ? t("err.check") : data.detail;
-    throw new Error(detail || t("err.generic"));
+    throw Object.assign(new Error(detail || t("err.generic")), { status: res.status });
   }
   return data;
 }
@@ -316,9 +316,15 @@ function renderLogin() {
   const last = lastUser();
   const first = last && last.name ? last.name.split(/\s+/)[0] : null;
   const up = authMode === "up";
+  // „reset” = parolă nouă din linkul de pe email; „code” = lipsește codul clasei după Google / confirmare
+  const special = authMode === "reset" || authMode === "code";
   // Numele tău apare automat data viitoare: „Bine ai revenit, Madalina!”
-  $("#login-title").textContent = first && !up ? t("login.welcomeBack", first) : t("login.title");
-  $("#not-you").classList.toggle("hidden", !first || up);
+  $("#login-title").textContent = special ? t(authMode === "reset" ? "login.resetTitle" : "login.codeTitle")
+    : first && !up ? t("login.welcomeBack", first) : t("login.title");
+  $("#not-you").classList.toggle("hidden", !first || up || special);
+  $(".auth-tabs").classList.toggle("hidden", special);
+  $("#email-field").classList.toggle("hidden", special);
+  $("#password-field").classList.toggle("hidden", authMode === "code");
   if (first) {
     $("#not-you-btn").textContent = t("login.notYou", first);
     if (!$("#login-email").value && last.email) $("#login-email").value = last.email;
@@ -328,20 +334,29 @@ function renderLogin() {
     b.setAttribute("aria-selected", String(b.dataset.auth === authMode));
   });
   $("#name-field").classList.toggle("hidden", !up);
-  $("#class-field").classList.toggle("hidden", !up || !cfg.class_code_required);
+  $("#class-field").classList.toggle("hidden", !(up && cfg.class_code_required) && authMode !== "code");
   $("#trainer-field").classList.toggle("hidden", !up);
-  $("#login-password").placeholder = t(up ? "login.passwordNewPh" : "login.passwordPh");
-  $("#login-password").autocomplete = up ? "new-password" : "current-password";
-  $("#auth-hint").textContent = up ? t("login.hintNew") : "";
-  $("#auth-submit").textContent = t(up ? "login.create" : "login.submit");
-  $("#forgot").classList.toggle("hidden", up);
+  const newPass = up || authMode === "reset";
+  $("#login-password").placeholder = t(newPass ? "login.passwordNewPh" : "login.passwordPh");
+  $("#login-password").autocomplete = newPass ? "new-password" : "current-password";
+  $("#auth-hint").textContent = up ? t(cfg.supabase ? "login.hintSupabase" : "login.hintNew") : "";
+  $("#auth-submit").textContent = t({ up: "login.create", reset: "login.resetSave", code: "login.codeSave" }[authMode] || "login.submit");
+  $("#forgot").classList.toggle("hidden", up || special || !!cfg.supabase);
+  $("#forgot-supa").classList.toggle("hidden", up || special || !cfg.supabase);
+  $("#secured-by").classList.toggle("hidden", !cfg.supabase);
   renderMarquee();
   setupGoogle();
+}
+
+function loginInfo(text) {
+  $("#login-info").textContent = text || "";
+  $("#login-info").classList.toggle("hidden", !text);
 }
 
 document.querySelectorAll(".auth-tabs button").forEach((b) => b.addEventListener("click", () => {
   authMode = b.dataset.auth;
   $("#login-error").textContent = "";
+  loginInfo("");
   renderLogin();
   (authMode === "up" ? $("#login-name") : $("#login-email")).focus();
 }));
@@ -363,8 +378,19 @@ async function finishLogin(data) {
 $("#login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   $("#login-error").textContent = "";
+  loginInfo("");
   const email = $("#login-email").value.trim();
   try {
+    if (authMode === "reset" || authMode === "code") {
+      const data = authMode === "reset"
+        ? await api("/api/auth/supabase/new-password", { method: "POST", body: { access_token: supaToken, password: $("#login-password").value } })
+        : await api("/api/auth/supabase", { method: "POST", body: { access_token: supaToken, class_code: $("#login-class").value } });
+      supaToken = null;
+      authMode = "in";
+      rememberUser(data.name, "");
+      await finishLogin(data);
+      return;
+    }
     const data = authMode === "up"
       ? await api("/api/register", {
           method: "POST",
@@ -374,6 +400,14 @@ $("#login-form").addEventListener("submit", async (e) => {
           },
         })
       : await api("/api/login", { method: "POST", body: { email, password: $("#login-password").value } });
+    if (data.confirm_email) {
+      // Supabase a trimis emailul de confirmare: contul se activează din link
+      $("#login-password").value = "";
+      authMode = "in";
+      renderLogin();
+      loginInfo(t("login.confirmSent", email));
+      return;
+    }
     rememberUser(data.name, email);
     await finishLogin(data);
   } catch (err) {
@@ -381,10 +415,83 @@ $("#login-form").addEventListener("submit", async (e) => {
   }
 });
 
+// ---------------------------------------------------------------- Supabase (dacă serverul are SUPABASE_URL)
+// Tokenul primit înapoi de la Supabase (linkul din email sau Google) stă doar în memorie
+// până îl verifică serverul; din bara de adrese îl ștergem imediat.
+let supaToken = null;
+
+$("#forgot-btn").addEventListener("click", async () => {
+  $("#login-error").textContent = "";
+  const email = $("#login-email").value.trim();
+  if (!email) {
+    $("#login-error").textContent = t("login.needEmail");
+    $("#login-email").focus();
+    return;
+  }
+  try {
+    await api("/api/auth/supabase/recover", { method: "POST", body: { email } });
+    loginInfo(t("login.resetSent", email));
+  } catch (err) { $("#login-error").textContent = err.message; }
+});
+
+$("#supa-google").addEventListener("click", () => {
+  // Codul clasei (dacă l-ai scris) te așteaptă până te întorci de la Google
+  try { sessionStorage.setItem("cutia-class", $("#login-class").value); } catch (_) {}
+  const back = location.origin + location.pathname;
+  location.href = `${cfg.supabase.url}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(back)}`;
+});
+
+async function handleSupabaseReturn() {
+  const hash = new URLSearchParams(location.hash.slice(1));
+  if (!hash.has("access_token") && !hash.has("error")) return false;
+  history.replaceState(null, "", location.pathname + location.search);
+  if (!cfg.supabase) return false;
+  loginInfo("");
+  $("#login-error").textContent = "";
+  if (hash.has("error")) {
+    $("#login-error").textContent = t("login.linkError");
+    return true;
+  }
+  supaToken = hash.get("access_token");
+  if (hash.get("type") === "recovery") {
+    authMode = "reset";
+    renderLogin();
+    $("#login-password").focus();
+    return true;
+  }
+  let classCode = "";
+  try { classCode = sessionStorage.getItem("cutia-class") || ""; sessionStorage.removeItem("cutia-class"); } catch (_) {}
+  try {
+    const data = await api("/api/auth/supabase", { method: "POST", body: { access_token: supaToken, class_code: classCode } });
+    supaToken = null;
+    rememberUser(data.name, "");
+    await finishLogin(data);
+  } catch (err) {
+    if (err.status === 403 && cfg.class_code_required) {
+      authMode = "code";
+      renderLogin();
+      $("#login-class").focus();
+      if (!classCode) return true;  // titlul „Încă un pas: codul clasei” spune deja ce lipsește
+    }
+    $("#login-error").textContent = err.message;
+  }
+  return true;
+}
+
+// Linkul deschis în același tab (doar se schimbă #...) ajunge tot aici
+window.addEventListener("hashchange", () => handleSupabaseReturn());
+
 // ---------------------------------------------------------------- Google (doar dacă serverul are GOOGLE_CLIENT_ID)
 let googleReady = false;
 function setupGoogle() {
   const wrap = $("#google-wrap");
+  const special = authMode === "reset" || authMode === "code";
+  if (cfg.supabase) {
+    wrap.classList.toggle("hidden", !cfg.supabase.google || special);
+    $("#supa-google").classList.remove("hidden");
+    $("#google-btn").classList.add("hidden");
+    return;
+  }
   wrap.classList.toggle("hidden", !cfg.google_client_id);
   if (!cfg.google_client_id) return;
   const render = () => {
@@ -426,6 +533,7 @@ $("#logout-btn").addEventListener("click", () => logout());
 function logout(expired = false) {
   if (auth && !expired) fetch("/api/logout", { method: "POST", headers: { Authorization: `Bearer ${auth.token}` } }).catch(() => {});
   auth = null;
+  supaToken = null;
   try { localStorage.removeItem("cutia-auth"); } catch (_) {}
   // Pe un calculator comun, textul nescris al cuiva nu rămâne pe ecran pentru următorul
   [...LOCAL_DRAFTS, "#p-title", "#p-description", "#p-audience", "#f-title", "#f-description", "#f-audience"].forEach((sel) => ($(sel).value = ""));
@@ -1947,10 +2055,11 @@ function renderBoard() {
 $("#reset-pass").addEventListener("click", async () => {
   const key = $("#bonus-student").value;
   const student = students.find((x) => x.key === key);
-  if (!student || !confirm(t("pt.resetConfirm", student.name))) return;
+  if (!student || !confirm(t(cfg.supabase ? "pt.resetConfirmEmail" : "pt.resetConfirm", student.name))) return;
   try {
     const r = await api(`/api/students/${encodeURIComponent(key)}/reset-password`, { method: "POST" });
-    $("#reset-result").textContent = t("pt.resetDone", student.name, r.temporary_password);
+    $("#reset-result").textContent = r.email_sent ? t("pt.resetEmailSent", student.name)
+      : t("pt.resetDone", student.name, r.temporary_password);
   } catch (err) { toast(err.message); }
 });
 
@@ -2108,6 +2217,19 @@ function openSettings() {
 $("#settings-btn").addEventListener("click", openSettings);
 
 function passwordForm() {
+  // Cont Google prin Supabase: parola se pune din linkul primit pe email
+  if (cfg.supabase && auth.has_password === false) {
+    const send = el("button", { type: "button", class: "ghost small" }, t("set.sendLink"));
+    send.addEventListener("click", async () => {
+      try {
+        await api("/api/auth/supabase/recover", { method: "POST", body: { email: auth.email } });
+        send.disabled = true;
+        toast(t("set.linkSent"));
+      } catch (err) { toast(err.message); }
+    });
+    return el("div", { class: "set-group" }, el("h4", {}, t("set.password")),
+      el("p", { class: "muted small" }, t("set.passwordByEmail")), el("div", { class: "row end" }, send));
+  }
   const current = el("input", { type: "password", autocomplete: "current-password", maxlength: 200 });
   const next = el("input", { type: "password", autocomplete: "new-password", maxlength: 200, placeholder: t("login.passwordNewPh") });
   const error = el("p", { class: "error" });
@@ -2242,7 +2364,11 @@ setStep(1);
   try { await Promise.all([loadLang("en"), loadLang(lang)]); } catch (_) { lang = "en"; }
   applyI18n();
   try { cfg = await api("/api/config"); } catch (_) {}
+  if (cfg.supabase) $("#reset-pass").dataset.i18n = "pt.resetEmail";
+  applyI18n();
   renderLogin();
-  if (auth) start();
+  await handleSupabaseReturn();
+  if (!$("#app-view").classList.contains("hidden")) return;  // a intrat din linkul Supabase
+  if (auth && !supaToken) start();
   else runTerminal();
 })();

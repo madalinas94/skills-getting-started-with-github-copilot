@@ -43,11 +43,12 @@ def load_env_file(path: Path):
 load_env_file(current_dir.parent / ".env")
 
 try:
-    from . import ai, news, points
+    from . import ai, news, points, supa
 except ImportError:  # rulare directă: python app.py
     import ai
     import news
     import points
+    import supa
 
 DATA_FILE = Path(os.environ.get("CUTIA_DATA", current_dir.parent / "data" / "cutia.json"))
 UPLOAD_DIR = Path(os.environ.get("CUTIA_UPLOADS", DATA_FILE.parent / "uploads"))
@@ -104,6 +105,11 @@ MESSAGES = {
     "no_assignment": ("Tema nu există.", "Assignment not found.", "Devoir introuvable.", "Compito non trovato.", "Tarea no encontrada.", "Aufgabe nicht gefunden."),
     "bad_points": ("Punctele trebuie să fie între -100 și 100, diferite de 0.", "Points must be between -100 and 100, not 0.", "Les points doivent être entre -100 et 100, sauf 0.", "I punti devono essere tra -100 e 100, diversi da 0.", "Los puntos deben estar entre -100 y 100, distintos de 0.", "Punkte müssen zwischen -100 und 100 liegen, nicht 0."),
     "need_reason": ("Scrie motivul bonusului.", "Add a reason for the bonus.", "Indique la raison du bonus.", "Scrivi il motivo del bonus.", "Escribe el motivo del bonus.", "Gib einen Grund für den Bonus an."),
+    "confirm_email_first": ("Confirmă întâi emailul: apasă linkul primit de la noi, apoi intră.", "Confirm your email first: click the link we sent you, then sign in.", "Confirme d'abord ton e-mail : clique sur le lien reçu, puis connecte-toi.", "Conferma prima l'email: clicca il link che ti abbiamo inviato, poi accedi.", "Confirma primero tu correo: pulsa el enlace que te enviamos y luego inicia sesión.", "Bestätige zuerst deine E-Mail: Klick auf den Link, den wir dir geschickt haben, dann melde dich an."),
+    "weak_password": ("Parola e prea slabă. Alege una mai lungă, cu litere și cifre.", "That password is too weak. Pick a longer one with letters and numbers.", "Ce mot de passe est trop faible. Choisis-en un plus long, avec lettres et chiffres.", "La password è troppo debole. Scegline una più lunga, con lettere e numeri.", "La contraseña es demasiado débil. Elige una más larga, con letras y números.", "Das Passwort ist zu schwach. Wähl ein längeres mit Buchstaben und Zahlen."),
+    "auth_down": ("Serviciul de conturi (Supabase) nu răspunde. Încearcă peste un minut.", "The account service (Supabase) isn't responding. Try again in a minute.", "Le service de comptes (Supabase) ne répond pas. Réessaie dans une minute.", "Il servizio account (Supabase) non risponde. Riprova tra un minuto.", "El servicio de cuentas (Supabase) no responde. Inténtalo en un minuto.", "Der Kontodienst (Supabase) antwortet nicht. Versuch es in einer Minute."),
+    "link_expired": ("Linkul a expirat sau a fost deja folosit. Cere unul nou.", "This link has expired or was already used. Ask for a new one.", "Ce lien a expiré ou a déjà été utilisé. Demandes-en un nouveau.", "Il link è scaduto o è già stato usato. Chiedine uno nuovo.", "El enlace ha caducado o ya se usó. Pide uno nuevo.", "Der Link ist abgelaufen oder wurde schon benutzt. Fordere einen neuen an."),
+    "supabase_off": ("Conturile Supabase nu sunt configurate pe server.", "Supabase accounts aren't configured on the server.", "Les comptes Supabase ne sont pas configurés sur le serveur.", "Gli account Supabase non sono configurati sul server.", "Las cuentas de Supabase no están configuradas en el servidor.", "Supabase-Konten sind auf dem Server nicht eingerichtet."),
     "no_announcement": ("Anunțul nu există.", "Announcement not found.", "Annonce introuvable.", "Annuncio non trovato.", "Anuncio no encontrado.", "Ankündigung nicht gefunden."),
 }
 FIELD_NAMES = {
@@ -145,7 +151,7 @@ db = {
     "users": {}, "sessions": {}, "prefs": {}, "drafts": [],
     "questions": [], "proposals": [], "submissions": [],
     "messages": [], "assignments": [], "announcements": [], "bonuses": [],
-    "next_id": 1,
+    "supabase_pending": {}, "next_id": 1,
 }
 SESSION_DAYS = 60
 
@@ -288,7 +294,7 @@ def root():
 
 
 @app.post("/api/register", status_code=201)
-def register(body: RegisterIn):
+def register(body: RegisterIn, request: Request):
     name = body.name.strip()
     if not name:
         fail(400, "need_name")
@@ -300,6 +306,8 @@ def register(body: RegisterIn):
     role = role_for(email, body.trainer_code)
     if role == "student":
         check_class_code(body.class_code)
+    if supa.enabled():
+        return supabase_register(body, name, email, request)
     with _lock:
         if email in db["users"]:
             fail(409, "email_taken")
@@ -313,6 +321,15 @@ def register(body: RegisterIn):
 def login(body: LoginIn):
     email = clean_email(body.email)
     throttle(email)
+    if supa.enabled():
+        try:
+            token = supa.sign_in(email, body.password)
+        except supa.SupabaseError as err:
+            if err.code == "invalid":
+                _failed.setdefault(email, []).append(datetime.now(timezone.utc).timestamp())
+            supabase_fail(err)
+        _failed.pop(email, None)
+        return supabase_account(supabase_user(token))
     user = db["users"].get(email)
     # Același mesaj pentru email greșit și parolă greșită: nu dezvăluim cine are cont
     ok = bool(user and user.get("hash")) and same(
@@ -351,6 +368,146 @@ def google_login(body: GoogleIn):
         return start_session(user)
 
 
+# ---------------------------------------------------------------------------
+# Supabase Auth (dacă sunt setate SUPABASE_URL și SUPABASE_ANON_KEY): parolele,
+# confirmarea emailului, resetarea și Google merg prin Supabase. Orice token
+# primit din browser îl verificăm la Supabase înainte să deschidem o sesiune.
+# ---------------------------------------------------------------------------
+
+RECOVER_LIMIT = 3  # emailuri de resetare per adresă, la 10 minute
+_recover_sent: dict[str, list] = {}
+
+
+class SupabaseTokenIn(BaseModel):
+    access_token: str = Field(min_length=10, max_length=5000)
+    class_code: Optional[str] = Field(None, max_length=100)
+
+
+class RecoverIn(BaseModel):
+    email: str = Field(min_length=3, max_length=200)
+
+
+class NewPasswordIn(BaseModel):
+    access_token: str = Field(min_length=10, max_length=5000)
+    password: str = Field(max_length=200)
+
+
+def app_url(request: Request) -> str:
+    """Unde ne întoarce linkul din email (trebuie adăugat și în Supabase → Redirect URLs)."""
+    return str(request.base_url).rstrip("/") + "/static/index.html"
+
+
+def supabase_fail(err: "supa.SupabaseError"):
+    key = {"invalid": "wrong_login", "unconfirmed": "confirm_email_first", "exists": "email_taken",
+           "weak": "weak_password"}.get(err.code, "auth_down")
+    fail({"wrong_login": 401, "confirm_email_first": 403, "email_taken": 409, "weak_password": 400}.get(key, 503), key)
+
+
+def supabase_user(token: str) -> dict:
+    try:
+        return supa.get_user(token)
+    except supa.SupabaseError as err:
+        if err.code == "invalid":
+            fail(401, "link_expired")
+        supabase_fail(err)
+
+
+def supabase_account(sb_user: dict, class_code: Optional[str] = None) -> dict:
+    """Leagă contul Supabase de contul nostru (același email = aceleași date) și deschide sesiunea."""
+    email = clean_email(sb_user["email"])
+    provider = supa.provider(sb_user)
+    # TRAINER_EMAILS contează doar dacă emailul e dovedit (Google sau confirmare pe email);
+    # altfel oricine și-ar putea face cont cu emailul trainerului
+    trusted = provider == "google" or supa.emails_are_verified()
+    with _lock:
+        user = db["users"].get(email)
+        pending = db.setdefault("supabase_pending", {}).get(email)
+        if user is None:
+            role = "trainer" if (pending or {}).get("role") == "trainer" or (trusted and email in TRAINER_EMAILS) else "student"
+            if role == "student" and not (pending or {}).get("class_ok"):
+                check_class_code(class_code)
+            name = (pending or {}).get("name") or supa.display_name(sb_user)
+            user = db["users"][email] = {"name": name, "email": email, "role": role, "created_at": now()}
+        elif user["role"] == "student" and trusted and email in TRAINER_EMAILS:
+            user["role"] = "trainer"
+        db["supabase_pending"].pop(email, None)
+        user["supabase"] = "email" if provider == "email" else provider
+        return start_session(user)
+
+
+def supabase_register(body: RegisterIn, name: str, email: str, request: Request) -> dict:
+    # Ce am verificat aici (codul clasei, codul de trainer) ținem minte până la confirmarea emailului
+    with _lock:
+        pending = db.setdefault("supabase_pending", {})
+        week_ago = datetime.fromtimestamp(datetime.now(timezone.utc).timestamp() - 7 * 86400, timezone.utc).isoformat(timespec="seconds")
+        for old in [e for e, p in pending.items() if p.get("at", "") < week_ago]:
+            pending.pop(old)
+        is_trainer = bool(body.trainer_code and same(body.trainer_code.strip(), TRAINER_CODE))
+        pending[email] = {
+            "name": name, "role": "trainer" if is_trainer else "student",
+            "class_ok": is_trainer or not CLASS_CODE or same((body.class_code or "").strip(), CLASS_CODE),
+            "at": now()}
+        save_db()
+    try:
+        token = supa.sign_up(email, body.password, name, app_url(request))
+    except supa.SupabaseError as err:
+        if err.code != "exists":
+            supabase_fail(err)
+        # Contul există deja la Supabase (de exemplu creat din alt loc): încercăm să intrăm cu parola dată
+        try:
+            token = supa.sign_in(email, body.password)
+        except supa.SupabaseError as err2:
+            supabase_fail(supa.SupabaseError("exists" if err2.code == "invalid" else err2.code))
+    if not token:
+        return {"confirm_email": True, "email": email}
+    return supabase_account(supabase_user(token), body.class_code)
+
+
+@app.post("/api/auth/supabase")
+def supabase_login(body: SupabaseTokenIn):
+    """Întoarcerea din linkul de confirmare sau de la Google (prin Supabase)."""
+    if not supa.enabled():
+        fail(404, "supabase_off")
+    return supabase_account(supabase_user(body.access_token), body.class_code)
+
+
+@app.post("/api/auth/supabase/recover")
+def supabase_recover(body: RecoverIn, request: Request):
+    """Trimite linkul de resetare. Răspundem la fel dacă emailul are cont sau nu."""
+    if not supa.enabled():
+        fail(404, "supabase_off")
+    email = clean_email(body.email)
+    cutoff = datetime.now(timezone.utc).timestamp() - LOCK_SECONDS
+    sent = [t for t in _recover_sent.get(email, []) if t > cutoff]
+    if len(sent) >= RECOVER_LIMIT:
+        fail(429, "too_many_attempts")
+    _recover_sent[email] = sent + [datetime.now(timezone.utc).timestamp()]
+    try:
+        supa.recover(email, app_url(request))
+    except supa.SupabaseError as err:
+        supabase_fail(err)
+    return {"ok": True}
+
+
+@app.post("/api/auth/supabase/new-password")
+def supabase_new_password(body: NewPasswordIn):
+    """Parola nouă, din linkul de resetare primit pe email; apoi intri direct."""
+    if not supa.enabled():
+        fail(404, "supabase_off")
+    if len(body.password) < MIN_PASSWORD:
+        fail(400, "short_password")
+    sb_user = supabase_user(body.access_token)
+    try:
+        supa.update_password(body.access_token, body.password)
+    except supa.SupabaseError as err:
+        supabase_fail(err)
+    account = supabase_account(sb_user)
+    with _lock:
+        db["users"][clean_email(sb_user["email"])]["supabase"] = "email"  # acum are și parolă
+        save_db()
+    return account
+
+
 class PasswordIn(BaseModel):
     current: Optional[str] = Field(None, max_length=200)
     new: str = Field(max_length=200)
@@ -362,6 +519,23 @@ def change_password(body: PasswordIn, user: dict = Depends(current_user)):
     account = db["users"].get(user["key"])
     if account is None:
         fail(401, "login_again")
+    if supa.enabled():
+        # Parola stă la Supabase: o schimbăm cu un token obținut din parola actuală
+        if len(body.new) < MIN_PASSWORD:
+            fail(400, "short_password")
+        throttle(account["email"])
+        try:
+            token = supa.sign_in(account["email"], body.current or "")
+        except supa.SupabaseError as err:
+            if err.code == "invalid":
+                _failed.setdefault(account["email"], []).append(datetime.now(timezone.utc).timestamp())
+                fail(403, "wrong_current")
+            supabase_fail(err)
+        try:
+            supa.update_password(token, body.new)
+        except supa.SupabaseError as err:
+            supabase_fail(err)
+        return {"ok": True}
     if account.get("hash") and not same(hash_password(body.current or "", bytes.fromhex(account["salt"])), account["hash"]):
         fail(403, "wrong_current")
     if len(body.new) < MIN_PASSWORD:
@@ -374,14 +548,22 @@ def change_password(body: PasswordIn, user: dict = Depends(current_user)):
 
 
 class ResetOut(BaseModel):
-    temporary_password: str
+    temporary_password: Optional[str] = None
+    email_sent: bool = False
 
 
 @app.post("/api/students/{student_key}/reset-password")
-def reset_password(student_key: str, user: dict = Depends(require_trainer)) -> ResetOut:
-    """Trainerul generează o parolă temporară pentru un student care a uitat-o."""
+def reset_password(student_key: str, request: Request, user: dict = Depends(require_trainer)) -> ResetOut:
+    """Trainerul generează o parolă temporară pentru un student care a uitat-o.
+    Cu Supabase, studentul primește în schimb un link de resetare pe email."""
     if student_key not in known_students():
         fail(404, "no_student")
+    if supa.enabled():
+        try:
+            supa.recover(student_key, app_url(request))
+        except supa.SupabaseError as err:
+            supabase_fail(err)
+        return ResetOut(email_sent=True)
     temp = secrets.token_urlsafe(9)
     with _lock:
         salt = secrets.token_bytes(16)
@@ -410,7 +592,7 @@ class PrefsIn(BaseModel):
 def me(user: dict = Depends(current_user)):
     account = db["users"].get(user["key"], {})
     return {"name": user["name"], "role": user["role"], "email": user["key"],
-            "has_password": bool(account.get("hash")), "prefs": db["prefs"].get(user["key"], {})}
+            "has_password": account.get("supabase") == "email" if supa.enabled() else bool(account.get("hash")), "prefs": db["prefs"].get(user["key"], {})}
 
 
 @app.patch("/api/me")
@@ -428,8 +610,10 @@ def update_prefs(body: PrefsIn, user: dict = Depends(current_user)):
 @app.get("/api/config")
 def config():
     """Ce poate interfața: dacă AI-ul e disponibil și ce topicuri există."""
-    return {"ai": ai.available(), "topics": TOPICS, "google_client_id": GOOGLE_CLIENT_ID or None,
-            "class_code_required": bool(CLASS_CODE)}
+    # Adresa Supabase e publică (o vede oricum browserul la Google); anon key rămâne pe server
+    sb = {"url": supa.url(), "google": supa.google_enabled()} if supa.enabled() else None
+    return {"ai": ai.available(), "topics": TOPICS, "google_client_id": None if sb else (GOOGLE_CLIENT_ID or None),
+            "class_code_required": bool(CLASS_CODE), "supabase": sb}
 
 
 # ---------------------------------------------------------------------------

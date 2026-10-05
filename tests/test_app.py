@@ -549,3 +549,184 @@ def test_drafts_are_private_and_limited():
     assert client.post("/api/drafts", json={"title": "prea multe"}, headers=ana).status_code == 400
     assert client.delete(f"/api/drafts/{d['id']}", headers=ana).status_code == 200
     assert len(client.get("/api/drafts", headers=ana).json()) == 19
+
+
+# ---------------------------------------------------------------- Supabase Auth (cu un Supabase fals)
+
+import json as _json
+import httpx
+from src import supa
+
+
+class FakeSupabase:
+    """Imită API-ul REST Supabase Auth: conturi, confirmare pe email, resetare."""
+
+    def __init__(self, autoconfirm=False, google=True):
+        self.users, self.tokens, self.sent = {}, {}, []
+        self.autoconfirm, self.google = autoconfirm, google
+
+    def token_for(self, email, provider="email"):
+        tok = f"tok-{len(self.tokens)}-{email}"
+        self.tokens[tok] = (email, provider)
+        return tok
+
+    def confirm(self, email):
+        self.users[email]["confirmed"] = True
+        return self.token_for(email)
+
+    def handler(self, request):
+        assert request.headers["apikey"] == "anon-test"
+        path, body = request.url.path, _json.loads(request.content or b"{}")
+        if path == "/auth/v1/settings":
+            return httpx.Response(200, json={"external": {"google": self.google}, "mailer_autoconfirm": self.autoconfirm})
+        if path == "/auth/v1/signup":
+            if body["email"] in self.users:
+                return httpx.Response(422, json={"code": "user_already_exists", "msg": "User already registered"})
+            self.users[body["email"]] = {"password": body["password"], "confirmed": self.autoconfirm, "name": body["data"]["name"]}
+            if self.autoconfirm:
+                return httpx.Response(200, json={"access_token": self.token_for(body["email"])})
+            self.sent.append(("confirm", body["email"]))
+            return httpx.Response(200, json={"id": "u1", "email": body["email"]})
+        if path == "/auth/v1/token":
+            u = self.users.get(body["email"])
+            if not u or u["password"] != body["password"]:
+                return httpx.Response(400, json={"code": "invalid_credentials", "msg": "Invalid login credentials"})
+            if not u["confirmed"]:
+                return httpx.Response(400, json={"code": "email_not_confirmed", "msg": "Email not confirmed"})
+            return httpx.Response(200, json={"access_token": self.token_for(body["email"])})
+        if path == "/auth/v1/recover":
+            self.sent.append(("recover", body["email"]))
+            return httpx.Response(200, json={})
+        if path == "/auth/v1/user":
+            found = self.tokens.get(request.headers["authorization"].removeprefix("Bearer "))
+            if not found:
+                return httpx.Response(401, json={"msg": "invalid JWT"})
+            email, provider = found
+            if request.method == "PUT":
+                self.users.setdefault(email, {"confirmed": True, "name": email})["password"] = body["password"]
+                return httpx.Response(200, json={"email": email})
+            u = self.users.get(email, {"confirmed": True, "name": "Google " + email})
+            return httpx.Response(200, json={
+                "email": email, "email_confirmed_at": "2026-01-01T00:00:00Z" if u["confirmed"] else None,
+                "app_metadata": {"provider": provider}, "user_metadata": {"name": u["name"]}})
+        return httpx.Response(404)
+
+
+@pytest.fixture
+def fake_supabase(monkeypatch):
+    fake = FakeSupabase()
+    monkeypatch.setenv("SUPABASE_URL", "https://proiect.supabase.co")
+    monkeypatch.setenv("SUPABASE_ANON_KEY", "anon-test")
+    monkeypatch.setattr(supa, "_transport", httpx.MockTransport(fake.handler))
+    monkeypatch.setattr(supa, "_settings_cache", {"at": 0.0, "value": None})
+    app_module._recover_sent.clear()
+    app_module.db["supabase_pending"] = {}
+    return fake
+
+
+def test_supabase_signup_needs_email_confirmation(fake_supabase):
+    cfg = client.get("/api/config").json()
+    assert cfg["supabase"] == {"url": "https://proiect.supabase.co", "google": True}
+    assert "anon-test" not in _json.dumps(cfg)  # cheia rămâne pe server
+    r = client.post("/api/register", json={"name": "Madalina", "email": "madalina@test.ro", "password": "parola-buna"})
+    assert r.status_code == 201 and r.json()["confirm_email"] is True and "token" not in r.json()
+    assert fake_supabase.sent == [("confirm", "madalina@test.ro")]
+    # Fără confirmare nu se poate intra
+    r = client.post("/api/login", json={"email": "madalina@test.ro", "password": "parola-buna"})
+    assert r.status_code == 403
+    # Linkul din email aduce tokenul înapoi; serverul îl verifică la Supabase
+    r = client.post("/api/auth/supabase", json={"access_token": fake_supabase.confirm("madalina@test.ro")})
+    assert r.status_code == 200 and r.json()["name"] == "Madalina" and r.json()["role"] == "student"
+    r = client.post("/api/login", json={"email": "madalina@test.ro", "password": "parola-buna"})
+    assert r.status_code == 200
+    me = client.get("/api/me", headers={"Authorization": f"Bearer {r.json()['token']}"}).json()
+    assert me["has_password"] is True
+    # Parola nu e salvată la noi
+    assert "hash" not in app_module.db["users"]["madalina@test.ro"]
+
+
+def test_supabase_rejects_fake_tokens_and_wrong_passwords(fake_supabase):
+    assert client.post("/api/auth/supabase", json={"access_token": "token-inventat"}).status_code == 401
+    fake_supabase.autoconfirm = True
+    assert client.post("/api/register", json={"name": "Ana", "email": "ana@test.ro", "password": "parola-buna"}).status_code == 201
+    assert client.post("/api/login", json={"email": "ana@test.ro", "password": "gresit!!"}).status_code == 401
+    assert client.post("/api/login", json={"email": "nimeni@test.ro", "password": "gresit!!"}).json()["detail"] == \
+        client.post("/api/login", json={"email": "ana@test.ro", "password": "gresit!!"}).json()["detail"]
+    for _ in range(3):
+        client.post("/api/login", json={"email": "ana@test.ro", "password": "gresit!!"})
+    assert client.post("/api/login", json={"email": "ana@test.ro", "password": "parola-buna"}).status_code == 429
+
+
+def test_supabase_trainer_email_needs_verified_email(fake_supabase, monkeypatch):
+    # Fără confirmare pe email, oricine ar putea pretinde emailul trainerului
+    fake_supabase.autoconfirm = True
+    r = client.post("/api/register", json={"name": "Impostor", "email": "radu@test.ro", "password": "parola-buna"})
+    assert r.json()["role"] == "student"
+    # Cu confirmare pe email (sau Google), emailul din TRAINER_EMAILS devine trainer
+    app_module.db["users"].clear()
+    monkeypatch.setattr(supa, "_settings_cache", {"at": 0.0, "value": None})
+    fake_supabase.autoconfirm = False
+    r = client.post("/api/auth/supabase", json={"access_token": fake_supabase.token_for("radu@test.ro", "google")})
+    assert r.json()["role"] == "trainer"
+
+
+def test_supabase_class_code_and_google(fake_supabase, monkeypatch):
+    monkeypatch.setattr(app_module, "CLASS_CODE", "VIBE2026")
+    google_token = fake_supabase.token_for("vlad@gmail.com", "google")
+    assert client.post("/api/auth/supabase", json={"access_token": google_token}).status_code == 403
+    r = client.post("/api/auth/supabase", json={"access_token": google_token, "class_code": "VIBE2026"})
+    assert r.status_code == 200 and r.json()["name"] == "Google vlad@gmail.com"
+    # Codul verificat la „Cont nou” rămâne valabil când revine din linkul de confirmare
+    assert client.post("/api/register", json={"name": "Ana", "email": "ana@test.ro", "password": "parola-buna"}).status_code == 403
+    assert client.post("/api/register", json={"name": "Ana", "email": "ana@test.ro", "password": "parola-buna", "class_code": "VIBE2026"}).json()["confirm_email"]
+    assert client.post("/api/auth/supabase", json={"access_token": fake_supabase.confirm("ana@test.ro")}).status_code == 200
+
+
+def test_supabase_password_reset(fake_supabase):
+    fake_supabase.autoconfirm = True
+    client.post("/api/register", json={"name": "Ana", "email": "ana@test.ro", "password": "parola-buna"})
+    for _ in range(3):
+        assert client.post("/api/auth/supabase/recover", json={"email": "ana@test.ro"}).status_code == 200
+    assert client.post("/api/auth/supabase/recover", json={"email": "ana@test.ro"}).status_code == 429
+    # Același răspuns pentru un email fără cont
+    assert client.post("/api/auth/supabase/recover", json={"email": "nimeni@test.ro"}).json() == {"ok": True}
+    link_token = fake_supabase.token_for("ana@test.ro")
+    assert client.post("/api/auth/supabase/new-password", json={"access_token": link_token, "password": "scurta"}).status_code == 400
+    r = client.post("/api/auth/supabase/new-password", json={"access_token": link_token, "password": "parola-noua-1"})
+    assert r.status_code == 200 and r.json()["name"] == "Ana"
+    assert client.post("/api/login", json={"email": "ana@test.ro", "password": "parola-noua-1"}).status_code == 200
+    # Schimbarea parolei din Setări cere parola actuală
+    h = {"Authorization": f"Bearer {r.json()['token']}"}
+    assert client.post("/api/me/password", headers=h, json={"current": "gresit!!", "new": "parola-noua-2"}).status_code == 403
+    assert client.post("/api/me/password", headers=h, json={"current": "parola-noua-1", "new": "parola-noua-2"}).status_code == 200
+    assert fake_supabase.users["ana@test.ro"]["password"] == "parola-noua-2"
+
+
+def test_supabase_trainer_reset_sends_email_and_privacy_holds(fake_supabase):
+    fake_supabase.autoconfirm = True
+    a = client.post("/api/register", json={"name": "Ana", "email": "ana@test.ro", "password": "parola-buna"}).json()
+    b = client.post("/api/register", json={"name": "Vlad", "email": "vlad@test.ro", "password": "parola-buna"}).json()
+    ha, hb = ({"Authorization": f"Bearer {x['token']}"} for x in (a, b))
+    client.post("/api/questions", headers=ha, json={"text": "Cum pun cheia API în .env?", "category": "security"})
+    assert client.get("/api/questions", headers=hb).json() == []
+    trainer = client.post("/api/register", json={"name": "Radu", "email": "radu2@test.ro", "password": "parola-buna", "trainer_code": "secret"}).json()
+    assert trainer["role"] == "trainer"
+    r = client.post("/api/students/ana@test.ro/reset-password", headers={"Authorization": f"Bearer {trainer['token']}"})
+    assert r.json() == {"temporary_password": None, "email_sent": True}
+    assert ("recover", "ana@test.ro") in fake_supabase.sent
+    assert client.post("/api/students/ana@test.ro/reset-password", headers=hb).status_code == 403
+
+
+def test_supabase_down_gives_clear_error(fake_supabase, monkeypatch):
+    def broken(request):
+        raise httpx.ConnectError("down")
+    monkeypatch.setattr(supa, "_transport", httpx.MockTransport(broken))
+    r = client.post("/api/login", json={"email": "ana@test.ro", "password": "parola-buna"})
+    assert r.status_code == 503 and "Supabase" in r.json()["detail"]
+
+
+def test_supabase_trainer_email_does_not_skip_class_code(fake_supabase, monkeypatch):
+    monkeypatch.setattr(app_module, "CLASS_CODE", "VIBE2026")
+    fake_supabase.autoconfirm = True
+    r = client.post("/api/register", json={"name": "Impostor", "email": "radu@test.ro", "password": "parola-buna"})
+    assert r.status_code == 403
