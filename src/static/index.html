@@ -1,50 +1,138 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mergington High School Activities</title>
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <header>
-      <h1>Mergington High School</h1>
-      <h2>Extracurricular Activities</h2>
-    </header>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cutia Clasei</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">▣</span>
+      <span>Cutia Clasei</span>
+    </div>
+    <div id="user-box" class="user-box hidden">
+      <span id="user-name"></span>
+      <span id="user-role" class="pill"></span>
+      <button id="logout-btn" class="ghost">Ieși</button>
+    </div>
+  </header>
 
-    <main>
-      <section id="activities-container">
-        <h3>Available Activities</h3>
-        <div id="activities-list">
-          <!-- Activities will be loaded here -->
-          <p>Loading activities...</p>
+  <!-- Login -->
+  <main id="login-view" class="center">
+    <form id="login-form" class="card login">
+      <h1>Cutia Clasei</h1>
+      <p class="muted">Pune întrebări trainerului și propune proiecte pentru ora următoare.</p>
+      <div class="role-switch" role="radiogroup">
+        <label><input type="radio" name="role" value="student" checked> Student</label>
+        <label><input type="radio" name="role" value="trainer"> Trainer</label>
+      </div>
+      <label>Numele tău
+        <input id="login-name" required maxlength="60" placeholder="ex. Ana Popescu">
+      </label>
+      <label id="code-field" class="hidden">Cod trainer
+        <input id="login-code" type="password" placeholder="codul primit">
+      </label>
+      <button type="submit" class="primary">Intră</button>
+      <p id="login-error" class="error"></p>
+    </form>
+  </main>
+
+  <!-- App -->
+  <main id="app-view" class="hidden">
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="questions">Întrebări <span id="q-badge" class="badge hidden"></span></button>
+      <button class="tab" data-tab="proposals">Propuneri</button>
+    </nav>
+
+    <!-- Întrebări -->
+    <section id="tab-questions" class="tab-panel">
+      <form id="question-form" class="card student-only">
+        <h2>Ce n-ai înțeles?</h2>
+        <textarea id="question-text" rows="3" maxlength="2000" required
+          placeholder="Scrie întrebarea ta. O vezi doar tu și trainerul."></textarea>
+        <div class="row">
+          <select id="question-category"></select>
+          <label class="check"><input type="checkbox" id="question-anon"> Anonim pentru trainer</label>
+          <button type="submit" class="primary">Trimite întrebarea</button>
         </div>
-      </section>
+      </form>
 
-      <section id="signup-container">
-        <h3>Sign Up for an Activity</h3>
-        <form id="signup-form">
-          <div class="form-group">
-            <label for="email">Student Email:</label>
-            <input type="email" id="email" required placeholder="your-email@mergington.edu" />
+      <div class="toolbar">
+        <h2 id="questions-title">Întrebările mele</h2>
+        <input id="question-search" type="search" placeholder="Caută…">
+        <select id="question-filter">
+          <option value="all">Toate</option>
+          <option value="open">Fără răspuns</option>
+          <option value="answered">Cu răspuns</option>
+        </select>
+      </div>
+      <div id="questions-list" class="list"></div>
+    </section>
+
+    <!-- Propuneri -->
+    <section id="tab-proposals" class="tab-panel hidden">
+      <div id="proposal-wizard" class="card student-only">
+        <h2>Propune un proiect</h2>
+        <ol class="steps">
+          <li data-step="1" class="active">Scrie</li>
+          <li data-step="2">Retușare AI</li>
+          <li data-step="3">Aprobă și trimite</li>
+        </ol>
+
+        <form id="proposal-form">
+          <label>Titlu
+            <input id="p-title" maxlength="200" placeholder="ex. Calendarul clasei">
+          </label>
+          <label>Ce face aplicația
+            <textarea id="p-description" rows="3" maxlength="4000"
+              placeholder="Ce poate face un utilizator în ea?"></textarea>
+          </label>
+          <label>Cine o folosește
+            <input id="p-audience" maxlength="500" placeholder="ex. studenții și trainerul">
+          </label>
+          <div class="row end">
+            <button type="submit" class="primary">✨ Retușează cu AI</button>
           </div>
-          <div class="form-group">
-            <label for="activity">Select Activity:</label>
-            <select id="activity" required>
-              <option value="">-- Select an activity --</option>
-              <!-- Activity options will be loaded here -->
-            </select>
-          </div>
-          <button type="submit">Sign Up</button>
         </form>
-        <div id="message" class="hidden"></div>
-      </section>
-    </main>
 
-    <footer>
-      <p>&copy; 2023 Mergington High School</p>
-    </footer>
+        <div id="refine-result" class="hidden">
+          <p id="refine-notes" class="muted"></p>
+          <div id="missing-box" class="missing hidden">
+            <h3>AI-ul are nevoie de câteva detalii</h3>
+            <div id="missing-list"></div>
+            <div class="row end">
+              <button id="apply-answers" class="primary">Adaugă detaliile și retușează din nou</button>
+            </div>
+          </div>
+          <h3>Varianta finală <span class="muted small">(o poți edita)</span></h3>
+          <label>Titlu <input id="f-title" maxlength="200"></label>
+          <label>Ce face aplicația <textarea id="f-description" rows="4" maxlength="4000"></textarea></label>
+          <label>Cine o folosește <input id="f-audience" maxlength="500"></label>
+          <label class="check approve"><input type="checkbox" id="approve"> Am citit și aprob varianta finală</label>
+          <div class="row end">
+            <button id="back-edit" class="ghost">Înapoi la ciornă</button>
+            <button id="submit-proposal" class="primary" disabled>Trimite propunerea</button>
+          </div>
+        </div>
+        <p id="proposal-error" class="error"></p>
+      </div>
 
-    <script src="app.js"></script>
-  </body>
+      <div class="toolbar">
+        <h2>Propunerile clasei</h2>
+        <input id="proposal-search" type="search" placeholder="Caută…">
+        <select id="proposal-sort">
+          <option value="new">Cele mai noi</option>
+          <option value="votes">Cele mai votate</option>
+          <option value="chosen">Alese întâi</option>
+        </select>
+      </div>
+      <div id="proposals-list" class="list"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="app.js"></script>
+</body>
 </html>
