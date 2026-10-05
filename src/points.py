@@ -71,8 +71,10 @@ def compute(db: dict) -> dict:
 
     for p in db.get("proposals", []):
         key = p["author_key"]
-        add(key, "idea", RULES["idea"], p["title"], p["created_at"])
-        add(key, "vote", RULES["vote"] * len([v for v in p["voters"] if v != key]), p["title"], p["created_at"])
+        # O idee retrasă nu mai aduce puncte pentru idee și voturi (dar „aleasă” rămâne)
+        if p.get("status") != "withdrawn":
+            add(key, "idea", RULES["idea"], p["title"], p["created_at"])
+            add(key, "vote", RULES["vote"] * len([v for v in p["voters"] if v != key]), p["title"], p["created_at"])
         if p.get("chosen"):
             add(key, "chosen", RULES["chosen"], p["title"], p["created_at"])
 
@@ -91,7 +93,7 @@ def compute(db: dict) -> dict:
 
 def badges(key: str, db: dict, total: int) -> list:
     subs = [x for x in db.get("submissions", []) if x["author_key"] == key and x["kind"] != "other"]
-    ideas = [p for p in db.get("proposals", []) if p["author_key"] == key]
+    ideas = [p for p in db.get("proposals", []) if p["author_key"] == key and p.get("status") != "withdrawn"]
     votes = sum(len([v for v in p["voters"] if v != key]) for p in ideas)
     questions = [q for q in db.get("questions", []) if q["author_key"] == key]
     checks = {
@@ -100,7 +102,7 @@ def badges(key: str, db: dict, total: int) -> list:
         "five_homework": len(subs) >= 5,
         "first_idea": len(ideas) >= 1,
         "crowd_favorite": votes >= 5,
-        "chosen": any(p.get("chosen") for p in ideas),
+        "chosen": any(p.get("chosen") for p in db.get("proposals", []) if p["author_key"] == key),
         "perfectionist": any(x.get("status") == "reviewed" and len(x.get("checklist", [])) == 6 for x in subs),
         "century": total >= 100,
     }

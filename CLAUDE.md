@@ -38,6 +38,8 @@ Ce verifică AI-ul la fiecare propunere: **problema** (ce rezolvă și pentru ci
 6. **Linkurile** trimise de utilizatori se acceptă doar dacă încep cu `http://` sau `https://` (fără `javascript:`), verificat pe server și în interfață.
 7. **Fără `innerHTML` cu text de la utilizatori sau de la AI.** În `app.js` totul se construiește cu `el(...)` și noduri text; markdown-ul AI trece prin `renderMd()`, care nu folosește HTML.
 8. Parolele se salvează doar ca hash PBKDF2 cu salt; sesiunile doar ca hash SHA-256 al tokenului. Login: același mesaj pentru email greșit și parolă greșită, blocare 10 minute după 5 încercări. Tokenul Google se verifică pe server cu `google-auth`, doar pentru emailuri verificate. Emailurile studenților nu ajung niciodată la alți studenți (doar trainerul le vede).
+12. **Propunerile retrase** nu apar în cutia publică (doar autorului și trainerului), nu mai pot fi votate sau alese și nu aduc puncte pentru idee și voturi. Doar autorul le poate retrage sau pune înapoi.
+13. **Ciornele sunt private**: pe server doar proprietarul le vede (altcuiva îi răspundem 404); ciornele locale din browser se șterg la „Ieși”.
 9. **Mesajele directe** sunt mereu o conversație student ↔ trainer: studentul vede doar conversația lui, trainerul pe toate. Nu există mesaje între studenți.
 10. **Punctele nu se salvează ca număr.** Se calculează în `src/points.py` din activitatea reală + bonusurile trainerului. Nu adăuga endpoint-uri care modifică direct punctele; nimeni nu își votează propria idee.
 11. **Conținutul din internet (AI News) e date, nu instrucțiuni**: fără HTML, doar linkuri `http(s)`, iar când îl trimitem la Claude îl marcăm explicit ca date.

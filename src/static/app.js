@@ -29,6 +29,7 @@ let newsData = null, newsLoading = false, newsCat = "all";
 let lastMissing = [], lastStats = {};
 let currentView = "home", selectedTopic = "prompting", selectedKind = "homework", pendingFiles = [];
 let authMode = "in";
+let drafts = [], currentDraftId = null, draftTimer = null, draftSavedAt = null;
 const aiPending = new Set();
 
 // ================================================================ i18n
@@ -426,6 +427,10 @@ function logout(expired = false) {
   if (auth && !expired) fetch("/api/logout", { method: "POST", headers: { Authorization: `Bearer ${auth.token}` } }).catch(() => {});
   auth = null;
   try { localStorage.removeItem("cutia-auth"); } catch (_) {}
+  // Pe un calculator comun, textul nescris al cuiva nu rămâne pe ecran pentru următorul
+  [...LOCAL_DRAFTS, "#p-title", "#p-description", "#p-audience", "#f-title", "#f-description", "#f-audience"].forEach((sel) => ($(sel).value = ""));
+  clearTimeout(draftTimer);
+  drafts = []; currentDraftId = null; draftSavedAt = null;
   closeDrawer();
   closeMenus();
   $("#app-view").classList.add("hidden");
@@ -546,6 +551,7 @@ async function start(fromLogin = false) {
   renderTopicFilter();
   renderSubmissionForm();
   renderMessages();
+  restoreLocalDrafts();
   showView("home");
   let seenThisSession = false;
   try { seenThisSession = Boolean(sessionStorage.getItem("cutia-intro-done")); } catch (_) {}
@@ -564,6 +570,7 @@ function renderAll() {
   renderQuestions();
   renderSubmissions();
   renderProposals();
+  renderDrafts();
   renderMessages();
   renderGuide();
   renderPoints();
@@ -841,7 +848,7 @@ function renderHome(instant = false) {
       el("span", { class: "k" }, it.k), el("span", { class: "t" }, it.text), it.status))
     : [el("div", { class: "empty" }, t("home.nothing"))]));
 
-  const best = [...proposals].sort((a, b) => b.votes - a.votes || b.id - a.id).slice(0, 5);
+  const best = proposals.filter((p) => p.status !== "withdrawn").sort((a, b) => b.votes - a.votes || b.id - a.id).slice(0, 5);
   $("#home-top").replaceChildren(...(best.length ? best.map((p) =>
     el("button", { class: "mini", onclick: () => showView("box") },
       el("span", { class: "k" }, p.chosen ? "★" : "✦"), el("span", { class: "t" }, p.title),
@@ -931,6 +938,7 @@ $("#chat-form").addEventListener("submit", async (e) => {
     const m = await api(path, { method: "POST", body: { text } });
     chat.push(m);
     chatInput.value = "";
+    clearLocalDraft("#chat-input");
     chatInput.style.height = "auto";
     $("#chat-log").dataset.ready = "";
     renderMessages();
@@ -975,6 +983,7 @@ $("#question-form").addEventListener("submit", async (e) => {
       body: { text: $("#question-text").value, category: selectedTopic, anonymous: $("#question-anon").checked },
     });
     $("#question-text").value = "";
+    clearLocalDraft("#question-text");
     toast(t("q.sent"));
     await loadQuestions();
     loadPoints();
@@ -1262,6 +1271,7 @@ $("#submission-form").addEventListener("submit", async (e) => {
   try {
     await uploadForm(form, (k) => (bar.firstElementChild.style.width = `${Math.round(k * 100)}%`));
     ["#s-title", "#s-link", "#s-note"].forEach((id) => ($(id).value = ""));
+    clearLocalDraft("#s-title", "#s-link", "#s-note");
     $("#s-assignment").value = "";
     pendingFiles = [];
     document.querySelectorAll("#checklist input").forEach((c) => (c.checked = false));
@@ -1491,6 +1501,7 @@ $("#approve").addEventListener("change", () => {
     $("#approve").checked = false;
     $("#submit-proposal").disabled = true;
     setStep(4);
+    scheduleDraftSave();
   }));
 
 $("#back-edit").addEventListener("click", (e) => {
@@ -1510,6 +1521,13 @@ $("#submit-proposal").addEventListener("click", async (e) => {
     ["#p-title", "#p-description", "#p-audience"].forEach((id) => ($(id).value = ""));
     showStage("#proposal-form");
     setStep(1);
+    if (currentDraftId) {
+      api(`/api/drafts/${currentDraftId}`, { method: "DELETE" }).catch(() => {}).finally(loadDrafts);
+      currentDraftId = null;
+    }
+    clearTimeout(draftTimer);
+    draftSavedAt = null;
+    renderDrafts();
     confetti();
     toast(t("p.submitted"));
     loadProposals();
@@ -1533,14 +1551,17 @@ function renderProposals() {
   const term = norm($("#proposal-search").value.trim());
   const sort = $("#proposal-sort").value;
   const shown = proposals
+    .filter((p) => isTrainer() || p.status !== "withdrawn")
     .filter((p) => !term || norm(`${p.title} ${p.description} ${p.audience} ${p.author}`).includes(term))
     .sort((a, b) => {
       if (sort === "votes") return b.votes - a.votes || b.id - a.id;
       if (sort === "chosen") return b.chosen - a.chosen || b.votes - a.votes || b.id - a.id;
       return b.id - a.id;
     });
-  $("#p-badge").textContent = proposals.length;
-  $("#p-badge").classList.toggle("hidden", proposals.length === 0);
+  const active = proposals.filter((p) => p.status !== "withdrawn").length;
+  $("#p-badge").textContent = active;
+  $("#p-badge").classList.toggle("hidden", active === 0);
+  renderMyProposals();
   const list = $("#proposals-list");
   if (!shown.length) {
     list.replaceChildren(el("div", { class: "empty" }, t(proposals.length ? "q.emptyFilter" : "p.empty")));
@@ -1568,13 +1589,15 @@ function proposalCard(p, rank) {
       onclick: () => act(`/api/proposals/${p.id}/vote`),
     }, `▲ ${p.votes}`));
   }
-  return el("article", { class: `item ${p.chosen ? "chosen" : ""}` },
+  if (p.mine && p.status !== "withdrawn") actions.append(withdrawControls(p));
+  return el("article", { class: `item ${p.chosen ? "chosen" : ""} ${p.status === "withdrawn" ? "withdrawn" : ""}` },
     el("div", { class: "item-head" },
       rank && p.votes > 0 ? el("span", { class: `rank ${rank <= 3 ? "top" : ""}` }, `#${rank}`) : null,
       avatar(p.author),
       el("strong", {}, p.mine ? p.author + t("p.you") : p.author),
       el("span", {}, timeAgo(p.created_at)),
-      p.chosen ? el("span", { class: "right chosen-badge" }, t("p.chosen")) : null),
+      p.status === "withdrawn" ? el("span", { class: "right status withdrawn" }, t(p.withdrawn_reason === "resolved" ? "p.withdrawnResolved" : "p.withdrawn"))
+        : p.chosen ? el("span", { class: "right chosen-badge" }, t("p.chosen")) : null),
     el("h3", {}, p.title),
     el("p", { class: "meta-line" }, el("b", {}, t("p.what")), p.description),
     el("p", { class: "meta-line" }, el("b", {}, t("p.for")), p.audience),
@@ -1592,6 +1615,179 @@ async function act(path) {
     return false;
   }
 }
+
+// ================================================================ drafts (ciorne pe server) & propunerile mele
+
+function wizardValues() {
+  // Dacă AI-ul a retușat deja textul, salvăm varianta finală la care lucrezi
+  const refined = !$("#refine-result").classList.contains("hidden");
+  const pick = (a, b) => $(refined ? a : b).value;
+  return {
+    title: pick("#f-title", "#p-title"),
+    description: pick("#f-description", "#p-description"),
+    audience: pick("#f-audience", "#p-audience"),
+  };
+}
+
+async function loadDrafts() {
+  if (!auth || isTrainer()) return;
+  try { drafts = await api("/api/drafts"); } catch (_) { return; }
+  renderDrafts();
+}
+
+function renderDrafts() {
+  $("#drafts-title").textContent = `${t("p.drafts")} · ${drafts.length}`;
+  $("#draft-status").textContent = draftSavedAt ? t("p.draftSaved", timeAgo(draftSavedAt)) : "";
+  $("#drafts-list").replaceChildren(...drafts.map((d) =>
+    el("span", { class: `draft-chip ${d.id === currentDraftId ? "on" : ""}` },
+      el("span", { class: "dt", title: t("p.continue"), onclick: () => openDraft(d) }, "✎ ", d.title || trunc(d.description || "", 30) || t("p.untitled")),
+      el("small", {}, timeAgo(d.updated_at)),
+      el("button", { type: "button", class: "ghost", title: t("p.delete"), onclick: () => deleteDraft(d) }, "✕"))));
+}
+
+function scheduleDraftSave() {
+  if (!auth || isTrainer()) return;
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => saveDraft(true), 1500);
+}
+
+async function saveDraft(silent = false) {
+  clearTimeout(draftTimer);
+  const data = wizardValues();
+  if (!data.title.trim() && !data.description.trim() && !data.audience.trim()) return;
+  try {
+    const d = currentDraftId
+      ? await api(`/api/drafts/${currentDraftId}`, { method: "PUT", body: data })
+      : await api("/api/drafts", { method: "POST", body: data });
+    currentDraftId = d.id;
+    draftSavedAt = d.updated_at;
+    drafts = [d, ...drafts.filter((x) => x.id !== d.id)];
+    renderDrafts();
+    if (!silent) toast(t("p.draftSavedToast"));
+  } catch (err) {
+    // Ciorna a fost ștearsă între timp: începem una nouă la următoarea salvare
+    if (currentDraftId && /404|nu există|not found/i.test(err.message)) currentDraftId = null;
+    if (!silent) toast(err.message);
+  }
+}
+
+function openDraft(d) {
+  clearTimeout(draftTimer);
+  currentDraftId = d.id;
+  draftSavedAt = d.updated_at;
+  $("#p-title").value = d.title || "";
+  $("#p-description").value = d.description || "";
+  $("#p-audience").value = d.audience || "";
+  showStage("#proposal-form");
+  setStep(1);
+  renderDrafts();
+  $("#proposal-wizard").scrollIntoView({ behavior: motionOff() ? "auto" : "smooth", block: "start" });
+  $("#p-description").focus();
+}
+
+async function deleteDraft(d) {
+  if (!confirm(t("p.confirmDeleteDraft"))) return;
+  try {
+    await api(`/api/drafts/${d.id}`, { method: "DELETE" });
+    drafts = drafts.filter((x) => x.id !== d.id);
+    if (currentDraftId === d.id) { currentDraftId = null; draftSavedAt = null; }
+    renderDrafts();
+  } catch (err) { toast(err.message); }
+}
+
+function newDraft() {
+  clearTimeout(draftTimer);
+  currentDraftId = null;
+  draftSavedAt = null;
+  ["#p-title", "#p-description", "#p-audience"].forEach((id) => ($(id).value = ""));
+  showStage("#proposal-form");
+  setStep(1);
+  renderDrafts();
+  $("#p-title").focus();
+}
+
+["#p-title", "#p-description", "#p-audience"].forEach((id) => $(id).addEventListener("input", scheduleDraftSave));
+document.querySelectorAll(".save-draft").forEach((b) => b.addEventListener("click", () => saveDraft(false)));
+$("#new-draft").addEventListener("click", newDraft);
+
+function withdrawControls(p) {
+  const wrap = el("span", { style: "display:contents" });
+  let reason = "resolved";
+  const note = el("input", { maxlength: 300, placeholder: t("p.withdrawNote") });
+  const seg = el("div", { class: "seg" });
+  const drawSeg = () => seg.replaceChildren(...[["resolved", t("p.reasonResolved")], ["other", t("p.reasonOther")]].map(([v, label]) =>
+    el("button", { type: "button", class: `small ${v === reason ? "on" : ""}`, onclick: () => { reason = v; drawSeg(); } }, label)));
+  drawSeg();
+  const form = el("div", { class: "withdraw-form hidden" },
+    el("b", {}, t("p.withdrawTitle")), seg, note,
+    el("div", { class: "row end" },
+      el("button", { type: "button", class: "small ghost", onclick: () => form.classList.add("hidden") }, t("p.cancel")),
+      el("button", { type: "button", class: "small primary", onclick: async () => {
+        try {
+          await api(`/api/proposals/${p.id}/withdraw`, { method: "POST", body: { reason, note: note.value } });
+          toast(t("p.withdrawDone"));
+          await loadProposals();
+          loadPoints();
+        } catch (err) { toast(err.message); }
+      } }, t("p.withdraw"))));
+  wrap.append(el("button", { type: "button", class: "small ghost", onclick: () => { form.classList.toggle("hidden"); note.focus(); } }, "⤺ ", t("p.withdraw")), form);
+  return wrap;
+}
+
+function renderMyProposals() {
+  if (!auth || isTrainer()) return;
+  const mine = proposals.filter((p) => p.mine);
+  $("#my-count").textContent = t("p.myCount", mine.length);
+  $("#my-proposals-list").replaceChildren(...(mine.length ? mine.map((p) => {
+    const withdrawn = p.status === "withdrawn";
+    const status = withdrawn
+      ? el("span", { class: `status ${p.withdrawn_reason === "resolved" ? "resolved" : "withdrawn"}` }, t(p.withdrawn_reason === "resolved" ? "p.withdrawnResolved" : "p.withdrawn"))
+      : p.chosen ? el("span", { class: "chosen-badge" }, t("p.chosen")) : el("span", { class: "status ok" }, t("p.active"));
+    const row = el("div", { class: `mine-row ${withdrawn ? "withdrawn" : ""}` },
+      el("span", { class: "t" }, p.title), status,
+      el("span", { class: "votes mono small" }, `▲ ${p.votes}`),
+      el("span", { class: "muted small" }, timeAgo(p.created_at)));
+    if (withdrawn) {
+      if (p.withdrawn_note) row.append(el("span", { class: "muted small", style: "flex-basis:100%" }, `“${p.withdrawn_note}”`));
+      row.append(el("button", { type: "button", class: "small", onclick: async () => {
+        try { await api(`/api/proposals/${p.id}/restore`, { method: "POST" }); toast(t("p.restored")); await loadProposals(); loadPoints(); }
+        catch (err) { toast(err.message); }
+      } }, t("p.restore")));
+    } else {
+      row.append(withdrawControls(p));
+    }
+    return row;
+  }) : [el("div", { class: "empty" }, t("p.mineEmpty"))]));
+}
+
+// ================================================================ ciorne locale (întrebări, mesaje, teme)
+// Textul pe care-l scrii nu se pierde dacă închizi pagina: îl ținem în browser până îl trimiți.
+
+const LOCAL_DRAFTS = ["#question-text", "#chat-input", "#s-title", "#s-link", "#s-note"];
+
+function localDraftKey(sel) { return `cutia-draft-${(auth && auth.name || "").toLowerCase()}-${sel.slice(1)}`; }
+
+function restoreLocalDrafts() {
+  LOCAL_DRAFTS.forEach((sel) => {
+    try {
+      const v = localStorage.getItem(localDraftKey(sel));
+      if (v && !$(sel).value) { $(sel).value = v; $(sel).dispatchEvent(new Event("input")); }
+    } catch (_) {}
+  });
+}
+
+function clearLocalDraft(...sels) {
+  sels.forEach((sel) => { try { localStorage.removeItem(localDraftKey(sel)); } catch (_) {} });
+}
+
+LOCAL_DRAFTS.forEach((sel) => $(sel).addEventListener("input", () => {
+  if (!auth) return;
+  try {
+    const v = $(sel).value;
+    if (v.trim()) localStorage.setItem(localDraftKey(sel), v);
+    else localStorage.removeItem(localDraftKey(sel));
+  } catch (_) {}
+}));
 
 // ================================================================ AI news
 
@@ -2016,7 +2212,7 @@ async function loadAnnouncements() {
 
 async function refresh() {
   try {
-    await Promise.all([loadQuestions(), loadProposals(), loadSubmissions(), loadAssignments(), loadAnnouncements(), loadUnread()]);
+    await Promise.all([loadQuestions(), loadProposals(), loadSubmissions(), loadAssignments(), loadAnnouncements(), loadUnread(), loadDrafts()]);
     await loadPoints();
     renderNotifications();
   } catch (err) { toast(err.message); }

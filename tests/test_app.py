@@ -20,7 +20,7 @@ client = TestClient(app_module.app)
 @pytest.fixture(autouse=True)
 def reset_db():
     app_module.db.update({
-        "users": {}, "sessions": {}, "prefs": {}, "questions": [], "proposals": [], "submissions": [],
+        "users": {}, "sessions": {}, "prefs": {}, "drafts": [], "questions": [], "proposals": [], "submissions": [],
         "messages": [], "assignments": [], "announcements": [], "bonuses": [], "next_id": 1,
     })
     app_module._failed.clear()
@@ -505,3 +505,47 @@ def test_change_password():
     assert client.post("/api/login", json={"email": "ana@test.ro", "password": "parola-noua-1"}).status_code == 200
     me = client.get("/api/me", headers=ana).json()
     assert me["email"] == "ana@test.ro" and me["has_password"] is True
+
+
+# ---------------------------------------------------------------- retragere & ciorne
+
+def make_proposal(headers, title="Quiz"):
+    body = {"title": title, "description": "Un quiz.", "audience": "Clasa", "approved": True}
+    return client.post("/api/proposals", json=body, headers=headers).json()["id"]
+
+
+def test_author_can_withdraw_and_restore_a_proposal():
+    ana, bob = login("Ana"), login("Bob")
+    trainer = login("Radu", "trainer")
+    pid = make_proposal(ana)
+    make_proposal(ana, "A doua idee")                      # se pot trimite mai multe
+    client.post(f"/api/proposals/{pid}/vote", headers=bob)
+    assert client.post(f"/api/proposals/{pid}/withdraw", json={"reason": "resolved"}, headers=bob).status_code == 403
+
+    r = client.post(f"/api/proposals/{pid}/withdraw", json={"reason": "resolved", "note": "Am găsit o soluție"}, headers=ana)
+    assert r.json()["status"] == "withdrawn" and r.json()["withdrawn_reason"] == "resolved"
+    assert [p["title"] for p in client.get("/api/proposals", headers=bob).json()] == ["A doua idee"]
+    assert len(client.get("/api/proposals", headers=ana).json()) == 2        # autorul o vede în continuare
+    assert len(client.get("/api/proposals", headers=trainer).json()) == 2
+    assert client.post(f"/api/proposals/{pid}/vote", headers=bob).status_code == 400
+    assert client.post(f"/api/proposals/{pid}/choose", headers=trainer).status_code == 400
+    # Idee retrasă = fără puncte pentru idee și voturi; rămâne doar a doua idee (+5)
+    assert client.get("/api/points/me", headers=ana).json()["total"] == 5
+
+    assert client.post(f"/api/proposals/{pid}/restore", headers=ana).json()["status"] == "active"
+    assert len(client.get("/api/proposals", headers=bob).json()) == 2
+
+
+def test_drafts_are_private_and_limited():
+    ana, bob = login("Ana"), login("Bob")
+    d = client.post("/api/drafts", json={"title": "Idee", "description": "ceva"}, headers=ana).json()
+    assert client.get("/api/drafts", headers=bob).json() == []
+    assert client.put(f"/api/drafts/{d['id']}", json={"title": "x"}, headers=bob).status_code == 404
+    assert client.delete(f"/api/drafts/{d['id']}", headers=bob).status_code == 404
+    r = client.put(f"/api/drafts/{d['id']}", json={"title": "Idee mai bună", "description": "ceva", "audience": "noi"}, headers=ana)
+    assert r.json()["title"] == "Idee mai bună" and "owner" not in r.json()
+    for _ in range(19):
+        client.post("/api/drafts", json={"title": "x"}, headers=ana)
+    assert client.post("/api/drafts", json={"title": "prea multe"}, headers=ana).status_code == 400
+    assert client.delete(f"/api/drafts/{d['id']}", headers=ana).status_code == 200
+    assert len(client.get("/api/drafts", headers=ana).json()) == 19

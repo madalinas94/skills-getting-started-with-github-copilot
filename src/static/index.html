@@ -308,6 +308,15 @@
           </div>
           <p class="muted small" data-i18n="p.lead"></p>
 
+          <div id="drafts-panel" class="drafts">
+            <div class="drafts-head">
+              <span class="mono small" id="drafts-title"></span>
+              <span id="draft-status" class="muted small mono" aria-live="polite"></span>
+              <button type="button" id="new-draft" class="small ghost" data-i18n="p.newDraft"></button>
+            </div>
+            <div id="drafts-list" class="drafts-list"></div>
+          </div>
+
           <ol class="pipeline" id="pipeline">
             <li data-step="1"><b data-i18n="p.s1"></b><span data-i18n="p.s1d"></span></li>
             <li data-step="2"><b data-i18n="p.s2"></b><span data-i18n="p.s2d"></span></li>
@@ -327,6 +336,7 @@
               <input id="p-audience" maxlength="500" data-i18n-placeholder="p.fAudPh">
             </label>
             <div class="row end">
+              <button type="button" class="ghost save-draft" data-i18n="p.saveDraft"></button>
               <button type="submit" class="primary glow" data-i18n="p.toAi"></button>
             </div>
           </form>
@@ -358,10 +368,16 @@
             <label class="check approve"><input type="checkbox" id="approve"> <span data-i18n="p.approve"></span></label>
             <div class="row end">
               <button id="back-edit" class="ghost" data-i18n="p.back"></button>
+              <button type="button" class="ghost save-draft" data-i18n="p.saveDraft"></button>
               <button id="submit-proposal" class="primary glow" disabled data-i18n="p.submit"></button>
             </div>
           </div>
           <p id="proposal-error" class="error" role="alert"></p>
+        </div>
+
+        <div id="my-proposals" class="card panel student-only">
+          <div class="panel-head"><h3 data-i18n="p.mine"></h3><span id="my-count" class="muted small mono"></span></div>
+          <div id="my-proposals-list" class="mini-list"></div>
         </div>
 
         <div class="toolbar">

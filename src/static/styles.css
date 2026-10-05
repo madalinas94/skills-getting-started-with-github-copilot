@@ -1043,3 +1043,24 @@ body.no-scroll { overflow: hidden; }
 @keyframes intro-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .intro-skip { position: absolute; right: 1.2rem; top: 1rem; color: #eeedf7; border-color: rgba(255, 255, 255, .18); font-size: .82rem; }
 .intro-skip:hover:not(:disabled) { background: rgba(255, 255, 255, .08); }
+
+/* ============================================================ ciorne & propunerile mele */
+.drafts { margin: 1rem 0 .4rem; padding: .7rem .9rem; border-radius: 16px; border: 1px dashed var(--border-strong); background: color-mix(in srgb, var(--a4) 4%, transparent); }
+.drafts-head { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+.drafts-head #draft-status { margin-right: auto; }
+.drafts-list { display: flex; gap: .45rem; overflow-x: auto; padding-top: .5rem; scrollbar-width: thin; }
+.drafts-list:empty { display: none; }
+.draft-chip { flex: none; display: inline-flex; align-items: center; gap: .4rem; max-width: 260px; padding: .35rem .4rem .35rem .8rem; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface); font-size: .82rem; }
+.draft-chip.on { border-color: color-mix(in srgb, var(--a1) 60%, transparent); background: color-mix(in srgb, var(--a1) 10%, transparent); }
+.draft-chip .dt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.draft-chip small { color: var(--muted); font-family: "JetBrains Mono", monospace; font-size: .66rem; white-space: nowrap; }
+.draft-chip button { padding: .05rem .45rem; font-size: .72rem; border: none; }
+#my-proposals { margin-bottom: 1.4rem; }
+.mine-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; padding: .6rem .7rem; border-radius: 14px; background: color-mix(in srgb, var(--bg) 35%, transparent); }
+.mine-row .t { flex: 1; min-width: 160px; font-weight: 600; }
+.mine-row.withdrawn .t { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 50%, transparent); }
+.status.withdrawn { color: var(--muted); background: var(--surface-2); }
+.status.resolved { color: var(--ok); background: var(--ok-soft); }
+.withdraw-form { flex-basis: 100%; display: grid; gap: .5rem; padding: .7rem; margin-top: .3rem; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); }
+.withdraw-form .row { margin-top: 0; }
+.item.withdrawn { opacity: .55; }

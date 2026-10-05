@@ -88,6 +88,10 @@ MESSAGES = {
     "approve_first": ("Aprobă varianta finală înainte să o trimiți.", "Approve the final version before submitting it.", "Approuve la version finale avant de l'envoyer.", "Approva la versione finale prima di inviarla.", "Aprueba la versión final antes de enviarla.", "Bestätige die finale Version, bevor du sie sendest."),
     "missing": ("Lipsește: {}.", "Missing: {}.", "Il manque : {}.", "Manca: {}.", "Falta: {}.", "Es fehlt: {}."),
     "no_proposal": ("Propunerea nu există.", "Proposal not found.", "Proposition introuvable.", "Proposta non trovata.", "Propuesta no encontrada.", "Vorschlag nicht gefunden."),
+    "withdrawn": ("Propunerea a fost retrasă de autor.", "The author withdrew this proposal.", "L'auteur a retiré cette proposition.", "L'autore ha ritirato questa proposta.", "El autor retiró esta propuesta.", "Der Vorschlag wurde vom Autor zurückgezogen."),
+    "not_author": ("Doar autorul poate face asta.", "Only the author can do this.", "Seul l'auteur peut faire ça.", "Solo l'autore può farlo.", "Solo el autor puede hacer esto.", "Nur der Autor kann das tun."),
+    "too_many_drafts": ("Poți păstra maxim {} ciorne. Șterge una veche.", "You can keep at most {} drafts. Delete an old one.", "Tu peux garder au maximum {} brouillons. Supprimes-en un ancien.", "Puoi tenere al massimo {} bozze. Eliminane una vecchia.", "Puedes guardar como máximo {} borradores. Borra uno antiguo.", "Du kannst höchstens {} Entwürfe behalten. Lösch einen alten."),
+    "no_draft": ("Ciorna nu există.", "Draft not found.", "Brouillon introuvable.", "Bozza non trovata.", "Borrador no encontrado.", "Entwurf nicht gefunden."),
     "own_vote": ("Nu-ți poți vota propria idee.", "You can't vote for your own idea.", "Tu ne peux pas voter pour ta propre idée.", "Non puoi votare la tua idea.", "No puedes votar tu propia idea.", "Du kannst nicht für deine eigene Idee stimmen."),
     "no_submission": ("Predarea nu există.", "Submission not found.", "Rendu introuvable.", "Consegna non trovata.", "Entrega no encontrada.", "Abgabe nicht gefunden."),
     "need_title": ("Scrie un titlu.", "Add a title.", "Ajoute un titre.", "Aggiungi un titolo.", "Añade un título.", "Füge einen Titel hinzu."),
@@ -138,7 +142,7 @@ app.mount("/static", StaticFiles(directory=current_dir / "static"), name="static
 
 _lock = threading.Lock()
 db = {
-    "users": {}, "sessions": {}, "prefs": {},
+    "users": {}, "sessions": {}, "prefs": {}, "drafts": [],
     "questions": [], "proposals": [], "submissions": [],
     "messages": [], "assignments": [], "announcements": [], "bonuses": [],
     "next_id": 1,
@@ -688,8 +692,13 @@ class ProposalIn(ProposalDraft):
     approved: bool = False
 
 
+def is_withdrawn(p: dict) -> bool:
+    return p.get("status") == "withdrawn"
+
+
 def proposal_view(p: dict, user: dict) -> dict:
     view = {k: v for k, v in p.items() if k not in ("author_key", "voters")}
+    view["status"] = p.get("status", "active")
     view["votes"] = len(p["voters"])
     view["voted"] = user["key"] in p["voters"]
     view["mine"] = p["author_key"] == user["key"]
@@ -728,7 +737,9 @@ def submit_proposal(body: ProposalIn, user: dict = Depends(require_student)):
 
 @app.get("/api/proposals")
 def list_proposals(user: dict = Depends(current_user)):
-    return [proposal_view(p, user) for p in reversed(db["proposals"])]
+    """Clasa vede doar propunerile active; autorul și trainerul le văd și pe cele retrase."""
+    return [proposal_view(p, user) for p in reversed(db["proposals"])
+            if not is_withdrawn(p) or p["author_key"] == user["key"] or user["role"] == "trainer"]
 
 
 def find_proposal(proposal_id: int) -> dict:
@@ -742,6 +753,8 @@ def find_proposal(proposal_id: int) -> dict:
 def toggle_vote(proposal_id: int, user: dict = Depends(require_student)):
     with _lock:
         p = find_proposal(proposal_id)
+        if is_withdrawn(p):
+            fail(400, "withdrawn")
         if p["author_key"] == user["key"]:
             fail(400, "own_vote")
         if user["key"] in p["voters"]:
@@ -756,10 +769,104 @@ def toggle_vote(proposal_id: int, user: dict = Depends(require_student)):
 def toggle_chosen(proposal_id: int, user: dict = Depends(require_trainer)):
     with _lock:
         p = find_proposal(proposal_id)
+        if is_withdrawn(p) and not p["chosen"]:
+            fail(400, "withdrawn")
         p["chosen"] = not p["chosen"]
         p["chosen_at"] = now() if p["chosen"] else None
         save_db()
     return proposal_view(p, user)
+
+
+class WithdrawIn(BaseModel):
+    reason: str = Field("resolved", pattern="^(resolved|other)$")
+    note: str = Field("", max_length=300)
+
+
+def own_proposal(proposal_id: int, user: dict) -> dict:
+    p = find_proposal(proposal_id)
+    if p["author_key"] != user["key"]:
+        fail(403, "not_author")
+    return p
+
+
+@app.post("/api/proposals/{proposal_id}/withdraw")
+def withdraw_proposal(proposal_id: int, body: WithdrawIn, user: dict = Depends(require_student)):
+    """Autorul își retrage propunerea (de ex. a rezolvat singur problema). Iese din cutia publică."""
+    with _lock:
+        p = own_proposal(proposal_id, user)
+        p.update(status="withdrawn", withdrawn_reason=body.reason,
+                 withdrawn_note=body.note.strip() or None, withdrawn_at=now())
+        save_db()
+    return proposal_view(p, user)
+
+
+@app.post("/api/proposals/{proposal_id}/restore")
+def restore_proposal(proposal_id: int, user: dict = Depends(require_student)):
+    with _lock:
+        p = own_proposal(proposal_id, user)
+        p.update(status="active", withdrawn_reason=None, withdrawn_note=None, withdrawn_at=None)
+        save_db()
+    return proposal_view(p, user)
+
+
+# ---------------------------------------------------------------------------
+# Ciorne: propunerile la care încă lucrezi, salvate pe server (doar ale tale).
+# ---------------------------------------------------------------------------
+
+MAX_DRAFTS = 20
+
+
+class DraftIn(BaseModel):
+    title: str = Field("", max_length=200)
+    description: str = Field("", max_length=4000)
+    audience: str = Field("", max_length=500)
+
+
+def draft_view(d: dict) -> dict:
+    return {k: v for k, v in d.items() if k != "owner"}
+
+
+def own_draft(draft_id: int, user: dict) -> dict:
+    d = next((d for d in db["drafts"] if d["id"] == draft_id), None)
+    # O ciornă străină „nu există”, ca să nu confirmăm nici măcar că e acolo
+    if not d or d["owner"] != user["key"]:
+        fail(404, "no_draft")
+    return d
+
+
+@app.get("/api/drafts")
+def list_drafts(user: dict = Depends(current_user)):
+    mine = [d for d in db["drafts"] if d["owner"] == user["key"]]
+    return [draft_view(d) for d in sorted(mine, key=lambda d: d["updated_at"], reverse=True)]
+
+
+@app.post("/api/drafts", status_code=201)
+def create_draft(body: DraftIn, user: dict = Depends(current_user)):
+    with _lock:
+        if sum(1 for d in db["drafts"] if d["owner"] == user["key"]) >= MAX_DRAFTS:
+            fail(400, "too_many_drafts", MAX_DRAFTS)
+        d = {"id": next_id(), "owner": user["key"], **body.model_dump(), "created_at": now(), "updated_at": now()}
+        db["drafts"].append(d)
+        save_db()
+    return draft_view(d)
+
+
+@app.put("/api/drafts/{draft_id}")
+def update_draft(draft_id: int, body: DraftIn, user: dict = Depends(current_user)):
+    with _lock:
+        d = own_draft(draft_id, user)
+        d.update(**body.model_dump(), updated_at=now())
+        save_db()
+    return draft_view(d)
+
+
+@app.delete("/api/drafts/{draft_id}")
+def delete_draft(draft_id: int, user: dict = Depends(current_user)):
+    with _lock:
+        d = own_draft(draft_id, user)
+        db["drafts"].remove(d)
+        save_db()
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
