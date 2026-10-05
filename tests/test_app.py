@@ -730,3 +730,94 @@ def test_supabase_trainer_email_does_not_skip_class_code(fake_supabase, monkeypa
     fake_supabase.autoconfirm = True
     r = client.post("/api/register", json={"name": "Impostor", "email": "radu@test.ro", "password": "parola-buna"})
     assert r.status_code == 403
+
+
+# ---------------------------------------------------------------- Byte: briefing-ul zilei
+
+from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+from src import digest as digest_mod
+
+
+def _fresh_feed(n=8):
+    now = _dt.now(_tz.utc)
+    items = "".join(
+        f"<item><title>New AI coding agent launches tool number {i}</title><link>https://news.example/{i}</link>"
+        f"<description>Developers can try the app {i}</description>"
+        f"<pubDate>{(now - _td(hours=i)).strftime('%a, %d %b %Y %H:%M:%S GMT')}</pubDate></item>" for i in range(n))
+    old = "<item><title>Old model release from last month</title><link>https://news.example/old</link>" \
+          f"<pubDate>{(now - _td(days=30)).strftime('%a, %d %b %Y %H:%M:%S GMT')}</pubDate></item>"
+    return f"<?xml version='1.0'?><rss version='2.0'><channel>{items}{old}</channel></rss>"
+
+
+@pytest.fixture
+def byte(monkeypatch):
+    from src import news
+    monkeypatch.setenv("CUTIA_NEWS_FEEDS", "Feed|https://feed.example/rss")
+    monkeypatch.setattr(app_module, "run_digest_in_background", lambda: None)  # în teste rulăm noi, sincron
+    app_module.db["digests"] = []
+    feed = _fresh_feed()
+    return lambda: app_module.make_digest(lambda su: (news.parse_feed(feed, su[0]), None))
+
+
+def test_digest_keeps_last_24_hours_and_works_without_ai(byte):
+    h = login("Ana")
+    assert client.get("/api/digest", headers=h).json()["digest"] is None
+    byte()
+    data = client.get("/api/digest", headers=h).json()
+    d = data["digest"]
+    assert d["ai"] is False and d["window_hours"] == 24
+    assert d["stats"] == {"sources": 1, "scanned": 9, "fresh": 8, "picked": 6}
+    assert len(d["stories"]) == 6 and all("old" not in s["link"] for s in d["stories"])
+    assert d["tool"]["link"].startswith("https://news.example/")
+    assert data["history"] == [d["date"]] and "pool" not in d and "by_lang" not in d
+    assert client.get("/api/digest").status_code == 401  # doar pentru cei logați
+
+
+def test_digest_written_by_ai_once_per_language(byte, monkeypatch):
+    calls = []
+
+    def fake_write(d, lang, ai_module):
+        calls.append(lang)
+        return digest_mod.validate(d, {
+            "line": "Bună dimineața!", "title": "Ziua agenților", "tldr": "Agenți noi.", "pulse": 9,
+            "stories": [{"id": "n1", "headline": "H1", "why": "W", "for_you": "F"},
+                        {"id": "inventat", "headline": "Fals", "why": "", "for_you": ""}],
+            "tool": {"id": "n2", "name": "Unealta", "what": "Face X", "try_prompt": "Explică-mi X"},
+            "challenge": {"title": "15 minute", "steps": ["a", "b", "c", "d"]},
+            "word": {"term": "agent", "explain": "Un AI care face pași singur."}})
+    monkeypatch.setattr(app_module.ai, "available", lambda: True)
+    monkeypatch.setattr(digest_mod, "write", fake_write)
+    byte()
+    assert calls == ["ro", "en"]  # limbile implicite, scrise dimineața
+    h = login("Ana")
+    d = client.get("/api/digest", headers=h).json()["digest"]
+    assert d["ai"] and d["title"] == "Ziua agenților" and d["pulse"] == 5
+    assert [s["id"] for s in d["stories"]] == ["n1"]                 # id-ul inventat dispare
+    assert d["stories"][0]["link"] == "https://news.example/1"       # linkul vine din flux, nu de la AI
+    assert d["tool"]["link"] == "https://news.example/2" and len(d["challenge"]["steps"]) == 3
+    client.get("/api/digest", headers={**h, "X-Lang": "fr"})
+    client.get("/api/digest", headers={**h, "X-Lang": "fr"})
+    assert calls == ["ro", "en", "fr"]  # franceza: o singură dată, apoi din memorie
+
+
+def test_digest_ai_failure_falls_back_and_waits_before_retry(byte, monkeypatch):
+    calls = []
+    monkeypatch.setattr(app_module.ai, "available", lambda: True)
+    monkeypatch.setattr(digest_mod, "write", lambda d, lang, ai_module: calls.append(lang))
+    byte()
+    h = login("Ana")
+    d = client.get("/api/digest", headers=h).json()["digest"]
+    assert d["ai"] is False and len(d["stories"]) == 6
+    client.get("/api/digest", headers=h)
+    assert calls == ["ro", "en"]  # nu reîncercăm la fiecare vizită
+
+
+def test_only_trainer_can_rerun_digest(byte):
+    assert client.post("/api/digest/run", headers=login("Ana")).status_code == 403
+    assert client.post("/api/digest/run", headers=login("Radu", "trainer")).status_code == 200
+
+
+def test_digest_is_due_once_a_day():
+    today = digest_mod.today()
+    assert digest_mod.due([{"date": today}]) is False
+    assert digest_mod.next_run() > _dt.now(_tz.utc).isoformat()

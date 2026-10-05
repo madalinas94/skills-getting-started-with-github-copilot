@@ -85,6 +85,7 @@ async function setLang(next) {
     api("/api/me", { method: "PATCH", body: { lang } }).catch(() => {});
     renderAll();
     if (newsData) loadNews(); // știrile sunt alese și explicate în limba ta
+    if (digestData) loadDigest();
   } else {
     renderLogin();
   }
@@ -534,6 +535,10 @@ function logout(expired = false) {
   if (auth && !expired) fetch("/api/logout", { method: "POST", headers: { Authorization: `Bearer ${auth.token}` } }).catch(() => {});
   auth = null;
   supaToken = null;
+  digestData = null; digestDate = null;
+  clearTimeout(digestPoll);
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  speaking = false;
   try { localStorage.removeItem("cutia-auth"); } catch (_) {}
   // Pe un calculator comun, textul nescris al cuiva nu rămâne pe ecran pentru următorul
   [...LOCAL_DRAFTS, "#p-title", "#p-description", "#p-audience", "#f-title", "#f-description", "#f-audience"].forEach((sel) => ($(sel).value = ""));
@@ -565,6 +570,7 @@ function showView(name) {
   updateStatusSpace();
   if (name === "messages") loadChat();
   if (name === "news" && !newsData && !newsLoading) loadNews();
+  if (name === "news" && !digestData) loadDigest();
   if (name === "points") loadPoints();
   window.scrollTo({ top: 0, behavior: motionOff() ? "auto" : "smooth" });
 }
@@ -666,6 +672,7 @@ async function start(fromLogin = false) {
   const intro = introEnabled() && !motionOff() && (fromLogin || !seenThisSession) ? playIntro() : Promise.resolve();
   await Promise.all([refresh(), intro]);
   loadNews();
+  loadDigest();
   maybeOnboard();
 }
 
@@ -683,6 +690,7 @@ function renderAll() {
   renderGuide();
   renderPoints();
   renderNews();
+  renderByte();
   renderHome(true);
   renderNotifications();
   if (!$("#drawer").classList.contains("hidden")) {
@@ -762,6 +770,7 @@ function notifications() {
     proposals.filter((p) => p.mine && p.chosen).forEach((p) =>
       items.push({ at: p.chosen_at || p.created_at, icon: "🏆", text: t("notif.chosen", trunc(p.title, 40)), view: "box" }));
   }
+  if (digestData && digestData.digest && !digestDate) items.push({ at: digestData.digest.created_at, icon: "📰", text: t("byte.notif"), sub: digestData.digest.title || "", view: "news" });
   announcements.forEach((a) => items.push({ at: a.created_at, icon: "📣", text: t("notif.announcement", trunc(a.text, 50)), view: "home" }));
   assignments.forEach((a) => items.push({ at: a.created_at, icon: "📌", text: t("notif.assignment", trunc(a.title, 50)), view: "submissions" }));
   return items.filter((i) => i.at).sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, 15);
@@ -934,8 +943,18 @@ function renderHome(instant = false) {
 
   // Știrea zilei din AI News
   const insight = $("#home-insight");
+  const brief = digestData && digestData.digest;
+  if (brief && (brief.tldr || brief.stories.length)) {
+    insight.replaceChildren(el("div", { class: "insight" },
+      el("div", { class: "meta mono muted small" }, `🤖 Byte · ${t("byte.eyebrow")}`),
+      el("h4", {}, brief.title || brief.stories[0].headline || brief.stories[0].title),
+      el("p", {}, brief.tldr || brief.stories[0].why || trunc(brief.stories[0].summary || "", 200)),
+      el("button", { class: "link-btn", onclick: () => showView("news") }, t("byte.open"))));
+  }
   const top = newsData && newsData.items && newsData.items.length ? (newsData.items.find((i) => i.top) || newsData.items[0]) : null;
-  if (top) {
+  if (brief && (brief.tldr || brief.stories.length)) {
+    // briefing-ul lui Byte e deja afișat mai sus
+  } else if (top) {
     insight.replaceChildren(el("div", { class: "insight" },
       el("div", { class: "meta mono muted small" }, `${top.source} · ${timeAgo(top.published)}`),
       el("h4", {}, top.headline || top.title),
@@ -1969,6 +1988,190 @@ function newsCard(it, isTop, idx) {
   return card;
 }
 
+// ================================================================ Byte: briefing-ul zilei
+
+let digestData = null, digestDate = null, digestPoll = null, digestPolls = 0, speaking = false;
+const SPEECH_LANG = { ro: "ro-RO", en: "en-US", fr: "fr-FR", it: "it-IT", es: "es-ES", de: "de-DE" };
+
+async function loadDigest(date = digestDate) {
+  if (!auth) return;
+  clearTimeout(digestPoll);
+  try {
+    digestData = await api(`/api/digest${date ? `?date=${encodeURIComponent(date)}` : ""}`);
+  } catch (_) { digestData = digestData || { digest: null, history: [] }; }
+  // Cât timp Byte scrie, mai întrebăm din când în când (maxim ~3 minute)
+  if (digestData.generating && digestPolls < 30) {
+    digestPolls++;
+    digestPoll = setTimeout(() => loadDigest(), 6000);
+  } else digestPolls = 0;
+  renderByte();
+  renderHome();
+  renderNotifications();
+}
+
+function dayLabel(iso) {
+  const today = new Date().toISOString().slice(0, 10);
+  const y = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  if (iso === today) return t("byte.today");
+  if (iso === y) return t("byte.yesterday");
+  return new Date(iso + "T12:00:00").toLocaleDateString(lang, { day: "numeric", month: "short" });
+}
+
+function countUp(node, target) {
+  if (motionOff()) { node.textContent = target; return; }
+  const t0 = performance.now();
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / 900);
+    node.textContent = Math.round(target * (1 - Math.pow(1 - k, 3)));
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function typeInto(node, text) {
+  node.textContent = "";
+  if (motionOff() || !text) { node.textContent = text || ""; return; }
+  let i = 0;
+  const tick = () => {
+    if (!node.isConnected) return;
+    i = Math.min(text.length, i + 2);
+    node.textContent = text.slice(0, i);
+    if (i < text.length) setTimeout(tick, 16);
+  };
+  tick();
+}
+
+function renderByte() {
+  const box = $("#byte");
+  if (!box || !auth) return;
+  const data = digestData;
+  const d = data && data.digest;
+  box.classList.toggle("scanning", Boolean(data && data.generating) || !data);
+  box.classList.toggle("talking", speaking);
+  $("#byte-eyebrow").textContent = `Byte · ${t("byte.eyebrow")}` + (d ? ` · ${new Date(d.date + "T12:00:00").toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" })}` : "");
+  const body = $("#byte-body");
+  if (!d) {
+    $("#byte-title").textContent = t(data && data.generating ? "byte.generating" : "byte.none");
+    $("#byte-say").textContent = data ? t("byte.next", new Date(data.next_run).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit" })) : "";
+    $("#byte-pulse").replaceChildren();
+    body.replaceChildren(data && data.generating ? el("div", { class: "byte-loading" }, ...Array.from({ length: 3 }, () => el("div", { class: "skeleton" }))) : el("span"));
+    return;
+  }
+  $("#byte-title").textContent = d.title || t("byte.eyebrow");
+  const say = $("#byte-say");
+  const line = d.line || t("byte.localLine");
+  if (say.dataset.shown !== d.date + lang) { say.dataset.shown = d.date + lang; typeInto(say, line); } else say.textContent = line;
+  $("#byte-pulse").replaceChildren(el("span", { class: "mono" }, t("byte.pulse")),
+    el("span", { class: "bars" }, ...Array.from({ length: 5 }, (_, i) => el("i", { class: i < d.pulse ? "on" : "" }))));
+
+  // Statistici: câte surse, câte știri citite, câte alese
+  const stat = (n, label) => { const b = el("b", {}, "0"); countUp(b, n); return el("div", { class: "byte-stat" }, b, el("span", {}, label)); };
+  const stats = el("div", { class: "byte-stats" },
+    stat(d.stats.sources, t("byte.statSources")), stat(d.stats.scanned, t("byte.statScanned")),
+    stat(d.stats.fresh, d.window_hours ? t("byte.statFresh", d.window_hours) : t("byte.statRecent")), stat(d.stories.length, t("byte.statPicked")));
+
+  const actions = el("div", { class: "byte-actions" },
+    "speechSynthesis" in window ? el("button", { type: "button", class: "small", onclick: () => toggleListen(d) }, t(speaking ? "byte.stop" : "byte.listen")) : null,
+    el("button", { type: "button", class: "small ghost", onclick: () => copy(digestText(d)) }, t("byte.copy")),
+    isTrainer() ? el("button", { type: "button", class: "small ghost", onclick: rerunDigest }, t("byte.rerun")) : null,
+    el("span", { class: "muted small mono byte-next" }, t("byte.next", new Date(data.next_run).toLocaleString(lang, { weekday: "short", hour: "2-digit", minute: "2-digit" }))));
+
+  const history = data.history.length > 1 ? el("div", { class: "chips byte-history" },
+    el("span", { class: "muted small" }, t("byte.history")),
+    ...data.history.slice(0, 7).map((day) => el("button", {
+      type: "button", class: `chip ${day === d.date ? "on" : ""}`,
+      onclick: () => { digestDate = day === data.history[0] ? null : day; loadDigest(); },
+    }, dayLabel(day)))) : null;
+
+  const stories = el("ol", { class: "byte-stories" }, ...d.stories.map((s, i) => el("li", { style: `--h:${NEWS_HUE[s.category] || 260}; animation-delay:${i * 70}ms` },
+    el("span", { class: "num mono" }, String(i + 1).padStart(2, "0")),
+    el("div", {},
+      el("div", { class: "meta mono muted small" }, `${s.source}${s.published ? " · " + timeAgo(s.published) : ""}`),
+      el("h3", {}, safeLink(s.link) ? el("a", { href: s.link, target: "_blank", rel: "noopener noreferrer" }, s.headline || s.title) : (s.headline || s.title)),
+      s.why ? el("p", {}, s.why) : (s.summary ? el("p", { class: "muted" }, trunc(s.summary, 200)) : null),
+      s.for_you ? el("p", { class: "for-you" }, el("b", {}, t("byte.forYou")), " ", s.for_you) : null))));
+
+  const side = el("aside", { class: "byte-side" });
+  if (d.tool) {
+    side.append(el("div", { class: "byte-card" }, el("h4", {}, t("byte.tool")),
+      el("b", {}, d.tool.name), el("p", { class: "muted small" }, d.tool.what),
+      d.tool.try_prompt ? el("div", { class: "prompt-box" }, el("span", { class: "mono small muted" }, t("byte.tryPrompt")), el("p", {}, d.tool.try_prompt),
+        el("button", { type: "button", class: "small", onclick: () => copy(d.tool.try_prompt) }, t("byte.copyPrompt"))) : null,
+      safeLink(d.tool.link) ? el("a", { class: "link-btn", href: d.tool.link, target: "_blank", rel: "noopener noreferrer" }, t("n.read")) : null));
+  }
+  side.append(challengeCard(d));
+  if (d.word) side.append(el("div", { class: "byte-card" }, el("h4", {}, t("byte.word")), el("b", { class: "word" }, d.word.term), el("p", { class: "small" }, d.word.explain)));
+  if (!d.ai) side.append(el("p", { class: "muted small" }, t("byte.localHint")));
+
+  const tldr = d.tldr ? el("p", { class: "byte-tldr" }) : null;
+  body.replaceChildren(stats, ...(tldr ? [tldr] : []), actions, ...(history ? [history] : []), el("div", { class: "byte-grid" }, stories, side));
+  if (tldr) tldr.textContent = d.tldr;
+}
+
+function challengeCard(d) {
+  // Fără AI: provocarea zilei e promptul unui topic din ghid (altul în fiecare zi)
+  let title = d.challenge && d.challenge.title, steps = d.challenge ? d.challenge.steps : null;
+  if (!steps) {
+    const keys = cfg.topics.filter((k) => k !== "other");
+    const tp = topic(keys[Number(d.date.replaceAll("-", "")) % keys.length]);
+    title = `${tp.icon} ${tp.title}`;
+    steps = [t("byte.guideStep1", tp.title), tp.prompt, t("byte.guideStep3")];
+  }
+  const key = `cutia-challenge-${d.date}`;
+  let done = [];
+  try { done = JSON.parse(localStorage.getItem(key)) || []; } catch (_) {}
+  const card = el("div", { class: "byte-card challenge" }, el("h4", {}, t("byte.challenge")), el("b", {}, title));
+  const list = el("ul", { class: "steps" });
+  steps.forEach((step, i) => {
+    const box = el("input", { type: "checkbox" });
+    box.checked = done.includes(i);
+    box.addEventListener("change", () => {
+      done = box.checked ? [...done, i] : done.filter((x) => x !== i);
+      try { localStorage.setItem(key, JSON.stringify(done)); } catch (_) {}
+      if (done.length === steps.length) { toast(t("byte.challengeDone")); confetti(); }
+    });
+    list.append(el("li", {}, el("label", {}, box, el("span", {}, step))));
+  });
+  card.append(list);
+  return card;
+}
+
+function digestText(d) {
+  const lines = [`Byte · ${d.title || t("byte.eyebrow")} (${d.date})`, ""];
+  if (d.tldr) lines.push(d.tldr, "");
+  d.stories.forEach((s, i) => lines.push(`${i + 1}. ${s.headline || s.title}`, ...(s.why ? [`   ${s.why}`] : []), `   ${s.link}`));
+  if (d.tool) lines.push("", `${t("byte.tool")}: ${d.tool.name}`);
+  return lines.join("\n");
+}
+
+function toggleListen(d) {
+  const synth = window.speechSynthesis;
+  if (speaking) { synth.cancel(); speaking = false; renderByte(); return; }
+  const text = [d.title, d.tldr, ...d.stories.map((s) => `${s.headline || s.title}. ${s.why || ""}`)].filter(Boolean).join(" … ");
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = SPEECH_LANG[lang] || "en-US";
+  const voice = synth.getVoices().find((v) => v.lang && v.lang.toLowerCase().startsWith(lang));
+  if (voice) u.voice = voice;
+  u.rate = 1.02;
+  u.onend = u.onerror = () => { speaking = false; renderByte(); };
+  synth.cancel();
+  synth.speak(u);
+  speaking = true;
+  renderByte();
+}
+
+async function rerunDigest() {
+  try {
+    await api("/api/digest/run", { method: "POST" });
+    toast(t("byte.rerunStarted"));
+    digestDate = null;
+    digestPolls = 0;
+    digestData = { ...(digestData || {}), generating: true };
+    renderByte();
+    digestPoll = setTimeout(() => loadDigest(), 4000);
+  } catch (err) { toast(err.message); }
+}
+
 // ================================================================ points & leaderboard
 
 async function loadPoints() {
@@ -2258,6 +2461,7 @@ function paletteActions() {
   const views = ["home", "messages", "questions", "submissions", "box", "news", "points", "guide"];
   const icons = { home: "⌂", messages: "✉", questions: "?", submissions: "⇪", box: "✦", news: "◉", points: "⚡", guide: "#" };
   const items = views.map((v) => ({ icon: icons[v], label: t("k.go", t("nav." + v)), run: () => showView(v) }));
+  items.push({ icon: "🤖", label: t("byte.palette"), run: () => showView("news") });
   if (!isTrainer()) {
     items.push(
       { icon: "?", label: t("k.ask"), run: () => { showView("questions"); setTimeout(() => $("#question-text").focus(), 60); } },

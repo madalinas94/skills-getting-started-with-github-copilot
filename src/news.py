@@ -29,6 +29,12 @@ DEFAULT_FEEDS = [
     ("Google AI", "https://blog.google/technology/ai/rss/"),
     ("OpenAI", "https://openai.com/news/rss.xml"),
     ("Simon Willison", "https://simonwillison.net/atom/everything/"),
+    ("Google DeepMind", "https://deepmind.google/blog/rss.xml"),
+    ("The Decoder", "https://the-decoder.com/feed/"),
+    ("Wired AI", "https://www.wired.com/feed/tag/ai/latest/rss"),
+    ("GitHub Blog", "https://github.blog/feed/"),
+    ("Latent Space", "https://www.latent.space/feed"),
+    ("Hacker News", "https://hnrss.org/frontpage?points=150"),
 ]
 
 CACHE_SECONDS = int(os.environ.get("CUTIA_NEWS_CACHE", 2 * 3600))
@@ -41,6 +47,9 @@ BOOST = {
     "open source": 3, "open-source": 3, "model": 2, "claude": 3, "gpt": 2, "gemini": 2, "llama": 2,
     "mistral": 2, "copilot": 2, "cursor": 2, "vibe": 4, "prompt": 2, "api": 2, "free": 1,
     "image": 1, "video": 1, "voice": 1, "robot": 1, "research": 1, "benchmark": 1,
+    # unelte de vibe coding: interesante chiar dacă nu scrie „AI” în titlu
+    "show hn": 2, "github": 1, "vercel": 2, "supabase": 2, "replit": 2, "lovable": 2, "bolt": 1,
+    "windsurf": 2, "mcp": 3, "no-code": 2, "low-code": 1, "python": 1, "javascript": 1, "typescript": 1,
 }
 # Subiecte puțin utile la curs (bani, procese, politică)
 PENALTY = {
@@ -168,7 +177,7 @@ def _fetch(source_url):
         return [], f"{source}: {type(exc).__name__}"
 
 
-def collect(fetcher=None) -> tuple:
+def collect(fetcher=None, limit: int = MAX_ITEMS) -> tuple:
     with ThreadPoolExecutor(max_workers=6) as pool:
         results = list(pool.map(fetcher or _fetch, feeds()))
     items, errors, seen = [], [], set()
@@ -185,9 +194,9 @@ def collect(fetcher=None) -> tuple:
             items.append(it)
     items = [it for it in items if it["score"] > 0]
     items.sort(key=lambda it: (it["score"], it["published"] or ""), reverse=True)
-    for i, it in enumerate(items[:MAX_ITEMS]):
+    for i, it in enumerate(items[:limit]):
         it["id"] = f"n{i}"
-    return items[:MAX_ITEMS], errors
+    return items[:limit], errors
 
 
 def get_items(force: bool = False, fetcher=None) -> dict:

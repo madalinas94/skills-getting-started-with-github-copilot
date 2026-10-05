@@ -7,6 +7,7 @@ Toate regulile de acces se verifică aici, pe server.
 """
 
 import contextvars
+from contextlib import asynccontextmanager
 import hashlib
 import hmac
 import json
@@ -43,9 +44,10 @@ def load_env_file(path: Path):
 load_env_file(current_dir.parent / ".env")
 
 try:
-    from . import ai, news, points, supa
+    from . import ai, digest, news, points, supa
 except ImportError:  # rulare directă: python app.py
     import ai
+    import digest
     import news
     import points
     import supa
@@ -54,8 +56,14 @@ DATA_FILE = Path(os.environ.get("CUTIA_DATA", current_dir.parent / "data" / "cut
 UPLOAD_DIR = Path(os.environ.get("CUTIA_UPLOADS", DATA_FILE.parent / "uploads"))
 TRAINER_CODE = os.environ.get("TRAINER_CODE", "trainer")
 
+@asynccontextmanager
+async def lifespan(_app):
+    start_byte()  # robotul de știri (definit mai jos, la „Byte”)
+    yield
+
+
 app = FastAPI(title="Cutia Clasei API",
-              description="Întrebări pentru trainer și propuneri de proiecte")
+              description="Întrebări pentru trainer și propuneri de proiecte", lifespan=lifespan)
 
 # ---------------------------------------------------------------------------
 # Limba: interfața trimite antetul X-Lang (ro, en, fr, it, es, de); mesajele
@@ -151,7 +159,7 @@ db = {
     "users": {}, "sessions": {}, "prefs": {}, "drafts": [],
     "questions": [], "proposals": [], "submissions": [],
     "messages": [], "assignments": [], "announcements": [], "bonuses": [],
-    "supabase_pending": {}, "next_id": 1,
+    "supabase_pending": {}, "digests": [], "next_id": 1,
 }
 SESSION_DAYS = 60
 
@@ -1342,6 +1350,101 @@ def get_news(refresh: bool = False, user: dict = Depends(current_user)):
     data = news.get_items(force=force)
     curated = news.curate(data["items"], current_lang.get(), ai)
     return {**data, **curated}
+
+
+# ---------------------------------------------------------------------------
+# Byte, robotul de știri: o dată la 24 de ore face „Briefing-ul zilei” din
+# toate sursele. Rulează pe server, într-un fir separat; cheia API nu iese
+# de aici. Fiecare limbă se scrie o singură dată pe zi (apoi stă în db).
+# ---------------------------------------------------------------------------
+
+DIGEST_LANGS = [l for l in os.environ.get("CUTIA_DIGEST_LANGS", "ro,en").split(",") if l in ai.LANGS]
+AI_RETRY_SECONDS = 30 * 60
+_digest_state = {"running": False, "manual_at": 0.0, "auto_at": 0.0}
+_digest_write_lock = threading.Lock()
+
+
+def make_digest(fetcher=None) -> dict:
+    items, errors = news.collect(fetcher, limit=digest.SCAN_LIMIT)
+    d = digest.build(items, len(news.feeds()), errors)
+    with _lock:
+        kept = [x for x in db.setdefault("digests", []) if x["date"] != d["date"]] + [d]
+        db["digests"] = sorted(kept, key=lambda x: x["date"])[-digest.KEEP_DAYS:]
+        save_db()
+    for lang in DIGEST_LANGS:
+        digest_view(d, lang)
+    return d
+
+
+def run_digest_in_background():
+    def job():
+        try:
+            make_digest()
+        except Exception:  # o sursă sau AI-ul căzut nu oprește serverul; încercăm la următorul tur
+            pass
+        finally:
+            _digest_state["running"] = False
+    if not _digest_state["running"]:
+        _digest_state["running"] = True
+        threading.Thread(target=job, daemon=True).start()
+
+
+def digest_view(d: dict, lang: str) -> dict:
+    """Briefing-ul în limba cerută: scris de Claude (o dată) sau varianta locală."""
+    import time
+    with _digest_write_lock:  # mai mulți colegi deodată = tot un singur apel la Claude
+        view = d["by_lang"].get(lang)
+        failed_at = d.setdefault("failed", {}).get(lang, 0)
+        if view is None and ai.available() and time.time() - failed_at > AI_RETRY_SECONDS:
+            view = digest.write(d, lang, ai)
+            with _lock:
+                if view:
+                    d["by_lang"][lang] = view
+                else:
+                    d["failed"][lang] = time.time()
+                save_db()
+    return view or digest.local_view(d)
+
+
+def digest_loop():
+    import time
+    while True:
+        if digest.due(db.get("digests", [])) and not _digest_state["running"]:
+            run_digest_in_background()
+        time.sleep(600)
+
+
+def start_byte():
+    if os.environ.get("CUTIA_DIGEST", "on") != "off":
+        threading.Thread(target=digest_loop, daemon=True).start()
+
+
+@app.get("/api/digest")
+def get_digest(date: Optional[str] = None, user: dict = Depends(current_user)):
+    digests = db.get("digests", [])
+    d = next((x for x in digests if x["date"] == date), None) if date else (digests[-1] if digests else None)
+    import time
+    # Primul briefing (sau cel de azi) se face acum; dacă sursele nu merg, nu reîncercăm la fiecare vizită
+    if (d is None or (not date and digest.due(digests))) and time.time() - _digest_state["auto_at"] > 600:
+        _digest_state["auto_at"] = time.time()
+        run_digest_in_background()
+    base = {"next_run": digest.next_run(), "generating": _digest_state["running"],
+            "history": [x["date"] for x in reversed(digests)], "hour": digest.HOUR}
+    if d is None:
+        return {**base, "digest": None}
+    view = digest_view(d, current_lang.get())
+    return {**base, "digest": {"date": d["date"], "created_at": d["created_at"], "window_hours": d["window_hours"],
+                               "stats": d["stats"], **view}}
+
+
+@app.post("/api/digest/run")
+def rerun_digest(user: dict = Depends(require_trainer)):
+    """Trainerul cere un briefing nou acum (cel mult o dată la 10 minute)."""
+    import time
+    if time.time() - _digest_state["manual_at"] > 600:
+        _digest_state["manual_at"] = time.time()
+        run_digest_in_background()
+    return {"generating": _digest_state["running"]}
 
 
 if __name__ == "__main__":

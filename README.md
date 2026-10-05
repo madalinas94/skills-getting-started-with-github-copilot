@@ -33,7 +33,17 @@
 - **Mesaje directe** student ↔ trainer, cu mesaje necitite și notificări.
 - **Teme anunțate de trainer** cu termen, puncte și numărătoare inversă; **anunțuri** fixate pe pagina de acasă.
 - **Credite & puncte bonus:** puncte pentru teme (+10), predare la timp (+5), temă revizuită (+20 sau cât stabilește trainerul), idei (+5), voturi primite (+2), idee aleasă (+30), întrebări (+2, max 3/zi) și bonusuri de la trainer. 6 niveluri (Prompt Rookie → AI Wizard), 8 badge-uri, podium și clasament (poți alege să nu apari).
-- **AI News:** știri din surse publice despre AI (TechCrunch, The Verge, MIT Technology Review, Ars Technica, VentureBeat, Hugging Face, Google AI, OpenAI, Simon Willison), filtrate după relevanță (aplicații noi, modele, unelte, „wow”), pe categorii. Cu cheie API, Claude alege cele mai bune și explică „de ce contează” în limba ta. Din orice știre: „Trimite trainerului” sau „Fă o idee din asta”.
+- **Byte, robotul de știri 🤖 (briefing-ul zilei):** o dată la 24 de ore (implicit la 07:00, ora României) Byte citește toate sursele și păstrează ce a apărut în ultimele 24 de ore. Cu cheie API, Claude scrie briefing-ul pentru clasă:
+  - un titlu și un rezumat al zilei;
+  - 5–7 știri, fiecare cu „de ce contează” și „💡 pentru tine” (ce poți încerca sau construi cu ea);
+  - **unealta zilei**, cu un prompt gata de copiat în Claude;
+  - o **provocare de 15 minute** cu 3 pași de bifat;
+  - **cuvântul zilei** și **pulsul zilei** (cât de mare a fost ziua în AI).
+
+  Byte arată câte surse și câte știri a citit, iar briefing-ul se poate **asculta** (citit cu voce în limba ta), copia pentru grupul clasei sau răsfoi pe zilele trecute. Primești notificare când e gata. Trainerul îl poate face din nou oricând.
+
+  Claude alege știrile doar din listă, iar linkurile le punem noi din surse, deci nu poate inventa știri. Fără cheie, Byte face un briefing din scorul știrilor, iar provocarea vine din ghid.
+- **AI News:** știri din surse publice despre AI (TechCrunch, The Verge, MIT Technology Review, Ars Technica, VentureBeat, Wired, The Decoder, Hugging Face, Google AI, Google DeepMind, OpenAI, GitHub Blog, Latent Space, Simon Willison, Hacker News), filtrate după relevanță (aplicații noi, modele, unelte, „wow”), pe categorii. Cu cheie API, Claude alege cele mai bune și explică „de ce contează” în limba ta. Din orice știre: „Trimite trainerului” sau „Fă o idee din asta”.
 - **Răspuns rapid de la AI** la fiecare întrebare, marcat „neverificat de trainer”.
 - **6 limbi** (RO, EN, FR, IT, ES, DE): interfață, erori de server, texte AI și ghid. Limba aleasă te urmează pe orice dispozitiv.
 - **Design „Aurora”:** fundal adânc cu lumini de auroră discrete și grăunte fin de film, titluri în serif elegant (Instrument Serif), text în Manrope, butoane calme în formă de pastilă. 5 stiluri: Aurora, Perlă (luminos), Apus, Ocean, Contrast mare. Plus animații pornite/oprite și text normal/mare.
@@ -78,6 +88,10 @@ Deschide http://localhost:8000.
 | `CUTIA_DATA` | `data/cutia.json` | Unde se salvează datele. |
 | `CUTIA_UPLOADS` | `data/uploads` | Unde se salvează fișierele încărcate. |
 | `CUTIA_NEWS_FEEDS` | sursele de mai sus | Alte surse: `Nume\|https://...,Nume\|https://...` |
+| `CUTIA_DIGEST_HOUR` | `7` | Ora la care Byte face briefing-ul zilei. |
+| `CUTIA_TZ` | `Europe/Bucharest` | Fusul orar pentru ora de mai sus. |
+| `CUTIA_DIGEST_LANGS` | `ro,en` | Limbile scrise dimineața; celelalte se scriu la prima vizită și rămân salvate. |
+| `CUTIA_DIGEST` | `on` | `off` oprește robotul (briefing-ul se face doar la cerere). |
 | `CUTIA_NEWS_CACHE` | `7200` | Cât timp (secunde) păstrăm știrile înainte să le recitim. |
 
 ### Conturi prin Supabase (pas cu pas)
@@ -112,6 +126,7 @@ Datele (întrebări, teme, idei) rămân tot în `data/cutia.json`, legate de em
 - **Cheia API nu are voie în browser** → AI-ul e chemat doar din `src/ai.py` și `src/news.py`, pe server.
 - **Spațiul privat trebuie să fie chiar privat** → fiecare endpoint filtrează după autor pe server, plus teste cu două conturi.
 - **Punctele trebuie să fie corecte și greu de trișat** → nu se salvează ca număr; `src/points.py` le calculează mereu din teme, idei, voturi și bonusuri.
+- **Un briefing pe zi, nu un flux nesfârșit** → Byte rulează pe server o dată la 24 de ore; fiecare limbă se scrie o singură dată pe zi și se salvează, deci costă câteva apeluri pe zi, indiferent câți colegi îl deschid. Dacă AI-ul nu merge, reîncearcă abia peste 30 de minute.
 - **Știrile trebuie să fie relevante, nu zgomot** → filtru pe cuvinte cheie (lansări, unelte, modele, agenți) și penalizare pentru bani, procese și politică; cu cheie, Claude alege și explică.
 - **Aplicația trebuie să meargă și fără AI** → mod local pentru retușare, sfaturi din ghid și filtru automat de știri.
 - **AI-ul nu decide în locul studentului** → răspuns structurat (JSON), maxim 3 întrebări, trimitere doar cu aprobare verificată pe server.
@@ -127,6 +142,7 @@ Datele (întrebări, teme, idei) rămân tot în `data/cutia.json`, legate de em
 src/app.py               API (FastAPI): conturi, mesaje, întrebări, teme, idei, puncte, știri
 src/ai.py                Modulul AI (Claude): retușarea ideilor + tutorul pentru întrebări
 src/news.py              AI News: surse RSS/Atom, filtrare, cache, alegere cu Claude
+src/digest.py            Byte: briefing-ul zilei (ultimele 24h, scris de Claude o dată pe zi)
 src/points.py            Puncte, niveluri și badge-uri
 src/supa.py              Conturi prin Supabase Auth (opțional): verificare token, resetare parolă
 src/static/              Interfața: index.html, app.js, styles.css

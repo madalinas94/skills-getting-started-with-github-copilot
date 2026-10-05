@@ -52,6 +52,7 @@ Ce verifică AI-ul la fiecare propunere: **problema** (ce rezolvă și pentru ci
 - **Nimic nu se trimite fără acordul studentului**: AI-ul doar propune; trimiterea cere checkbox-ul de aprobare, iar orice editare cere o nouă aprobare.
 - Răspunsul rapid la întrebări (`answer_question`) e marcat mereu „AI · neverificat de trainer”. Răspunsul trainerului rămâne cel **oficial** și apare primul. Se generează o singură dată per întrebare.
 - AI News: Claude alege maxim 12 știri utile pentru clasă și scrie „de ce contează”, fără să inventeze fapte peste titlu și rezumat. Rezultatul stă în cache per limbă.
+- **Byte (briefing-ul zilei, `src/digest.py`)**: rulează pe server o dată la 24h (`CUTIA_DIGEST_HOUR`, `CUTIA_TZ`). Claude primește știrile ca date, alege doar după `id`, iar linkurile le punem noi din fluxuri (`digest.validate()` aruncă id-urile inventate). Fiecare limbă se scrie o singură dată pe zi și se salvează în `db["digests"]` (ultimele 30 de zile); după un eșec, nu reîncercăm 30 de minute. Doar trainerul poate cere un briefing nou (`POST /api/digest/run`, maxim o dată la 10 minute).
 - Dacă AI-ul nu e disponibil, aplicația merge în continuare (mod local / sfaturi din ghid / filtru automat de știri). Nu bloca nicio funcție obligatorie pe AI.
 
 ## Structura
@@ -61,6 +62,7 @@ src/app.py                API FastAPI: conturi & sesiuni, mesaje, întrebări, t
                           propuneri, puncte, știri, limbă (X-Lang)
 src/ai.py                 Modulul AI: retușarea propunerilor + tutorul pentru întrebări
 src/news.py               AI News: surse RSS/Atom, filtrare, categorii, cache, alegere cu Claude
+src/digest.py             Byte: briefing-ul zilei (ultimele 24h), programare, scriere cu Claude, varianta locală
 src/points.py             Reguli de puncte, niveluri, badge-uri
 src/supa.py               Supabase Auth prin REST (httpx): cont nou, intrare, verificare token, resetare
 src/static/index.html     Scheletul platformei (sidebar privat/public, 8 ecrane, setări, Ctrl+K)

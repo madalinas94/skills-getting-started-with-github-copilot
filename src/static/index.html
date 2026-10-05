@@ -403,6 +403,37 @@
           <h1 data-i18n="n.title"></h1>
           <p class="muted" data-i18n="n.lead"></p>
         </div>
+        <!-- Byte, robotul de știri: briefing-ul zilei (o dată la 24 de ore) -->
+        <section id="byte" class="byte card" aria-live="polite">
+          <div class="byte-top">
+            <svg class="byte-bot" viewBox="0 0 120 120" aria-hidden="true">
+              <defs>
+                <linearGradient id="byte-shell" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="var(--a1)"/><stop offset=".55" stop-color="var(--a3)"/><stop offset="1" stop-color="var(--a2)"/>
+                </linearGradient>
+                <clipPath id="byte-visor-clip"><rect x="28" y="44" width="64" height="34" rx="17"/></clipPath>
+              </defs>
+              <line x1="60" y1="26" x2="60" y2="14" class="byte-antenna"/>
+              <circle cx="60" cy="11" r="5" class="byte-bulb"/>
+              <rect x="16" y="26" width="88" height="70" rx="30" fill="url(#byte-shell)" class="byte-head"/>
+              <rect x="10" y="50" width="8" height="22" rx="4" class="byte-ear"/>
+              <rect x="102" y="50" width="8" height="22" rx="4" class="byte-ear"/>
+              <rect x="28" y="44" width="64" height="34" rx="17" class="byte-visor"/>
+              <g clip-path="url(#byte-visor-clip)"><rect x="20" y="44" width="10" height="34" class="byte-scan"/></g>
+              <g class="byte-eyes"><rect x="42" y="53" width="9" height="15" rx="4.5"/><rect x="69" y="53" width="9" height="15" rx="4.5"/></g>
+              <path d="M52 86 Q60 91 68 86" class="byte-mouth"/>
+            </svg>
+            <div class="byte-intro">
+              <p class="eyebrow mono" id="byte-eyebrow"></p>
+              <h2 id="byte-title"></h2>
+              <p class="byte-say" id="byte-say"></p>
+            </div>
+            <div class="byte-pulse" id="byte-pulse"></div>
+          </div>
+          <div id="byte-body"></div>
+        </section>
+
+        <h2 class="news-all-title" data-i18n="byte.allNews"></h2>
         <div class="toolbar">
           <div id="news-cats" class="chips news-cats"></div>
           <span id="news-meta" class="muted small mono"></span>
