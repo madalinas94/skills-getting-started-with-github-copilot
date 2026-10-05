@@ -1,5 +1,4 @@
 const $ = (sel) => document.querySelector(sel);
-const FIELD_LABELS = { title: "titlu", problem: "problema", description: "ce face", audience: "cine o folosește" };
 // Răspunsul despre „problema” rezolvată se adaugă la descriere
 const TARGET_FIELD = { problem: "description" };
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -7,10 +6,59 @@ const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matc
 let auth = null;
 try { auth = JSON.parse(localStorage.getItem("cutia-auth")); } catch (_) { auth = null; }
 
+let lang = document.documentElement.lang === "en" ? "en" : "ro";
+let cfg = { ai: false, topics: Object.keys(TOPICS) };
 let questions = [];
 let proposals = [];
 let lastMissing = [];
 let lastStats = {};
+let selectedTopic = "prompting";
+const aiPending = new Set();
+
+// ================================================================ i18n
+
+function t(key, ...args) {
+  let s = STRINGS[lang][key] ?? STRINGS.ro[key] ?? key;
+  for (const a of args) s = typeof s === "string" ? s.replace("{}", a) : s;
+  return s;
+}
+
+function topic(key) {
+  const info = TOPICS[key];
+  if (!info) return { key, icon: "✨", hue: 50, title: key, summary: "", tips: [], prompt: "", pitfall: "" };
+  return { key, icon: info.icon, hue: info.hue, ...info[lang] };
+}
+
+function applyI18n() {
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-i18n]").forEach((n) => (n.textContent = t(n.dataset.i18n)));
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((n) => (n.placeholder = t(n.dataset.i18nPlaceholder)));
+  document.querySelectorAll("[data-i18n-title]").forEach((n) => {
+    n.title = t(n.dataset.i18nTitle);
+    n.setAttribute("aria-label", n.title);
+  });
+  document.querySelectorAll(".lang-switch button").forEach((b) => b.classList.toggle("on", b.dataset.lang === lang));
+}
+
+function setLang(next) {
+  if (next === lang) return;
+  lang = next;
+  try { localStorage.setItem("cutia-lang", lang); } catch (_) {}
+  applyI18n();
+  renderMarquee();
+  if (auth && !$("#app-view").classList.contains("hidden")) {
+    renderHeader();
+    renderChips();
+    renderTopicFilter();
+    renderQuestions();
+    renderProposals();
+    renderGuide();
+    renderStats(true);
+    if (!$("#drawer").classList.contains("hidden")) openTopic($("#drawer").dataset.topic);
+  }
+}
+
+document.querySelectorAll(".lang-switch button").forEach((b) => b.addEventListener("click", () => setLang(b.dataset.lang)));
 
 // ================================================================ helpers
 
@@ -19,6 +67,7 @@ async function api(path, options = {}) {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      "X-Lang": lang,
       ...(auth ? { Authorization: `Bearer ${auth.token}` } : {}),
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
@@ -26,8 +75,8 @@ async function api(path, options = {}) {
   const data = await res.json().catch(() => ({}));
   if (res.status === 401 && auth) logout();
   if (!res.ok) {
-    const detail = Array.isArray(data.detail) ? "Verifică datele introduse." : data.detail;
-    throw new Error(detail || "A apărut o eroare.");
+    const detail = Array.isArray(data.detail) ? t("err.check") : data.detail;
+    throw new Error(detail || t("err.generic"));
   }
   return data;
 }
@@ -52,10 +101,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, reducedMotion ? 0 : ms));
 function timeAgo(iso) {
   if (!iso) return "";
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (s < 60) return "acum";
-  if (s < 3600) return `acum ${Math.floor(s / 60)} min`;
-  if (s < 86400) return `acum ${Math.floor(s / 3600)} h`;
-  return new Date(iso).toLocaleDateString("ro-RO", { day: "numeric", month: "short" });
+  if (s < 60) return t("time.now");
+  if (s < 3600) return t("time.min", Math.floor(s / 60));
+  if (s < 86400) return t("time.h", Math.floor(s / 3600));
+  return new Date(iso).toLocaleDateString(lang === "en" ? "en-GB" : "ro-RO", { day: "numeric", month: "short" });
 }
 
 function hue(name) {
@@ -72,15 +121,63 @@ function avatar(name, small = true) {
 
 let toastTimer;
 function toast(msg) {
-  const t = $("#toast");
-  t.textContent = msg;
-  t.classList.remove("hidden");
-  t.style.animation = "none"; void t.offsetWidth; t.style.animation = "";
+  const box = $("#toast");
+  box.textContent = msg;
+  box.classList.remove("hidden");
+  box.style.animation = "none"; void box.offsetWidth; box.style.animation = "";
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.add("hidden"), 2600);
+  toastTimer = setTimeout(() => box.classList.add("hidden"), 2600);
+}
+
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); toast(t("g.copied")); } catch (_) {}
 }
 
 const isTrainer = () => auth && auth.role === "trainer";
+
+// Markdown minimal și sigur (doar noduri text, fără innerHTML): paragrafe,
+// liste, blocuri de cod, `cod` și **bold**.
+function inlineMd(text) {
+  const out = [];
+  const re = /(`[^`]+`|\*\*[^*]+\*\*)/g;
+  let last = 0, m;
+  while ((m = re.exec(text))) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    const tok = m[0];
+    out.push(tok.startsWith("`") ? el("code", {}, tok.slice(1, -1)) : el("strong", {}, tok.slice(2, -2)));
+    last = m.index + tok.length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
+function renderMd(src) {
+  const root = el("div", { class: "md" });
+  const parts = src.split(/```[^\n]*\n?/);
+  parts.forEach((part, i) => {
+    if (i % 2 === 1) {
+      const code = part.replace(/\n$/, "");
+      root.append(el("pre", {}, el("code", {}, code),
+        el("button", { class: "copy-btn small", type: "button", onclick: () => copy(code) }, t("g.copy"))));
+      return;
+    }
+    let list = null;
+    for (const block of part.split(/\n{2,}/)) {
+      for (const line of block.split("\n")) {
+        const item = line.match(/^\s*(?:[-*]|\d+\.)\s+(.*)/);
+        if (item) {
+          if (!list) { list = el(/^\s*\d/.test(line) ? "ol" : "ul"); root.append(list); }
+          list.append(el("li", {}, inlineMd(item[1])));
+        } else if (line.trim()) {
+          list = null;
+          root.append(el("p", {}, inlineMd(line.replace(/^#+\s*/, ""))));
+        }
+      }
+      list = null;
+    }
+  });
+  return root;
+}
 
 // ================================================================ confetti
 
@@ -104,7 +201,7 @@ function confetti() {
     c: colors[Math.floor(Math.random() * colors.length)],
   }));
   const start = performance.now();
-  (function frame(t) {
+  (function frame(now) {
     ctx.clearRect(0, 0, innerWidth, innerHeight);
     for (const p of parts) {
       p.vy += .35; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
@@ -112,7 +209,7 @@ function confetti() {
       ctx.fillStyle = p.c; ctx.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2);
       ctx.restore();
     }
-    if (t - start < 2600) requestAnimationFrame(frame);
+    if (now - start < 2600) requestAnimationFrame(frame);
     else ctx.clearRect(0, 0, innerWidth, innerHeight);
   })(start);
 }
@@ -125,16 +222,7 @@ $("#theme-btn").addEventListener("click", () => {
   try { localStorage.setItem("cutia-theme", next); } catch (_) {}
 });
 
-// ================================================================ login terminal
-
-const TERM_SCRIPT = [
-  ["t-prompt", "$ ", "t-cmd", 'claude "vreau o aplicație pentru clasa mea"'],
-  ["t-ai", "› ", "t-ai", "citesc ideea…"],
-  ["t-q", "? ", "t-q", "Cine o va folosi?"],
-  ["t-prompt", "$ ", "t-cmd", "studenții și trainerul"],
-  ["t-ai", "› ", "t-ai", "retușez textul, totul e clar"],
-  ["t-ok", "✓ ", "t-ok", "propunere trimisă · ora următoare 🚀"],
-];
+// ================================================================ login: terminal & topics marquee
 
 let terminalRunning = false;
 async function runTerminal() {
@@ -143,12 +231,12 @@ async function runTerminal() {
   const body = $("#term-body");
   while (!$("#login-view").classList.contains("hidden")) {
     body.replaceChildren();
-    for (const [pc, prefix, tc, text] of TERM_SCRIPT) {
-      const span = el("span", { class: tc });
+    for (const [prefix, text, typed] of t("term")) {
+      const cls = prefix === "$ " ? "t-prompt" : prefix === "? " ? "t-q" : prefix === "✓ " ? "t-ok" : "t-ai";
+      const span = el("span", { class: typed ? "" : cls });
       const cursor = el("span", { class: "cursor" });
-      body.append(el("div", {}, el("span", { class: pc }, prefix), span, cursor));
-      const typed = tc === "t-cmd" && !reducedMotion;
-      if (typed) {
+      body.append(el("div", {}, el("span", { class: cls }, prefix), span, cursor));
+      if (typed && !reducedMotion) {
         for (let i = 1; i <= text.length; i++) {
           span.textContent = text.slice(0, i);
           await sleep(28 + Math.random() * 40);
@@ -164,6 +252,15 @@ async function runTerminal() {
     await sleep(3500);
   }
   terminalRunning = false;
+}
+
+function renderMarquee() {
+  const chips = cfg.topics.map((k) => {
+    const tp = topic(k);
+    return el("span", { class: "chip", style: `--h:${tp.hue}` }, tp.icon, " ", tp.title);
+  });
+  // Lista apare de două ori, ca animația să se repete fără salt
+  $("#topic-marquee .marquee-track").replaceChildren(...chips, ...chips.map((c) => c.cloneNode(true)));
 }
 
 // ================================================================ auth
@@ -204,15 +301,20 @@ $("#logout-btn").addEventListener("click", logout);
 function logout() {
   auth = null;
   try { localStorage.removeItem("cutia-auth"); } catch (_) {}
+  closeTopic();
   $("#app-view").classList.add("hidden");
   $("#user-box").classList.add("hidden");
   $("#login-view").classList.remove("hidden");
   runTerminal();
 }
 
-function greeting() {
+function renderHeader() {
   const h = new Date().getHours();
-  return h < 11 ? "Bună dimineața" : h < 18 ? "Salut" : "Bună seara";
+  const hello = h < 11 ? t("greet.morning") : h < 18 ? t("greet.day") : t("greet.evening");
+  $("#user-role").textContent = t(isTrainer() ? "role.trainer" : "role.student");
+  $("#greet-eyebrow").textContent = t(isTrainer() ? "greet.trainer" : "greet.student");
+  $("#greet-title").textContent = `${hello}, ${auth.name.split(/\s+/)[0]} 👋`;
+  $("#questions-title").textContent = t(isTrainer() ? "q.class" : "q.mine");
 }
 
 async function start() {
@@ -229,34 +331,30 @@ async function start() {
   const av = avatar(auth.name, false);
   av.id = "user-avatar";
   $("#user-avatar").replaceWith(av);
-  $("#user-role").textContent = isTrainer() ? "trainer" : "student";
-  const first = auth.name.split(/\s+/)[0];
-  $("#greet-eyebrow").textContent = isTrainer() ? "// panoul trainerului" : "// clasa de vibe coding";
-  $("#greet-title").textContent = `${greeting()}, ${first} 👋`;
+  renderHeader();
   document.querySelectorAll(".student-only").forEach((n) => n.classList.toggle("hidden", isTrainer()));
-  $("#questions-title").textContent = isTrainer() ? "Întrebările clasei" : "Întrebările mele";
   document.querySelector('.tab[data-tab="questions"]').click();
   lastStats = {};
+  renderChips();
+  renderTopicFilter();
   refresh();
 }
 
 // ================================================================ tabs & shortcuts
 
-document.querySelectorAll(".tab").forEach((tab) =>
-  tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t === tab));
-    document.querySelectorAll(".tab-panel").forEach((p) =>
-      p.classList.toggle("hidden", p.id !== `tab-${tab.dataset.tab}`)
-    );
-  })
-);
+function showTab(name) {
+  document.querySelectorAll(".tab").forEach((tb) => tb.classList.toggle("active", tb.dataset.tab === name));
+  document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.id !== `tab-${name}`));
+}
+
+document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => showTab(tab.dataset.tab)));
 
 document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeTopic();
   const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
   if (e.key === "/" && !typing && auth) {
-    e.preventDefault();
-    const panel = document.querySelector(".tab-panel:not(.hidden)");
-    if (panel) panel.querySelector('input[type="search"]').focus();
+    const search = document.querySelector('.tab-panel:not(.hidden) input[type="search"]');
+    if (search) { e.preventDefault(); search.focus(); }
   }
   // Ctrl/Cmd + Enter trimite formularul în care scrii
   if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && typing) {
@@ -267,35 +365,36 @@ document.addEventListener("keydown", (e) => {
 
 // ================================================================ stats
 
-function renderStats() {
+function renderStats(instant = false) {
   const answered = questions.filter((q) => q.answer).length;
   const stats = isTrainer()
     ? [
-        ["open", questions.length - answered, "fără răspuns", true],
-        ["answered", answered, "răspunse"],
-        ["proposals", proposals.length, "propuneri"],
-        ["chosen", proposals.filter((p) => p.chosen).length, "alese"],
+        ["open", questions.length - answered, "stat.open", true],
+        ["answered", answered, "stat.answeredT"],
+        ["proposals", proposals.length, "stat.proposalsT"],
+        ["chosen", proposals.filter((p) => p.chosen).length, "stat.chosen"],
       ]
     : [
-        ["mine", questions.length, "întrebările mele"],
-        ["answered", answered, "cu răspuns", answered > 0],
-        ["proposals", proposals.length, "propuneri în clasă"],
-        ["votes", proposals.filter((p) => p.voted).length, "voturile tale"],
+        ["mine", questions.length, "stat.mine"],
+        ["answered", answered, "stat.answered", answered > 0],
+        ["proposals", proposals.length, "stat.proposals"],
+        ["votes", proposals.filter((p) => p.voted).length, "stat.votes"],
       ];
 
   $("#stats").replaceChildren(...stats.map(([key, value, label, hl]) => {
-    const b = el("b", {}, String(lastStats[key] ?? 0));
-    countUp(b, lastStats[key] ?? 0, value);
+    const from = instant ? value : lastStats[key] ?? 0;
+    const b = el("b", {}, String(from));
+    countUp(b, from, value);
     lastStats[key] = value;
-    return el("div", { class: `stat ${hl ? "hl" : ""}` }, b, el("span", {}, label));
+    return el("div", { class: `stat ${hl ? "hl" : ""}` }, b, el("span", {}, t(label)));
   }));
 }
 
 function countUp(node, from, to) {
   if (from === to || reducedMotion) { node.textContent = to; return; }
   const t0 = performance.now();
-  (function step(t) {
-    const k = Math.min(1, (t - t0) / 600);
+  (function step(now) {
+    const k = Math.min(1, (now - t0) / 600);
     node.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3)));
     if (k < 1) requestAnimationFrame(step);
   })(t0);
@@ -303,46 +402,78 @@ function countUp(node, from, to) {
 
 // ================================================================ questions
 
-async function loadCategories() {
-  const cats = await api("/api/categories");
-  $("#question-category").replaceChildren(...cats.map((c) => el("option", { value: c }, c)));
+function renderChips() {
+  $("#topic-chips").replaceChildren(...cfg.topics.map((k) => {
+    const tp = topic(k);
+    return el("button", {
+      type: "button", role: "radio", "aria-checked": String(k === selectedTopic),
+      class: `chip ${k === selectedTopic ? "on" : ""}`, style: `--h:${tp.hue}`,
+      onclick: () => { selectedTopic = k; renderChips(); },
+    }, tp.icon, " ", tp.title);
+  }));
+  const tp = topic(selectedTopic);
+  $("#topic-hint").replaceChildren(t("q.tryFirst"),
+    el("code", { title: t("g.copy"), onclick: () => copy(tp.prompt) }, tp.prompt));
+}
+
+function renderTopicFilter() {
+  const select = $("#question-topic");
+  const current = select.value || "all";
+  select.replaceChildren(el("option", { value: "all" }, t("q.allTopics")),
+    ...cfg.topics.map((k) => el("option", { value: k }, `${topic(k).icon} ${topic(k).title}`)));
+  select.value = current;
 }
 
 $("#question-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   try {
-    await api("/api/questions", {
+    const q = await api("/api/questions", {
       method: "POST",
-      body: {
-        text: $("#question-text").value,
-        category: $("#question-category").value,
-        anonymous: $("#question-anon").checked,
-      },
+      body: { text: $("#question-text").value, category: selectedTopic, anonymous: $("#question-anon").checked },
     });
     $("#question-text").value = "";
-    toast("📨 Întrebarea a ajuns la trainer.");
-    loadQuestions();
+    toast(t("q.sent"));
+    await loadQuestions();
+    if (cfg.ai) requestAiAnswer(q.id);
   } catch (err) {
     toast(err.message);
   }
 });
 
+async function requestAiAnswer(id) {
+  aiPending.add(id);
+  renderQuestions();
+  try {
+    const updated = await api(`/api/questions/${id}/ai-answer`, { method: "POST" });
+    questions = questions.map((q) => (q.id === id ? updated : q));
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    aiPending.delete(id);
+    renderQuestions();
+  }
+}
+
 $("#question-search").addEventListener("input", renderQuestions);
 $("#question-filter").addEventListener("change", renderQuestions);
+$("#question-topic").addEventListener("change", renderQuestions);
 
 async function loadQuestions() {
   questions = await api("/api/questions");
   renderQuestions();
   renderStats();
+  renderGuide();
 }
 
 function renderQuestions() {
   const term = $("#question-search").value.trim().toLowerCase();
   const filter = $("#question-filter").value;
+  const topicFilter = $("#question-topic").value || "all";
   const shown = questions.filter((q) => {
     if (filter === "open" && q.answer) return false;
     if (filter === "answered" && !q.answer) return false;
-    return !term || `${q.text} ${q.answer || ""} ${q.author}`.toLowerCase().includes(term);
+    if (topicFilter !== "all" && q.category !== topicFilter) return false;
+    return !term || `${q.text} ${q.answer || ""} ${q.ai_answer || ""} ${q.author}`.toLowerCase().includes(term);
   });
 
   const open = questions.filter((q) => !q.answer).length;
@@ -353,9 +484,7 @@ function renderQuestions() {
   const list = $("#questions-list");
   if (!shown.length) {
     list.replaceChildren(el("div", { class: "empty" },
-      questions.length ? "// nimic nu se potrivește căutării" :
-      isTrainer() ? "// liniște în clasă. Nicio întrebare încă." :
-      "// nicio întrebare încă. Nu există întrebări proaste 🙂"));
+      t(questions.length ? "q.emptyFilter" : isTrainer() ? "q.emptyTrainer" : "q.emptyStudent")));
     return;
   }
   list.replaceChildren(...shown.map((q, i) => {
@@ -365,44 +494,165 @@ function renderQuestions() {
   }));
 }
 
+function topicChip(key) {
+  const tp = topic(key);
+  return el("button", { type: "button", class: "topic-chip", style: `--h:${tp.hue}`, onclick: () => openTopic(key) },
+    tp.icon, " ", tp.title);
+}
+
 function questionCard(q) {
   const head = el("div", { class: "item-head" },
     isTrainer() ? avatar(q.author) : null,
-    isTrainer() ? el("strong", {}, q.author) : null,
-    el("span", { class: "tag" }, `#${q.category.toLowerCase()}`),
-    !isTrainer() && q.anonymous ? el("span", { class: "tag" }, "anonim") : null,
+    isTrainer() ? el("strong", {}, q.anonymous ? t("q.anonTag") : q.author) : null,
+    topicChip(q.category),
+    !isTrainer() && q.anonymous ? el("span", { class: "tag" }, t("q.anonTag")) : null,
     el("span", {}, timeAgo(q.created_at)),
-    el("span", { class: `right status ${q.answer ? "ok" : "open"}` }, q.answer ? "✓ răspuns" : "în așteptare"),
+    el("span", { class: `right status ${q.answer ? "ok" : "open"}` }, t(q.answer ? "q.statusOk" : "q.statusOpen")),
   );
   const card = el("article", { class: "item" }, head, el("p", { class: "item-text" }, q.text));
 
+  // Răspunsul oficial al trainerului vine primul
   if (q.answer) {
     card.append(el("div", { class: "answer" },
-      el("div", { class: "label" }, "🧑‍🏫 trainer", el("span", { class: "muted" }, `· ${timeAgo(q.answered_at)}`)),
-      el("div", { class: "item-text" }, q.answer)));
-  } else if (!isTrainer()) {
-    card.append(el("div", { class: "waiting" }, "trainerul încă n-a răspuns"));
+      el("div", { class: "label" }, t("q.trainer"), el("span", { class: "muted" }, ` · ${timeAgo(q.answered_at)}`)),
+      renderMd(q.answer)));
+  }
+
+  if (q.ai_answer) {
+    card.append(el("div", { class: "ai-answer" }, el("div", { class: "label" }, t("q.ai")), renderMd(q.ai_answer)));
+  } else if (aiPending.has(q.id)) {
+    card.append(el("div", { class: "ai-loading" }, "› ", t("q.aiThinking"), el("span", { class: "dots" })));
+  }
+
+  if (!isTrainer() && !q.answer) {
+    card.append(el("div", { class: "waiting" }, t("q.waiting")));
+    if (!q.ai_answer && !aiPending.has(q.id)) {
+      if (cfg.ai) {
+        card.append(el("div", { class: "actions" },
+          el("button", { class: "small glow", onclick: () => requestAiAnswer(q.id) }, t("q.aiAsk"))));
+      } else {
+        const tp = topic(q.category);
+        card.append(el("div", { class: "guide-peek" },
+          el("strong", {}, `${t("q.fromGuide")} · ${tp.icon} ${tp.title}`),
+          el("ul", {}, tp.tips.slice(0, 2).map((tip) => el("li", {}, tip))),
+          el("button", { class: "link-btn", type: "button", onclick: () => openTopic(q.category) }, t("q.openGuide"))));
+      }
+    }
   }
 
   if (isTrainer()) {
-    const area = el("textarea", { rows: 3, placeholder: "Scrie răspunsul…  (Ctrl ↵ trimite)" });
+    const area = el("textarea", { rows: 3, placeholder: t("q.replyPh") });
     area.value = q.answer || "";
-    const form = el("form", { class: "answer-form hidden" }, area,
-      el("div", { class: "row end" }, el("button", { type: "submit", class: "primary small" }, "Trimite răspunsul")));
+    const formButtons = el("div", { class: "row end" });
+    if (q.ai_answer) {
+      formButtons.append(el("button", { type: "button", class: "ghost small", onclick: () => { area.value = q.ai_answer; area.focus(); } }, t("q.useAi")));
+    }
+    formButtons.append(el("button", { type: "submit", class: "primary small" }, t("q.sendReply")));
+    const form = el("form", { class: "answer-form hidden" }, area, formButtons);
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       try {
         await api(`/api/questions/${q.id}/answer`, { method: "POST", body: { text: area.value } });
-        toast("✅ Răspuns trimis.");
+        toast(t("q.replied"));
         loadQuestions();
       } catch (err) { toast(err.message); }
     });
-    const toggle = el("button", { class: "small", onclick: () => { form.classList.toggle("hidden"); area.focus(); } },
-      q.answer ? "✎ Editează răspunsul" : "↩ Răspunde");
-    card.append(el("div", { class: "actions" }, toggle), form);
+    const actions = el("div", { class: "actions" },
+      el("button", { class: "small", onclick: () => { form.classList.toggle("hidden"); area.focus(); } },
+        t(q.answer ? "q.edit" : "q.reply")));
+    if (cfg.ai && !q.ai_answer && !aiPending.has(q.id)) {
+      actions.append(el("button", { class: "small ghost", onclick: () => requestAiAnswer(q.id) }, "✨ ", t("q.aiDraft")));
+    }
+    card.append(actions, form);
   }
   return card;
 }
+
+// ================================================================ guide
+
+function topicCounts() {
+  const counts = {};
+  for (const q of questions) counts[q.category] = (counts[q.category] || 0) + 1;
+  return counts;
+}
+
+function renderGuide() {
+  const counts = topicCounts();
+  $("#topic-grid").replaceChildren(...cfg.topics.map((k, i) => {
+    const tp = topic(k);
+    const n = counts[k] || 0;
+    const card = el("button", { type: "button", class: "topic-card", style: `--h:${tp.hue}; animation-delay:${i * 30}ms`, onclick: () => openTopic(k) },
+      el("span", { class: "ico" }, tp.icon),
+      n ? el("span", { class: "count" }, `${n} ${t(n === 1 ? "g.qcount1" : "g.qcount")}`) : null,
+      el("h3", {}, tp.title),
+      el("p", {}, tp.summary));
+    card.addEventListener("pointermove", (e) => {
+      const r = card.getBoundingClientRect();
+      card.style.setProperty("--mx", `${e.clientX - r.left}px`);
+      card.style.setProperty("--my", `${e.clientY - r.top}px`);
+    });
+    return card;
+  }));
+
+  const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const heat = $("#heat");
+  heat.classList.toggle("hidden", ranked.length === 0);
+  if (!ranked.length) return;
+  const max = ranked[0][1];
+  heat.replaceChildren(el("h3", {}, t(isTrainer() ? "g.heatT" : "g.heatS")),
+    ...ranked.map(([k, n]) => {
+      const tp = topic(k);
+      return el("div", { class: "heat-row", style: `--h:${tp.hue}` },
+        el("span", { class: "name" }, `${tp.icon} ${tp.title}`),
+        el("div", { class: "heat-bar" }, el("i", { style: `width:${(n / max) * 100}%` })),
+        el("b", {}, String(n)));
+    }));
+}
+
+function openTopic(key) {
+  const tp = topic(key);
+  const drawer = $("#drawer");
+  drawer.dataset.topic = key;
+  drawer.style.setProperty("--h", tp.hue);
+  const body = [
+    el("div", { class: "ico" }, tp.icon),
+    el("h2", { id: "drawer-title" }, tp.title),
+    el("p", { class: "muted" }, tp.summary),
+    el("h4", {}, t("g.tips")),
+    el("ol", {}, tp.tips.map((tip) => el("li", {}, tip))),
+    el("h4", {}, t("g.prompt")),
+    el("div", { class: "md" }, el("pre", {}, el("code", {}, tp.prompt),
+      el("button", { class: "copy-btn small", type: "button", onclick: () => copy(tp.prompt) }, t("g.copy")))),
+    el("h4", {}, t("g.pitfall")),
+    el("p", { class: "pitfall" }, "⚠️ ", tp.pitfall),
+  ];
+  if (!isTrainer()) {
+    body.push(el("button", {
+      class: "primary glow", type: "button",
+      onclick: () => {
+        selectedTopic = cfg.topics.includes(key) ? key : "other";
+        renderChips();
+        closeTopic();
+        showTab("questions");
+        $("#question-text").focus();
+      },
+    }, t("g.ask")));
+  }
+  $("#drawer-body").replaceChildren(...body);
+  drawer.classList.remove("hidden");
+  $("#drawer-backdrop").classList.remove("hidden");
+  document.body.classList.add("no-scroll");
+  $("#drawer-close").focus();
+}
+
+function closeTopic() {
+  $("#drawer").classList.add("hidden");
+  $("#drawer-backdrop").classList.add("hidden");
+  document.body.classList.remove("no-scroll");
+}
+
+$("#drawer-close").addEventListener("click", closeTopic);
+$("#drawer-backdrop").addEventListener("click", closeTopic);
 
 // ================================================================ proposals: wizard
 
@@ -427,36 +677,28 @@ function draft() {
   };
 }
 
-const AI_LOG = [
-  "citesc ciorna…",
-  "verific titlul",
-  "verific ce problemă rezolvă și pentru cine",
-  "verific ce poate face un utilizator",
-  "retușez textul (fără să inventez funcții)",
-];
-
 async function runRefine(body) {
   $("#proposal-error").textContent = "";
   showStage("#ai-thinking");
   setStep(2);
   const log = $("#ai-log");
-  log.replaceChildren(el("div", {}, el("span", { class: "t-prompt" }, "$ "), "claude refine propunere.json"));
+  log.replaceChildren(el("div", {}, el("span", { class: "t-prompt" }, "$ "), "claude refine proposal.json"));
 
   let done = false;
   const request = api("/api/proposals/refine", { method: "POST", body }).finally(() => { done = true; });
   request.catch(() => {}); // eroarea e tratată mai jos, după animație
-  for (const line of AI_LOG) {
+  for (const line of t("p.log")) {
     log.append(el("div", { class: "t-ai" }, "› " + line));
     await sleep(380);
   }
   const cursor = el("span", { class: "cursor" });
-  if (!done) log.append(el("div", { class: "t-dim" }, "› aștept răspunsul de la Claude ", cursor));
+  if (!done) log.append(el("div", { class: "t-dim" }, "› " + t("p.waitClaude"), cursor));
 
   try {
     const r = await request;
     cursor.remove();
     const n = (r.missing || []).length;
-    log.append(el("div", { class: "t-ok" }, `✓ gata · ${n ? n + (n === 1 ? " întrebare" : " întrebări") : "totul e clar"}`));
+    log.append(el("div", { class: "t-ok" }, t("p.done") + (n ? n + t(n === 1 ? "p.oneQ" : "p.manyQ") : t("p.allClear"))));
     await sleep(500);
     showRefined(r);
   } catch (err) {
@@ -477,8 +719,8 @@ async function typewrite(node, text) {
 
 function showRefined(r) {
   showStage("#refine-result");
-  typewrite($("#understood-text"), r.understood || "Încă prea puțin ca să înțeleg ideea. Răspunde la întrebările de mai jos.");
-  $("#refine-notes").textContent = (r.engine === "claude" ? "Claude · " : "mod local · ") + (r.notes || "");
+  typewrite($("#understood-text"), r.understood || t("p.understoodEmpty"));
+  $("#refine-notes").textContent = t(r.engine === "claude" ? "p.engineClaude" : "p.engineLocal") + (r.notes || "");
   $("#f-title").value = r.title || "";
   $("#f-description").value = r.description || "";
   $("#f-audience").value = r.audience || "";
@@ -488,10 +730,10 @@ function showRefined(r) {
   lastMissing = r.missing || [];
   $("#missing-box").classList.toggle("hidden", lastMissing.length === 0);
   $("#missing-list").replaceChildren(...lastMissing.map((m, i) => {
-    const ta = el("textarea", { rows: 2, "data-missing": i, placeholder: "Răspunsul tău…", "aria-label": m.question });
+    const ta = el("textarea", { rows: 2, "data-missing": i, placeholder: t("p.answerPh"), "aria-label": m.question });
     ta.addEventListener("input", () => setStep(4), { once: true });
     return el("div", { class: "q-bubble" },
-      el("div", { class: "q" }, el("small", {}, `🤖 ${FIELD_LABELS[m.field] || m.field}`), m.question),
+      el("div", { class: "q" }, el("small", {}, `🤖 ${t("field." + m.field)}`), m.question),
       ta);
   }));
   setStep(lastMissing.length ? 3 : 4);
@@ -561,7 +803,7 @@ $("#submit-proposal").addEventListener("click", async (e) => {
     showStage("#proposal-form");
     setStep(1);
     confetti();
-    toast("🚀 Propunerea ta e în cutie!");
+    toast(t("p.submitted"));
     loadProposals();
   } catch (err) {
     $("#proposal-error").textContent = err.message;
@@ -596,8 +838,7 @@ function renderProposals() {
 
   const list = $("#proposals-list");
   if (!shown.length) {
-    list.replaceChildren(el("div", { class: "empty" },
-      proposals.length ? "// nimic nu se potrivește căutării" : "// cutia e goală. Fii primul care propune ceva ✨"));
+    list.replaceChildren(el("div", { class: "empty" }, t(proposals.length ? "q.emptyFilter" : "p.empty")));
     return;
   }
   list.replaceChildren(...shown.map((p, i) => {
@@ -613,12 +854,12 @@ function proposalCard(p, rank) {
     actions.append(el("button", {
       class: `small choose ${p.chosen ? "on" : ""}`,
       onclick: async () => { const was = p.chosen; if (await act(`/api/proposals/${p.id}/choose`) && !was) confetti(); },
-    }, p.chosen ? "✓ Aleasă · anulează" : "★ Marchează „Aleasă”"));
-    actions.append(el("span", { class: "muted small mono" }, `▲ ${p.votes} ${p.votes === 1 ? "vot" : "voturi"}`));
+    }, t(p.chosen ? "p.unchoose" : "p.choose")));
+    actions.append(el("span", { class: "muted small mono" }, `▲ ${p.votes} ${t(p.votes === 1 ? "p.vote1" : "p.votes")}`));
   } else {
     actions.append(el("button", {
       class: `small vote ${p.voted ? "on" : ""}`,
-      title: p.voted ? "Retrage votul" : "Votează",
+      title: t(p.voted ? "p.unvote" : "p.vote"),
       onclick: () => act(`/api/proposals/${p.id}/vote`),
     }, `▲ ${p.votes}`));
   }
@@ -627,12 +868,12 @@ function proposalCard(p, rank) {
     el("div", { class: "item-head" },
       rank && p.votes > 0 ? el("span", { class: `rank ${rank <= 3 ? "top" : ""}` }, `#${rank}`) : null,
       avatar(p.author),
-      el("strong", {}, p.mine ? `${p.author} (tu)` : p.author),
+      el("strong", {}, p.mine ? p.author + t("p.you") : p.author),
       el("span", {}, timeAgo(p.created_at)),
-      p.chosen ? el("span", { class: "right chosen-badge" }, "★ ALEASĂ") : null),
+      p.chosen ? el("span", { class: "right chosen-badge" }, t("p.chosen")) : null),
     el("h3", {}, p.title),
-    el("p", { class: "meta-line" }, el("b", {}, "ce face"), p.description),
-    el("p", { class: "meta-line" }, el("b", {}, "pentru"), p.audience),
+    el("p", { class: "meta-line" }, el("b", {}, t("p.what")), p.description),
+    el("p", { class: "meta-line" }, el("b", {}, t("p.for")), p.audience),
     actions);
 }
 
@@ -651,17 +892,22 @@ async function act(path) {
 
 async function refresh() {
   try {
-    await Promise.all([loadCategories(), loadQuestions(), loadProposals()]);
+    await Promise.all([loadQuestions(), loadProposals()]);
   } catch (err) { toast(err.message); }
 }
 
 // Reîmprospătare periodică, ca trainerul să vadă întrebările noi
 setInterval(() => {
   if (!auth || document.hidden || $("#app-view").classList.contains("hidden")) return;
-  // Nu redesenăm întrebările cât timp trainerul scrie un răspuns
-  if (!document.querySelector(".answer-form:not(.hidden)")) loadQuestions().catch(() => {});
+  // Nu redesenăm întrebările cât timp cineva scrie un răspuns sau așteaptă AI-ul
+  if (!document.querySelector(".answer-form:not(.hidden)") && aiPending.size === 0) loadQuestions().catch(() => {});
   loadProposals().catch(() => {});
 }, 15000);
 
-if (auth) start();
-else runTerminal();
+(async function boot() {
+  applyI18n();
+  try { cfg = await api("/api/config"); } catch (_) {}
+  renderMarquee();
+  if (auth) start();
+  else runTerminal();
+})();

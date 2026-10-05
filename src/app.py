@@ -8,6 +8,7 @@ retușează și cere detalii doar unde lipsesc; studentul aprobă varianta final
 alese.
 """
 
+import contextvars
 import hashlib
 import hmac
 import json
@@ -18,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -51,6 +52,54 @@ TRAINER_CODE = os.environ.get("TRAINER_CODE", "trainer")
 
 app = FastAPI(title="Cutia Clasei API",
               description="Întrebări pentru trainer și propuneri de proiecte")
+
+# ---------------------------------------------------------------------------
+# Limba (ro/en): interfața trimite antetul X-Lang; mesajele de eroare și
+# textele AI vin în limba aleasă.
+# ---------------------------------------------------------------------------
+
+current_lang = contextvars.ContextVar("current_lang", default="ro")
+
+MESSAGES = {
+    "short_password": ("Parola trebuie să aibă minim 4 caractere.", "Password must be at least 4 characters."),
+    "wrong_password": ("Parolă greșită. Numele e deja folosit de alt cont.", "Wrong password. This name is already used by another account."),
+    "login_again": ("Autentifică-te din nou.", "Please sign in again."),
+    "trainer_only": ("Doar trainerul poate face asta.", "Only the trainer can do this."),
+    "student_only": ("Doar studenții pot face asta.", "Only students can do this."),
+    "need_name": ("Scrie-ți numele.", "Enter your name."),
+    "wrong_code": ("Cod de trainer greșit.", "Wrong trainer code."),
+    "too_short": ("Întrebarea e prea scurtă.", "The question is too short."),
+    "no_question": ("Întrebarea nu există.", "Question not found."),
+    "not_yours": ("Poți cere răspuns AI doar pentru întrebările tale.", "You can only ask the AI about your own questions."),
+    "ai_off": ("AI-ul nu e configurat pe server (lipsește cheia API).", "AI is not configured on the server (missing API key)."),
+    "ai_failed": ("AI-ul nu a putut răspunde acum. Încearcă din nou.", "The AI couldn't answer right now. Try again."),
+    "empty_idea": ("Scrie măcar o idee înainte de retușare.", "Write at least an idea before the AI touch-up."),
+    "approve_first": ("Aprobă varianta finală înainte să o trimiți.", "Approve the final version before submitting it."),
+    "missing": ("Lipsește: {}.", "Missing: {}."),
+    "no_proposal": ("Propunerea nu există.", "Proposal not found."),
+}
+FIELD_NAMES = {
+    "title": ("titlu", "title"),
+    "description": ("ce face aplicația", "what the app does"),
+    "audience": ("cine o folosește", "who uses it"),
+}
+
+
+def msg(key: str, *args) -> str:
+    text = MESSAGES[key][1 if current_lang.get() == "en" else 0]
+    return text.format(*args)
+
+
+def fail(status: int, key: str, *args):
+    raise HTTPException(status_code=status, detail=msg(key, *args))
+
+
+@app.middleware("http")
+async def language_middleware(request: Request, call_next):
+    lang = request.headers.get("x-lang", "ro")
+    current_lang.set(lang if lang in ai.LANGS else "ro")
+    return await call_next(request)
+
 
 app.mount("/static", StaticFiles(directory=current_dir / "static"), name="static")
 
@@ -111,7 +160,7 @@ def hash_password(password: str, salt: bytes) -> str:
 def check_student(name: str, password: str):
     """Creează contul la prima intrare; după aceea cere aceeași parolă."""
     if len(password or "") < 4:
-        raise HTTPException(status_code=400, detail="Parola trebuie să aibă minim 4 caractere.")
+        fail(400, "short_password")
     key = name.casefold()
     with _lock:
         user = db["users"].get(key)
@@ -123,27 +172,26 @@ def check_student(name: str, password: str):
             return
     expected = hash_password(password, bytes.fromhex(user["salt"]))
     if not hmac.compare_digest(expected, user["hash"]):
-        raise HTTPException(status_code=401,
-                            detail="Parolă greșită. Numele e deja folosit de alt cont.")
+        fail(401, "wrong_password")
 
 
 def current_user(authorization: Optional[str] = Header(None)) -> dict:
     token = (authorization or "").removeprefix("Bearer ").strip()
     user = sessions.get(token)
     if not user:
-        raise HTTPException(status_code=401, detail="Autentifică-te din nou.")
+        fail(401, "login_again")
     return user
 
 
 def require_trainer(user: dict = Depends(current_user)) -> dict:
     if user["role"] != "trainer":
-        raise HTTPException(status_code=403, detail="Doar trainerul poate face asta.")
+        fail(403, "trainer_only")
     return user
 
 
 def require_student(user: dict = Depends(current_user)) -> dict:
     if user["role"] != "student":
-        raise HTTPException(status_code=403, detail="Doar studenții pot face asta.")
+        fail(403, "student_only")
     return user
 
 
@@ -156,10 +204,10 @@ def root():
 def login(body: LoginIn):
     name = body.name.strip()
     if not name:
-        raise HTTPException(status_code=400, detail="Scrie-ți numele.")
+        fail(400, "need_name")
     if body.role == "trainer":
         if not hmac.compare_digest((body.code or "").encode(), TRAINER_CODE.encode()):
-            raise HTTPException(status_code=403, detail="Cod de trainer greșit.")
+            fail(403, "wrong_code")
     else:
         check_student(name, body.password)
     token = secrets.token_urlsafe(24)
@@ -172,16 +220,26 @@ def me(user: dict = Depends(current_user)):
     return {"name": user["name"], "role": user["role"]}
 
 
+@app.get("/api/config")
+def config():
+    """Ce poate interfața: dacă AI-ul e disponibil și ce topicuri există."""
+    return {"ai": ai.available(), "topics": TOPICS}
+
+
 # ---------------------------------------------------------------------------
 # Întrebări: le vede doar autorul și trainerul.
+# Categoriile sunt topicurile de vibe coding (textele lor stau în interfață).
 # ---------------------------------------------------------------------------
 
-CATEGORIES = ["General", "Teorie", "Cod", "Temă", "Altceva"]
+TOPICS = [
+    "prompting", "context", "planning", "claude-code", "artifacts", "debugging",
+    "git", "security", "data", "deploy", "testing", "ai-apis", "mcp", "design", "other",
+]
 
 
 class QuestionIn(BaseModel):
     text: str = Field(min_length=3, max_length=2000)
-    category: str = "General"
+    category: str = "other"
     anonymous: bool = False
 
 
@@ -199,7 +257,7 @@ def question_view(q: dict, user: dict) -> dict:
 
 @app.get("/api/categories")
 def categories():
-    return CATEGORIES
+    return TOPICS
 
 
 @app.get("/api/questions")
@@ -214,32 +272,60 @@ def list_questions(user: dict = Depends(current_user)):
 def ask_question(body: QuestionIn, user: dict = Depends(require_student)):
     text = body.text.strip()
     if len(text) < 3:
-        raise HTTPException(status_code=400, detail="Întrebarea e prea scurtă.")
+        fail(400, "too_short")
     with _lock:
         q = {
             "id": next_id(),
             "text": text,
-            "category": body.category if body.category in CATEGORIES else "General",
+            "category": body.category if body.category in TOPICS else "other",
             "anonymous": body.anonymous,
             "author": user["name"],
             "author_key": user["key"],
             "created_at": now(),
             "answer": None,
             "answered_at": None,
+            "ai_answer": None,
+            "ai_answered_at": None,
         }
         db["questions"].append(q)
         save_db()
     return question_view(q, user)
 
 
+def find_question(question_id: int) -> dict:
+    q = next((q for q in db["questions"] if q["id"] == question_id), None)
+    if not q:
+        fail(404, "no_question")
+    return q
+
+
 @app.post("/api/questions/{question_id}/answer")
 def answer_question(question_id: int, body: AnswerIn, user: dict = Depends(require_trainer)):
     with _lock:
-        q = next((q for q in db["questions"] if q["id"] == question_id), None)
-        if not q:
-            raise HTTPException(status_code=404, detail="Întrebarea nu există.")
+        q = find_question(question_id)
         q["answer"] = body.text.strip()
         q["answered_at"] = now()
+        save_db()
+    return question_view(q, user)
+
+
+@app.post("/api/questions/{question_id}/ai-answer")
+def ai_answer_question(question_id: int, user: dict = Depends(current_user)):
+    """Răspuns rapid de la tutorul AI, cât timp studentul așteaptă trainerul.
+    Se generează o singură dată per întrebare și se păstrează."""
+    q = find_question(question_id)
+    if user["role"] != "trainer" and q["author_key"] != user["key"]:
+        fail(403, "not_yours")
+    if q.get("ai_answer"):
+        return question_view(q, user)
+    if not ai.available():
+        fail(503, "ai_off")
+    answer = ai.answer_question(q["text"], q["category"], current_lang.get())
+    if not answer:
+        fail(502, "ai_failed")
+    with _lock:
+        q["ai_answer"] = answer
+        q["ai_answered_at"] = now()
         save_db()
     return question_view(q, user)
 
@@ -271,18 +357,19 @@ def proposal_view(p: dict, user: dict) -> dict:
 @app.post("/api/proposals/refine")
 def refine_proposal(body: ProposalDraft, user: dict = Depends(require_student)):
     if not (body.title.strip() or body.description.strip() or body.audience.strip()):
-        raise HTTPException(status_code=400, detail="Scrie măcar o idee înainte de retușare.")
-    return ai.refine(body.title, body.description, body.audience)
+        fail(400, "empty_idea")
+    return ai.refine(body.title, body.description, body.audience, current_lang.get())
 
 
 @app.post("/api/proposals", status_code=201)
 def submit_proposal(body: ProposalIn, user: dict = Depends(require_student)):
     if not body.approved:
-        raise HTTPException(status_code=400, detail="Aprobă varianta finală înainte să o trimiți.")
+        fail(400, "approve_first")
     fields = {k: getattr(body, k).strip() for k in ("title", "description", "audience")}
-    empty = [ai.FIELDS[k] for k, v in fields.items() if not v]
+    en = current_lang.get() == "en"
+    empty = [FIELD_NAMES[k][1 if en else 0] for k, v in fields.items() if not v]
     if empty:
-        raise HTTPException(status_code=400, detail="Lipsește: " + ", ".join(empty) + ".")
+        fail(400, "missing", ", ".join(empty))
     with _lock:
         p = {
             "id": next_id(),
@@ -306,7 +393,7 @@ def list_proposals(user: dict = Depends(current_user)):
 def find_proposal(proposal_id: int) -> dict:
     p = next((p for p in db["proposals"] if p["id"] == proposal_id), None)
     if not p:
-        raise HTTPException(status_code=404, detail="Propunerea nu există.")
+        fail(404, "no_proposal")
     return p
 
 

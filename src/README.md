@@ -15,6 +15,13 @@ Aplicație în care studenții pun întrebări trainerului și propun proiecte p
 | Trimite propunerea | Studentul editează și aprobă varianta finală (checkbox) înainte de trimitere; orice editare cere o nouă aprobare. |
 | Trainerul alege | Trainerul vede toate propunerile și le marchează „Aleasă”. |
 
+**Pentru clasa de vibe coding**
+
+- **Română / English:** toată interfața, mesajele serverului și textele AI-ului, cu un buton RO/EN.
+- **Ghidul de vibe coding** (15 topicuri: prompting, context, planificare, Claude Code, artifacts, debugging, Git, securitate & chei API, baze de date & RLS, deploy, testare, AI în aplicație, MCP, design): pașii de bază, un prompt de copiat și greșeala clasică. Topicul „Securitate” conține regulile trainerului.
+- **Întrebările au topic** (chips), iar ghidul arată ce întreabă clasa cel mai des.
+- **Răspuns rapid de la AI** la fiecare întrebare, marcat clar „neverificat de trainer”. Răspunsul trainerului rămâne cel oficial, iar trainerul poate folosi răspunsul AI ca ciornă. Fără cheie API, sub întrebare apar sfaturile din ghid.
+
 **În plus:** întrebări anonime (trainerul vede „Anonim”), categorii, voturi pe propuneri, căutare și filtre, sortare după voturi / alese, badge cu întrebările fără răspuns, reîmprospătare automată, temă dark, layout pentru telefon.
 
 ## Pornire
@@ -53,6 +60,8 @@ Deschide http://localhost:8000. Studentul își creează contul la prima intrare
 | GET | `/api/questions` | trainerul vede tot, studentul doar întrebările lui |
 | POST | `/api/questions` | student |
 | POST | `/api/questions/{id}/answer` | trainer |
+| POST | `/api/questions/{id}/ai-answer` | autorul întrebării sau trainerul (cere cheie API) |
+| GET | `/api/config` | toți: AI disponibil + topicuri |
 | POST | `/api/proposals/refine` | student (modul AI) |
 | GET | `/api/proposals` | toți |
 | POST | `/api/proposals` | student (cere `approved: true`) |

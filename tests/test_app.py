@@ -138,3 +138,51 @@ def test_refine_asks_at_most_three_questions_and_explains():
     data = client.post("/api/proposals/refine", json={"title": "x"}, headers=ana).json()
     assert len(data["missing"]) <= 3
     assert "understood" in data
+
+
+def test_config_lists_vibe_coding_topics():
+    data = client.get("/api/config").json()
+    assert data["ai"] is False
+    assert {"prompting", "security", "claude-code", "deploy"} <= set(data["topics"])
+
+
+def test_question_topic_falls_back_to_other():
+    ana = login("Ana")
+    q = client.post("/api/questions", json={"text": "Ceva?", "category": "nu-exista"}, headers=ana).json()
+    assert q["category"] == "other"
+    q = client.post("/api/questions", json={"text": "Ceva?", "category": "prompting"}, headers=ana).json()
+    assert q["category"] == "prompting"
+
+
+def test_ai_answer_only_for_own_question_and_needs_ai():
+    ana, bob = login("Ana"), login("Bob")
+    qid = client.post("/api/questions", json={"text": "Ce e un prompt?"}, headers=ana).json()["id"]
+    assert client.post(f"/api/questions/{qid}/ai-answer", headers=bob).status_code == 403
+    r = client.post(f"/api/questions/{qid}/ai-answer", headers=ana)
+    assert r.status_code == 503  # AI oprit în teste: fără cheie, fără apel
+
+
+def test_ai_answer_is_stored_once(monkeypatch):
+    calls = []
+    monkeypatch.setattr(app_module.ai, "available", lambda: True)
+    monkeypatch.setattr(app_module.ai, "answer_question",
+                        lambda text, topic, lang: calls.append(lang) or "Încearcă așa.")
+    ana = login("Ana")
+    qid = client.post("/api/questions", json={"text": "Ce e un prompt?"}, headers=ana).json()["id"]
+    for _ in range(2):
+        r = client.post(f"/api/questions/{qid}/ai-answer", headers={**ana, "X-Lang": "en"})
+        assert r.json()["ai_answer"] == "Încearcă așa."
+    assert calls == ["en"]
+
+
+def test_errors_follow_selected_language():
+    r = client.post("/api/login", json={"name": "T", "role": "trainer", "code": "x"}, headers={"X-Lang": "en"})
+    assert r.json()["detail"] == "Wrong trainer code."
+    r = client.post("/api/login", json={"name": "T", "role": "trainer", "code": "x"})
+    assert r.json()["detail"] == "Cod de trainer greșit."
+
+
+def test_local_refine_in_english():
+    ana = login("Ana")
+    r = client.post("/api/proposals/refine", json={"title": "quiz"}, headers={**ana, "X-Lang": "en"}).json()
+    assert r["missing"][0]["question"].startswith("Briefly describe")
