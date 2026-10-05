@@ -8,6 +8,8 @@ retușează și cere detalii doar unde lipsesc; studentul aprobă varianta final
 alese.
 """
 
+import hashlib
+import hmac
 import json
 import os
 import secrets
@@ -21,12 +23,29 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+current_dir = Path(__file__).parent
+
+
+def load_env_file(path: Path):
+    """Citește KEY=VALUE din .env (fișier ignorat de git). Variabilele deja
+    setate în mediu au prioritate. Cheia API rămâne doar pe server."""
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+load_env_file(current_dir.parent / ".env")
+
 try:
     from . import ai
 except ImportError:  # rulare directă: python app.py
     import ai
 
-current_dir = Path(__file__).parent
 DATA_FILE = Path(os.environ.get("CUTIA_DATA", current_dir.parent / "data" / "cutia.json"))
 TRAINER_CODE = os.environ.get("TRAINER_CODE", "trainer")
 
@@ -41,7 +60,7 @@ app.mount("/static", StaticFiles(directory=current_dir / "static"), name="static
 # ---------------------------------------------------------------------------
 
 _lock = threading.Lock()
-db = {"questions": [], "proposals": [], "next_id": 1}
+db = {"users": {}, "questions": [], "proposals": [], "next_id": 1}
 sessions: dict[str, dict] = {}
 
 
@@ -73,14 +92,39 @@ def now() -> str:
 load_db()
 
 # ---------------------------------------------------------------------------
-# Autentificare simplă: studentul intră cu numele, trainerul cu un cod.
+# Autentificare: studentul are cont cu nume + parolă (creat la prima intrare),
+# trainerul intră cu codul din TRAINER_CODE.
 # ---------------------------------------------------------------------------
 
 
 class LoginIn(BaseModel):
     name: str = Field(min_length=1, max_length=60)
     role: str = Field(pattern="^(student|trainer)$")
+    password: Optional[str] = Field(None, max_length=200)
     code: Optional[str] = None
+
+
+def hash_password(password: str, salt: bytes) -> str:
+    return hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 200_000).hex()
+
+
+def check_student(name: str, password: str):
+    """Creează contul la prima intrare; după aceea cere aceeași parolă."""
+    if len(password or "") < 4:
+        raise HTTPException(status_code=400, detail="Parola trebuie să aibă minim 4 caractere.")
+    key = name.casefold()
+    with _lock:
+        user = db["users"].get(key)
+        if user is None:
+            salt = secrets.token_bytes(16)
+            db["users"][key] = {"name": name, "salt": salt.hex(),
+                                "hash": hash_password(password, salt)}
+            save_db()
+            return
+    expected = hash_password(password, bytes.fromhex(user["salt"]))
+    if not hmac.compare_digest(expected, user["hash"]):
+        raise HTTPException(status_code=401,
+                            detail="Parolă greșită. Numele e deja folosit de alt cont.")
 
 
 def current_user(authorization: Optional[str] = Header(None)) -> dict:
@@ -113,8 +157,11 @@ def login(body: LoginIn):
     name = body.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Scrie-ți numele.")
-    if body.role == "trainer" and body.code != TRAINER_CODE:
-        raise HTTPException(status_code=403, detail="Cod de trainer greșit.")
+    if body.role == "trainer":
+        if not hmac.compare_digest((body.code or "").encode(), TRAINER_CODE.encode()):
+            raise HTTPException(status_code=403, detail="Cod de trainer greșit.")
+    else:
+        check_student(name, body.password)
     token = secrets.token_urlsafe(24)
     sessions[token] = {"name": name, "role": body.role, "key": name.casefold()}
     return {"token": token, "name": name, "role": body.role}

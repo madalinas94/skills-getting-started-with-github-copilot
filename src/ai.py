@@ -22,24 +22,39 @@ FIELDS = {
 # Pragul sub care considerăm un câmp "lipsă" în modul local
 MIN_LEN = {"title": 3, "description": 25, "audience": 4}
 
+MAX_QUESTIONS = 3
+
 SYSTEM_PROMPT = """Ești asistentul din „Cutia Clasei", o aplicație în care studenții \
 propun proiecte pentru ora următoare. Primești o propunere cu trei câmpuri: \
 titlu, ce face aplicația (description) și cine o folosește (audience).
 
+Nu decizi în locul studentului: îi arăți ce ai înțeles, îi spui ce lipsește, \
+iar el alege ce versiune trimite.
+
 Sarcina ta:
-1. Retușează fiecare câmp: corectează gramatica și diacriticele, fă textul clar \
+1. În "understood" rezumă în 1-2 propoziții ce ai înțeles: ce problemă rezolvă \
+aplicația, pentru cine și ce face.
+2. Retușează fiecare câmp: corectează gramatica și diacriticele, fă textul clar \
 și concis, păstrează ideea și vocea studentului. Nu inventa funcții sau detalii noi.
-2. Pentru fiecare câmp care lipsește sau e prea vag ca să înțelegi propunerea, \
-adaugă în "missing" o întrebare scurtă și concretă. Dacă un câmp e suficient de \
-clar, NU pune întrebări despre el. Dacă totul e clar, "missing" e o listă goală.
-3. Dacă un câmp lipsește complet, lasă-l gol în varianta retușată.
-4. În "notes" scrie o singură propoziție despre ce ai schimbat.
+3. Verifică propunerea și, DOAR pentru ce lipsește sau e prea vag, adaugă în \
+"missing" o întrebare scurtă și concretă. Ce verifici:
+   - title: are un nume? Întrebare: „Cum se numește aplicația?"
+   - problem: e clar ce problemă rezolvă? Întrebare: „Ce problemă rezolvă \
+aplicația și pentru cine?"
+   - description: e clar ce face concret? Întrebare: „Ce poate face un \
+utilizator în aplicație?"
+   - audience: e clar cine o folosește? Întrebare: „Cine o va folosi?"
+   Pune cel mult 3 întrebări, cele mai importante primele. Dacă un aspect e \
+suficient de clar, NU întreba despre el. Dacă totul e clar, "missing" e o listă goală.
+4. Dacă un câmp lipsește complet, lasă-l gol în varianta retușată.
+5. În "notes" scrie o singură propoziție despre ce ai schimbat în text.
 
 Răspunde în limba română."""
 
 SCHEMA = {
     "type": "object",
     "properties": {
+        "understood": {"type": "string"},
         "title": {"type": "string"},
         "description": {"type": "string"},
         "audience": {"type": "string"},
@@ -48,7 +63,7 @@ SCHEMA = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "field": {"type": "string", "enum": list(FIELDS)},
+                    "field": {"type": "string", "enum": [*FIELDS, "problem"]},
                     "question": {"type": "string"},
                 },
                 "required": ["field", "question"],
@@ -57,7 +72,7 @@ SCHEMA = {
         },
         "notes": {"type": "string"},
     },
-    "required": ["title", "description", "audience", "missing", "notes"],
+    "required": ["understood", "title", "description", "audience", "missing", "notes"],
     "additionalProperties": False,
 }
 
@@ -84,6 +99,19 @@ LOCAL_QUESTIONS = {
 }
 
 
+def _understood_local(p: dict) -> str:
+    """Rezumat simplu „ce am înțeles”, compus din câmpurile completate."""
+    name = f"„{p['title']}”" if p["title"] else "Aplicația"
+    parts = []
+    if p["description"]:
+        parts.append(f"{name} {p['description'][0].lower()}{p['description'][1:]}")
+    elif p["title"]:
+        parts.append(f"{name} (încă nu știu ce face).")
+    if p["audience"]:
+        parts.append(f"O folosesc: {p['audience'][0].lower()}{p['audience'][1:]}.")
+    return " ".join(parts)
+
+
 def refine_local(title: str, description: str, audience: str) -> dict:
     """Retușare simplă fără AI: curăță spațiile, majuscule, punctuație."""
     raw = {"title": title, "description": description, "audience": audience}
@@ -101,8 +129,9 @@ def refine_local(title: str, description: str, audience: str) -> dict:
         if not (raw[item["field"]] or "").strip():
             refined[item["field"]] = ""
     return {
+        "understood": _understood_local(refined),
         **refined,
-        "missing": missing,
+        "missing": missing[:MAX_QUESTIONS],
         "notes": "Retușare locală (fără AI): am curățat spațiile, majusculele și punctuația.",
         "engine": "local",
     }
@@ -153,6 +182,8 @@ def refine(title: str, description: str, audience: str) -> dict:
     except (anthropic.APIError, StopIteration, json.JSONDecodeError, TypeError):
         return refine_local(title, description, audience)
 
-    data["missing"] = [m for m in data.get("missing", []) if m.get("field") in FIELDS]
+    data["missing"] = [
+        m for m in data.get("missing", []) if m.get("field") in (*FIELDS, "problem")
+    ][:MAX_QUESTIONS]
     data["engine"] = "claude"
     return data

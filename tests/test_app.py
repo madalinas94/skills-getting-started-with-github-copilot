@@ -14,12 +14,12 @@ client = TestClient(app_module.app)
 
 @pytest.fixture(autouse=True)
 def reset_db():
-    app_module.db.update({"questions": [], "proposals": [], "next_id": 1})
+    app_module.db.update({"users": {}, "questions": [], "proposals": [], "next_id": 1})
     app_module.sessions.clear()
 
 
-def login(name, role="student", code=None):
-    r = client.post("/api/login", json={"name": name, "role": role, "code": code})
+def login(name, role="student", code=None, password="parola-test"):
+    r = client.post("/api/login", json={"name": name, "role": role, "code": code, "password": password})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['token']}"}
 
@@ -99,3 +99,42 @@ def test_trainer_chooses_and_students_vote():
 
 def test_requires_login():
     assert client.get("/api/questions").status_code == 401
+
+
+def test_student_b_cannot_log_in_as_student_a():
+    ana = login("Ana", password="parola-ana")
+    client.post("/api/questions", json={"text": "Întrebarea Anei"}, headers=ana)
+
+    # Studentul B încearcă să intre cu numele Anei
+    r = client.post("/api/login", json={"name": "ana", "role": "student", "password": "ghicit"})
+    assert r.status_code == 401
+
+    bob = login("Bob", password="parola-bob")
+    assert client.get("/api/questions", headers=bob).json() == []
+    assert len(client.get("/api/questions", headers=login("Ana", password="parola-ana")).json()) == 1
+
+
+def test_password_required_and_not_exposed():
+    r = client.post("/api/login", json={"name": "Ana", "role": "student", "password": "123"})
+    assert r.status_code == 400
+    login("Ana")
+    assert "parola-test" not in str(app_module.db["users"])
+
+
+def test_api_key_is_never_sent_to_browser():
+    os.environ["ANTHROPIC_API_KEY"] = "sk-ant-test-secret"
+    try:
+        for path in ("/static/index.html", "/static/app.js"):
+            assert "sk-ant" not in client.get(path).text
+        ana = login("Ana")
+        r = client.post("/api/proposals/refine", json={"title": "x"}, headers=ana)
+        assert "sk-ant" not in r.text
+    finally:
+        del os.environ["ANTHROPIC_API_KEY"]
+
+
+def test_refine_asks_at_most_three_questions_and_explains():
+    ana = login("Ana")
+    data = client.post("/api/proposals/refine", json={"title": "x"}, headers=ana).json()
+    assert len(data["missing"]) <= 3
+    assert "understood" in data

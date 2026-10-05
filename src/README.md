@@ -11,7 +11,7 @@ Aplicație în care studenții pun întrebări trainerului și propun proiecte p
 | Pune o întrebare | Studentul scrie întrebarea; o văd doar el și trainerul. |
 | Răspuns | Trainerul răspunde (sau editează răspunsul); studentul îl vede sub întrebare. |
 | Scrie o propunere | Titlu, ce face aplicația, cine o folosește. |
-| Modul AI | Claude retușează textul și cere detalii **doar** pentru câmpurile care lipsesc sau sunt vagi. |
+| Modul AI | Claude arată ce a înțeles, retușează textul și pune **maxim 3 întrebări**, doar despre ce lipsește (titlu, problema rezolvată, ce face aplicația, cine o folosește). |
 | Trimite propunerea | Studentul editează și aprobă varianta finală (checkbox) înainte de trimitere; orice editare cere o nouă aprobare. |
 | Trainerul alege | Trainerul vede toate propunerile și le marchează „Aleasă”. |
 
@@ -24,7 +24,9 @@ pip install -r requirements.txt
 uvicorn src.app:app --reload
 ```
 
-Deschide http://localhost:8000. Studentul intră cu numele; trainerul cu numele și codul de trainer.
+Pentru AI, copiază `.env.example` în `.env` și pune cheia acolo (`.env` e în `.gitignore`).
+
+Deschide http://localhost:8000. Studentul își creează contul la prima intrare (nume + parolă); trainerul intră cu numele și codul de trainer.
 
 ### Configurare (variabile de mediu)
 
@@ -35,6 +37,13 @@ Deschide http://localhost:8000. Studentul intră cu numele; trainerul cu numele 
 | `CUTIA_AI` | `auto` | `auto` / `on` / `off` |
 | `CUTIA_MODEL` | `claude-opus-5-5` | Modelul Claude folosit. |
 | `CUTIA_DATA` | `data/cutia.json` | Unde se salvează întrebările și propunerile. |
+
+## Securitate
+
+- **Cheia API nu ajunge niciodată în browser sau pe GitHub.** Apelul către Claude se face doar pe server (`src/ai.py`), iar cheia se citește din variabila de mediu sau din `.env`, care e ignorat de git. Un test verifică că cheia nu apare în paginile trimise browserului.
+- **Ai urcat o cheie din greșeală?** Regenerează-o imediat din consola Anthropic. Nu ajunge să o ștergi din cod: rămâne în istoricul git.
+- **Regulile de acces se verifică pe server**, nu doar în interfață: fiecare endpoint verifică rolul (student/trainer) și cine e autorul.
+- **Testat cu două conturi:** studentul B nu vede întrebările studentului A și nu poate intra pe contul lui fără parolă (`tests/test_app.py`). Parolele se salvează doar ca hash PBKDF2.
 
 ## API
 

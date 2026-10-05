@@ -1,5 +1,7 @@
 const $ = (sel) => document.querySelector(sel);
-const FIELD_LABELS = { title: "Titlu", description: "Ce face aplicația", audience: "Cine o folosește" };
+const FIELD_LABELS = { title: "Titlu", problem: "Problema", description: "Ce face aplicația", audience: "Cine o folosește" };
+// Răspunsul despre „problema” rezolvată se adaugă la descriere
+const TARGET_FIELD = { problem: "description" };
 
 let auth = null;
 try { auth = JSON.parse(localStorage.getItem("cutia-auth")); } catch (_) { auth = null; }
@@ -62,7 +64,9 @@ const isTrainer = () => auth && auth.role === "trainer";
 
 document.querySelectorAll('input[name="role"]').forEach((r) =>
   r.addEventListener("change", () => {
-    $("#code-field").classList.toggle("hidden", r.value !== "trainer" || !r.checked);
+    const trainer = document.querySelector('input[name="role"]:checked').value === "trainer";
+    $("#code-field").classList.toggle("hidden", !trainer);
+    $("#password-field").classList.toggle("hidden", trainer);
   })
 );
 
@@ -73,9 +77,16 @@ $("#login-form").addEventListener("submit", async (e) => {
   try {
     auth = await api("/api/login", {
       method: "POST",
-      body: { name: $("#login-name").value, role, code: $("#login-code").value },
+      body: {
+        name: $("#login-name").value,
+        role,
+        password: $("#login-password").value,
+        code: $("#login-code").value,
+      },
     });
     try { localStorage.setItem("cutia-auth", JSON.stringify(auth)); } catch (_) {}
+    $("#login-password").value = "";
+    $("#login-code").value = "";
     start();
   } catch (err) {
     $("#login-error").textContent = err.message;
@@ -254,6 +265,7 @@ async function runRefine(body) {
 function showRefined(r) {
   $("#refine-result").classList.remove("hidden");
   $("#proposal-form").classList.add("hidden");
+  $("#understood-text").textContent = r.understood || "Încă prea puțin ca să înțeleg ideea — răspunde la întrebările de mai jos.";
   $("#refine-notes").textContent = (r.engine === "claude" ? "Claude: " : "") + (r.notes || "");
   $("#f-title").value = r.title || "";
   $("#f-description").value = r.description || "";
@@ -285,7 +297,8 @@ $("#apply-answers").addEventListener("click", (e) => {
   document.querySelectorAll("[data-missing]").forEach((ta) => {
     const answer = ta.value.trim();
     if (!answer) return;
-    const field = lastMissing[Number(ta.dataset.missing)].field;
+    const asked = lastMissing[Number(ta.dataset.missing)].field;
+    const field = TARGET_FIELD[asked] || asked;
     body[field] = body[field] ? `${body[field]} ${answer}` : answer;
   });
   // Ținem ciorna sincronizată, ca „Înapoi" să nu piardă detaliile

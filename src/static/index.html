@@ -31,6 +31,11 @@
       <label>Numele tău
         <input id="login-name" required maxlength="60" placeholder="ex. Ana Popescu">
       </label>
+      <label id="password-field">Parola
+        <input id="login-password" type="password" minlength="4" autocomplete="current-password"
+          placeholder="minim 4 caractere">
+        <span class="hint">Prima dată îți creezi contul cu parola aleasă. Data viitoare intri cu aceeași parolă.</span>
+      </label>
       <label id="code-field" class="hidden">Cod trainer
         <input id="login-code" type="password" placeholder="codul primit">
       </label>
@@ -77,7 +82,7 @@
         <h2>Propune un proiect</h2>
         <ol class="steps">
           <li data-step="1" class="active">Scrie</li>
-          <li data-step="2">Retușare AI</li>
+          <li data-step="2">AI-ul citește și întreabă</li>
           <li data-step="3">Aprobă și trimite</li>
         </ol>
 
@@ -98,7 +103,11 @@
         </form>
 
         <div id="refine-result" class="hidden">
-          <p id="refine-notes" class="muted"></p>
+          <div id="understood-box" class="understood">
+            <h3>Ce a înțeles AI-ul</h3>
+            <p id="understood-text"></p>
+          </div>
+          <p id="refine-notes" class="muted small"></p>
           <div id="missing-box" class="missing hidden">
             <h3>AI-ul are nevoie de câteva detalii</h3>
             <div id="missing-list"></div>

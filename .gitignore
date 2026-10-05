@@ -42,3 +42,8 @@ Thumbs.db
 __pycache__/
 # Cutia Clasei data
 data/
+
+# Secrets: cheia API stă doar aici, niciodată în git
+.env
+.env.*
+!.env.example
