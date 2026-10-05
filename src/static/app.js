@@ -1,37 +1,59 @@
+// Cutia Clasei · interfața platformei (fără framework).
+// Tot textul vine din i18n/<limbă>.js; totul se construiește cu el(), fără innerHTML.
+
 const $ = (sel) => document.querySelector(sel);
-// Răspunsul despre „problema” rezolvată se adaugă la descriere
+// Răspunsurile la întrebările AI despre problemă, funcții, date și mărime se adaugă la descriere
 const TARGET_FIELD = { problem: "description", features: "description", data: "description", size: "description" };
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const THEMES = [
+  ["dark", "#8b5cf6"], ["light", "#f5f4fb"], ["matrix", "#00e676"],
+  ["sunset", "#ff6b6b"], ["ocean", "#2dd4bf"], ["contrast", "#ffd400"],
+];
+const CHECKLIST = ["features", "privacy", "ai_consent", "github_readme", "no_keys", "trainer_access"];
+const BADGES = {
+  first_question: "❓", first_homework: "📚", five_homework: "🔥", first_idea: "💡",
+  crowd_favorite: "🎉", chosen: "🏆", perfectionist: "💎", century: "💯",
+};
+const NEWS_HUE = { launch: 330, tools: 190, models: 265, research: 150, industry: 35 };
 
 let auth = null;
 try { auth = JSON.parse(localStorage.getItem("cutia-auth")); } catch (_) { auth = null; }
 
-let lang = document.documentElement.lang === "en" ? "en" : "ro";
-let cfg = { ai: false, topics: Object.keys(TOPICS) };
-let questions = [];
-let proposals = [];
-let submissions = [];
-let currentView = "home";
-let selectedKind = "homework";
-let pendingFiles = [];
-const CHECKLIST = ["features", "privacy", "ai_consent", "github_readme", "no_keys", "trainer_access"];
-let lastMissing = [];
-let lastStats = {};
-let selectedTopic = "prompting";
+let lang = LANGS.some((l) => l.code === document.documentElement.lang) ? document.documentElement.lang : "ro";
+let cfg = { ai: false, topics: Object.keys(TOPIC_META) };
+let questions = [], proposals = [], submissions = [], assignments = [], announcements = [];
+let threads = [], chat = [], activeThread = null, unread = 0;
+let myPoints = null, board = [], students = [];
+let newsData = null, newsLoading = false, newsCat = "all";
+let lastMissing = [], lastStats = {};
+let currentView = "home", selectedTopic = "prompting", selectedKind = "homework", pendingFiles = [];
 const aiPending = new Set();
 
 // ================================================================ i18n
 
+function strings(code) { return (I18N[code] && I18N[code].strings) || {}; }
+
 function t(key, ...args) {
-  let s = STRINGS[lang][key] ?? STRINGS.ro[key] ?? key;
+  let s = strings(lang)[key] ?? strings("en")[key] ?? key;
   for (const a of args) s = typeof s === "string" ? s.replace("{}", a) : s;
   return s;
 }
 
 function topic(key) {
-  const info = TOPICS[key];
-  if (!info) return { key, icon: "✨", hue: 50, title: key, summary: "", tips: [], prompt: "", pitfall: "" };
-  return { key, icon: info.icon, hue: info.hue, ...info[lang] };
+  const meta = TOPIC_META[key];
+  const text = (I18N[lang] && I18N[lang].topics[key]) || (I18N.en && I18N.en.topics[key]);
+  if (!meta || !text) return { key, icon: "✨", hue: 50, title: key, summary: "", tips: [], prompt: "", pitfall: "" };
+  return { key, ...meta, ...text };
+}
+
+function loadLang(code) {
+  if (I18N[code]) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = `i18n/${code}.js`;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.append(s);
+  });
 }
 
 function applyI18n() {
@@ -42,30 +64,27 @@ function applyI18n() {
     n.title = t(n.dataset.i18nTitle);
     n.setAttribute("aria-label", n.title);
   });
-  document.querySelectorAll(".lang-switch button").forEach((b) => b.classList.toggle("on", b.dataset.lang === lang));
+  const current = LANGS.find((l) => l.code === lang);
+  $("#lang-btn").replaceChildren(current.flag, " ", el("span", { class: "mono" }, current.code.toUpperCase()));
+  $("#lang-menu").replaceChildren(...LANGS.map((l) =>
+    el("button", { class: l.code === lang ? "on" : "", role: "menuitem", onclick: () => { closeMenus(); setLang(l.code); } },
+      l.flag, " ", l.name)));
 }
 
-function setLang(next) {
-  if (next === lang) return;
+async function setLang(next) {
+  if (next === lang || !LANGS.some((l) => l.code === next)) return;
+  try { await loadLang(next); } catch (_) { return; }
   lang = next;
   try { localStorage.setItem("cutia-lang", lang); } catch (_) {}
   applyI18n();
-  renderMarquee();
-  if (auth && !$("#app-view").classList.contains("hidden")) {
-    renderHeader();
-    renderChips();
-    renderTopicFilter();
-    renderSubmissionForm();
-    renderQuestions();
-    renderSubmissions();
-    renderProposals();
-    renderGuide();
-    renderHome(true);
-    if (!$("#drawer").classList.contains("hidden")) openTopic($("#drawer").dataset.topic);
+  if (isLoggedIn()) {
+    api("/api/me", { method: "PATCH", body: { lang } }).catch(() => {});
+    renderAll();
+    if (newsData) loadNews(); // știrile sunt alese și explicate în limba ta
+  } else {
+    renderLogin();
   }
 }
-
-document.querySelectorAll(".lang-switch button").forEach((b) => b.addEventListener("click", () => setLang(b.dataset.lang)));
 
 // ================================================================ helpers
 
@@ -80,7 +99,7 @@ async function api(path, options = {}) {
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && auth) logout();
+  if (res.status === 401 && auth) logout(true);
   if (!res.ok) {
     const detail = Array.isArray(data.detail) ? t("err.check") : data.detail;
     throw new Error(detail || t("err.generic"));
@@ -103,7 +122,18 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, reducedMotion ? 0 : ms));
+const motionOff = () =>
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.dataset.motion === "off";
+const sleep = (ms) => new Promise((r) => setTimeout(r, motionOff() ? 0 : ms));
+const isTrainer = () => auth && auth.role === "trainer";
+const isLoggedIn = () => auth && !$("#app-view").classList.contains("hidden");
+const safeLink = (url) => /^https?:\/\//i.test(url || "");
+const trunc = (s, n = 60) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+const norm = (s) => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+function locale() {
+  return { ro: "ro-RO", en: "en-GB", fr: "fr-FR", it: "it-IT", es: "es-ES", de: "de-DE" }[lang];
+}
 
 function timeAgo(iso) {
   if (!iso) return "";
@@ -111,7 +141,15 @@ function timeAgo(iso) {
   if (s < 60) return t("time.now");
   if (s < 3600) return t("time.min", Math.floor(s / 60));
   if (s < 86400) return t("time.h", Math.floor(s / 3600));
-  return new Date(iso).toLocaleDateString(lang === "en" ? "en-GB" : "ro-RO", { day: "numeric", month: "short" });
+  return new Date(iso).toLocaleDateString(locale(), { day: "numeric", month: "short" });
+}
+
+function countdown(iso) {
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms < 0) return { text: t("time.overdue"), late: true };
+  const d = Math.floor(ms / 86400000), h = Math.floor((ms % 86400000) / 3600000), m = Math.floor((ms % 3600000) / 60000);
+  const parts = d ? [t("time.d", d), t("time.hh", h)] : h ? [t("time.hh", h), t("time.mm", m)] : [t("time.mm", m)];
+  return { text: t("time.left", parts.join(" ")), late: false };
 }
 
 function hue(name) {
@@ -133,17 +171,14 @@ function toast(msg) {
   box.classList.remove("hidden");
   box.style.animation = "none"; void box.offsetWidth; box.style.animation = "";
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => box.classList.add("hidden"), 2600);
+  toastTimer = setTimeout(() => box.classList.add("hidden"), 2800);
 }
 
 async function copy(text) {
   try { await navigator.clipboard.writeText(text); toast(t("g.copied")); } catch (_) {}
 }
 
-const isTrainer = () => auth && auth.role === "trainer";
-
-// Markdown minimal și sigur (doar noduri text, fără innerHTML): paragrafe,
-// liste, blocuri de cod, `cod` și **bold**.
+// Markdown minimal și sigur (doar noduri text): paragrafe, liste, cod, `cod`, **bold**
 function inlineMd(text) {
   const out = [];
   const re = /(`[^`]+`|\*\*[^*]+\*\*)/g;
@@ -160,8 +195,7 @@ function inlineMd(text) {
 
 function renderMd(src) {
   const root = el("div", { class: "md" });
-  const parts = src.split(/```[^\n]*\n?/);
-  parts.forEach((part, i) => {
+  src.split(/```[^\n]*\n?/).forEach((part, i) => {
     if (i % 2 === 1) {
       const code = part.replace(/\n$/, "");
       root.append(el("pre", {}, el("code", {}, code),
@@ -169,27 +203,34 @@ function renderMd(src) {
       return;
     }
     let list = null;
-    for (const block of part.split(/\n{2,}/)) {
-      for (const line of block.split("\n")) {
-        const item = line.match(/^\s*(?:[-*]|\d+\.)\s+(.*)/);
-        if (item) {
-          if (!list) { list = el(/^\s*\d/.test(line) ? "ol" : "ul"); root.append(list); }
-          list.append(el("li", {}, inlineMd(item[1])));
-        } else if (line.trim()) {
-          list = null;
-          root.append(el("p", {}, inlineMd(line.replace(/^#+\s*/, ""))));
-        }
+    for (const line of part.split("\n")) {
+      const item = line.match(/^\s*(?:[-*]|\d+\.)\s+(.*)/);
+      if (item) {
+        if (!list) { list = el(/^\s*\d/.test(line) ? "ol" : "ul"); root.append(list); }
+        list.append(el("li", {}, inlineMd(item[1])));
+      } else {
+        list = null;
+        if (line.trim()) root.append(el("p", {}, inlineMd(line.replace(/^#+\s*/, ""))));
       }
-      list = null;
     }
   });
   return root;
 }
 
-// ================================================================ confetti
+function richText(src) {
+  // Pașii de predare au <b>…</b>; îi transformăm în noduri, fără innerHTML
+  return src.split(/(<b>.*?<\/b>)/).filter(Boolean).map((part) =>
+    part.startsWith("<b>") ? el("b", {}, part.slice(3, -4)) : part);
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
 
 function confetti() {
-  if (reducedMotion) return;
+  if (motionOff()) return;
   const canvas = $("#confetti");
   const ctx = canvas.getContext("2d");
   const dpr = window.devicePixelRatio || 1;
@@ -197,14 +238,10 @@ function confetti() {
   canvas.height = innerHeight * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const colors = ["#8b5cf6", "#22d3ee", "#f472b6", "#34d399", "#fbbf24"];
-  const parts = Array.from({ length: 140 }, () => ({
-    x: innerWidth / 2 + (Math.random() - .5) * 120,
-    y: innerHeight * .35,
-    vx: (Math.random() - .5) * 14,
-    vy: Math.random() * -13 - 4,
-    r: Math.random() * 6 + 4,
-    rot: Math.random() * 6,
-    vr: (Math.random() - .5) * .3,
+  const parts = Array.from({ length: 150 }, () => ({
+    x: innerWidth / 2 + (Math.random() - .5) * 120, y: innerHeight * .35,
+    vx: (Math.random() - .5) * 14, vy: Math.random() * -13 - 4,
+    r: Math.random() * 6 + 4, rot: Math.random() * 6, vr: (Math.random() - .5) * .3,
     c: colors[Math.floor(Math.random() * colors.length)],
   }));
   const start = performance.now();
@@ -221,15 +258,12 @@ function confetti() {
   })(start);
 }
 
-// ================================================================ theme
+function setPref(name, value) {
+  document.documentElement.dataset[name] = value;
+  try { localStorage.setItem(`cutia-${name}`, value); } catch (_) {}
+}
 
-$("#theme-btn").addEventListener("click", () => {
-  const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
-  document.documentElement.dataset.theme = next;
-  try { localStorage.setItem("cutia-theme", next); } catch (_) {}
-});
-
-// ================================================================ login: terminal & topics marquee
+// ================================================================ login
 
 let terminalRunning = false;
 async function runTerminal() {
@@ -243,11 +277,8 @@ async function runTerminal() {
       const span = el("span", { class: typed ? "" : cls });
       const cursor = el("span", { class: "cursor" });
       body.append(el("div", {}, el("span", { class: cls }, prefix), span, cursor));
-      if (typed && !reducedMotion) {
-        for (let i = 1; i <= text.length; i++) {
-          span.textContent = text.slice(0, i);
-          await sleep(28 + Math.random() * 40);
-        }
+      if (typed && !motionOff()) {
+        for (let i = 1; i <= text.length; i++) { span.textContent = text.slice(0, i); await sleep(28 + Math.random() * 40); }
       } else {
         span.textContent = text;
       }
@@ -255,7 +286,7 @@ async function runTerminal() {
       cursor.remove();
     }
     body.lastChild.append(el("span", { class: "cursor" }));
-    if (reducedMotion) break;
+    if (motionOff()) break;
     await sleep(3500);
   }
   terminalRunning = false;
@@ -266,11 +297,33 @@ function renderMarquee() {
     const tp = topic(k);
     return el("span", { class: "chip", style: `--h:${tp.hue}` }, tp.icon, " ", tp.title);
   });
-  // Lista apare de două ori, ca animația să se repete fără salt
   $("#topic-marquee .marquee-track").replaceChildren(...chips, ...chips.map((c) => c.cloneNode(true)));
 }
 
-// ================================================================ auth
+function lastUser() {
+  try { return JSON.parse(localStorage.getItem("cutia-last")); } catch (_) { return null; }
+}
+
+function renderLogin() {
+  const last = lastUser();
+  // Numele tău apare automat data viitoare: „Bine ai revenit, Madalina!”
+  $("#login-title").textContent = last ? t("login.welcomeBack", last.name.split(/\s+/)[0]) : t("login.title");
+  $("#not-you").classList.toggle("hidden", !last);
+  if (last) {
+    $("#not-you-btn").textContent = t("login.notYou", last.name.split(/\s+/)[0]);
+    if (!$("#login-name").value) $("#login-name").value = last.name;
+    const radio = document.querySelector(`input[name="role"][value="${last.role}"]`);
+    if (radio && !radio.checked) { radio.checked = true; radio.dispatchEvent(new Event("change")); }
+  }
+  renderMarquee();
+}
+
+$("#not-you-btn").addEventListener("click", () => {
+  try { localStorage.removeItem("cutia-last"); } catch (_) {}
+  $("#login-name").value = "";
+  renderLogin();
+  $("#login-name").focus();
+});
 
 document.querySelectorAll('input[name="role"]').forEach((r) =>
   r.addEventListener("change", () => {
@@ -287,14 +340,12 @@ $("#login-form").addEventListener("submit", async (e) => {
   try {
     auth = await api("/api/login", {
       method: "POST",
-      body: {
-        name: $("#login-name").value,
-        role,
-        password: $("#login-password").value,
-        code: $("#login-code").value,
-      },
+      body: { name: $("#login-name").value, role, password: $("#login-password").value, code: $("#login-code").value },
     });
-    try { localStorage.setItem("cutia-auth", JSON.stringify(auth)); } catch (_) {}
+    try {
+      localStorage.setItem("cutia-auth", JSON.stringify(auth));
+      localStorage.setItem("cutia-last", JSON.stringify({ name: auth.name, role: auth.role }));
+    } catch (_) {}
     $("#login-password").value = "";
     $("#login-code").value = "";
     start();
@@ -303,33 +354,71 @@ $("#login-form").addEventListener("submit", async (e) => {
   }
 });
 
-$("#logout-btn").addEventListener("click", logout);
+$("#logout-btn").addEventListener("click", () => logout());
 
-function logout() {
+function logout(expired = false) {
+  if (auth && !expired) fetch("/api/logout", { method: "POST", headers: { Authorization: `Bearer ${auth.token}` } }).catch(() => {});
   auth = null;
   try { localStorage.removeItem("cutia-auth"); } catch (_) {}
-  closeTopic();
+  closeDrawer();
+  closeMenus();
   $("#app-view").classList.add("hidden");
   $("#user-box").classList.add("hidden");
+  $("#points-chip").classList.add("hidden");
+  document.querySelectorAll(".app-only").forEach((n) => n.classList.add("hidden"));
   $("#login-view").classList.remove("hidden");
+  renderLogin();
   runTerminal();
 }
+
+// ================================================================ shell
+
+const VIEW_SPACE = {
+  home: null, messages: "private", questions: "private", submissions: "private",
+  box: "public", news: "public", points: "public", guide: "public",
+};
+
+function showView(name) {
+  currentView = name;
+  document.querySelectorAll(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
+  document.querySelectorAll(".view").forEach((v) => v.classList.toggle("hidden", v.id !== `view-${name}`));
+  $("#sidebar").classList.remove("open");
+  updateStatusSpace();
+  if (name === "messages") loadChat();
+  if (name === "news" && !newsData && !newsLoading) loadNews();
+  if (name === "points") loadPoints();
+  window.scrollTo({ top: 0, behavior: motionOff() ? "auto" : "smooth" });
+}
+
+function updateStatusSpace() {
+  const space = VIEW_SPACE[currentView];
+  $("#sb-space").textContent = space ? t(space === "public" ? "space.public" : "space.private") : "⌂ " + t("nav.home");
+}
+
+document.querySelectorAll(".nav-item").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
+document.querySelectorAll("[data-goto]").forEach((b) => b.addEventListener("click", () => showView(b.dataset.goto)));
+$("#more-btn").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
+$("#points-chip").addEventListener("click", () => showView("points"));
 
 function renderHeader() {
   const h = new Date().getHours();
   const hello = h < 11 ? t("greet.morning") : h < 18 ? t("greet.day") : t("greet.evening");
-  $("#user-role").textContent = t(isTrainer() ? "role.trainer" : "role.student");
-  $("#greet-eyebrow").textContent = t(isTrainer() ? "greet.trainer" : "greet.student");
-  $("#greet-title").textContent = `${hello}, ${auth.name.split(/\s+/)[0]} 👋`;
-  $("#questions-title").textContent = t(isTrainer() ? "q.class" : "q.mine");
-  $("#submissions-title").textContent = t(isTrainer() ? "s.all" : "s.mine");
-  $("#nav-private-label").textContent = t(isTrainer() ? "nav.privateT" : "nav.private");
-  $("#home-lead").textContent = t(isTrainer() ? "home.leadT" : "home.lead");
-  $("#home-recent-title").textContent = t(isTrainer() ? "home.recentT" : "home.recent");
-  $("#q-lead").textContent = t(isTrainer() ? "q.leadT" : "q.lead");
-  $("#s-lead").textContent = t(isTrainer() ? "s.viewLeadT" : "s.viewLead");
+  const first = auth.name.split(/\s+/)[0];
+  const T = isTrainer();
+  $("#user-role").textContent = t(T ? "role.trainer" : "role.student");
+  $("#greet-eyebrow").textContent = t(T ? "greet.trainer" : "greet.student");
+  $("#greet-title").textContent = `${hello}, ${first} 👋`;
+  $("#home-lead").textContent = t(T ? "home.leadT" : "home.lead");
+  $("#home-recent-title").textContent = t(T ? "home.recentT" : "home.recent");
+  $("#questions-title").textContent = t(T ? "q.class" : "q.mine");
+  $("#submissions-title").textContent = t(T ? "s.all" : "s.mine");
+  $("#nav-private-label").textContent = t(T ? "nav.privateT" : "nav.private");
+  $("#q-lead").textContent = t(T ? "q.leadT" : "q.lead");
+  $("#s-lead").textContent = t(T ? "s.viewLeadT" : "s.viewLead");
+  $("#m-lead").textContent = t(T ? "m.leadT" : "m.lead");
+  $("#pt-lead").textContent = t(T ? "pt.leadT" : "pt.lead");
   document.querySelectorAll("[data-space]").forEach((n) => {
-    n.textContent = n.dataset.space === "public" ? t("space.public") : t(isTrainer() ? "space.privateT" : "space.private");
+    n.textContent = n.dataset.space === "public" ? t("space.public") : t(T ? "space.privateT" : "space.private");
   });
   const ai = t(cfg.ai ? "status.aiOn" : "status.aiOff");
   $("#ai-status").textContent = (cfg.ai ? "● " : "○ ") + ai;
@@ -340,64 +429,166 @@ function renderHeader() {
 }
 
 async function start() {
+  let me;
   try {
-    await api("/api/me");
+    me = await api("/api/me");
   } catch (_) {
-    logout();
+    logout(true);
     return;
   }
+  // Limba aleasă pe alt dispozitiv te urmează, dacă aici n-ai ales alta
+  let localLang = null;
+  try { localLang = localStorage.getItem("cutia-lang"); } catch (_) {}
+  if (me.prefs && me.prefs.lang && !localLang && me.prefs.lang !== lang) await setLang(me.prefs.lang);
+  auth.prefs = me.prefs || {};
+
   $("#login-view").classList.add("hidden");
   $("#app-view").classList.remove("hidden");
   $("#user-box").classList.remove("hidden");
+  document.querySelectorAll(".app-only").forEach((n) => n.classList.remove("hidden"));
+  $("#points-chip").classList.toggle("hidden", isTrainer());
   $("#user-name").textContent = auth.name;
   const av = avatar(auth.name, false);
   av.id = "user-avatar";
   $("#user-avatar").replaceWith(av);
-  renderHeader();
   document.querySelectorAll(".student-only").forEach((n) => n.classList.toggle("hidden", isTrainer()));
+  document.querySelectorAll(".trainer-only").forEach((n) => n.classList.toggle("hidden", !isTrainer()));
+  $("#chat-layout").classList.toggle("trainer", isTrainer());
+  $("#thread-list").classList.toggle("hidden", !isTrainer());
   lastStats = {};
+  myPoints = null;
+  renderHeader();
   renderChips();
   renderTopicFilter();
   renderSubmissionForm();
+  renderMessages();
   showView("home");
-  refresh();
+  await refresh();
+  loadNews();
+  maybeOnboard();
 }
 
-// ================================================================ tabs & shortcuts
-
-const VIEW_SPACE = { home: null, questions: "private", submissions: "private", box: "public", guide: "public" };
-
-function showView(name) {
-  currentView = name;
-  document.querySelectorAll(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
-  document.querySelectorAll(".view").forEach((v) => v.classList.toggle("hidden", v.id !== `view-${name}`));
-  updateStatusSpace();
-  window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
+function renderAll() {
+  renderHeader();
+  renderChips();
+  renderTopicFilter();
+  renderSubmissionForm();
+  renderAssignments();
+  renderQuestions();
+  renderSubmissions();
+  renderProposals();
+  renderMessages();
+  renderGuide();
+  renderPoints();
+  renderNews();
+  renderHome(true);
+  renderNotifications();
+  if (!$("#drawer").classList.contains("hidden")) {
+    if ($("#drawer").dataset.mode === "settings") openSettings();
+    else openTopic($("#drawer").dataset.topic);
+  }
 }
 
-function updateStatusSpace() {
-  const space = VIEW_SPACE[currentView];
-  $("#sb-space").textContent = space ? t(space === "public" ? "space.public" : "space.private") : "⌂ " + t("nav.home");
-}
-
-document.querySelectorAll(".nav-item").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
-document.querySelectorAll("[data-goto]").forEach((b) => b.addEventListener("click", () => showView(b.dataset.goto)));
+// ================================================================ keyboard
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeTopic();
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k" && isLoggedIn()) {
+    e.preventDefault();
+    openPalette();
+    return;
+  }
+  if (e.key === "Escape") { closeDrawer(); closeMenus(); closePalette(); $("#sidebar").classList.remove("open"); }
   const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
-  if (e.key === "/" && !typing && auth) {
+  if (e.key === "/" && !typing && isLoggedIn()) {
     const search = document.querySelector('.view:not(.hidden) input[type="search"]');
     if (search) { e.preventDefault(); search.focus(); }
   }
-  // Ctrl/Cmd + Enter trimite formularul în care scrii
   if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && typing) {
     const form = document.activeElement.closest("form");
     if (form) { e.preventDefault(); form.requestSubmit(); }
   }
 });
 
-// ================================================================ stats
+// ================================================================ menus (limbă, notificări)
+
+function closeMenus() {
+  document.querySelectorAll(".menu").forEach((m) => m.classList.add("hidden"));
+  document.querySelectorAll("[aria-expanded]").forEach((b) => b.setAttribute("aria-expanded", "false"));
+}
+
+function toggleMenu(btn, menu) {
+  const open = menu.classList.contains("hidden");
+  closeMenus();
+  if (open) { menu.classList.remove("hidden"); btn.setAttribute("aria-expanded", "true"); }
+  return open;
+}
+
+$("#lang-btn").addEventListener("click", (e) => { e.stopPropagation(); toggleMenu($("#lang-btn"), $("#lang-menu")); });
+$("#bell-btn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (toggleMenu($("#bell-btn"), $("#notif-menu"))) {
+    renderNotifications();
+    markSeen();
+  }
+});
+document.addEventListener("click", (e) => { if (!e.target.closest(".menu-wrap")) closeMenus(); });
+
+// ================================================================ notifications
+
+function seenKey() { return `cutia-seen-${auth.role}-${auth.name.toLowerCase()}`; }
+function lastSeen() { try { return localStorage.getItem(seenKey()) || ""; } catch (_) { return ""; } }
+function markSeen() {
+  try { localStorage.setItem(seenKey(), new Date().toISOString()); } catch (_) {}
+  setTimeout(renderBell, 1500);
+}
+
+function notifications() {
+  const items = [];
+  const nowIso = new Date().toISOString();
+  if (isTrainer()) {
+    if (unread) items.push({ at: nowIso, icon: "✉", text: t("notif.dmT", unread), view: "messages" });
+    questions.filter((q) => !q.answer).forEach((q) =>
+      items.push({ at: q.created_at, icon: "?", text: t("notif.question", q.anonymous ? t("q.anonTag") : q.author), sub: trunc(q.text), view: "questions" }));
+    submissions.filter((x) => x.status === "sent").forEach((x) =>
+      items.push({ at: x.created_at, icon: "⇪", text: t("notif.submission", x.author), sub: trunc(x.title), view: "submissions" }));
+  } else {
+    if (unread) items.push({ at: nowIso, icon: "✉", text: t("notif.dm", unread), view: "messages" });
+    questions.filter((q) => q.answer).forEach((q) =>
+      items.push({ at: q.answered_at, icon: "🧑‍🏫", text: t("notif.answer", trunc(q.text, 40)), view: "questions" }));
+    submissions.filter((x) => x.reviewed_at).forEach((x) =>
+      items.push({ at: x.reviewed_at, icon: "💬", text: t("notif.feedback", trunc(x.title, 40)), view: "submissions" }));
+    proposals.filter((p) => p.mine && p.chosen).forEach((p) =>
+      items.push({ at: p.chosen_at || p.created_at, icon: "🏆", text: t("notif.chosen", trunc(p.title, 40)), view: "box" }));
+  }
+  announcements.forEach((a) => items.push({ at: a.created_at, icon: "📣", text: t("notif.announcement", trunc(a.text, 50)), view: "home" }));
+  assignments.forEach((a) => items.push({ at: a.created_at, icon: "📌", text: t("notif.assignment", trunc(a.title, 50)), view: "submissions" }));
+  return items.filter((i) => i.at).sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, 15);
+}
+
+function renderBell() {
+  if (!auth) return;
+  const seen = lastSeen();
+  const n = notifications().filter((i) => i.at > seen).length;
+  $("#bell-dot").textContent = n > 9 ? "9+" : n;
+  $("#bell-dot").classList.toggle("hidden", n === 0);
+}
+
+function renderNotifications() {
+  if (!auth) return;
+  renderBell();
+  const seen = lastSeen();
+  const items = notifications();
+  $("#notif-menu").replaceChildren(
+    el("div", { class: "notif-head" }, t("notif.title"),
+      el("button", { class: "link-btn", style: "width:auto", onclick: () => { markSeen(); closeMenus(); } }, t("notif.markRead"))),
+    ...(items.length ? items.map((i) => el("button", {
+      class: `notif-item ${i.at > seen ? "unread" : ""}`,
+      onclick: () => { closeMenus(); showView(i.view); },
+    }, el("span", { class: "ni" }, i.icon), el("span", { class: "nt" }, i.text, i.sub ? el("small", {}, i.sub) : null, el("small", {}, timeAgo(i.at)))))
+      : [el("div", { class: "empty" }, t("notif.empty"))]));
+}
+
+// ================================================================ home
 
 function renderStats(instant = false) {
   const answered = questions.filter((q) => q.answer).length;
@@ -405,16 +596,15 @@ function renderStats(instant = false) {
     ? [
         ["open", questions.length - answered, "stat.open", true],
         ["toReview", submissions.filter((x) => x.status === "sent").length, "act.reviewT", true],
+        ["unread", unread, "stat.unread", true],
         ["proposals", proposals.length, "stat.proposalsT"],
-        ["chosen", proposals.filter((p) => p.chosen).length, "stat.chosen"],
       ]
     : [
+        ["points", myPoints ? myPoints.total : 0, "stat.points", true],
         ["mine", questions.length, "stat.mine"],
-        ["answered", answered, "stat.answered", answered > 0],
         ["subs", submissions.length, "nav.submissions"],
         ["proposals", proposals.length, "stat.proposals"],
       ];
-
   $("#stats").replaceChildren(...stats.map(([key, value, label, hl]) => {
     const from = instant ? value : lastStats[key] ?? 0;
     const b = el("b", {}, String(from));
@@ -425,13 +615,246 @@ function renderStats(instant = false) {
 }
 
 function countUp(node, from, to) {
-  if (from === to || reducedMotion) { node.textContent = to; return; }
+  if (from === to || motionOff()) { node.textContent = to; return; }
   const t0 = performance.now();
   (function step(now) {
     const k = Math.min(1, (now - t0) / 600);
     node.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3)));
     if (k < 1) requestAnimationFrame(step);
   })(t0);
+}
+
+function levelProgress(p) {
+  const lvl = p.level;
+  if (!lvl.next_min) return { pct: 100, text: t("home.maxLevel") };
+  return {
+    pct: Math.round(((p.total - lvl.min) / (lvl.next_min - lvl.min)) * 100),
+    text: t("home.toNext", lvl.next_min - p.total, t("lvl." + lvl.next_key)),
+  };
+}
+
+function renderLevelCard() {
+  const card = $("#level-card");
+  card.classList.toggle("hidden", isTrainer() || !myPoints);
+  if (isTrainer() || !myPoints) return;
+  const prog = levelProgress(myPoints);
+  card.replaceChildren(
+    el("div", { class: "level-badge" }, String(myPoints.level.index)),
+    el("div", {},
+      el("b", {}, `${t("pt.level", myPoints.level.index)} · ${t("lvl." + myPoints.level.key)}`),
+      el("div", { class: "xp" }, el("i", { style: `width:${prog.pct}%` })),
+      el("small", {}, prog.text)),
+    el("button", { class: "ghost big-btn", onclick: () => showView("points") }, el("span", { class: "big" }, `⚡ ${myPoints.total}`)));
+}
+
+function renderAnnouncements() {
+  const box = $("#announce-box");
+  const list = announcements.slice(0, 3);
+  box.classList.toggle("hidden", !isTrainer() && list.length === 0);
+  const rows = list.map((a) => el("div", { class: "ann" },
+    el("span", { class: "pin" }, a.pinned ? "📌" : "📣"),
+    el("div", { class: "md-wrap", style: "flex:1;min-width:0" }, renderMd(a.text), el("small", { class: "muted" }, `${a.author} · ${timeAgo(a.created_at)}`)),
+    isTrainer() ? el("button", { class: "ghost small", title: t("a.delete"), onclick: async () => {
+      try { await api(`/api/announcements/${a.id}`, { method: "DELETE" }); loadAnnouncements(); } catch (err) { toast(err.message); }
+    } }, "✕") : null));
+  const children = [el("div", { class: "panel-head" }, el("h3", {}, t("home.announcements")))];
+  if (isTrainer()) {
+    const area = el("textarea", { rows: 2, maxlength: 2000, placeholder: t("home.announcePh") });
+    const pin = el("input", { type: "checkbox" });
+    const form = el("form", { class: "ann-form" }, area,
+      el("div", { class: "row" }, el("label", { class: "check" }, pin, " ", t("home.pin")),
+        el("button", { type: "submit", class: "primary small" }, t("home.post"))));
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!area.value.trim()) return;
+      try {
+        await api("/api/announcements", { method: "POST", body: { text: area.value, pinned: pin.checked } });
+        toast(t("home.posted"));
+        loadAnnouncements();
+      } catch (err) { toast(err.message); }
+    });
+    children.push(form);
+  }
+  box.replaceChildren(...children, ...rows);
+}
+
+function actionCard(view, h, top, title, desc, after) {
+  const card = el("button", {
+    class: "action-card", style: `--h:${h}`,
+    onclick: () => { showView(view); if (after) setTimeout(after, 60); },
+  }, top, el("b", {}, title), el("span", { class: "d" }, desc));
+  return card;
+}
+
+function renderHome(instant = false) {
+  if (!auth) return;
+  renderStats(instant);
+  renderLevelCard();
+  renderAnnouncements();
+  const open = questions.filter((q) => !q.answer).length;
+  const toReview = submissions.filter((x) => x.status === "sent").length;
+  const num = (n) => el("span", { class: "big-num" }, String(n));
+  const ico = (s) => el("span", { class: "ico mono" }, s);
+  const cards = isTrainer()
+    ? [
+        actionCard("questions", 330, num(open), t("nav.questions"), t("act.answerT")),
+        actionCard("submissions", 190, num(toReview), t("nav.submissions"), t("act.reviewT")),
+        actionCard("messages", 20, num(unread), t("nav.messages"), t("act.unreadT")),
+        actionCard("box", 265, num(proposals.length), t("nav.box"), t("act.ideasT")),
+        actionCard("news", 210, ico("◉"), t("act.news"), t("act.newsD")),
+        actionCard("points", 45, ico("⚡"), t("nav.points"), t("pt.bonusTitle")),
+      ]
+    : [
+        actionCard("questions", 330, ico("?"), t("act.ask"), t("act.askD"), () => $("#question-text").focus()),
+        actionCard("submissions", 190, ico("⇪"), t("act.submit"), t("act.submitD"), () => $("#s-title").focus()),
+        actionCard("box", 265, ico("✦"), t("act.idea"), t("act.ideaD"), () => $("#p-description").focus()),
+        actionCard("messages", 20, ico("✉"), t("act.msg"), t("act.msgD"), () => $("#chat-input").focus()),
+        actionCard("news", 210, ico("◉"), t("act.news"), t("act.newsD")),
+        actionCard("guide", 150, ico("#"), t("act.learn"), t("act.learnD")),
+      ];
+  cards.forEach((c, i) => (c.style.animationDelay = `${i * 50}ms`));
+  $("#actions").replaceChildren(...cards);
+
+  // Teme cu termen
+  const upcoming = assignments
+    .filter((a) => a.due_at)
+    .sort((a, b) => (a.due_at < b.due_at ? -1 : 1))
+    .filter((a) => isTrainer() || !a.submitted || new Date(a.due_at) > new Date())
+    .slice(0, 4);
+  $("#home-deadlines").replaceChildren(...(upcoming.length ? upcoming.map((a) => {
+    const cd = countdown(a.due_at);
+    const badge = !isTrainer() && a.submitted
+      ? el("span", { class: "countdown done" }, t("a.done"))
+      : el("span", { class: `countdown ${cd.late ? "late" : ""}` }, cd.text);
+    return el("button", { class: "mini", onclick: () => showView("submissions") },
+      el("span", { class: "k" }, "📌"), el("span", { class: "t" }, a.title), badge);
+  }) : [el("div", { class: "empty" }, t("home.noDeadlines"))]));
+
+  // Știrea zilei din AI News
+  const insight = $("#home-insight");
+  const top = newsData && newsData.items && newsData.items.length ? (newsData.items.find((i) => i.top) || newsData.items[0]) : null;
+  if (top) {
+    insight.replaceChildren(el("div", { class: "insight" },
+      el("div", { class: "meta mono muted small" }, `${top.source} · ${timeAgo(top.published)}`),
+      el("h4", {}, top.headline || top.title),
+      el("p", {}, top.why || top.summary),
+      safeLink(top.link) ? el("a", { class: "link-btn", href: top.link, target: "_blank", rel: "noopener noreferrer" }, t("n.read")) : null));
+  } else {
+    insight.replaceChildren(el("div", { class: "empty" }, newsLoading || !newsData ? el("span", {}, t("n.loading"), el("span", { class: "dots" })) : t("n.empty")));
+  }
+
+  const recent = [
+    ...questions.map((q) => ({ at: q.created_at, view: "questions", k: topic(q.category).icon, text: q.text,
+      status: el("span", { class: `status ${q.answer ? "ok" : "open"}` }, t(q.answer ? "q.statusOk" : "q.statusOpen")) })),
+    ...submissions.map((x) => ({ at: x.created_at, view: "submissions", k: t("kind." + x.kind).split(" ")[0], text: x.title,
+      status: el("span", { class: `status ${x.status}` }, t("st." + x.status)) })),
+  ].sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, 5);
+  $("#home-recent").replaceChildren(...(recent.length ? recent.map((it) =>
+    el("button", { class: "mini", onclick: () => showView(it.view) },
+      el("span", { class: "k" }, it.k), el("span", { class: "t" }, it.text), it.status))
+    : [el("div", { class: "empty" }, t("home.nothing"))]));
+
+  const best = [...proposals].sort((a, b) => b.votes - a.votes || b.id - a.id).slice(0, 5);
+  $("#home-top").replaceChildren(...(best.length ? best.map((p) =>
+    el("button", { class: "mini", onclick: () => showView("box") },
+      el("span", { class: "k" }, p.chosen ? "★" : "✦"), el("span", { class: "t" }, p.title),
+      el("span", { class: "votes" }, `▲ ${p.votes}`)))
+    : [el("div", { class: "empty" }, t("home.nothing"))]));
+}
+
+// ================================================================ direct messages
+
+async function loadUnread() {
+  try { unread = (await api("/api/dm/unread")).unread; } catch (_) { return; }
+  $("#m-badge").textContent = unread;
+  $("#m-badge").classList.toggle("hidden", unread === 0);
+}
+
+async function loadChat() {
+  if (!auth) return;
+  try {
+    if (isTrainer()) {
+      // Întâi conversația deschisă (o marchează citită), apoi lista cu numărul de necitite
+      if (activeThread) chat = (await api(`/api/dm/${encodeURIComponent(activeThread)}`)).messages;
+      threads = (await api("/api/dm")).threads;
+    } else {
+      chat = (await api("/api/dm")).messages;
+    }
+  } catch (err) { toast(err.message); return; }
+  renderMessages();
+  loadUnread();
+}
+
+function renderMessages() {
+  if (!auth) return;
+  const layout = $("#chat-layout");
+  layout.classList.toggle("has-thread", Boolean(activeThread));
+  if (isTrainer()) {
+    const q = norm($("#thread-search").value);
+    const shown = threads.filter((th) => !q || norm(th.name).includes(q));
+    $("#threads").replaceChildren(...(shown.length ? shown.map((th) =>
+      el("button", { class: `thread ${th.student_key === activeThread ? "on" : ""}`, onclick: () => { activeThread = th.student_key; chat = []; loadChat(); } },
+        avatar(th.name), el("span", { class: "tt" }, th.name, el("small", {}, th.last || "…")),
+        th.unread ? el("span", { class: "badge" }, String(th.unread)) : null))
+      : [el("div", { class: "empty" }, t("m.noStudents"))]));
+  }
+  const active = threads.find((th) => th.student_key === activeThread);
+  const head = $("#chat-head");
+  if (isTrainer()) {
+    head.replaceChildren(...(active
+      ? [el("button", { class: "ghost small back-btn", onclick: () => { activeThread = null; renderMessages(); } }, t("m.back")), avatar(active.name), active.name]
+      : [el("span", { class: "muted" }, t("m.pick"))]));
+  } else {
+    head.replaceChildren(el("span", { class: "avatar sm", style: "--h:160" }, "🧑‍🏫"), t("m.trainer"),
+      el("span", { class: "space private", style: "margin-left:auto" }, t("space.private")));
+  }
+  const canWrite = !isTrainer() || Boolean(activeThread);
+  $("#chat-form").classList.toggle("hidden", !canWrite);
+  const log = $("#chat-log");
+  const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+  if (!canWrite) {
+    log.replaceChildren();
+  } else if (!chat.length) {
+    log.replaceChildren(el("div", { class: "empty" }, t("m.empty")));
+  } else {
+    log.replaceChildren(...chat.map((m) => el("div", { class: `bubble ${m.mine ? "mine" : ""}` },
+      el("div", { class: "who" }, `${m.mine ? t("m.you") : m.from_role === "trainer" ? m.from_name + " · " + t("m.trainer") : m.from_name} · ${timeAgo(m.created_at)}`),
+      renderMd(m.text))));
+  }
+  if (atBottom || !log.dataset.ready) { log.scrollTop = log.scrollHeight; log.dataset.ready = "1"; }
+}
+
+$("#thread-search").addEventListener("input", renderMessages);
+
+const chatInput = $("#chat-input");
+chatInput.addEventListener("input", () => {
+  chatInput.style.height = "auto";
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 160) + "px";
+});
+chatInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); $("#chat-form").requestSubmit(); }
+});
+
+$("#chat-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = chatInput.value.trim();
+  if (!text) return;
+  try {
+    const path = isTrainer() ? `/api/dm/${encodeURIComponent(activeThread)}` : "/api/dm";
+    const m = await api(path, { method: "POST", body: { text } });
+    chat.push(m);
+    chatInput.value = "";
+    chatInput.style.height = "auto";
+    $("#chat-log").dataset.ready = "";
+    renderMessages();
+  } catch (err) { toast(err.message); }
+});
+
+function prefillMessage(text) {
+  showView("messages");
+  chatInput.value = text;
+  chatInput.dispatchEvent(new Event("input"));
+  chatInput.focus();
 }
 
 // ================================================================ questions
@@ -446,8 +869,7 @@ function renderChips() {
     }, tp.icon, " ", tp.title);
   }));
   const tp = topic(selectedTopic);
-  $("#topic-hint").replaceChildren(t("q.tryFirst"),
-    el("code", { title: t("g.copy"), onclick: () => copy(tp.prompt) }, tp.prompt));
+  $("#topic-hint").replaceChildren(t("q.tryFirst"), el("code", { title: t("g.copy"), onclick: () => copy(tp.prompt) }, tp.prompt));
 }
 
 function renderTopicFilter() {
@@ -468,10 +890,9 @@ $("#question-form").addEventListener("submit", async (e) => {
     $("#question-text").value = "";
     toast(t("q.sent"));
     await loadQuestions();
+    loadPoints();
     if (cfg.ai) requestAiAnswer(q.id);
-  } catch (err) {
-    toast(err.message);
-  }
+  } catch (err) { toast(err.message); }
 });
 
 async function requestAiAnswer(id) {
@@ -497,24 +918,22 @@ async function loadQuestions() {
   renderQuestions();
   renderGuide();
   renderHome();
+  renderBell();
 }
 
 function renderQuestions() {
-  const term = $("#question-search").value.trim().toLowerCase();
+  const term = norm($("#question-search").value.trim());
   const filter = $("#question-filter").value;
   const topicFilter = $("#question-topic").value || "all";
   const shown = questions.filter((q) => {
     if (filter === "open" && q.answer) return false;
     if (filter === "answered" && !q.answer) return false;
     if (topicFilter !== "all" && q.category !== topicFilter) return false;
-    return !term || `${q.text} ${q.answer || ""} ${q.ai_answer || ""} ${q.author}`.toLowerCase().includes(term);
+    return !term || norm(`${q.text} ${q.answer || ""} ${q.ai_answer || ""} ${q.author}`).includes(term);
   });
-
   const open = questions.filter((q) => !q.answer).length;
-  const badge = $("#q-badge");
-  badge.textContent = open;
-  badge.classList.toggle("hidden", !isTrainer() || open === 0);
-
+  $("#q-badge").textContent = open;
+  $("#q-badge").classList.toggle("hidden", !isTrainer() || open === 0);
   const list = $("#questions-list");
   if (!shown.length) {
     list.replaceChildren(el("div", { class: "empty" },
@@ -541,8 +960,7 @@ function questionCard(q) {
     topicChip(q.category),
     !isTrainer() && q.anonymous ? el("span", { class: "tag" }, t("q.anonTag")) : null,
     el("span", {}, timeAgo(q.created_at)),
-    el("span", { class: `right status ${q.answer ? "ok" : "open"}` }, t(q.answer ? "q.statusOk" : "q.statusOpen")),
-  );
+    el("span", { class: `right status ${q.answer ? "ok" : "open"}` }, t(q.answer ? "q.statusOk" : "q.statusOpen")));
   const card = el("article", { class: "item" }, head, el("p", { class: "item-text" }, q.text));
 
   // Răspunsul oficial al trainerului vine primul
@@ -551,7 +969,6 @@ function questionCard(q) {
       el("div", { class: "label" }, t("q.trainer"), el("span", { class: "muted" }, ` · ${timeAgo(q.answered_at)}`)),
       renderMd(q.answer)));
   }
-
   if (q.ai_answer) {
     card.append(el("div", { class: "ai-answer" }, el("div", { class: "label" }, t("q.ai")), renderMd(q.ai_answer)));
   } else if (aiPending.has(q.id)) {
@@ -577,12 +994,12 @@ function questionCard(q) {
   if (isTrainer()) {
     const area = el("textarea", { rows: 3, placeholder: t("q.replyPh") });
     area.value = q.answer || "";
-    const formButtons = el("div", { class: "row end" });
+    const buttons = el("div", { class: "row end" });
     if (q.ai_answer) {
-      formButtons.append(el("button", { type: "button", class: "ghost small", onclick: () => { area.value = q.ai_answer; area.focus(); } }, t("q.useAi")));
+      buttons.append(el("button", { type: "button", class: "ghost small", onclick: () => { area.value = q.ai_answer; area.focus(); } }, t("q.useAi")));
     }
-    formButtons.append(el("button", { type: "submit", class: "primary small" }, t("q.sendReply")));
-    const form = el("form", { class: "answer-form hidden" }, area, formButtons);
+    buttons.append(el("button", { type: "submit", class: "primary small" }, t("q.sendReply")));
+    const form = el("form", { class: "answer-form hidden" }, area, buttons);
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       try {
@@ -592,8 +1009,7 @@ function questionCard(q) {
       } catch (err) { toast(err.message); }
     });
     const actions = el("div", { class: "actions" },
-      el("button", { class: "small", onclick: () => { form.classList.toggle("hidden"); area.focus(); } },
-        t(q.answer ? "q.edit" : "q.reply")));
+      el("button", { class: "small", onclick: () => { form.classList.toggle("hidden"); area.focus(); } }, t(q.answer ? "q.edit" : "q.reply")));
     if (cfg.ai && !q.ai_answer && !aiPending.has(q.id)) {
       actions.append(el("button", { class: "small ghost", onclick: () => requestAiAnswer(q.id) }, "✨ ", t("q.aiDraft")));
     }
@@ -602,386 +1018,74 @@ function questionCard(q) {
   return card;
 }
 
-// ================================================================ guide
+// ================================================================ homework & projects
 
-function topicCounts() {
-  const counts = {};
-  for (const q of questions) counts[q.category] = (counts[q.category] || 0) + 1;
-  return counts;
-}
-
-function renderGuide() {
-  const counts = topicCounts();
-  $("#topic-grid").replaceChildren(...cfg.topics.map((k, i) => {
-    const tp = topic(k);
-    const n = counts[k] || 0;
-    const card = el("button", { type: "button", class: "topic-card", style: `--h:${tp.hue}; animation-delay:${i * 30}ms`, onclick: () => openTopic(k) },
-      el("span", { class: "ico" }, tp.icon),
-      n ? el("span", { class: "count" }, `${n} ${t(n === 1 ? "g.qcount1" : "g.qcount")}`) : null,
-      el("h3", {}, tp.title),
-      el("p", {}, tp.summary));
-    card.addEventListener("pointermove", (e) => {
-      const r = card.getBoundingClientRect();
-      card.style.setProperty("--mx", `${e.clientX - r.left}px`);
-      card.style.setProperty("--my", `${e.clientY - r.top}px`);
-    });
-    return card;
-  }));
-
-  const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  const heat = $("#heat");
-  heat.classList.toggle("hidden", ranked.length === 0);
-  if (!ranked.length) return;
-  const max = ranked[0][1];
-  heat.replaceChildren(el("h3", {}, t(isTrainer() ? "g.heatT" : "g.heatS")),
-    ...ranked.map(([k, n]) => {
-      const tp = topic(k);
-      return el("div", { class: "heat-row", style: `--h:${tp.hue}` },
-        el("span", { class: "name" }, `${tp.icon} ${tp.title}`),
-        el("div", { class: "heat-bar" }, el("i", { style: `width:${(n / max) * 100}%` })),
-        el("b", {}, String(n)));
-    }));
-}
-
-function openTopic(key) {
-  const tp = topic(key);
-  const drawer = $("#drawer");
-  drawer.dataset.topic = key;
-  drawer.style.setProperty("--h", tp.hue);
-  const body = [
-    el("div", { class: "ico" }, tp.icon),
-    el("h2", { id: "drawer-title" }, tp.title),
-    el("p", { class: "muted" }, tp.summary),
-    el("h4", {}, t("g.tips")),
-    el("ol", {}, tp.tips.map((tip) => el("li", {}, tip))),
-    el("h4", {}, t("g.prompt")),
-    el("div", { class: "md" }, el("pre", {}, el("code", {}, tp.prompt),
-      el("button", { class: "copy-btn small", type: "button", onclick: () => copy(tp.prompt) }, t("g.copy")))),
-    el("h4", {}, t("g.pitfall")),
-    el("p", { class: "pitfall" }, "⚠️ ", tp.pitfall),
-  ];
-  if (!isTrainer()) {
-    body.push(el("button", {
-      class: "primary glow", type: "button",
-      onclick: () => {
-        selectedTopic = cfg.topics.includes(key) ? key : "other";
-        renderChips();
-        closeTopic();
-        showView("questions");
-        $("#question-text").focus();
-      },
-    }, t("g.ask")));
-  }
-  $("#drawer-body").replaceChildren(...body);
-  drawer.classList.remove("hidden");
-  $("#drawer-backdrop").classList.remove("hidden");
-  document.body.classList.add("no-scroll");
-  $("#drawer-close").focus();
-}
-
-function closeTopic() {
-  $("#drawer").classList.add("hidden");
-  $("#drawer-backdrop").classList.add("hidden");
-  document.body.classList.remove("no-scroll");
-}
-
-$("#drawer-close").addEventListener("click", closeTopic);
-$("#drawer-backdrop").addEventListener("click", closeTopic);
-
-// ================================================================ proposals: wizard
-
-function setStep(n) {
-  document.querySelectorAll("#pipeline li").forEach((li) => {
-    const s = Number(li.dataset.step);
-    li.classList.toggle("active", s === n);
-    li.classList.toggle("dark", s === n && (s === 2 || s === 5));
-    li.classList.toggle("done", s < n);
-  });
-}
-
-function showStage(id) {
-  ["#proposal-form", "#ai-thinking", "#refine-result"].forEach((s) => $(s).classList.toggle("hidden", s !== id));
-}
-
-function draft() {
-  return {
-    title: $("#p-title").value,
-    description: $("#p-description").value,
-    audience: $("#p-audience").value,
-  };
-}
-
-async function runRefine(body) {
-  $("#proposal-error").textContent = "";
-  showStage("#ai-thinking");
-  setStep(2);
-  const log = $("#ai-log");
-  log.replaceChildren(el("div", {}, el("span", { class: "t-prompt" }, "$ "), "claude refine proposal.json"));
-
-  let done = false;
-  const request = api("/api/proposals/refine", { method: "POST", body }).finally(() => { done = true; });
-  request.catch(() => {}); // eroarea e tratată mai jos, după animație
-  for (const line of t("p.log")) {
-    log.append(el("div", { class: "t-ai" }, "› " + line));
-    await sleep(380);
-  }
-  const cursor = el("span", { class: "cursor" });
-  if (!done) log.append(el("div", { class: "t-dim" }, "› " + t("p.waitClaude"), cursor));
-
-  try {
-    const r = await request;
-    cursor.remove();
-    const n = (r.missing || []).length;
-    log.append(el("div", { class: "t-ok" }, t("p.done") + (n ? n + t(n === 1 ? "p.oneQ" : "p.manyQ") : t("p.allClear"))));
-    await sleep(500);
-    showRefined(r);
-  } catch (err) {
-    showStage("#proposal-form");
-    setStep(1);
-    $("#proposal-error").textContent = err.message;
-  }
-}
-
-async function typewrite(node, text) {
-  node.textContent = "";
-  if (reducedMotion) { node.textContent = text; return; }
-  for (let i = 0; i < text.length; i += 2) {
-    node.textContent = text.slice(0, i + 2);
-    await new Promise((r) => setTimeout(r, 12));
-  }
-}
-
-function showRefined(r) {
-  showStage("#refine-result");
-  typewrite($("#understood-text"), r.understood || t("p.understoodEmpty"));
-  $("#refine-notes").textContent = t(r.engine === "claude" ? "p.engineClaude" : "p.engineLocal") + (r.notes || "");
-  $("#f-title").value = r.title || "";
-  $("#f-description").value = r.description || "";
-  $("#f-audience").value = r.audience || "";
-  $("#approve").checked = false;
-  $("#submit-proposal").disabled = true;
-
-  lastMissing = r.missing || [];
-  $("#missing-box").classList.toggle("hidden", lastMissing.length === 0);
-  $("#missing-list").replaceChildren(...lastMissing.map((m, i) => {
-    const ta = el("textarea", { rows: 2, "data-missing": i, placeholder: t("p.answerPh"), "aria-label": m.question });
-    ta.addEventListener("input", () => setStep(4), { once: true });
-    return el("div", { class: "q-bubble" },
-      el("div", { class: "q" }, el("small", {}, `🤖 ${t("field." + m.field)}`), m.question),
-      ta);
-  }));
-  setStep(lastMissing.length ? 3 : 4);
-}
-
-$("#proposal-form").addEventListener("submit", (e) => {
-  e.preventDefault();
-  runRefine(draft());
-});
-
-$("#apply-answers").addEventListener("click", (e) => {
-  e.preventDefault();
-  // Pornim de la varianta retușată și adăugăm răspunsurile la câmpurile cerute
-  const body = {
-    title: $("#f-title").value,
-    description: $("#f-description").value,
-    audience: $("#f-audience").value,
-  };
-  document.querySelectorAll("[data-missing]").forEach((ta) => {
-    const answer = ta.value.trim();
-    if (!answer) return;
-    const asked = lastMissing[Number(ta.dataset.missing)].field;
-    const field = TARGET_FIELD[asked] || asked;
-    body[field] = body[field] ? `${body[field]} ${answer}` : answer;
-  });
-  // Ținem ciorna sincronizată, ca „Înapoi” să nu piardă detaliile
-  $("#p-title").value = body.title;
-  $("#p-description").value = body.description;
-  $("#p-audience").value = body.audience;
-  runRefine(body);
-});
-
-$("#approve").addEventListener("change", () => {
-  $("#submit-proposal").disabled = !$("#approve").checked;
-  setStep($("#approve").checked ? 5 : 4);
-});
-
-["#f-title", "#f-description", "#f-audience"].forEach((id) =>
-  $(id).addEventListener("input", () => {
-    // Orice modificare cere o nouă aprobare
-    $("#approve").checked = false;
-    $("#submit-proposal").disabled = true;
-    setStep(4);
-  })
-);
-
-$("#back-edit").addEventListener("click", (e) => {
-  e.preventDefault();
-  showStage("#proposal-form");
-  setStep(1);
-});
-
-$("#submit-proposal").addEventListener("click", async (e) => {
-  e.preventDefault();
-  $("#proposal-error").textContent = "";
-  try {
-    await api("/api/proposals", {
-      method: "POST",
-      body: {
-        title: $("#f-title").value,
-        description: $("#f-description").value,
-        audience: $("#f-audience").value,
-        approved: $("#approve").checked,
-      },
-    });
-    ["#p-title", "#p-description", "#p-audience"].forEach((id) => ($(id).value = ""));
-    showStage("#proposal-form");
-    setStep(1);
-    confetti();
-    toast(t("p.submitted"));
-    loadProposals();
-  } catch (err) {
-    $("#proposal-error").textContent = err.message;
-  }
-});
-
-// ================================================================ proposals: list
-
-$("#proposal-search").addEventListener("input", renderProposals);
-$("#proposal-sort").addEventListener("change", renderProposals);
-
-async function loadProposals() {
-  proposals = await api("/api/proposals");
-  renderProposals();
+async function loadAssignments() {
+  assignments = await api("/api/assignments");
+  renderAssignments();
+  renderSubmissionForm();
   renderHome();
+  renderBell();
 }
 
-function renderProposals() {
-  const term = $("#proposal-search").value.trim().toLowerCase();
-  const sort = $("#proposal-sort").value;
-  const shown = proposals
-    .filter((p) => !term || `${p.title} ${p.description} ${p.audience} ${p.author}`.toLowerCase().includes(term))
-    .sort((a, b) => {
-      if (sort === "votes") return b.votes - a.votes || b.id - a.id;
-      if (sort === "chosen") return b.chosen - a.chosen || b.votes - a.votes || b.id - a.id;
-      return b.id - a.id;
-    });
-
-  const pBadge = $("#p-badge");
-  pBadge.textContent = proposals.length;
-  pBadge.classList.toggle("hidden", proposals.length === 0);
-
-  const list = $("#proposals-list");
-  if (!shown.length) {
-    list.replaceChildren(el("div", { class: "empty" }, t(proposals.length ? "q.emptyFilter" : "p.empty")));
+function renderAssignments() {
+  const box = $("#assignments");
+  if (!assignments.length) {
+    box.replaceChildren(el("div", { class: "empty" }, t("a.empty")));
     return;
   }
-  list.replaceChildren(...shown.map((p, i) => {
-    const card = proposalCard(p, sort === "votes" && !term ? i + 1 : null);
-    card.style.animationDelay = `${Math.min(i, 8) * 40}ms`;
-    return card;
+  box.replaceChildren(...assignments.map((a) => {
+    const cd = a.due_at ? countdown(a.due_at) : null;
+    const right = [];
+    if (isTrainer()) {
+      right.push(el("span", { class: "countdown" }, t("a.submittedN", a.submitted)));
+      right.push(el("button", { class: "ghost small", title: t("a.delete"), onclick: async (e) => {
+        e.stopPropagation();
+        if (!confirm(t("a.confirmDelete", a.title))) return;
+        try { await api(`/api/assignments/${a.id}`, { method: "DELETE" }); loadAssignments(); } catch (err) { toast(err.message); }
+      } }, "✕"));
+    } else if (a.submitted) {
+      right.push(el("span", { class: "countdown done" }, t("a.done")));
+    } else {
+      if (cd) right.push(el("span", { class: `countdown ${cd.late ? "late" : ""}` }, cd.text));
+      right.push(el("button", { class: "small primary", onclick: () => handInFor(a) }, t("a.handIn")));
+    }
+    return el("div", { class: "mini" },
+      el("span", { class: "k" }, "📌"),
+      el("span", { class: "t" }, el("b", {}, a.title), " ",
+        el("small", { class: "muted" }, [t("a.points", a.points), a.due_at ? t("a.onTime") : null].filter(Boolean).join(" · ")),
+        a.description ? el("small", { class: "muted", style: "display:block;white-space:normal" }, a.description) : null),
+      ...right);
   }));
 }
 
-function proposalCard(p, rank) {
-  const actions = el("div", { class: "actions" });
-  if (isTrainer()) {
-    actions.append(el("button", {
-      class: `small choose ${p.chosen ? "on" : ""}`,
-      onclick: async () => { const was = p.chosen; if (await act(`/api/proposals/${p.id}/choose`) && !was) confetti(); },
-    }, t(p.chosen ? "p.unchoose" : "p.choose")));
-    actions.append(el("span", { class: "muted small mono" }, `▲ ${p.votes} ${t(p.votes === 1 ? "p.vote1" : "p.votes")}`));
-  } else {
-    actions.append(el("button", {
-      class: `small vote ${p.voted ? "on" : ""}`,
-      title: t(p.voted ? "p.unvote" : "p.vote"),
-      onclick: () => act(`/api/proposals/${p.id}/vote`),
-    }, `▲ ${p.votes}`));
-  }
-
-  return el("article", { class: `item ${p.chosen ? "chosen" : ""}` },
-    el("div", { class: "item-head" },
-      rank && p.votes > 0 ? el("span", { class: `rank ${rank <= 3 ? "top" : ""}` }, `#${rank}`) : null,
-      avatar(p.author),
-      el("strong", {}, p.mine ? p.author + t("p.you") : p.author),
-      el("span", {}, timeAgo(p.created_at)),
-      p.chosen ? el("span", { class: "right chosen-badge" }, t("p.chosen")) : null),
-    el("h3", {}, p.title),
-    el("p", { class: "meta-line" }, el("b", {}, t("p.what")), p.description),
-    el("p", { class: "meta-line" }, el("b", {}, t("p.for")), p.audience),
-    actions);
+function handInFor(a) {
+  selectedKind = "homework";
+  renderSubmissionForm();
+  $("#s-assignment").value = String(a.id);
+  if (!$("#s-title").value) $("#s-title").value = a.title;
+  $("#submission-form").scrollIntoView({ behavior: motionOff() ? "auto" : "smooth", block: "start" });
+  setTimeout(() => $("#s-link").focus(), 300);
 }
 
-async function act(path) {
+$("#assignment-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const due = $("#a-due").value;
   try {
-    await api(path, { method: "POST" });
-    await loadProposals();
-    return true;
-  } catch (err) {
-    toast(err.message);
-    return false;
-  }
-}
-
-// ================================================================ home
-
-function renderHome(instant = false) {
-  if (!auth) return;
-  renderStats(instant);
-  const open = questions.filter((q) => !q.answer).length;
-  const toReview = submissions.filter((x) => x.status === "sent").length;
-  const actions = isTrainer()
-    ? [
-        ["questions", 330, open, "act.answerT", "nav.questions"],
-        ["submissions", 190, toReview, "act.reviewT", "nav.submissions"],
-        ["box", 265, proposals.length, "act.ideasT", "nav.box"],
-        ["guide", 150, "#", "act.guideT", "nav.guide"],
-      ].map(([view, h, num, label, title]) => el("button", { class: "action-card", style: `--h:${h}`, onclick: () => showView(view) },
-        el("span", { class: "big-num" }, String(num)), el("b", {}, t(title)), el("span", { class: "d" }, t(label))))
-    : [
-        ["questions", 330, "?", "act.ask", "act.askD", () => $("#question-text").focus()],
-        ["submissions", 190, "⇪", "act.submit", "act.submitD", () => $("#s-title").focus()],
-        ["box", 265, "✦", "act.idea", "act.ideaD", () => $("#p-description").focus()],
-        ["guide", 150, "#", "act.learn", "act.learnD", null],
-      ].map(([view, h, ico, title, desc, focus]) => el("button", {
-        class: "action-card", style: `--h:${h}`,
-        onclick: () => { showView(view); if (focus) setTimeout(focus, 50); },
-      }, el("span", { class: "ico mono" }, ico), el("b", {}, t(title)), el("span", { class: "d" }, t(desc))));
-  actions.forEach((a, i) => (a.style.animationDelay = `${i * 60}ms`));
-  $("#actions").replaceChildren(...actions);
-
-  // Privat: ultimele întrebări și predări, amestecate după dată
-  const recent = [
-    ...questions.map((q) => ({ at: q.created_at, view: "questions", k: topic(q.category).icon, text: q.text,
-      status: el("span", { class: `status ${q.answer ? "ok" : "open"}` }, t(q.answer ? "q.statusOk" : "q.statusOpen")) })),
-    ...submissions.map((x) => ({ at: x.created_at, view: "submissions", k: t("kind." + x.kind).split(" ")[0], text: x.title,
-      status: el("span", { class: `status ${x.status}` }, t("st." + x.status)) })),
-  ].sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, 5);
-  $("#home-recent").replaceChildren(...(recent.length ? recent.map((it) =>
-    el("button", { class: "mini", onclick: () => showView(it.view) },
-      el("span", { class: "k" }, it.k), el("span", { class: "t" }, it.text), it.status))
-    : [el("div", { class: "empty" }, t("home.nothing"))]));
-
-  const top = [...proposals].sort((a, b) => b.votes - a.votes || b.id - a.id).slice(0, 5);
-  $("#home-top").replaceChildren(...(top.length ? top.map((p) =>
-    el("button", { class: "mini", onclick: () => showView("box") },
-      el("span", { class: "k" }, p.chosen ? "★" : "✦"), el("span", { class: "t" }, p.title),
-      el("span", { class: "votes" }, `▲ ${p.votes}`)))
-    : [el("div", { class: "empty" }, t("home.nothing"))]));
-}
-
-// ================================================================ teme & proiecte (privat)
-
-function richText(src) {
-  // Textele pașilor au <b>…</b>; le transformăm în noduri, fără innerHTML
-  return src.split(/(<b>.*?<\/b>)/).filter(Boolean).map((part) =>
-    part.startsWith("<b>") ? el("b", {}, part.slice(3, -4)) : part);
-}
-
-function formatSize(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
+    await api("/api/assignments", {
+      method: "POST",
+      body: {
+        title: $("#a-title").value,
+        description: $("#a-desc").value,
+        due_at: due ? new Date(due).toISOString() : null,
+        points: Number($("#a-points").value) || 0,
+      },
+    });
+    ["#a-title", "#a-desc", "#a-due"].forEach((id) => ($(id).value = ""));
+    toast(t("a.created"));
+    loadAssignments();
+  } catch (err) { toast(err.message); }
+});
 
 function renderSubmissionForm() {
   $("#kind-chips").replaceChildren(...["homework", "project", "other"].map((k, i) =>
@@ -989,6 +1093,11 @@ function renderSubmissionForm() {
       type: "button", class: `chip ${k === selectedKind ? "on" : ""}`, style: `--h:${[190, 265, 330][i]}`,
       onclick: () => { selectedKind = k; renderSubmissionForm(); },
     }, t("kind." + k))));
+  const sel = $("#s-assignment");
+  const current = sel.value;
+  sel.replaceChildren(el("option", { value: "" }, t("s.noAssignment")),
+    ...assignments.map((a) => el("option", { value: String(a.id) }, a.title)));
+  sel.value = assignments.some((a) => String(a.id) === current) ? current : "";
   const ticked = new Set([...document.querySelectorAll("#checklist input:checked")].map((c) => c.value));
   $("#checklist").replaceChildren(...CHECKLIST.map((key) => {
     const box = el("input", { type: "checkbox", value: key });
@@ -1034,7 +1143,7 @@ function uploadForm(form, onProgress) {
     xhr.onload = () => {
       let data = {};
       try { data = JSON.parse(xhr.responseText); } catch (_) {}
-      if (xhr.status === 401) logout();
+      if (xhr.status === 401) logout(true);
       if (xhr.status >= 200 && xhr.status < 300) resolve(data);
       else reject(new Error(Array.isArray(data.detail) ? t("err.check") : data.detail || t("err.generic")));
     };
@@ -1051,6 +1160,7 @@ $("#submission-form").addEventListener("submit", async (e) => {
   form.append("title", $("#s-title").value);
   form.append("link", $("#s-link").value);
   form.append("note", $("#s-note").value);
+  if ($("#s-assignment").value) form.append("assignment_id", $("#s-assignment").value);
   if (selectedKind !== "other") {
     document.querySelectorAll("#checklist input:checked").forEach((c) => form.append("checklist", c.value));
   }
@@ -1065,12 +1175,15 @@ $("#submission-form").addEventListener("submit", async (e) => {
   try {
     await uploadForm(form, (k) => (bar.firstElementChild.style.width = `${Math.round(k * 100)}%`));
     ["#s-title", "#s-link", "#s-note"].forEach((id) => ($(id).value = ""));
+    $("#s-assignment").value = "";
     pendingFiles = [];
     document.querySelectorAll("#checklist input").forEach((c) => (c.checked = false));
     renderPendingFiles();
     confetti();
     toast(t("s.sent"));
     loadSubmissions();
+    loadAssignments();
+    loadPoints();
   } catch (err) {
     $("#submission-error").textContent = err.message;
   } finally {
@@ -1110,19 +1223,18 @@ async function loadSubmissions() {
   submissions = await api("/api/submissions");
   renderSubmissions();
   renderHome();
+  renderBell();
 }
 
 function renderSubmissions() {
-  const term = $("#submission-search").value.trim().toLowerCase();
+  const term = norm($("#submission-search").value.trim());
   const status = $("#submission-status").value || "all";
   const shown = submissions.filter((x) =>
     (status === "all" || x.status === status) &&
-    (!term || `${x.title} ${x.note} ${x.link} ${x.author}`.toLowerCase().includes(term)));
-
+    (!term || norm(`${x.title} ${x.note} ${x.link} ${x.author}`).includes(term)));
   const pending = submissions.filter((x) => x.status === "sent").length;
   $("#s-badge").textContent = pending;
   $("#s-badge").classList.toggle("hidden", !isTrainer() || pending === 0);
-
   const list = $("#submissions-list");
   if (!shown.length) {
     list.replaceChildren(el("div", { class: "empty" }, t(submissions.length ? "q.emptyFilter" : isTrainer() ? "s.emptyT" : "s.empty")));
@@ -1136,21 +1248,20 @@ function renderSubmissions() {
 }
 
 function submissionCard(x) {
+  const forA = assignments.find((a) => a.id === x.assignment_id);
   const card = el("article", { class: "item" },
     el("div", { class: "item-head" },
       isTrainer() ? avatar(x.author) : null,
       isTrainer() ? el("strong", {}, x.author) : null,
       el("span", { class: "tag" }, t("kind." + x.kind)),
+      forA ? el("span", { class: "tag" }, `📌 ${forA.title}`) : null,
       el("span", {}, timeAgo(x.created_at)),
       x.kind !== "other" ? el("span", { class: "ck-meter" }, `${t("s.check")} `, el("b", {}, `${x.checklist.length}/${CHECKLIST.length}`)) : null,
       el("span", { class: `right status ${x.status}` }, t("st." + x.status))),
     el("h3", {}, x.title));
-
   if (x.note) card.append(el("p", { class: "item-text" }, x.note));
   // Serverul acceptă doar linkuri http(s); verificăm și aici înainte să-l facem clicabil
-  if (x.link && /^https?:\/\//i.test(x.link)) {
-    card.append(el("a", { class: "sub-link", href: x.link, target: "_blank", rel: "noopener noreferrer" }, "↗ ", x.link));
-  }
+  if (safeLink(x.link)) card.append(el("a", { class: "sub-link", href: x.link, target: "_blank", rel: "noopener noreferrer" }, "↗ ", x.link));
   if (x.files.length) {
     card.append(el("div", { class: "file-list" }, x.files.map((f) =>
       el("span", { class: "file-chip" }, "📄 ", el("span", { class: "n" }, f.name), el("span", { class: "sz" }, formatSize(f.size)),
@@ -1161,7 +1272,6 @@ function submissionCard(x) {
       el("div", { class: "label" }, t("s.feedback"), el("span", { class: "muted" }, ` · ${timeAgo(x.reviewed_at)}`)),
       renderMd(x.feedback)));
   }
-
   if (isTrainer()) {
     let chosen = x.status === "sent" ? "received" : x.status;
     const area = el("textarea", { rows: 3, placeholder: t("s.feedbackPh") });
@@ -1178,6 +1288,7 @@ function submissionCard(x) {
         await api(`/api/submissions/${x.id}/review`, { method: "POST", body: { status: chosen, feedback: area.value } });
         toast(t("s.reviewed"));
         loadSubmissions();
+        loadBoard();
       } catch (err) { toast(err.message); }
     });
     card.append(el("div", { class: "actions" },
@@ -1186,27 +1297,629 @@ function submissionCard(x) {
   return card;
 }
 
-// ================================================================ boot
+// ================================================================ idea box (wizard)
+
+function setStep(n) {
+  document.querySelectorAll("#pipeline li").forEach((li) => {
+    const s = Number(li.dataset.step);
+    li.classList.toggle("active", s === n);
+    li.classList.toggle("dark", s === n && (s === 2 || s === 5));
+    li.classList.toggle("done", s < n);
+  });
+}
+
+function showStage(id) {
+  ["#proposal-form", "#ai-thinking", "#refine-result"].forEach((s) => $(s).classList.toggle("hidden", s !== id));
+}
+
+async function runRefine(body) {
+  $("#proposal-error").textContent = "";
+  showStage("#ai-thinking");
+  setStep(2);
+  const log = $("#ai-log");
+  log.replaceChildren(el("div", {}, el("span", { class: "t-prompt" }, "$ "), "claude refine proposal.json"));
+  let done = false;
+  const request = api("/api/proposals/refine", { method: "POST", body }).finally(() => { done = true; });
+  request.catch(() => {}); // eroarea e tratată mai jos, după animație
+  for (const line of t("p.log")) {
+    log.append(el("div", { class: "t-ai" }, "› " + line));
+    await sleep(380);
+  }
+  const cursor = el("span", { class: "cursor" });
+  if (!done) log.append(el("div", { class: "t-dim" }, "› " + t("p.waitClaude"), cursor));
+  try {
+    const r = await request;
+    cursor.remove();
+    const n = (r.missing || []).length;
+    log.append(el("div", { class: "t-ok" }, t("p.done") + (n ? n + t(n === 1 ? "p.oneQ" : "p.manyQ") : t("p.allClear"))));
+    await sleep(500);
+    showRefined(r);
+  } catch (err) {
+    showStage("#proposal-form");
+    setStep(1);
+    $("#proposal-error").textContent = err.message;
+  }
+}
+
+async function typewrite(node, text) {
+  node.textContent = "";
+  if (motionOff()) { node.textContent = text; return; }
+  for (let i = 0; i < text.length; i += 2) {
+    node.textContent = text.slice(0, i + 2);
+    await new Promise((r) => setTimeout(r, 12));
+  }
+}
+
+function showRefined(r) {
+  showStage("#refine-result");
+  typewrite($("#understood-text"), r.understood || t("p.understoodEmpty"));
+  $("#refine-notes").textContent = t(r.engine === "claude" ? "p.engineClaude" : "p.engineLocal") + (r.notes || "");
+  $("#f-title").value = r.title || "";
+  $("#f-description").value = r.description || "";
+  $("#f-audience").value = r.audience || "";
+  $("#approve").checked = false;
+  $("#submit-proposal").disabled = true;
+  lastMissing = r.missing || [];
+  $("#missing-box").classList.toggle("hidden", lastMissing.length === 0);
+  $("#missing-list").replaceChildren(...lastMissing.map((m, i) => {
+    const ta = el("textarea", { rows: 2, "data-missing": i, placeholder: t("p.answerPh"), "aria-label": m.question });
+    ta.addEventListener("input", () => setStep(4), { once: true });
+    return el("div", { class: "q-bubble" },
+      el("div", { class: "q" }, el("small", {}, `🤖 ${t("field." + m.field)}`), m.question), ta);
+  }));
+  setStep(lastMissing.length ? 3 : 4);
+}
+
+$("#proposal-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  runRefine({ title: $("#p-title").value, description: $("#p-description").value, audience: $("#p-audience").value });
+});
+
+$("#apply-answers").addEventListener("click", (e) => {
+  e.preventDefault();
+  // Pornim de la varianta retușată și adăugăm răspunsurile la câmpurile cerute
+  const body = { title: $("#f-title").value, description: $("#f-description").value, audience: $("#f-audience").value };
+  document.querySelectorAll("[data-missing]").forEach((ta) => {
+    const answer = ta.value.trim();
+    if (!answer) return;
+    const asked = lastMissing[Number(ta.dataset.missing)].field;
+    const field = TARGET_FIELD[asked] || asked;
+    body[field] = body[field] ? `${body[field]} ${answer}` : answer;
+  });
+  // Ținem ciorna sincronizată, ca „Înapoi” să nu piardă detaliile
+  $("#p-title").value = body.title;
+  $("#p-description").value = body.description;
+  $("#p-audience").value = body.audience;
+  runRefine(body);
+});
+
+$("#approve").addEventListener("change", () => {
+  $("#submit-proposal").disabled = !$("#approve").checked;
+  setStep($("#approve").checked ? 5 : 4);
+});
+
+["#f-title", "#f-description", "#f-audience"].forEach((id) =>
+  $(id).addEventListener("input", () => {
+    // Orice modificare cere o nouă aprobare
+    $("#approve").checked = false;
+    $("#submit-proposal").disabled = true;
+    setStep(4);
+  }));
+
+$("#back-edit").addEventListener("click", (e) => {
+  e.preventDefault();
+  showStage("#proposal-form");
+  setStep(1);
+});
+
+$("#submit-proposal").addEventListener("click", async (e) => {
+  e.preventDefault();
+  $("#proposal-error").textContent = "";
+  try {
+    await api("/api/proposals", {
+      method: "POST",
+      body: { title: $("#f-title").value, description: $("#f-description").value, audience: $("#f-audience").value, approved: $("#approve").checked },
+    });
+    ["#p-title", "#p-description", "#p-audience"].forEach((id) => ($(id).value = ""));
+    showStage("#proposal-form");
+    setStep(1);
+    confetti();
+    toast(t("p.submitted"));
+    loadProposals();
+    loadPoints();
+  } catch (err) {
+    $("#proposal-error").textContent = err.message;
+  }
+});
+
+$("#proposal-search").addEventListener("input", renderProposals);
+$("#proposal-sort").addEventListener("change", renderProposals);
+
+async function loadProposals() {
+  proposals = await api("/api/proposals");
+  renderProposals();
+  renderHome();
+  renderBell();
+}
+
+function renderProposals() {
+  const term = norm($("#proposal-search").value.trim());
+  const sort = $("#proposal-sort").value;
+  const shown = proposals
+    .filter((p) => !term || norm(`${p.title} ${p.description} ${p.audience} ${p.author}`).includes(term))
+    .sort((a, b) => {
+      if (sort === "votes") return b.votes - a.votes || b.id - a.id;
+      if (sort === "chosen") return b.chosen - a.chosen || b.votes - a.votes || b.id - a.id;
+      return b.id - a.id;
+    });
+  $("#p-badge").textContent = proposals.length;
+  $("#p-badge").classList.toggle("hidden", proposals.length === 0);
+  const list = $("#proposals-list");
+  if (!shown.length) {
+    list.replaceChildren(el("div", { class: "empty" }, t(proposals.length ? "q.emptyFilter" : "p.empty")));
+    return;
+  }
+  list.replaceChildren(...shown.map((p, i) => {
+    const card = proposalCard(p, sort === "votes" && !term ? i + 1 : null);
+    card.style.animationDelay = `${Math.min(i, 8) * 40}ms`;
+    return card;
+  }));
+}
+
+function proposalCard(p, rank) {
+  const actions = el("div", { class: "actions" });
+  if (isTrainer()) {
+    actions.append(el("button", {
+      class: `small choose ${p.chosen ? "on" : ""}`,
+      onclick: async () => { const was = p.chosen; if (await act(`/api/proposals/${p.id}/choose`) && !was) confetti(); },
+    }, t(p.chosen ? "p.unchoose" : "p.choose")));
+    actions.append(el("span", { class: "muted small mono" }, `▲ ${p.votes} ${t(p.votes === 1 ? "p.vote1" : "p.votes")}`));
+  } else {
+    actions.append(el("button", {
+      class: `small vote ${p.voted ? "on" : ""}`, disabled: p.mine,
+      title: t(p.voted ? "p.unvote" : "p.vote"),
+      onclick: () => act(`/api/proposals/${p.id}/vote`),
+    }, `▲ ${p.votes}`));
+  }
+  return el("article", { class: `item ${p.chosen ? "chosen" : ""}` },
+    el("div", { class: "item-head" },
+      rank && p.votes > 0 ? el("span", { class: `rank ${rank <= 3 ? "top" : ""}` }, `#${rank}`) : null,
+      avatar(p.author),
+      el("strong", {}, p.mine ? p.author + t("p.you") : p.author),
+      el("span", {}, timeAgo(p.created_at)),
+      p.chosen ? el("span", { class: "right chosen-badge" }, t("p.chosen")) : null),
+    el("h3", {}, p.title),
+    el("p", { class: "meta-line" }, el("b", {}, t("p.what")), p.description),
+    el("p", { class: "meta-line" }, el("b", {}, t("p.for")), p.audience),
+    actions);
+}
+
+async function act(path) {
+  try {
+    await api(path, { method: "POST" });
+    await loadProposals();
+    loadBoard();
+    return true;
+  } catch (err) {
+    toast(err.message);
+    return false;
+  }
+}
+
+// ================================================================ AI news
+
+async function loadNews(refresh = false) {
+  if (!auth) return;
+  newsLoading = true;
+  renderNews();
+  try {
+    newsData = await api(`/api/news${refresh ? "?refresh=true" : ""}`);
+  } catch (err) {
+    newsData = { items: [], sources: [], errors: [err.message] };
+  } finally {
+    newsLoading = false;
+  }
+  renderNews();
+  renderHome();
+}
+
+$("#news-refresh").addEventListener("click", () => loadNews(true));
+
+function renderNews() {
+  if (!auth) return;
+  const list = $("#news-list");
+  const items = (newsData && newsData.items) || [];
+  const cats = ["all", ...Object.keys(NEWS_HUE).filter((c) => items.some((i) => i.category === c))];
+  if (!cats.includes(newsCat)) newsCat = "all";
+  $("#news-cats").replaceChildren(...cats.map((c) => el("button", {
+    type: "button", class: `chip ${c === newsCat ? "on" : ""}`, style: `--h:${NEWS_HUE[c] || 260}`,
+    onclick: () => { newsCat = c; renderNews(); },
+  }, c === "all" ? t("n.all") : t("cat." + c))));
+  $("#news-meta").textContent = newsData && newsData.updated_at
+    ? `${t(newsData.curated ? "n.curated" : "n.filtered")} · ${t("n.updated", timeAgo(newsData.updated_at))}` : "";
+
+  if (newsLoading && !items.length) {
+    list.replaceChildren(...Array.from({ length: 4 }, () => el("div", { class: "skeleton" })));
+    return;
+  }
+  if (!items.length) {
+    list.replaceChildren(el("div", { class: "empty", style: "grid-column:1/-1" },
+      el("p", {}, t("n.empty")), el("p", { class: "small" }, t("n.emptyHint"), " ", ((newsData && newsData.sources) || []).join(" · "))));
+    return;
+  }
+  const shown = items.filter((i) => newsCat === "all" || i.category === newsCat);
+  const topIndex = Math.max(0, shown.findIndex((i) => i.top));
+  list.replaceChildren(...shown.map((it, idx) => newsCard(it, idx === topIndex && newsCat === "all", idx)));
+}
+
+function newsCard(it, isTop, idx) {
+  const title = it.headline || it.title;
+  const card = el("article", { class: `news-card ${isTop ? "top" : ""}`, style: `--h:${NEWS_HUE[it.category] || 260}; animation-delay:${Math.min(idx, 10) * 40}ms` },
+    el("div", { class: "meta" },
+      isTop ? el("span", { class: "countdown" }, t("n.top")) : null,
+      el("span", {}, t("cat." + it.category)), el("span", {}, "·"), el("span", {}, it.source),
+      it.published ? el("span", {}, `· ${timeAgo(it.published)}`) : null),
+    el("h3", {}, title));
+  if (it.why) card.append(el("div", { class: "why" }, el("b", {}, t("n.why")), it.why));
+  else if (it.summary) card.append(el("p", { class: "sum" }, trunc(it.summary, 220)));
+  const actions = el("div", { class: "actions" });
+  if (safeLink(it.link)) actions.append(el("a", { class: "read", href: it.link, target: "_blank", rel: "noopener noreferrer" }, t("n.read")));
+  if (!isTrainer()) {
+    actions.append(el("button", { class: "small ghost", onclick: () => prefillMessage(t("n.shareMsg", title, it.link)) }, "✉ ", t("n.share")));
+    actions.append(el("button", { class: "small ghost", onclick: () => {
+      showView("box");
+      showStage("#proposal-form");
+      setStep(1);
+      $("#p-description").value = t("n.inspireDesc", `${title} (${it.link})`) + "\n";
+      $("#p-description").focus();
+    } }, t("n.inspire")));
+  }
+  card.append(actions);
+  return card;
+}
+
+// ================================================================ points & leaderboard
+
+async function loadPoints() {
+  if (!auth) return;
+  try {
+    if (isTrainer()) {
+      students = await api("/api/students");
+    } else {
+      const before = myPoints ? myPoints.total : null;
+      myPoints = await api("/api/points/me");
+      $("#points-chip-n").textContent = myPoints.total;
+      $("#points-chip").title = `${t("pt.level", myPoints.level.index)} · ${t("lvl." + myPoints.level.key)}`;
+      if (before !== null && myPoints.total > before) {
+        const chip = $("#points-chip");
+        chip.classList.remove("bump"); void chip.offsetWidth; chip.classList.add("bump");
+        toast(`⚡ +${myPoints.total - before} ${t("pt.total")}`);
+      }
+    }
+  } catch (_) { return; }
+  await loadBoard();
+  renderPoints();
+  renderHome();
+}
+
+async function loadBoard() {
+  try { board = await api("/api/leaderboard"); } catch (_) { board = []; }
+  renderBoard();
+}
+
+function renderPoints() {
+  if (!auth) return;
+  if (isTrainer()) {
+    const sel = $("#bonus-student");
+    const current = sel.value;
+    sel.replaceChildren(...students.map((s) => el("option", { value: s.key }, `${s.name} · ⚡${s.total}`)));
+    if (students.some((s) => s.key === current)) sel.value = current;
+    $("#bonus-quick").replaceChildren(...[5, 10, 20, -5].map((n) =>
+      el("button", { type: "button", class: "small", onclick: () => ($("#bonus-points").value = n) }, n > 0 ? `+${n}` : String(n))));
+  } else if (myPoints) {
+    const prog = levelProgress(myPoints);
+    const got = new Set(myPoints.badges);
+    $("#my-points").replaceChildren(
+      el("div", { class: "card points-hero" },
+        el("div", { class: "ring", style: `--p:${prog.pct}` }, el("div", {}, el("div", {}, el("b", {}, String(myPoints.total)), el("small", {}, t("pt.total"))))),
+        el("div", {},
+          el("p", { class: "eyebrow mono" }, t("pt.level", myPoints.level.index)),
+          el("h2", {}, t("lvl." + myPoints.level.key)),
+          el("div", { class: "xp" }, el("i", { style: `width:${prog.pct}%` })),
+          el("p", {}, prog.text))),
+      el("div", { class: "card panel", style: "margin-bottom:1rem" },
+        el("div", { class: "panel-head" }, el("h3", {}, t("pt.badges"))),
+        el("div", { class: "badges" }, Object.entries(BADGES).map(([k, icon]) =>
+          el("div", { class: `badge-card ${got.has(k) ? "got" : "locked"}` },
+            el("span", { class: "bi" }, icon), el("b", {}, t("b." + k)), el("small", {}, t(`b.${k}.d`)))))),
+      el("div", { class: "pts-cols" },
+        el("div", { class: "card panel" },
+          el("div", { class: "panel-head" }, el("h3", {}, t("pt.how"))),
+          ...Object.entries(myPoints.rules).map(([k, v]) => el("div", { class: "rule" }, el("span", {}, t("rule." + k)), el("b", {}, `+${v}`))),
+          el("div", { class: "rule" }, el("span", {}, t("rule.bonus")), el("b", {}, "±"))),
+        el("div", { class: "card panel" },
+          el("div", { class: "panel-head" }, el("h3", {}, t("pt.history"))),
+          ...(myPoints.events.length ? myPoints.events.map((ev) => el("div", { class: "event" },
+            el("span", { title: ev.ref || "" }, `${t("rule." + ev.kind)}${ev.ref ? " · " + ev.ref : ""}`),
+            el("b", { class: ev.points < 0 ? "neg" : "" }, `${ev.points > 0 ? "+" : ""}${ev.points}`)))
+            : [el("div", { class: "empty" }, t("pt.noHistory"))]))));
+  }
+  renderBoard();
+}
+
+function renderBoard() {
+  const medals = ["🥇", "🥈", "🥉"];
+  const top = board.slice(0, 3);
+  const order = [top[1], top[0], top[2]];
+  $("#podium").replaceChildren(...(top.length >= 3 ? order.map((r, i) => el("div", { class: `p${[2, 1, 3][i]}` },
+    el("span", { class: "medal" }, medals[[1, 0, 2][i]]), avatar(r.name, false), el("b", {}, r.name), el("small", {}, `⚡ ${r.total}`))) : []));
+  $("#board").replaceChildren(...board.map((r) => el("div", { class: `board-row ${r.me ? "me" : ""}` },
+    el("span", { class: "rk" }, `#${r.rank}`), avatar(r.name),
+    el("span", { class: "nm" }, r.name, r.me ? ` (${t("pt.you")})` : "", r.hidden ? el("span", { class: "tag", style: "margin-left:.4rem" }, t("pt.hidden")) : null,
+      el("small", { class: "muted mono", style: "margin-left:.5rem" }, `L${r.level}`)),
+    el("span", { class: "sc" }, `⚡ ${r.total}`))));
+}
+
+$("#bonus-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    await api("/api/points/bonus", {
+      method: "POST",
+      body: { student_key: $("#bonus-student").value, points: Number($("#bonus-points").value), reason: $("#bonus-reason").value },
+    });
+    $("#bonus-reason").value = "";
+    toast(t("pt.given"));
+    confetti();
+    loadPoints();
+  } catch (err) { toast(err.message); }
+});
+
+// ================================================================ guide
+
+function renderGuide() {
+  const counts = {};
+  for (const q of questions) counts[q.category] = (counts[q.category] || 0) + 1;
+  $("#topic-grid").replaceChildren(...cfg.topics.map((k, i) => {
+    const tp = topic(k);
+    const n = counts[k] || 0;
+    const card = el("button", { type: "button", class: "topic-card", style: `--h:${tp.hue}; animation-delay:${i * 30}ms`, onclick: () => openTopic(k) },
+      el("span", { class: "ico" }, tp.icon),
+      n ? el("span", { class: "count" }, `${n} ${t(n === 1 ? "g.qcount1" : "g.qcount")}`) : null,
+      el("h3", {}, tp.title),
+      el("p", {}, tp.summary));
+    card.addEventListener("pointermove", (e) => {
+      const r = card.getBoundingClientRect();
+      card.style.setProperty("--mx", `${e.clientX - r.left}px`);
+      card.style.setProperty("--my", `${e.clientY - r.top}px`);
+    });
+    return card;
+  }));
+  const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const heat = $("#heat");
+  heat.classList.toggle("hidden", ranked.length === 0);
+  if (!ranked.length) return;
+  const max = ranked[0][1];
+  heat.replaceChildren(el("h3", {}, t(isTrainer() ? "g.heatT" : "g.heatS")),
+    ...ranked.map(([k, n]) => {
+      const tp = topic(k);
+      return el("div", { class: "heat-row", style: `--h:${tp.hue}` },
+        el("span", { class: "name" }, `${tp.icon} ${tp.title}`),
+        el("div", { class: "heat-bar" }, el("i", { style: `width:${(n / max) * 100}%` })),
+        el("b", {}, String(n)));
+    }));
+}
+
+// ================================================================ drawer: topic & settings
+
+function openDrawer(mode, hueValue, body) {
+  const drawer = $("#drawer");
+  drawer.dataset.mode = mode;
+  drawer.style.setProperty("--h", hueValue);
+  $("#drawer-body").replaceChildren(...body);
+  drawer.classList.remove("hidden");
+  $("#drawer-backdrop").classList.remove("hidden");
+  document.body.classList.add("no-scroll");
+}
+
+function closeDrawer() {
+  $("#drawer").classList.add("hidden");
+  $("#drawer-backdrop").classList.add("hidden");
+  document.body.classList.remove("no-scroll");
+}
+
+$("#drawer-close").addEventListener("click", closeDrawer);
+$("#drawer-backdrop").addEventListener("click", closeDrawer);
+
+function openTopic(key) {
+  const tp = topic(key);
+  $("#drawer").dataset.topic = key;
+  const body = [
+    el("div", { class: "ico" }, tp.icon),
+    el("h2", { id: "drawer-title" }, tp.title),
+    el("p", { class: "muted" }, tp.summary),
+    el("h4", {}, t("g.tips")),
+    el("ol", {}, tp.tips.map((tip) => el("li", {}, tip))),
+    el("h4", {}, t("g.prompt")),
+    el("div", { class: "md" }, el("pre", {}, el("code", {}, tp.prompt),
+      el("button", { class: "copy-btn small", type: "button", onclick: () => copy(tp.prompt) }, t("g.copy")))),
+    el("h4", {}, t("g.pitfall")),
+    el("p", { class: "pitfall" }, "⚠️ ", tp.pitfall),
+  ];
+  if (auth && !isTrainer()) {
+    body.push(el("button", {
+      class: "primary glow", type: "button",
+      onclick: () => {
+        selectedTopic = cfg.topics.includes(key) ? key : "other";
+        renderChips();
+        closeDrawer();
+        showView("questions");
+        $("#question-text").focus();
+      },
+    }, t("g.ask")));
+  }
+  openDrawer("topic", tp.hue, body);
+  $("#drawer-close").focus();
+}
+
+function segment(options, current, onPick) {
+  return el("div", { class: "seg" }, options.map(([value, label]) =>
+    el("button", { type: "button", class: `small ${value === current ? "on" : ""}`, onclick: () => onPick(value) }, label)));
+}
+
+function openSettings() {
+  const d = document.documentElement.dataset;
+  const body = [
+    el("div", { class: "ico" }, "⚙"),
+    el("h2", { id: "drawer-title" }, t("settings")),
+    el("div", { class: "set-group" }, el("h4", {}, t("set.lang")),
+      el("div", { class: "lang-grid" }, LANGS.map((l) =>
+        el("button", { type: "button", class: l.code === lang ? "on" : "", onclick: async () => { await setLang(l.code); openSettings(); } }, l.flag, " ", l.name)))),
+    el("div", { class: "set-group" }, el("h4", {}, t("set.style")),
+      el("div", { class: "theme-grid" }, THEMES.map(([name, color]) =>
+        el("button", { type: "button", class: d.theme === name ? "on" : "", onclick: () => { setPref("theme", name); openSettings(); } },
+          el("span", { class: "swatch", style: `background:${color}` }), t("theme." + name))))),
+    el("div", { class: "set-group" }, el("h4", {}, t("set.motion")),
+      segment([["on", t("set.on")], ["off", t("set.off")]], d.motion || "on", (v) => { setPref("motion", v); openSettings(); })),
+    el("div", { class: "set-group" }, el("h4", {}, t("set.size")),
+      segment([["normal", t("set.normal")], ["large", t("set.large")]], d.size || "normal", (v) => { setPref("size", v); openSettings(); })),
+  ];
+  if (auth && !isTrainer()) {
+    const box = el("input", { type: "checkbox" });
+    box.checked = !(auth.prefs && auth.prefs.hide_from_leaderboard);
+    box.addEventListener("change", async () => {
+      try {
+        const r = await api("/api/me", { method: "PATCH", body: { hide_from_leaderboard: !box.checked } });
+        auth.prefs = r.prefs;
+        loadBoard();
+      } catch (err) { toast(err.message); }
+    });
+    body.push(el("div", { class: "set-group" },
+      el("label", { class: "switch" }, el("span", {}, t("set.leaderboard")), box),
+      el("p", { class: "muted small" }, t("set.leaderboardHint"))));
+  }
+  body.push(el("div", { class: "set-group" }, el("h4", {}, t("set.shortcuts")),
+    el("div", { class: "kbd-list" },
+      el("div", {}, el("span", { class: "kbd" }, "Ctrl K"), t("set.k1")),
+      el("div", {}, el("span", { class: "kbd" }, "/"), t("set.k2")),
+      el("div", {}, el("span", { class: "kbd" }, "Ctrl ↵"), t("set.k3")))));
+  openDrawer("settings", 200, body);
+}
+
+$("#settings-btn").addEventListener("click", openSettings);
+
+// ================================================================ command palette (Ctrl+K)
+
+let paletteItems = [], paletteIndex = 0;
+
+function paletteActions() {
+  const views = ["home", "messages", "questions", "submissions", "box", "news", "points", "guide"];
+  const icons = { home: "⌂", messages: "✉", questions: "?", submissions: "⇪", box: "✦", news: "◉", points: "⚡", guide: "#" };
+  const items = views.map((v) => ({ icon: icons[v], label: t("k.go", t("nav." + v)), run: () => showView(v) }));
+  if (!isTrainer()) {
+    items.push(
+      { icon: "?", label: t("k.ask"), run: () => { showView("questions"); setTimeout(() => $("#question-text").focus(), 60); } },
+      { icon: "⇪", label: t("k.submit"), run: () => { showView("submissions"); setTimeout(() => $("#s-title").focus(), 60); } },
+      { icon: "✦", label: t("k.idea"), run: () => { showView("box"); setTimeout(() => $("#p-description").focus(), 60); } },
+      { icon: "✉", label: t("k.msg"), run: () => { showView("messages"); setTimeout(() => $("#chat-input").focus(), 60); } });
+  }
+  items.push({ icon: "⚙", label: t("k.settings"), run: openSettings });
+  LANGS.forEach((l) => items.push({ icon: l.flag, label: t("k.lang", l.name), run: () => setLang(l.code) }));
+  THEMES.forEach(([name]) => items.push({ icon: "◐", label: t("k.theme", t("theme." + name)), run: () => setPref("theme", name) }));
+  cfg.topics.forEach((k) => items.push({ icon: topic(k).icon, label: t("k.topic", topic(k).title), run: () => openTopic(k) }));
+  items.push({ icon: "⎋", label: t("k.logout"), run: () => logout() });
+  return items;
+}
+
+function openPalette() {
+  $("#palette").classList.remove("hidden");
+  $("#palette-input").value = "";
+  renderPalette();
+  $("#palette-input").focus();
+}
+
+function closePalette() { $("#palette").classList.add("hidden"); }
+
+function renderPalette() {
+  const q = norm($("#palette-input").value.trim());
+  paletteItems = paletteActions().filter((it) => !q || norm(it.label).includes(q)).slice(0, 12);
+  paletteIndex = Math.min(paletteIndex, Math.max(0, paletteItems.length - 1));
+  $("#palette-list").replaceChildren(...(paletteItems.length ? paletteItems.map((it, i) =>
+    el("button", { class: `pal-item ${i === paletteIndex ? "on" : ""}`, role: "option", onclick: () => runPalette(i) },
+      el("span", { class: "pi" }, it.icon), it.label, i === paletteIndex ? el("small", {}, "↵") : null))
+    : [el("div", { class: "empty" }, t("k.empty"))]));
+}
+
+function runPalette(i) {
+  const it = paletteItems[i];
+  closePalette();
+  if (it) it.run();
+}
+
+$("#palette-input").addEventListener("input", () => { paletteIndex = 0; renderPalette(); });
+$("#palette-input").addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown") { e.preventDefault(); paletteIndex = Math.min(paletteIndex + 1, paletteItems.length - 1); renderPalette(); }
+  if (e.key === "ArrowUp") { e.preventDefault(); paletteIndex = Math.max(paletteIndex - 1, 0); renderPalette(); }
+  if (e.key === "Enter") { e.preventDefault(); runPalette(paletteIndex); }
+});
+$("#palette").addEventListener("click", (e) => { if (e.target.id === "palette") closePalette(); });
+$("#palette-btn").addEventListener("click", () => (isLoggedIn() ? openPalette() : null));
+
+// ================================================================ onboarding
+
+function maybeOnboard() {
+  const key = `cutia-ob-${auth.role}-${auth.name.toLowerCase()}`;
+  let seen = false;
+  try { seen = Boolean(localStorage.getItem(key)); } catch (_) {}
+  if (seen) return;
+  $("#ob-title").textContent = t("ob.title", auth.name.split(/\s+/)[0]);
+  $("#onboarding").classList.remove("hidden");
+  $("#ob-go").onclick = () => {
+    try { localStorage.setItem(key, "1"); } catch (_) {}
+    $("#onboarding").classList.add("hidden");
+    confetti();
+  };
+  $("#ob-go").focus();
+}
+
+// ================================================================ data & boot
+
+async function loadAnnouncements() {
+  announcements = await api("/api/announcements");
+  renderAnnouncements();
+  renderBell();
+}
 
 async function refresh() {
   try {
-    await Promise.all([loadQuestions(), loadProposals(), loadSubmissions()]);
+    await Promise.all([loadQuestions(), loadProposals(), loadSubmissions(), loadAssignments(), loadAnnouncements(), loadUnread()]);
+    await loadPoints();
+    renderNotifications();
   } catch (err) { toast(err.message); }
 }
 
-// Reîmprospătare periodică, ca trainerul să vadă întrebările noi
+// Reîmprospătare periodică: mesajele des, restul la 20 de secunde
 setInterval(() => {
-  if (!auth || document.hidden || $("#app-view").classList.contains("hidden")) return;
-  // Nu redesenăm întrebările cât timp cineva scrie un răspuns sau așteaptă AI-ul
+  if (!isLoggedIn() || document.hidden) return;
+  loadUnread().then(() => { renderBell(); if (currentView === "home") renderHome(); });
+  if (currentView === "messages") loadChat();
+}, 6000);
+
+setInterval(() => {
+  if (!isLoggedIn() || document.hidden) return;
+  // Nu redesenăm cât timp cineva scrie un răspuns, un feedback sau așteaptă AI-ul
   if (!document.querySelector(".answer-form:not(.hidden)") && aiPending.size === 0) loadQuestions().catch(() => {});
   if (!document.querySelector(".review-form:not(.hidden)")) loadSubmissions().catch(() => {});
   loadProposals().catch(() => {});
-}, 15000);
+  loadAssignments().catch(() => {});
+  loadAnnouncements().catch(() => {});
+  loadPoints();
+}, 20000);
 
 (async function boot() {
+  try { await Promise.all([loadLang("en"), loadLang(lang)]); } catch (_) { lang = "en"; }
   applyI18n();
   try { cfg = await api("/api/config"); } catch (_) {}
-  renderMarquee();
+  renderLogin();
   if (auth) start();
   else runTerminal();
 })();

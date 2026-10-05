@@ -618,6 +618,7 @@ def toggle_chosen(proposal_id: int, user: dict = Depends(require_trainer)):
     with _lock:
         p = find_proposal(proposal_id)
         p["chosen"] = not p["chosen"]
+        p["chosen_at"] = now() if p["chosen"] else None
         save_db()
     return proposal_view(p, user)
 

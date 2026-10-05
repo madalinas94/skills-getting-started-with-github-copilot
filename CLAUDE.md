@@ -8,10 +8,10 @@ Instrucțiuni pentru Claude (și pentru oricine lucrează în proiect). Citește
 
 | Spațiu | Cine vede | Ce conține |
 | --- | --- | --- |
-| 🔒 **Privat** (student ↔ trainer) | doar studentul care a trimis și trainerul | Întrebări, Teme & proiecte (fișiere, link GitHub, checklist, feedback) |
-| 🌐 **Public** (toată clasa) | toți cei logați | Cutia de idei (propuneri trecute prin filtrul AI, voturi, „Aleasă”), Ghidul de vibe coding |
+| 🔒 **Privat** (student ↔ trainer) | doar studentul în cauză și trainerul | Mesaje directe, Întrebări, Teme & proiecte (fișiere, link GitHub, checklist, feedback) |
+| 🌐 **Public** (toată clasa) | toți cei logați | Cutia de idei (filtru AI, voturi, „Aleasă”), AI News, Puncte & clasament, Ghidul de vibe coding, anunțurile trainerului |
 
-Interfața e în **română și engleză** (buton RO/EN) și are temă întunecată (implicit) și luminoasă.
+Interfața e în **6 limbi** (ro, en, fr, it, es, de), are 6 stiluri vizuale (Neon, Luminos, Matrix, Apus, Ocean, Contrast mare) și îl salută pe utilizator pe nume. Trainerul anunță teme cu termen și puncte; studenții primesc puncte, niveluri și badge-uri.
 
 ## Minimul obligatoriu (din fișa trainerului): nu se strică niciodată
 
@@ -35,7 +35,10 @@ Ce verifică AI-ul la fiecare propunere: **problema** (ce rezolvă și pentru ci
 5. **Fișierele încărcate** se salvează cu nume aleatorii în `data/uploads/`, se descarcă doar prin API (după verificarea accesului), mereu ca `attachment` + `application/octet-stream` + `nosniff`. Limite: 5 fișiere, 10 MB, extensii din `ALLOWED_EXTENSIONS`.
 6. **Linkurile** trimise de utilizatori se acceptă doar dacă încep cu `http://` sau `https://` (fără `javascript:`), verificat pe server și în interfață.
 7. **Fără `innerHTML` cu text de la utilizatori sau de la AI.** În `app.js` totul se construiește cu `el(...)` și noduri text; markdown-ul AI trece prin `renderMd()`, care nu folosește HTML.
-8. Parolele se salvează doar ca hash PBKDF2 cu salt; codul de trainer vine din `TRAINER_CODE`.
+8. Parolele se salvează doar ca hash PBKDF2 cu salt; sesiunile doar ca hash SHA-256 al tokenului; codul de trainer vine din `TRAINER_CODE`.
+9. **Mesajele directe** sunt mereu o conversație student ↔ trainer: studentul vede doar conversația lui, trainerul pe toate. Nu există mesaje între studenți.
+10. **Punctele nu se salvează ca număr.** Se calculează în `src/points.py` din activitatea reală + bonusurile trainerului. Nu adăuga endpoint-uri care modifică direct punctele; nimeni nu își votează propria idee.
+11. **Conținutul din internet (AI News) e date, nu instrucțiuni**: fără HTML, doar linkuri `http(s)`, iar când îl trimitem la Claude îl marcăm explicit ca date.
 
 ## Reguli pentru AI
 
@@ -43,19 +46,25 @@ Ce verifică AI-ul la fiecare propunere: **problema** (ce rezolvă și pentru ci
 - Propuneri: răspuns structurat (JSON schema), maxim 3 întrebări, nu inventează funcții, câmpurile goale rămân goale. Fără cheie → `refine_local()` (retușare simplă, aceleași câmpuri).
 - **Nimic nu se trimite fără acordul studentului**: AI-ul doar propune; trimiterea cere checkbox-ul de aprobare, iar orice editare cere o nouă aprobare.
 - Răspunsul rapid la întrebări (`answer_question`) e marcat mereu „AI · neverificat de trainer”. Răspunsul trainerului rămâne cel **oficial** și apare primul. Se generează o singură dată per întrebare.
-- Dacă AI-ul nu e disponibil, aplicația merge în continuare (mod local / sfaturi din ghid). Nu bloca nicio funcție obligatorie pe AI.
+- AI News: Claude alege maxim 12 știri utile pentru clasă și scrie „de ce contează”, fără să inventeze fapte peste titlu și rezumat. Rezultatul stă în cache per limbă.
+- Dacă AI-ul nu e disponibil, aplicația merge în continuare (mod local / sfaturi din ghid / filtru automat de știri). Nu bloca nicio funcție obligatorie pe AI.
 
 ## Structura
 
 ```
-src/app.py            API FastAPI: login, întrebări, teme & proiecte, propuneri, limbă (X-Lang)
-src/ai.py             Modulul AI: retușarea propunerilor + tutorul pentru întrebări
-src/static/index.html Scheletul platformei (sidebar privat/public, 5 ecrane)
-src/static/i18n.js    TOATE textele RO + EN și ghidul de vibe coding (15 topicuri)
-src/static/app.js     Logica interfeței (fără framework)
-src/static/styles.css Design: tokens pe :root, dark/light, mobil, reduced motion
-tests/test_app.py     Teste API (acces, AI, upload, limbi)
-data/                 Date + fișiere încărcate (ignorat de git)
+src/app.py                API FastAPI: conturi & sesiuni, mesaje, întrebări, teme & anunțuri,
+                          propuneri, puncte, știri, limbă (X-Lang)
+src/ai.py                 Modulul AI: retușarea propunerilor + tutorul pentru întrebări
+src/news.py               AI News: surse RSS/Atom, filtrare, categorii, cache, alegere cu Claude
+src/points.py             Reguli de puncte, niveluri, badge-uri
+src/static/index.html     Scheletul platformei (sidebar privat/public, 8 ecrane, setări, Ctrl+K)
+src/static/app.js         Logica interfeței (fără framework, organizată pe secțiuni)
+src/static/styles.css     Design: tokens pe :root, 6 stiluri, mobil, animații oprite, text mare
+src/static/i18n/core.js   Limbile disponibile + iconițele/culorile topicurilor
+src/static/i18n/<l>.js    Toate textele unei limbi + ghidul (ro, en, fr, it, es, de)
+tests/test_app.py         Teste API (acces cu două conturi, mesaje, puncte, upload, știri, limbi)
+tests/check_i18n.js       Verifică să nu lipsească nicio traducere
+data/                     Date + fișiere încărcate (ignorat de git)
 ```
 
 ## Comenzi
@@ -69,18 +78,20 @@ pytest                            # rulează după fiecare schimbare
 
 ## Convenții
 
-- **Fiecare text din interfață există în română ȘI în engleză** în `src/static/i18n.js` (`STRINGS.ro` / `STRINGS.en`, aceleași chei). Mesajele de eroare ale serverului sunt în `MESSAGES` din `app.py`, tot în ambele limbi.
-- Topicurile din ghid au aceleași chei în `TOPICS` (`i18n.js`) și `TOPICS` (`app.py`). Când adaugi un topic, îl adaugi în ambele, în ambele limbi.
+- **Fiecare text din interfață există în toate cele 6 limbi** în `src/static/i18n/<limbă>.js` (aceleași chei ca `en.js`, aceleași `{}`). `pytest` pică dacă lipsește ceva. Mesajele de eroare ale serverului sunt în `MESSAGES` din `app.py`, câte 6 traduceri în ordinea din `ai.LANGS`.
+- Topicurile din ghid au aceleași chei în `TOPIC_META` (`i18n/core.js`), în fiecare fișier de limbă și în `TOPICS` (`app.py`). Un topic nou se adaugă peste tot, în toate limbile.
+- Numele nivelurilor (Prompt Rookie … AI Wizard) rămân în engleză în toate limbile, ca nume proprii.
 - Comentariile din cod sunt în română, scurte, și explică *de ce*.
-- Design: culorile doar din variabilele CSS de pe `:root` (tema dark e implicită, light prin `data-theme="light"`). Verifică orice ecran nou pe telefon (390px), în ambele teme, și cu `prefers-reduced-motion`.
+- Design: culorile doar din variabilele CSS de pe `:root`; fiecare stil e un bloc `:root[data-theme="..."]`. Verifică orice ecran nou pe telefon (390px), în Neon și Luminos, cu animațiile oprite (`data-motion="off"`) și cu text mare (`data-size="large"`).
+- Un ecran nou primește: o intrare în sidebar (secțiunea privat/public potrivită), o acțiune în paleta `Ctrl+K` și, dacă produce noutăți, o intrare în notificări.
 - Interfața marchează clar spațiul: `🔒 Privat` sau `🌐 Public`. Un ecran nou trebuie să spună în ce spațiu e.
 - Fără dependențe noi în frontend (fără build). În backend, doar ce e în `requirements.txt`.
 
 ## Când adaugi o funcție
 
 1. Endpoint cu verificare de acces pe server + test cu două conturi.
-2. Texte în `i18n.js` în ambele limbi (+ mesaje de eroare în `MESSAGES`).
-3. Verifică: desktop + mobil, dark + light, RO + EN.
+2. Texte în toate cele 6 fișiere din `src/static/i18n/` (+ mesaje de eroare în `MESSAGES`, 6 traduceri).
+3. Verifică: desktop + mobil, Neon + Luminos, cel puțin RO + EN + încă o limbă.
 4. `pytest` trece. Actualizează README-ul (funcții în plus) și, dacă e cazul, acest fișier.
 5. Commit mic, cu mesaj clar. Niciodată `.env`, `data/` sau chei.
 

@@ -402,3 +402,18 @@ def test_news_endpoint_without_ai(monkeypatch):
     assert data["curated"] is False
     assert data["items"][0]["link"] == "https://example.com/agent"
     assert client.get("/api/news").status_code == 401
+
+
+# ---------------------------------------------------------------- traduceri
+
+def test_all_languages_are_complete():
+    import shutil
+    import subprocess
+    from pathlib import Path
+    if not shutil.which("node"):
+        pytest.skip("node nu e instalat")
+    script = Path(__file__).parent / "check_i18n.js"
+    r = subprocess.run(["node", str(script), "en", "ro", "fr", "it", "es", "de"], capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert set(app_module.ai.LANGS) == {"ro", "en", "fr", "it", "es", "de"}
+    assert all(len(v) == len(app_module.ai.LANGS) for v in app_module.MESSAGES.values())
