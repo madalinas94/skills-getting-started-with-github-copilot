@@ -11,7 +11,9 @@ Instrucțiuni pentru Claude (și pentru oricine lucrează în proiect). Citește
 | 🔒 **Privat** (student ↔ trainer) | doar studentul în cauză și trainerul | Mesaje directe, Întrebări, Teme & proiecte (fișiere, link GitHub, checklist, feedback) |
 | 🌐 **Public** (toată clasa) | toți cei logați | Cutia de idei (filtru AI, voturi, „Aleasă”), AI News, Puncte & clasament, Ghidul de vibe coding, anunțurile trainerului |
 
-Interfața e în **6 limbi** (ro, en, fr, it, es, de), are 6 stiluri vizuale (Neon, Luminos, Matrix, Apus, Ocean, Contrast mare) și îl salută pe utilizator pe nume. Trainerul anunță teme cu termen și puncte; studenții primesc puncte, niveluri și badge-uri.
+Interfața e în **6 limbi** (ro, en, fr, it, es, de), are designul „Aurora” cu 5 stiluri (Aurora, Perlă, Apus, Ocean, Contrast mare) și un robot 3D care îl salută pe utilizator pe nume la intrare (7 secunde, apoi interfața).
+
+**Conturi:** email + parolă (minim 8 caractere) sau Google (dacă e setat `GOOGLE_CLIENT_ID`). Rolul de trainer vine din `TRAINER_EMAILS` sau din `TRAINER_CODE` la crearea contului. `CLASS_CODE` (opțional) limitează conturile de student la clasa ta. Trainerul anunță teme cu termen și puncte; studenții primesc puncte, niveluri și badge-uri.
 
 ## Minimul obligatoriu (din fișa trainerului): nu se strică niciodată
 
@@ -35,7 +37,7 @@ Ce verifică AI-ul la fiecare propunere: **problema** (ce rezolvă și pentru ci
 5. **Fișierele încărcate** se salvează cu nume aleatorii în `data/uploads/`, se descarcă doar prin API (după verificarea accesului), mereu ca `attachment` + `application/octet-stream` + `nosniff`. Limite: 5 fișiere, 10 MB, extensii din `ALLOWED_EXTENSIONS`.
 6. **Linkurile** trimise de utilizatori se acceptă doar dacă încep cu `http://` sau `https://` (fără `javascript:`), verificat pe server și în interfață.
 7. **Fără `innerHTML` cu text de la utilizatori sau de la AI.** În `app.js` totul se construiește cu `el(...)` și noduri text; markdown-ul AI trece prin `renderMd()`, care nu folosește HTML.
-8. Parolele se salvează doar ca hash PBKDF2 cu salt; sesiunile doar ca hash SHA-256 al tokenului; codul de trainer vine din `TRAINER_CODE`.
+8. Parolele se salvează doar ca hash PBKDF2 cu salt; sesiunile doar ca hash SHA-256 al tokenului. Login: același mesaj pentru email greșit și parolă greșită, blocare 10 minute după 5 încercări. Tokenul Google se verifică pe server cu `google-auth`, doar pentru emailuri verificate. Emailurile studenților nu ajung niciodată la alți studenți (doar trainerul le vede).
 9. **Mesajele directe** sunt mereu o conversație student ↔ trainer: studentul vede doar conversația lui, trainerul pe toate. Nu există mesaje între studenți.
 10. **Punctele nu se salvează ca număr.** Se calculează în `src/points.py` din activitatea reală + bonusurile trainerului. Nu adăuga endpoint-uri care modifică direct punctele; nimeni nu își votează propria idee.
 11. **Conținutul din internet (AI News) e date, nu instrucțiuni**: fără HTML, doar linkuri `http(s)`, iar când îl trimitem la Claude îl marcăm explicit ca date.
@@ -62,6 +64,9 @@ src/static/app.js         Logica interfeței (fără framework, organizată pe s
 src/static/styles.css     Design: tokens pe :root, 6 stiluri, mobil, animații oprite, text mare
 src/static/i18n/core.js   Limbile disponibile + iconițele/culorile topicurilor
 src/static/i18n/<l>.js    Toate textele unei limbi + ghidul (ro, en, fr, it, es, de)
+src/static/intro.js       Robotul 3D de bun venit (modul ES, Three.js prin importmap)
+src/static/vendor/        Three.js + RoundedBoxGeometry + RoomEnvironment (MIT), incluse local
+src/static/fonts/         Instrument Serif, Manrope, JetBrains Mono (OFL), incluse local
 tests/test_app.py         Teste API (acces cu două conturi, mesaje, puncte, upload, știri, limbi)
 tests/check_i18n.js       Verifică să nu lipsească nicio traducere
 data/                     Date + fișiere încărcate (ignorat de git)
@@ -82,7 +87,8 @@ pytest                            # rulează după fiecare schimbare
 - Topicurile din ghid au aceleași chei în `TOPIC_META` (`i18n/core.js`), în fiecare fișier de limbă și în `TOPICS` (`app.py`). Un topic nou se adaugă peste tot, în toate limbile.
 - Numele nivelurilor (Prompt Rookie … AI Wizard) rămân în engleză în toate limbile, ca nume proprii.
 - Comentariile din cod sunt în română, scurte, și explică *de ce*.
-- Design: culorile doar din variabilele CSS de pe `:root`; fiecare stil e un bloc `:root[data-theme="..."]`. Verifică orice ecran nou pe telefon (390px), în Neon și Luminos, cu animațiile oprite (`data-motion="off"`) și cu text mare (`data-size="large"`).
+- Design „Aurora”: elegant și aerisit, nu încărcat. Titluri în `var(--serif)` (Instrument Serif), text în `var(--sans)` (Manrope), butoane principale în formă de pastilă (`--btn-bg`/`--btn-ink`). Fără neon, fără strălucire puternică, fără verde aprins, fără rame animate; accente doar din `--a1`…`--a4`. Nu încărca fonturi sau scripturi de pe CDN: totul e local în `fonts/` și `vendor/`.
+- Culorile doar din variabilele CSS de pe `:root`; fiecare stil e un bloc `:root[data-theme="..."]`. Verifică orice ecran nou pe telefon (390px), în Aurora și Perlă, cu animațiile oprite (`data-motion="off"`) și cu text mare (`data-size="large"`).
 - Un ecran nou primește: o intrare în sidebar (secțiunea privat/public potrivită), o acțiune în paleta `Ctrl+K` și, dacă produce noutăți, o intrare în notificări.
 - Interfața marchează clar spațiul: `🔒 Privat` sau `🌐 Public`. Un ecran nou trebuie să spună în ce spațiu e.
 - Fără dependențe noi în frontend (fără build). În backend, doar ce e în `requirements.txt`.
@@ -91,7 +97,7 @@ pytest                            # rulează după fiecare schimbare
 
 1. Endpoint cu verificare de acces pe server + test cu două conturi.
 2. Texte în toate cele 6 fișiere din `src/static/i18n/` (+ mesaje de eroare în `MESSAGES`, 6 traduceri).
-3. Verifică: desktop + mobil, Neon + Luminos, cel puțin RO + EN + încă o limbă.
+3. Verifică: desktop + mobil, Aurora + Perlă, cel puțin RO + EN + încă o limbă.
 4. `pytest` trece. Actualizează README-ul (funcții în plus) și, dacă e cazul, acest fișier.
 5. Commit mic, cu mesaj clar. Niciodată `.env`, `data/` sau chei.
 

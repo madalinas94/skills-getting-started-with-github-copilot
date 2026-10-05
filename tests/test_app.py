@@ -4,6 +4,9 @@ import tempfile
 os.environ["CUTIA_PERSIST"] = "0"
 os.environ["CUTIA_AI"] = "off"
 os.environ["TRAINER_CODE"] = "secret"
+os.environ["TRAINER_EMAILS"] = "radu@test.ro"
+os.environ.pop("CLASS_CODE", None)
+os.environ.pop("GOOGLE_CLIENT_ID", None)
 os.environ["CUTIA_UPLOADS"] = tempfile.mkdtemp()
 
 import pytest
@@ -20,23 +23,98 @@ def reset_db():
         "users": {}, "sessions": {}, "prefs": {}, "questions": [], "proposals": [], "submissions": [],
         "messages": [], "assignments": [], "announcements": [], "bonuses": [], "next_id": 1,
     })
+    app_module._failed.clear()
+
+
+def email_for(name):
+    return f"{name.lower().replace(' ', '.')}@test.ro"
 
 
 def login(name, role="student", code=None, password="parola-test"):
-    r = client.post("/api/login", json={"name": name, "role": role, "code": code, "password": password})
-    assert r.status_code == 200, r.text
+    """Creează contul la prima folosire (Radu = trainer, din TRAINER_EMAILS), apoi intră."""
+    email = email_for(name)
+    if email not in app_module.db["users"]:
+        r = client.post("/api/register", json={"name": name, "email": email, "password": password})
+    else:
+        r = client.post("/api/login", json={"email": email, "password": password})
+    assert r.status_code in (200, 201), r.text
+    assert r.json()["role"] == role
     return {"Authorization": f"Bearer {r.json()['token']}"}
 
 
-def test_trainer_needs_code():
-    r = client.post("/api/login", json={"name": "T", "role": "trainer", "code": "wrong"})
+def test_trainer_is_recognized_by_email_or_code():
+    assert login("Radu", "trainer") is not None
+    r = client.post("/api/register", json={"name": "T", "email": "t@x.ro", "password": "parola-buna", "trainer_code": "gresit"})
     assert r.status_code == 403
-    login("T", "trainer", "secret")
+    r = client.post("/api/register", json={"name": "T", "email": "t@x.ro", "password": "parola-buna", "trainer_code": "secret"})
+    assert r.json()["role"] == "trainer"
+    r = client.post("/api/register", json={"name": "S", "email": "s@x.ro", "password": "parola-buna"})
+    assert r.json()["role"] == "student"
+
+
+def test_register_validation_and_duplicates():
+    base = {"name": "Ana", "email": "ana@test.ro", "password": "parola-buna"}
+    assert client.post("/api/register", json={**base, "email": "nu-e-email"}).status_code == 400
+    assert client.post("/api/register", json={**base, "password": "scurta"}).status_code == 400
+    assert client.post("/api/register", json=base).status_code == 201
+    assert client.post("/api/register", json={**base, "email": "ANA@test.ro "}).status_code == 409
+    assert client.post("/api/login", json={"email": "Ana@Test.ro", "password": "parola-buna"}).status_code == 200
+
+
+def test_class_code_required_when_set(monkeypatch):
+    monkeypatch.setattr(app_module, "CLASS_CODE", "VIBE2026")
+    base = {"name": "Ana", "email": "ana@test.ro", "password": "parola-buna"}
+    assert client.post("/api/register", json=base).status_code == 403
+    assert client.post("/api/register", json={**base, "class_code": "VIBE2026"}).status_code == 201
+    # Trainerul (din TRAINER_EMAILS) nu are nevoie de codul clasei
+    assert client.post("/api/register", json={"name": "Radu", "email": "radu@test.ro", "password": "parola-buna"}).status_code == 201
+    assert client.get("/api/config").json()["class_code_required"] is True
+
+
+def test_login_lockout_after_failed_attempts():
+    login("Ana")
+    for _ in range(5):
+        assert client.post("/api/login", json={"email": "ana@test.ro", "password": "gresit!!"}).status_code == 401
+    r = client.post("/api/login", json={"email": "ana@test.ro", "password": "parola-test"})
+    assert r.status_code == 429
+
+
+def test_wrong_email_and_wrong_password_look_the_same():
+    login("Ana")
+    a = client.post("/api/login", json={"email": "nimeni@test.ro", "password": "orice-parola"}).json()
+    b = client.post("/api/login", json={"email": "ana@test.ro", "password": "orice-parola"}).json()
+    assert a == b
+
+
+def test_google_login_disabled_without_client_id():
+    assert client.post("/api/auth/google", json={"credential": "x" * 20}).status_code == 404
+
+
+def test_google_login_creates_account(monkeypatch):
+    from google.oauth2 import id_token
+    monkeypatch.setattr(app_module, "GOOGLE_CLIENT_ID", "client-123")
+    monkeypatch.setattr(id_token, "verify_oauth2_token",
+                        lambda tok, req, aud: {"email": "Madalina@Gmail.com", "email_verified": True, "name": "Madalina"})
+    r = client.post("/api/auth/google", json={"credential": "x" * 20})
+    assert r.status_code == 200 and r.json()["name"] == "Madalina" and r.json()["role"] == "student"
+    assert "madalina@gmail.com" in app_module.db["users"]
+    monkeypatch.setattr(id_token, "verify_oauth2_token",
+                        lambda tok, req, aud: {"email": "x@gmail.com", "email_verified": False})
+    assert client.post("/api/auth/google", json={"credential": "x" * 20}).status_code == 401
+
+
+def test_trainer_can_reset_a_student_password():
+    ana = login("Ana")
+    trainer = login("Radu", "trainer")
+    assert client.post("/api/students/ana@test.ro/reset-password", headers=ana).status_code == 403
+    temp = client.post("/api/students/ana@test.ro/reset-password", headers=trainer).json()["temporary_password"]
+    assert client.get("/api/me", headers=ana).status_code == 401  # sesiunea veche s-a închis
+    assert client.post("/api/login", json={"email": "ana@test.ro", "password": temp}).status_code == 200
 
 
 def test_questions_visible_only_to_author_and_trainer():
     ana, bob = login("Ana"), login("Bob")
-    trainer = login("Radu", "trainer", "secret")
+    trainer = login("Radu", "trainer")
 
     r = client.post("/api/questions", json={"text": "Ce e un API?"}, headers=ana)
     assert r.status_code == 201
@@ -55,7 +133,7 @@ def test_questions_visible_only_to_author_and_trainer():
 
 def test_anonymous_question_hides_name_from_trainer():
     ana = login("Ana")
-    trainer = login("Radu", "trainer", "secret")
+    trainer = login("Radu", "trainer")
     client.post("/api/questions", json={"text": "Întrebare", "anonymous": True}, headers=ana)
     q = client.get("/api/questions", headers=trainer).json()[0]
     assert q["author"] == "Anonim"
@@ -86,7 +164,7 @@ def test_submit_requires_approval_and_fields():
 
 def test_trainer_chooses_and_students_vote():
     ana, bob = login("Ana"), login("Bob")
-    trainer = login("Radu", "trainer", "secret")
+    trainer = login("Radu", "trainer")
     body = {"title": "Calendar", "description": "Arată termenele.", "audience": "Studenții", "approved": True}
     pid = client.post("/api/proposals", json=body, headers=ana).json()["id"]
 
@@ -106,20 +184,20 @@ def test_requires_login():
 
 
 def test_student_b_cannot_log_in_as_student_a():
-    ana = login("Ana", password="parola-ana")
+    ana = login("Ana", password="parola-ana1")
     client.post("/api/questions", json={"text": "Întrebarea Anei"}, headers=ana)
 
-    # Studentul B încearcă să intre cu numele Anei
-    r = client.post("/api/login", json={"name": "ana", "role": "student", "password": "ghicit"})
+    # Studentul B încearcă să intre pe contul Anei
+    r = client.post("/api/login", json={"email": "ana@test.ro", "password": "ghicit123"})
     assert r.status_code == 401
 
-    bob = login("Bob", password="parola-bob")
+    bob = login("Bob", password="parola-bob1")
     assert client.get("/api/questions", headers=bob).json() == []
-    assert len(client.get("/api/questions", headers=login("Ana", password="parola-ana")).json()) == 1
+    assert len(client.get("/api/questions", headers=login("Ana", password="parola-ana1")).json()) == 1
 
 
 def test_password_required_and_not_exposed():
-    r = client.post("/api/login", json={"name": "Ana", "role": "student", "password": "123"})
+    r = client.post("/api/register", json={"name": "Ana", "email": "ana@test.ro", "password": "123"})
     assert r.status_code == 400
     login("Ana")
     assert "parola-test" not in str(app_module.db["users"])
@@ -180,10 +258,9 @@ def test_ai_answer_is_stored_once(monkeypatch):
 
 
 def test_errors_follow_selected_language():
-    r = client.post("/api/login", json={"name": "T", "role": "trainer", "code": "x"}, headers={"X-Lang": "en"})
-    assert r.json()["detail"] == "Wrong trainer code."
-    r = client.post("/api/login", json={"name": "T", "role": "trainer", "code": "x"})
-    assert r.json()["detail"] == "Cod de trainer greșit."
+    bad = {"email": "nimeni@test.ro", "password": "orice-parola"}
+    assert client.post("/api/login", json=bad, headers={"X-Lang": "en"}).json()["detail"] == "Wrong email or password."
+    assert client.post("/api/login", json=bad).json()["detail"] == "Email sau parolă greșită."
 
 
 def test_local_refine_in_english():
@@ -201,7 +278,7 @@ def submit(headers, files=None, **data):
 
 def test_submission_private_to_author_and_trainer():
     ana, bob = login("Ana"), login("Bob")
-    trainer = login("Radu", "trainer", "secret")
+    trainer = login("Radu", "trainer")
     r = submit(ana, files=[("files", ("tema.md", b"# Tema mea", "text/markdown"))],
                link="https://github.com/ana/cutia-clasei-ana", checklist=["no_keys", "nope"])
     assert r.status_code == 201, r.text
@@ -235,7 +312,7 @@ def test_submission_validation():
 
 def test_trainer_reviews_submission():
     ana, bob = login("Ana"), login("Bob")
-    trainer = login("Radu", "trainer", "secret")
+    trainer = login("Radu", "trainer")
     sid = submit(ana, note="Am terminat!").json()["id"]
     body = {"status": "reviewed", "feedback": "Super, adaugă README."}
     assert client.post(f"/api/submissions/{sid}/review", json=body, headers=bob).status_code == 403
@@ -263,27 +340,27 @@ def test_prefs_are_saved():
 
 
 def test_errors_in_french():
-    r = client.post("/api/login", json={"name": "T", "role": "trainer", "code": "x"}, headers={"X-Lang": "fr"})
-    assert r.json()["detail"] == "Code formateur incorrect."
+    r = client.post("/api/login", json={"email": "nimeni@test.ro", "password": "orice-parola"}, headers={"X-Lang": "fr"})
+    assert r.json()["detail"] == "E-mail ou mot de passe incorrect."
 
 
 # ---------------------------------------------------------------- mesaje directe
 
 def test_direct_messages_are_private():
     ana, bob = login("Ana"), login("Bob")
-    trainer = login("Radu", "trainer", "secret")
+    trainer = login("Radu", "trainer")
     client.post("/api/dm", json={"text": "Bună! Am o întrebare despre temă."}, headers=ana)
     assert client.get("/api/dm", headers=bob).json()["messages"] == []
-    assert client.get("/api/dm/ana", headers=bob).status_code == 403
+    assert client.get("/api/dm/ana@test.ro", headers=bob).status_code == 403
     assert client.get("/api/dm/unread", headers=trainer).json()["unread"] == 1
 
     threads = client.get("/api/dm", headers=trainer).json()["threads"]
-    ana_thread = next(t for t in threads if t["student_key"] == "ana")
+    ana_thread = next(t for t in threads if t["student_key"] == "ana@test.ro")
     assert ana_thread["unread"] == 1
-    assert len(client.get("/api/dm/ana", headers=trainer).json()["messages"]) == 1
+    assert len(client.get("/api/dm/ana@test.ro", headers=trainer).json()["messages"]) == 1
     assert client.get("/api/dm/unread", headers=trainer).json()["unread"] == 0  # citit
 
-    client.post("/api/dm/ana", json={"text": "Sigur, spune!"}, headers=trainer)
+    client.post("/api/dm/ana@test.ro", json={"text": "Sigur, spune!"}, headers=trainer)
     assert client.get("/api/dm/unread", headers=ana).json()["unread"] == 1
     msgs = client.get("/api/dm", headers=ana).json()["messages"]
     assert [m["from_role"] for m in msgs] == ["student", "trainer"]
@@ -295,7 +372,7 @@ def test_direct_messages_are_private():
 
 def test_points_follow_the_rules():
     ana, bob, cris = login("Ana"), login("Bob"), login("Cris")
-    trainer = login("Radu", "trainer", "secret")
+    trainer = login("Radu", "trainer")
     a = client.post("/api/assignments", json={"title": "Tema 1", "due_at": "2999-01-01T00:00:00Z", "points": 25},
                     headers=trainer).json()
     sid = submit(ana, note="gata", assignment_id=str(a["id"])).json()["id"]
@@ -309,7 +386,7 @@ def test_points_follow_the_rules():
     client.post(f"/api/proposals/{pid}/choose", headers=trainer)
     for i in range(5):
         client.post("/api/questions", json={"text": f"Întrebarea {i}?"}, headers=ana)
-    client.post("/api/points/bonus", json={"student_key": "ana", "points": 7, "reason": "Ajutor colegilor"},
+    client.post("/api/points/bonus", json={"student_key": "ana@test.ro", "points": 7, "reason": "Ajutor colegilor"},
                 headers=trainer)
 
     me = client.get("/api/points/me", headers=ana).json()
@@ -321,18 +398,18 @@ def test_points_follow_the_rules():
 
 def test_bonus_rules_and_access():
     ana = login("Ana")
-    trainer = login("Radu", "trainer", "secret")
-    body = {"student_key": "ana", "points": 10, "reason": "x"}
+    trainer = login("Radu", "trainer")
+    body = {"student_key": "ana@test.ro", "points": 10, "reason": "x"}
     assert client.post("/api/points/bonus", json=body, headers=ana).status_code == 403
     assert client.post("/api/points/bonus", json={**body, "points": 0}, headers=trainer).status_code == 400
     assert client.post("/api/points/bonus", json={**body, "reason": " "}, headers=trainer).status_code == 400
     assert client.post("/api/points/bonus", json={**body, "student_key": "zz"}, headers=trainer).status_code == 404
-    assert client.get("/api/points/ana", headers=ana).status_code == 403
+    assert client.get("/api/points/ana@test.ro", headers=ana).status_code == 403
 
 
 def test_leaderboard_respects_hide():
     ana, bob = login("Ana"), login("Bob")
-    trainer = login("Radu", "trainer", "secret")
+    trainer = login("Radu", "trainer")
     client.patch("/api/me", json={"hide_from_leaderboard": True}, headers=ana)
     names_bob = [r["name"] for r in client.get("/api/leaderboard", headers=bob).json()]
     assert "Ana" not in names_bob and "Bob" in names_bob
@@ -345,7 +422,7 @@ def test_leaderboard_respects_hide():
 
 def test_assignments_and_announcements():
     ana = login("Ana")
-    trainer = login("Radu", "trainer", "secret")
+    trainer = login("Radu", "trainer")
     assert client.post("/api/assignments", json={"title": "T"}, headers=ana).status_code == 403
     a = client.post("/api/assignments", json={"title": "Tema 2", "due_at": "2030-05-01T18:00"}, headers=trainer).json()
     assert a["due_at"] == "2030-05-01T18:00:00+00:00"
@@ -417,3 +494,14 @@ def test_all_languages_are_complete():
     assert r.returncode == 0, r.stdout + r.stderr
     assert set(app_module.ai.LANGS) == {"ro", "en", "fr", "it", "es", "de"}
     assert all(len(v) == len(app_module.ai.LANGS) for v in app_module.MESSAGES.values())
+
+
+def test_change_password():
+    ana = login("Ana")
+    body = {"current": "gresita!!", "new": "parola-noua-1"}
+    assert client.post("/api/me/password", json=body, headers=ana).status_code == 403
+    assert client.post("/api/me/password", json={**body, "current": "parola-test", "new": "scurt"}, headers=ana).status_code == 400
+    assert client.post("/api/me/password", json={**body, "current": "parola-test"}, headers=ana).status_code == 200
+    assert client.post("/api/login", json={"email": "ana@test.ro", "password": "parola-noua-1"}).status_code == 200
+    me = client.get("/api/me", headers=ana).json()
+    assert me["email"] == "ana@test.ro" and me["has_password"] is True

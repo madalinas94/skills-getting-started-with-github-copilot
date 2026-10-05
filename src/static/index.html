@@ -4,15 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cutia Clasei</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="preload" href="fonts/InstrumentSerif-normal-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/Manrope-normal-400_700-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="fonts.css">
   <link rel="stylesheet" href="styles.css">
+  <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
   <script>
     // Preferințele de afișare se aplică înainte de randare, ca să nu „clipească” pagina
     try {
       const d = document.documentElement, ls = localStorage;
-      d.dataset.theme = ls.getItem("cutia-theme") || "dark";
+      const theme = ls.getItem("cutia-theme");
+      d.dataset.theme = ["dark", "light", "sunset", "ocean", "contrast"].includes(theme) ? theme : "dark";
       d.dataset.motion = ls.getItem("cutia-motion") || "on";
       d.dataset.size = ls.getItem("cutia-size") || "normal";
       d.lang = ls.getItem("cutia-lang") || "ro";
@@ -67,25 +69,40 @@
       <div id="topic-marquee" class="marquee" aria-hidden="true"><div class="marquee-track"></div></div>
     </section>
 
-    <form id="login-form" class="card glass login">
+    <form id="login-form" class="card glass login" novalidate>
       <h2 id="login-title" data-i18n="login.title"></h2>
       <p id="not-you" class="muted small hidden"><button type="button" class="link-btn" id="not-you-btn"></button></p>
-      <div class="role-switch" role="radiogroup">
-        <label><input type="radio" name="role" value="student" checked><span data-i18n="login.student"></span></label>
-        <label><input type="radio" name="role" value="trainer"><span data-i18n="login.trainer"></span></label>
+      <div class="auth-tabs" role="tablist">
+        <button type="button" role="tab" data-auth="in" class="on" data-i18n="login.tabIn"></button>
+        <button type="button" role="tab" data-auth="up" data-i18n="login.tabUp"></button>
       </div>
-      <label><span data-i18n="login.name"></span>
-        <input id="login-name" required maxlength="60" autocomplete="username" data-i18n-placeholder="login.namePh">
+      <label id="name-field" class="hidden"><span data-i18n="login.name"></span>
+        <input id="login-name" maxlength="60" autocomplete="name" data-i18n-placeholder="login.namePh">
       </label>
-      <label id="password-field"><span data-i18n="login.password"></span>
-        <input id="login-password" type="password" minlength="4" autocomplete="current-password" data-i18n-placeholder="login.passwordPh">
-        <span class="hint" data-i18n="login.hint"></span>
+      <label><span data-i18n="login.email"></span>
+        <input id="login-email" type="email" maxlength="200" autocomplete="email" required data-i18n-placeholder="login.emailPh">
       </label>
-      <label id="code-field" class="hidden"><span data-i18n="login.code"></span>
-        <input id="login-code" type="password" autocomplete="off" data-i18n-placeholder="login.codePh">
+      <label><span data-i18n="login.password"></span>
+        <input id="login-password" type="password" maxlength="200" autocomplete="current-password" required>
       </label>
-      <button type="submit" class="primary big"><span data-i18n="login.submit"></span> <span class="kbd">↵</span></button>
+      <label id="class-field" class="hidden"><span data-i18n="login.classCode"></span>
+        <input id="login-class" maxlength="100" autocomplete="off" data-i18n-placeholder="login.classCodePh">
+      </label>
+      <details id="trainer-field" class="trainer-toggle hidden">
+        <summary data-i18n="login.amTrainer"></summary>
+        <label><span data-i18n="login.code"></span>
+          <input id="login-code" type="password" maxlength="100" autocomplete="off" data-i18n-placeholder="login.codePh">
+        </label>
+        <span class="hint" data-i18n="login.trainerHint"></span>
+      </details>
+      <span id="auth-hint" class="hint"></span>
+      <button type="submit" class="primary big"><span id="auth-submit"></span> <span class="kbd">↵</span></button>
       <p id="login-error" class="error" role="alert"></p>
+      <div id="google-wrap" class="hidden">
+        <div class="divider" data-i18n="login.or"></div>
+        <div id="google-btn"></div>
+      </div>
+      <p class="forgot" id="forgot" data-i18n="login.forgot"></p>
     </form>
   </main>
 
@@ -391,8 +408,10 @@
           </div>
           <div class="row">
             <div class="seg" id="bonus-quick"></div>
+            <button type="button" id="reset-pass" class="small ghost" data-i18n="pt.reset"></button>
             <button type="submit" class="primary glow" data-i18n="pt.give"></button>
           </div>
+          <p id="reset-result" class="muted small mono" aria-live="polite"></p>
         </form>
         <div class="card panel">
           <div class="panel-head"><h3 data-i18n="pt.board"></h3></div>
@@ -454,5 +473,6 @@
   <div id="toast" class="toast hidden" role="status"></div>
   <script src="i18n/core.js"></script>
   <script src="app.js"></script>
+  <script type="module" src="intro.js"></script>
 </body>
 </html>

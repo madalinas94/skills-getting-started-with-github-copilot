@@ -65,8 +65,15 @@ current_lang = contextvars.ContextVar("current_lang", default="ro")
 
 # Ordinea traducerilor: ro, en, fr, it, es, de (ca în ai.LANGS)
 MESSAGES = {
-    "short_password": ("Parola trebuie să aibă minim 4 caractere.", "Password must be at least 4 characters.", "Le mot de passe doit avoir au moins 4 caractères.", "La password deve avere almeno 4 caratteri.", "La contraseña debe tener al menos 4 caracteres.", "Das Passwort muss mindestens 4 Zeichen haben."),
-    "wrong_password": ("Parolă greșită. Numele e deja folosit de alt cont.", "Wrong password. This name is already used by another account.", "Mot de passe incorrect. Ce nom est déjà utilisé par un autre compte.", "Password errata. Questo nome è già usato da un altro account.", "Contraseña incorrecta. Este nombre ya lo usa otra cuenta.", "Falsches Passwort. Dieser Name wird schon von einem anderen Konto verwendet."),
+    "short_password": ("Parola trebuie să aibă minim 8 caractere.", "Password must be at least 8 characters.", "Le mot de passe doit avoir au moins 8 caractères.", "La password deve avere almeno 8 caratteri.", "La contraseña debe tener al menos 8 caracteres.", "Das Passwort muss mindestens 8 Zeichen haben."),
+    "bad_email": ("Adresa de email nu pare corectă.", "That email address doesn't look right.", "Cette adresse e-mail ne semble pas correcte.", "Questo indirizzo email non sembra corretto.", "Ese correo no parece correcto.", "Diese E-Mail-Adresse sieht nicht richtig aus."),
+    "email_taken": ("Există deja un cont cu acest email. Intră în cont.", "An account with this email already exists. Sign in instead.", "Un compte existe déjà avec cet e-mail. Connecte-toi.", "Esiste già un account con questa email. Accedi.", "Ya existe una cuenta con este correo. Inicia sesión.", "Mit dieser E-Mail gibt es schon ein Konto. Melde dich an."),
+    "wrong_login": ("Email sau parolă greșită.", "Wrong email or password.", "E-mail ou mot de passe incorrect.", "Email o password errati.", "Correo o contraseña incorrectos.", "E-Mail oder Passwort falsch."),
+    "too_many_attempts": ("Prea multe încercări. Mai încearcă peste 10 minute.", "Too many attempts. Try again in 10 minutes.", "Trop de tentatives. Réessaie dans 10 minutes.", "Troppi tentativi. Riprova tra 10 minuti.", "Demasiados intentos. Vuelve a intentarlo en 10 minutos.", "Zu viele Versuche. Versuch es in 10 Minuten wieder."),
+    "wrong_class_code": ("Codul clasei nu e corect. Îl primești de la trainer.", "The class code isn't right. Ask the trainer for it.", "Le code de la classe n'est pas correct. Demande-le au formateur.", "Il codice della classe non è corretto. Chiedilo al trainer.", "El código de la clase no es correcto. Pídeselo al formador.", "Der Klassencode stimmt nicht. Frag den Trainer danach."),
+    "wrong_current": ("Parola actuală nu e corectă.", "Your current password isn't right.", "Le mot de passe actuel n'est pas correct.", "La password attuale non è corretta.", "La contraseña actual no es correcta.", "Das aktuelle Passwort stimmt nicht."),
+    "google_off": ("Intrarea cu Google nu e configurată pe server.", "Google sign-in isn't configured on the server.", "La connexion Google n'est pas configurée sur le serveur.", "L'accesso con Google non è configurato sul server.", "El inicio de sesión con Google no está configurado en el servidor.", "Die Google-Anmeldung ist auf dem Server nicht eingerichtet."),
+    "google_failed": ("Nu am putut verifica contul Google. Încearcă din nou.", "Couldn't verify the Google account. Try again.", "Impossible de vérifier le compte Google. Réessaie.", "Impossibile verificare l'account Google. Riprova.", "No se pudo verificar la cuenta de Google. Inténtalo de nuevo.", "Das Google-Konto konnte nicht geprüft werden. Versuch es nochmal."),
     "login_again": ("Autentifică-te din nou.", "Please sign in again.", "Reconnecte-toi.", "Accedi di nuovo.", "Vuelve a iniciar sesión.", "Bitte melde dich erneut an."),
     "trainer_only": ("Doar trainerul poate face asta.", "Only the trainer can do this.", "Seul le formateur peut faire ça.", "Solo il trainer può farlo.", "Solo el formador puede hacer esto.", "Nur der Trainer kann das tun."),
     "student_only": ("Doar studenții pot face asta.", "Only students can do this.", "Seuls les étudiants peuvent faire ça.", "Solo gli studenti possono farlo.", "Solo los estudiantes pueden hacer esto.", "Nur Studierende können das tun."),
@@ -167,38 +174,84 @@ def now() -> str:
 load_db()
 
 # ---------------------------------------------------------------------------
-# Autentificare: studentul are cont cu nume + parolă (creat la prima intrare),
-# trainerul intră cu codul din TRAINER_CODE.
+# Conturi: email + parolă (sau Google, dacă e configurat GOOGLE_CLIENT_ID).
+# Trainerul e recunoscut după email (TRAINER_EMAILS) sau după codul de
+# trainer dat la crearea contului. Dacă e setat CLASS_CODE, doar cine are
+# codul clasei își poate face cont.
 # ---------------------------------------------------------------------------
+
+TRAINER_EMAILS = {e.strip().lower() for e in os.environ.get("TRAINER_EMAILS", "").split(",") if e.strip()}
+CLASS_CODE = os.environ.get("CLASS_CODE", "").strip()
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+MIN_PASSWORD = 8
+MAX_FAILED = 5          # încercări greșite permise…
+LOCK_SECONDS = 10 * 60  # …într-o fereastră de 10 minute
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_failed: dict[str, list] = {}
+
+
+class RegisterIn(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    email: str = Field(min_length=3, max_length=200)
+    password: str = Field(max_length=200)
+    class_code: Optional[str] = Field(None, max_length=100)
+    trainer_code: Optional[str] = Field(None, max_length=100)
 
 
 class LoginIn(BaseModel):
-    name: str = Field(min_length=1, max_length=60)
-    role: str = Field(pattern="^(student|trainer)$")
-    password: Optional[str] = Field(None, max_length=200)
-    code: Optional[str] = None
+    email: str = Field(min_length=3, max_length=200)
+    password: str = Field(max_length=200)
+
+
+class GoogleIn(BaseModel):
+    credential: str = Field(min_length=10, max_length=5000)
+    class_code: Optional[str] = Field(None, max_length=100)
 
 
 def hash_password(password: str, salt: bytes) -> str:
     return hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 200_000).hex()
 
 
-def check_student(name: str, password: str):
-    """Creează contul la prima intrare; după aceea cere aceeași parolă."""
-    if len(password or "") < 4:
-        fail(400, "short_password")
-    key = name.casefold()
-    with _lock:
-        user = db["users"].get(key)
-        if user is None:
-            salt = secrets.token_bytes(16)
-            db["users"][key] = {"name": name, "salt": salt.hex(),
-                                "hash": hash_password(password, salt)}
-            save_db()
-            return
-    expected = hash_password(password, bytes.fromhex(user["salt"]))
-    if not hmac.compare_digest(expected, user["hash"]):
-        fail(401, "wrong_password")
+def same(a: str, b: str) -> bool:
+    return hmac.compare_digest((a or "").encode(), (b or "").encode())
+
+
+def clean_email(email: str) -> str:
+    email = (email or "").strip().lower()
+    if not EMAIL_RE.match(email):
+        fail(400, "bad_email")
+    return email
+
+
+def check_class_code(code: Optional[str]):
+    if CLASS_CODE and not same((code or "").strip(), CLASS_CODE):
+        fail(403, "wrong_class_code")
+
+
+def role_for(email: str, trainer_code: Optional[str] = None) -> str:
+    if email in TRAINER_EMAILS or (trainer_code and same(trainer_code.strip(), TRAINER_CODE)):
+        return "trainer"
+    return "student"
+
+
+def throttle(email: str):
+    """Blochează temporar contul după prea multe parole greșite."""
+    recent = [t for t in _failed.get(email, []) if t > datetime.now(timezone.utc).timestamp() - LOCK_SECONDS]
+    _failed[email] = recent
+    if len(recent) >= MAX_FAILED:
+        fail(429, "too_many_attempts")
+
+
+def start_session(user: dict) -> dict:
+    token = secrets.token_urlsafe(32)
+    expires = datetime.now(timezone.utc).timestamp() + SESSION_DAYS * 86400
+    # Sesiunea rămâne validă și după repornirea serverului; „Ieși” o șterge
+    db["sessions"][token_hash(token)] = {
+        "name": user["name"], "role": user["role"], "key": user["email"],
+        "expires": datetime.fromtimestamp(expires, timezone.utc).isoformat(timespec="seconds"),
+    }
+    save_db()
+    return {"token": token, "name": user["name"], "role": user["role"]}
 
 
 def token_hash(token: str) -> str:
@@ -230,26 +283,109 @@ def root():
     return RedirectResponse(url="/static/index.html")
 
 
-@app.post("/api/login")
-def login(body: LoginIn):
+@app.post("/api/register", status_code=201)
+def register(body: RegisterIn):
     name = body.name.strip()
     if not name:
         fail(400, "need_name")
-    if body.role == "trainer":
-        if not hmac.compare_digest((body.code or "").encode(), TRAINER_CODE.encode()):
-            fail(403, "wrong_code")
-    else:
-        check_student(name, body.password)
-    token = secrets.token_urlsafe(32)
-    expires = datetime.now(timezone.utc).timestamp() + SESSION_DAYS * 86400
+    email = clean_email(body.email)
+    if len(body.password) < MIN_PASSWORD:
+        fail(400, "short_password")
+    if body.trainer_code and body.trainer_code.strip() and not same(body.trainer_code.strip(), TRAINER_CODE):
+        fail(403, "wrong_code")
+    role = role_for(email, body.trainer_code)
+    if role == "student":
+        check_class_code(body.class_code)
     with _lock:
-        # Sesiunea rămâne validă și după repornirea serverului; „Ieși” o șterge
-        db["sessions"][token_hash(token)] = {
-            "name": name, "role": body.role, "key": name.casefold(),
-            "expires": datetime.fromtimestamp(expires, timezone.utc).isoformat(timespec="seconds"),
-        }
+        if email in db["users"]:
+            fail(409, "email_taken")
+        salt = secrets.token_bytes(16)
+        db["users"][email] = {"name": name, "email": email, "role": role, "salt": salt.hex(),
+                              "hash": hash_password(body.password, salt), "created_at": now()}
+        return start_session(db["users"][email])
+
+
+@app.post("/api/login")
+def login(body: LoginIn):
+    email = clean_email(body.email)
+    throttle(email)
+    user = db["users"].get(email)
+    # Același mesaj pentru email greșit și parolă greșită: nu dezvăluim cine are cont
+    ok = bool(user and user.get("hash")) and same(
+        hash_password(body.password, bytes.fromhex(user["salt"])), user["hash"])
+    if not ok:
+        _failed.setdefault(email, []).append(datetime.now(timezone.utc).timestamp())
+        fail(401, "wrong_login")
+    _failed.pop(email, None)
+    with _lock:
+        user["role"] = role_for(email) if user["role"] == "student" else user["role"]
+        return start_session(user)
+
+
+@app.post("/api/auth/google")
+def google_login(body: GoogleIn):
+    """Intrare cu contul Google: verificăm pe server tokenul semnat de Google."""
+    if not GOOGLE_CLIENT_ID:
+        fail(404, "google_off")
+    try:
+        from google.auth.transport import requests as google_requests
+        from google.oauth2 import id_token
+        info = id_token.verify_oauth2_token(body.credential, google_requests.Request(), GOOGLE_CLIENT_ID)
+    except Exception:
+        fail(401, "google_failed")
+    if not info.get("email_verified"):
+        fail(401, "google_failed")
+    email = clean_email(info.get("email", ""))
+    with _lock:
+        user = db["users"].get(email)
+        if user is None:
+            role = role_for(email)
+            if role == "student":
+                check_class_code(body.class_code)
+            user = db["users"][email] = {"name": (info.get("name") or email.split("@")[0])[:60], "email": email,
+                                         "role": role, "google": True, "created_at": now()}
+        return start_session(user)
+
+
+class PasswordIn(BaseModel):
+    current: Optional[str] = Field(None, max_length=200)
+    new: str = Field(max_length=200)
+
+
+@app.post("/api/me/password")
+def change_password(body: PasswordIn, user: dict = Depends(current_user)):
+    """Schimbă parola. Conturile create cu Google își pot pune o parolă fără cea veche."""
+    account = db["users"].get(user["key"])
+    if account is None:
+        fail(401, "login_again")
+    if account.get("hash") and not same(hash_password(body.current or "", bytes.fromhex(account["salt"])), account["hash"]):
+        fail(403, "wrong_current")
+    if len(body.new) < MIN_PASSWORD:
+        fail(400, "short_password")
+    with _lock:
+        salt = secrets.token_bytes(16)
+        account.update(salt=salt.hex(), hash=hash_password(body.new, salt))
         save_db()
-    return {"token": token, "name": name, "role": body.role}
+    return {"ok": True}
+
+
+class ResetOut(BaseModel):
+    temporary_password: str
+
+
+@app.post("/api/students/{student_key}/reset-password")
+def reset_password(student_key: str, user: dict = Depends(require_trainer)) -> ResetOut:
+    """Trainerul generează o parolă temporară pentru un student care a uitat-o."""
+    if student_key not in known_students():
+        fail(404, "no_student")
+    temp = secrets.token_urlsafe(9)
+    with _lock:
+        salt = secrets.token_bytes(16)
+        db["users"][student_key].update(salt=salt.hex(), hash=hash_password(temp, salt))
+        # Sesiunile vechi ale studentului se închid
+        db["sessions"] = {h: sess for h, sess in db["sessions"].items() if sess["key"] != student_key}
+        save_db()
+    return ResetOut(temporary_password=temp)
 
 
 @app.post("/api/logout")
@@ -268,7 +404,9 @@ class PrefsIn(BaseModel):
 
 @app.get("/api/me")
 def me(user: dict = Depends(current_user)):
-    return {"name": user["name"], "role": user["role"], "prefs": db["prefs"].get(user["key"], {})}
+    account = db["users"].get(user["key"], {})
+    return {"name": user["name"], "role": user["role"], "email": user["key"],
+            "has_password": bool(account.get("hash")), "prefs": db["prefs"].get(user["key"], {})}
 
 
 @app.patch("/api/me")
@@ -286,7 +424,8 @@ def update_prefs(body: PrefsIn, user: dict = Depends(current_user)):
 @app.get("/api/config")
 def config():
     """Ce poate interfața: dacă AI-ul e disponibil și ce topicuri există."""
-    return {"ai": ai.available(), "topics": TOPICS}
+    return {"ai": ai.available(), "topics": TOPICS, "google_client_id": GOOGLE_CLIENT_ID or None,
+            "class_code_required": bool(CLASS_CODE)}
 
 
 # ---------------------------------------------------------------------------
@@ -634,8 +773,8 @@ class MessageIn(BaseModel):
 
 
 def known_students() -> dict:
-    """Toți studenții care au cont, după cheie."""
-    return {k: u["name"] for k, u in db["users"].items()}
+    """Toți studenții care au cont, după email."""
+    return {k: u["name"] for k, u in db["users"].items() if u.get("role") == "student" and u.get("email")}
 
 
 def thread_view(student_key: str, user: dict) -> list:

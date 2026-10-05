@@ -5,9 +5,11 @@ const $ = (sel) => document.querySelector(sel);
 // Răspunsurile la întrebările AI despre problemă, funcții, date și mărime se adaugă la descriere
 const TARGET_FIELD = { problem: "description", features: "description", data: "description", size: "description" };
 const THEMES = [
-  ["dark", "#8b5cf6"], ["light", "#f5f4fb"], ["matrix", "#00e676"],
-  ["sunset", "#ff6b6b"], ["ocean", "#2dd4bf"], ["contrast", "#ffd400"],
+  ["dark", "linear-gradient(135deg,#b4a5ff,#ffadd2)"], ["light", "linear-gradient(135deg,#f7f5f1,#d9d2ff)"],
+  ["sunset", "linear-gradient(135deg,#ff9a8b,#ffc48a)"], ["ocean", "linear-gradient(135deg,#8fb4ff,#7fe0e8)"],
+  ["contrast", "#ffd400"],
 ];
+const INTRO_MS = 7000;
 const CHECKLIST = ["features", "privacy", "ai_consent", "github_readme", "no_keys", "trainer_access"];
 const BADGES = {
   first_question: "❓", first_homework: "📚", five_homework: "🔥", first_idea: "💡",
@@ -26,6 +28,7 @@ let myPoints = null, board = [], students = [];
 let newsData = null, newsLoading = false, newsCat = "all";
 let lastMissing = [], lastStats = {};
 let currentView = "home", selectedTopic = "prompting", selectedKind = "homework", pendingFiles = [];
+let authMode = "in";
 const aiPending = new Set();
 
 // ================================================================ i18n
@@ -304,55 +307,118 @@ function lastUser() {
   try { return JSON.parse(localStorage.getItem("cutia-last")); } catch (_) { return null; }
 }
 
+function rememberUser(name, email) {
+  try { localStorage.setItem("cutia-last", JSON.stringify({ name, email })); } catch (_) {}
+}
+
 function renderLogin() {
   const last = lastUser();
+  const first = last && last.name ? last.name.split(/\s+/)[0] : null;
+  const up = authMode === "up";
   // Numele tău apare automat data viitoare: „Bine ai revenit, Madalina!”
-  $("#login-title").textContent = last ? t("login.welcomeBack", last.name.split(/\s+/)[0]) : t("login.title");
-  $("#not-you").classList.toggle("hidden", !last);
-  if (last) {
-    $("#not-you-btn").textContent = t("login.notYou", last.name.split(/\s+/)[0]);
-    if (!$("#login-name").value) $("#login-name").value = last.name;
-    const radio = document.querySelector(`input[name="role"][value="${last.role}"]`);
-    if (radio && !radio.checked) { radio.checked = true; radio.dispatchEvent(new Event("change")); }
+  $("#login-title").textContent = first && !up ? t("login.welcomeBack", first) : t("login.title");
+  $("#not-you").classList.toggle("hidden", !first || up);
+  if (first) {
+    $("#not-you-btn").textContent = t("login.notYou", first);
+    if (!$("#login-email").value && last.email) $("#login-email").value = last.email;
   }
+  document.querySelectorAll(".auth-tabs button").forEach((b) => {
+    b.classList.toggle("on", b.dataset.auth === authMode);
+    b.setAttribute("aria-selected", String(b.dataset.auth === authMode));
+  });
+  $("#name-field").classList.toggle("hidden", !up);
+  $("#class-field").classList.toggle("hidden", !up || !cfg.class_code_required);
+  $("#trainer-field").classList.toggle("hidden", !up);
+  $("#login-password").placeholder = t(up ? "login.passwordNewPh" : "login.passwordPh");
+  $("#login-password").autocomplete = up ? "new-password" : "current-password";
+  $("#auth-hint").textContent = up ? t("login.hintNew") : "";
+  $("#auth-submit").textContent = t(up ? "login.create" : "login.submit");
+  $("#forgot").classList.toggle("hidden", up);
   renderMarquee();
+  setupGoogle();
 }
+
+document.querySelectorAll(".auth-tabs button").forEach((b) => b.addEventListener("click", () => {
+  authMode = b.dataset.auth;
+  $("#login-error").textContent = "";
+  renderLogin();
+  (authMode === "up" ? $("#login-name") : $("#login-email")).focus();
+}));
 
 $("#not-you-btn").addEventListener("click", () => {
   try { localStorage.removeItem("cutia-last"); } catch (_) {}
-  $("#login-name").value = "";
+  $("#login-email").value = "";
   renderLogin();
-  $("#login-name").focus();
+  $("#login-email").focus();
 });
 
-document.querySelectorAll('input[name="role"]').forEach((r) =>
-  r.addEventListener("change", () => {
-    const trainer = document.querySelector('input[name="role"]:checked').value === "trainer";
-    $("#code-field").classList.toggle("hidden", !trainer);
-    $("#password-field").classList.toggle("hidden", trainer);
-  })
-);
+async function finishLogin(data) {
+  auth = data;
+  try { localStorage.setItem("cutia-auth", JSON.stringify(auth)); } catch (_) {}
+  ["#login-password", "#login-code", "#login-class"].forEach((id) => ($(id).value = ""));
+  await start(true);
+}
 
 $("#login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   $("#login-error").textContent = "";
-  const role = document.querySelector('input[name="role"]:checked').value;
+  const email = $("#login-email").value.trim();
   try {
-    auth = await api("/api/login", {
-      method: "POST",
-      body: { name: $("#login-name").value, role, password: $("#login-password").value, code: $("#login-code").value },
-    });
-    try {
-      localStorage.setItem("cutia-auth", JSON.stringify(auth));
-      localStorage.setItem("cutia-last", JSON.stringify({ name: auth.name, role: auth.role }));
-    } catch (_) {}
-    $("#login-password").value = "";
-    $("#login-code").value = "";
-    start();
+    const data = authMode === "up"
+      ? await api("/api/register", {
+          method: "POST",
+          body: {
+            name: $("#login-name").value, email, password: $("#login-password").value,
+            class_code: $("#login-class").value, trainer_code: $("#login-code").value,
+          },
+        })
+      : await api("/api/login", { method: "POST", body: { email, password: $("#login-password").value } });
+    rememberUser(data.name, email);
+    await finishLogin(data);
   } catch (err) {
     $("#login-error").textContent = err.message;
   }
 });
+
+// ---------------------------------------------------------------- Google (doar dacă serverul are GOOGLE_CLIENT_ID)
+let googleReady = false;
+function setupGoogle() {
+  const wrap = $("#google-wrap");
+  wrap.classList.toggle("hidden", !cfg.google_client_id);
+  if (!cfg.google_client_id) return;
+  const render = () => {
+    google.accounts.id.initialize({ client_id: cfg.google_client_id, callback: onGoogle });
+    $("#google-btn").replaceChildren();
+    google.accounts.id.renderButton($("#google-btn"), {
+      theme: document.documentElement.dataset.theme === "light" ? "outline" : "filled_black",
+      shape: "pill", size: "large", text: "continue_with", locale: lang, width: 300,
+    });
+  };
+  if (googleReady) { render(); return; }
+  if (document.getElementById("gsi-script")) return;
+  const s = document.createElement("script");
+  s.id = "gsi-script";
+  s.src = "https://accounts.google.com/gsi/client";
+  s.async = true;
+  s.onload = () => { googleReady = true; render(); };
+  s.onerror = () => wrap.classList.add("hidden");
+  document.head.append(s);
+}
+
+async function onGoogle(response) {
+  $("#login-error").textContent = "";
+  try {
+    const data = await api("/api/auth/google", {
+      method: "POST", body: { credential: response.credential, class_code: $("#login-class").value },
+    });
+    rememberUser(data.name, "");
+    await finishLogin(data);
+  } catch (err) {
+    $("#login-error").textContent = err.message;
+    // Primul cont cu Google, când clasa cere cod: arătăm câmpul pentru cod
+    if (cfg.class_code_required && authMode !== "up") { authMode = "up"; renderLogin(); }
+  }
+}
 
 $("#logout-btn").addEventListener("click", () => logout());
 
@@ -428,7 +494,23 @@ function renderHeader() {
   updateStatusSpace();
 }
 
-async function start() {
+// ---------------------------------------------------------------- robotul de bun venit
+function introEnabled() {
+  try { return localStorage.getItem("cutia-intro") !== "off"; } catch (_) { return true; }
+}
+
+async function playIntro() {
+  // intro.js e modul și se încarcă separat; îl așteptăm puțin, apoi renunțăm
+  for (let i = 0; i < 25 && !window.CutiaIntro; i++) await new Promise((r) => setTimeout(r, 100));
+  if (!window.CutiaIntro) return;
+  try { sessionStorage.setItem("cutia-intro-done", "1"); } catch (_) {}
+  await window.CutiaIntro.play({
+    hello: t("intro.hi"), name: auth.name.split(/\s+/)[0], line: t("intro.line"),
+    skipLabel: t("intro.skip"), durationMs: INTRO_MS,
+  });
+}
+
+async function start(fromLogin = false) {
   let me;
   try {
     me = await api("/api/me");
@@ -441,6 +523,8 @@ async function start() {
   try { localLang = localStorage.getItem("cutia-lang"); } catch (_) {}
   if (me.prefs && me.prefs.lang && !localLang && me.prefs.lang !== lang) await setLang(me.prefs.lang);
   auth.prefs = me.prefs || {};
+  auth.email = me.email;
+  auth.has_password = me.has_password;
 
   $("#login-view").classList.add("hidden");
   $("#app-view").classList.remove("hidden");
@@ -463,7 +547,10 @@ async function start() {
   renderSubmissionForm();
   renderMessages();
   showView("home");
-  await refresh();
+  let seenThisSession = false;
+  try { seenThisSession = Boolean(sessionStorage.getItem("cutia-intro-done")); } catch (_) {}
+  const intro = introEnabled() && !motionOff() && (fromLogin || !seenThisSession) ? playIntro() : Promise.resolve();
+  await Promise.all([refresh(), intro]);
   loadNews();
   maybeOnboard();
 }
@@ -1614,6 +1701,7 @@ function renderPoints() {
     const current = sel.value;
     sel.replaceChildren(...students.map((s) => el("option", { value: s.key }, `${s.name} · ⚡${s.total}`)));
     if (students.some((s) => s.key === current)) sel.value = current;
+    $("#reset-result").textContent = "";
     $("#bonus-quick").replaceChildren(...[5, 10, 20, -5].map((n) =>
       el("button", { type: "button", class: "small", onclick: () => ($("#bonus-points").value = n) }, n > 0 ? `+${n}` : String(n))));
   } else if (myPoints) {
@@ -1659,6 +1747,16 @@ function renderBoard() {
       el("small", { class: "muted mono", style: "margin-left:.5rem" }, `L${r.level}`)),
     el("span", { class: "sc" }, `⚡ ${r.total}`))));
 }
+
+$("#reset-pass").addEventListener("click", async () => {
+  const key = $("#bonus-student").value;
+  const student = students.find((x) => x.key === key);
+  if (!student || !confirm(t("pt.resetConfirm", student.name))) return;
+  try {
+    const r = await api(`/api/students/${encodeURIComponent(key)}/reset-password`, { method: "POST" });
+    $("#reset-result").textContent = t("pt.resetDone", student.name, r.temporary_password);
+  } catch (err) { toast(err.message); }
+});
 
 $("#bonus-form").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -1782,7 +1880,13 @@ function openSettings() {
       segment([["on", t("set.on")], ["off", t("set.off")]], d.motion || "on", (v) => { setPref("motion", v); openSettings(); })),
     el("div", { class: "set-group" }, el("h4", {}, t("set.size")),
       segment([["normal", t("set.normal")], ["large", t("set.large")]], d.size || "normal", (v) => { setPref("size", v); openSettings(); })),
+    el("div", { class: "set-group" }, el("h4", {}, t("set.intro")),
+      segment([["on", t("set.on")], ["off", t("set.off")]], introEnabled() ? "on" : "off", (v) => {
+        try { localStorage.setItem("cutia-intro", v); } catch (_) {}
+        openSettings();
+      })),
   ];
+  if (auth) body.push(passwordForm());
   if (auth && !isTrainer()) {
     const box = el("input", { type: "checkbox" });
     box.checked = !(auth.prefs && auth.prefs.hide_from_leaderboard);
@@ -1806,6 +1910,27 @@ function openSettings() {
 }
 
 $("#settings-btn").addEventListener("click", openSettings);
+
+function passwordForm() {
+  const current = el("input", { type: "password", autocomplete: "current-password", maxlength: 200 });
+  const next = el("input", { type: "password", autocomplete: "new-password", maxlength: 200, placeholder: t("login.passwordNewPh") });
+  const error = el("p", { class: "error" });
+  const form = el("form", { class: "set-group" }, el("h4", {}, t("set.password")),
+    auth.has_password === false ? null : el("label", {}, t("set.current"), current),
+    el("label", {}, t("set.new"), next),
+    el("div", { class: "row end" }, el("button", { type: "submit", class: "primary small" }, t("set.save"))), error);
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    error.textContent = "";
+    try {
+      await api("/api/me/password", { method: "POST", body: { current: current.value, new: next.value } });
+      current.value = next.value = "";
+      auth.has_password = true;
+      toast(t("set.saved"));
+    } catch (err) { error.textContent = err.message; }
+  });
+  return form;
+}
 
 // ================================================================ command palette (Ctrl+K)
 
@@ -1914,6 +2039,8 @@ setInterval(() => {
   loadAnnouncements().catch(() => {});
   loadPoints();
 }, 20000);
+
+setStep(1);
 
 (async function boot() {
   try { await Promise.all([loadLang("en"), loadLang(lang)]); } catch (_) { lang = "en"; }

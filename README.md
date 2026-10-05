@@ -1,8 +1,8 @@
 # {▣} Cutia Clasei
 
-**Platforma internă a cursului de vibe coding.** Fiecare student are un spațiu privat cu trainerul (mesaje, întrebări, teme), iar clasa are un spațiu public (cutia de idei cu filtru AI, AI News, clasament, ghid). Interfața merge în **6 limbi** (RO, EN, FR, IT, ES, DE) și are **6 stiluri vizuale**.
+**Platforma internă a cursului de vibe coding.** Fiecare student are un spațiu privat cu trainerul (mesaje, întrebări, teme), iar clasa are un spațiu public (cutia de idei cu filtru AI, AI News, clasament, ghid). Interfața merge în **6 limbi** (RO, EN, FR, IT, ES, DE), are un design elegant „Aurora” (5 stiluri vizuale) și un **robot 3D** care te salută pe nume când intri.
 
-![Acasă](docs/screenshots/acasa.png)
+![Robotul de bun venit](docs/screenshots/robot.png)
 
 ## Ce face aplicația
 
@@ -24,6 +24,8 @@
 
 ### Funcții în plus
 
+- **Robotul de bun venit (3D):** un robot construit în Three.js urcă pe ecran, îți face cu mâna, te urmărește cu privirea și îți spune „Salut, Madalina!”. După 7 secunde se deschide interfața (sau apeși „Sari peste”). Se poate opri din Setări și nu apare dacă ai animațiile oprite.
+- **Conturi cu email + parolă** (sau **Google**, dacă e configurat). Trainerul e recunoscut după email. Cod de clasă opțional, ca doar colegii tăi să-și poată face cont.
 - **Numele tău, automat:** sesiunea rămâne activă (și după repornirea serverului). Aplicația te salută pe nume peste tot, iar la revenire îți spune „Bine ai revenit, Madalina!”.
 - **Mesaje directe** student ↔ trainer, cu mesaje necitite și notificări.
 - **Teme anunțate de trainer** cu termen, puncte și numărătoare inversă; **anunțuri** fixate pe pagina de acasă.
@@ -31,16 +33,16 @@
 - **AI News:** știri din surse publice despre AI (TechCrunch, The Verge, MIT Technology Review, Ars Technica, VentureBeat, Hugging Face, Google AI, OpenAI, Simon Willison), filtrate după relevanță (aplicații noi, modele, unelte, „wow”), pe categorii. Cu cheie API, Claude alege cele mai bune și explică „de ce contează” în limba ta. Din orice știre: „Trimite trainerului” sau „Fă o idee din asta”.
 - **Răspuns rapid de la AI** la fiecare întrebare, marcat „neverificat de trainer”.
 - **6 limbi** (RO, EN, FR, IT, ES, DE): interfață, erori de server, texte AI și ghid. Limba aleasă te urmează pe orice dispozitiv.
-- **Setări de interfață:** 6 stiluri (Neon, Luminos, Matrix, Apus, Ocean, Contrast mare), animații pornite/oprite, text normal/mare.
+- **Design „Aurora”:** fundal adânc cu lumini de auroră discrete și grăunte fin de film, titluri în serif elegant (Instrument Serif), text în Manrope, butoane calme în formă de pastilă. 5 stiluri: Aurora, Perlă (luminos), Apus, Ocean, Contrast mare. Plus animații pornite/oprite și text normal/mare.
 - **Ușor de folosit:** pagină de acasă cu acțiuni rapide, tur de bun venit la prima intrare, notificări 🔔, paleta de comenzi `Ctrl+K` (mergi oriunde, schimbi limba sau stilul), `/` pentru căutare, `Ctrl+Enter` pentru trimitere, meniu jos pe telefon.
 
-| Mesaje (trainer) | Puncte & clasament | Cutia de idei (FR) | Ghid (DE) |
-| --- | --- | --- | --- |
-| ![](docs/screenshots/mesaje-trainer.png) | ![](docs/screenshots/puncte.png) | ![](docs/screenshots/cutia-de-idei-fr.png) | ![](docs/screenshots/ghid-de.png) |
-
-| Stilul Matrix | Setări | Telefon (ES) |
+| Login | Acasă | Puncte & clasament |
 | --- | --- | --- |
-| ![](docs/screenshots/stil-matrix.png) | ![](docs/screenshots/setari.png) | ![](docs/screenshots/mobil-es.png) |
+| ![](docs/screenshots/login.png) | ![](docs/screenshots/acasa.png) | ![](docs/screenshots/puncte.png) |
+
+| Ghidul | Cutia de idei (stilul Perlă) | Setări | Telefon |
+| --- | --- | --- | --- |
+| ![](docs/screenshots/ghid.png) | ![](docs/screenshots/cutia-perla.png) | ![](docs/screenshots/setari.png) | ![](docs/screenshots/robot-mobil.png) |
 
 ## Cum se pornește
 
@@ -52,15 +54,20 @@ uvicorn src.app:app --reload
 
 Deschide http://localhost:8000.
 
-- **Student:** intri cu numele și o parolă. Prima dată îți creezi contul, apoi intri cu aceeași parolă.
-- **Trainer:** intri cu numele și codul de trainer (`TRAINER_CODE`, implicit `trainer`, schimbă-l!).
+- **Cum intri:** cu **emailul tău personal și o parolă** (minim 8 caractere). Prima dată alegi „Cont nou”. Dacă serverul are `GOOGLE_CLIENT_ID`, apare și butonul **„Continuă cu Google”**.
+- **Trainerul:** emailul lui e în `TRAINER_EMAILS`, așa că intră direct ca trainer. Alternativ, își face cont cu codul de trainer (`TRAINER_CODE`).
+- **Doar clasa ta:** dacă setezi `CLASS_CODE`, un student își poate face cont doar cu codul clasei, primit de la trainer.
+- **Ai uitat parola?** Trainerul îți generează o parolă temporară (Puncte → „Parolă temporară”), iar tu o schimbi din Setări.
 - **Fără cheie API** aplicația merge complet: propunerile se retușează local, la întrebări apar sfaturi din ghid, iar știrile sunt filtrate automat (fără explicațiile lui Claude).
 - **AI News** are nevoie de acces la internet pe server, ca să citească sursele.
 
 | Variabilă | Implicit | Rol |
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | – | Activează AI-ul (doar pe server). |
-| `TRAINER_CODE` | `trainer` | Codul trainerului. |
+| `TRAINER_EMAILS` | – | Emailurile trainerilor, separate prin virgulă. |
+| `TRAINER_CODE` | `trainer` | Codul cu care un trainer își poate face cont. Schimbă-l! |
+| `CLASS_CODE` | – | Dacă e setat, studenții au nevoie de el ca să-și facă cont. |
+| `GOOGLE_CLIENT_ID` | – | Activează „Continuă cu Google” (Client ID din Google Cloud Console). |
 | `CUTIA_AI` | `auto` | `auto` / `on` / `off` |
 | `CUTIA_MODEL` | `claude-opus-5-5` | Modelul Claude. |
 | `CUTIA_DATA` | `data/cutia.json` | Unde se salvează datele. |
@@ -77,6 +84,8 @@ Deschide http://localhost:8000.
 - Cheia API stă doar pe server (variabilă de mediu / `.env`, ignorat de git) și nu ajunge niciodată în browser. Un test verifică asta.
 - Toate regulile de acces se verifică pe server și sunt testate cu două conturi: studentul B nu vede întrebările, temele, fișierele sau mesajele studentului A.
 - Sesiunile se salvează doar ca hash, iar parolele ca hash PBKDF2. „Ieși” închide sesiunea pe server.
+- După 5 parole greșite, contul se blochează 10 minute. Același mesaj pentru email greșit și parolă greșită, ca să nu se poată afla cine are cont.
+- Google: tokenul semnat de Google se verifică pe server (cu biblioteca oficială `google-auth`), doar pentru emailuri verificate.
 - Punctele se calculează pe server din activitatea reală, nu pot fi modificate din browser; nu îți poți vota propria idee.
 - Fișierele se salvează cu nume aleatorii și se descarcă doar ca atașament, după verificarea accesului.
 - Știrile din internet sunt tratate ca date: fără HTML, doar linkuri `http(s)`, iar AI-ul le primește ca date, nu ca instrucțiuni.
@@ -91,6 +100,8 @@ Deschide http://localhost:8000.
 - **AI-ul nu decide în locul studentului** → răspuns structurat (JSON), maxim 3 întrebări, trimitere doar cu aprobare verificată pe server.
 - **Clasa e internațională** → toate textele în `src/static/i18n/<limbă>.js`; se încarcă doar limba aleasă; un test verifică să nu lipsească nicio traducere.
 - **Simplu de rulat la curs** → FastAPI + HTML/CSS/JS fără build; datele într-un fișier JSON.
+- **Robotul 3D trebuie să meargă oriunde, fără CDN** → Three.js și fonturile sunt incluse local (`src/static/vendor/`, `src/static/fonts/`); fără WebGL sau cu animațiile oprite, intri direct în aplicație.
+- **Design elegant, nu încărcat** → puține culori (lavandă, cer, roz, piersică), mult spațiu, fără strălucire neon; serif pentru titluri, sans pentru text.
 
 ## Structura
 
@@ -101,6 +112,9 @@ src/news.py              AI News: surse RSS/Atom, filtrare, cache, alegere cu Cl
 src/points.py            Puncte, niveluri și badge-uri
 src/static/              Interfața: index.html, app.js, styles.css
 src/static/i18n/         Textele în 6 limbi (ro, en, fr, it, es, de)
+src/static/intro.js      Robotul 3D de bun venit (Three.js)
+src/static/vendor/       Three.js (licență MIT), inclus local
+src/static/fonts/        Fonturile (SIL Open Font License), incluse local
 tests/                   Teste (pytest) + verificarea traducerilor
 CLAUDE.md                Regulile proiectului pentru Claude
 ```

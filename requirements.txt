@@ -5,3 +5,5 @@ httpx
 watchfiles
 anthropic
 pytest
+google-auth
+requests
