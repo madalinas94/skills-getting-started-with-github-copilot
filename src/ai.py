@@ -17,8 +17,8 @@ import re
 
 MODEL = os.environ.get("CUTIA_MODEL", "claude-opus-5-5")
 
-LANGS = ("ro", "en")
-LANGUAGE_NAME = {"ro": "limba română", "en": "English"}
+LANGS = ("ro", "en", "fr", "it", "es", "de")
+LANGUAGE_NAME = {"ro": "Romanian", "en": "English", "fr": "French", "it": "Italian", "es": "Spanish", "de": "German"}
 
 FIELDS = ("title", "description", "audience")
 
@@ -122,6 +122,42 @@ LOCAL_TEXT = {
         "users": "Used by: {}.",
         "notes": "Local touch-up (no AI): cleaned up spacing, capitalisation and punctuation.",
     },
+    "fr": {
+        "title": "Comment s'appellerait l'application ? Choisis un nom court.",
+        "description": "Décris en bref 2-3 choses qu'un utilisateur peut y faire.",
+        "audience": "À qui s'adresse l'application ? (ex. les étudiants, le formateur, les parents)",
+        "named": "Tu proposes « {} ».",
+        "idea": "L'idée : {}",
+        "users": "Utilisée par : {}.",
+        "notes": "Retouche locale (sans IA) : espaces, majuscules et ponctuation nettoyés.",
+    },
+    "it": {
+        "title": "Come si chiamerebbe l'app? Scegli un nome breve.",
+        "description": "Descrivi in breve 2-3 cose che un utente può fare.",
+        "audience": "Per chi è l'app? (es. gli studenti, il trainer, i genitori)",
+        "named": "Proponi «{}».",
+        "idea": "L'idea: {}",
+        "users": "La usano: {}.",
+        "notes": "Ritocco locale (senza IA): sistemati spazi, maiuscole e punteggiatura.",
+    },
+    "es": {
+        "title": "¿Cómo se llamaría la app? Elige un nombre corto.",
+        "description": "Describe en breve 2-3 cosas que un usuario puede hacer.",
+        "audience": "¿Para quién es la app? (p. ej. estudiantes, el formador, los padres)",
+        "named": "Propones «{}».",
+        "idea": "La idea: {}",
+        "users": "La usan: {}.",
+        "notes": "Retoque local (sin IA): espacios, mayúsculas y puntuación corregidos.",
+    },
+    "de": {
+        "title": "Wie würde die App heißen? Wähle einen kurzen Namen.",
+        "description": "Beschreibe kurz 2-3 Dinge, die man darin tun kann.",
+        "audience": "Für wen ist die App? (z. B. Studierende, Trainer, Eltern)",
+        "named": "Du schlägst „{}“ vor.",
+        "idea": "Die Idee: {}",
+        "users": "Genutzt von: {}.",
+        "notes": "Lokale Überarbeitung (ohne KI): Leerzeichen, Großschreibung und Satzzeichen bereinigt.",
+    },
 }
 
 
@@ -204,7 +240,7 @@ def _client():
         return None
 
 
-def _language_line(lang: str) -> str:
+def language_line(lang: str) -> str:
     return f"\n\nWrite every piece of text in your answer in {LANGUAGE_NAME[lang_or_default(lang)]}."
 
 
@@ -224,7 +260,7 @@ def refine(title: str, description: str, audience: str, lang: str = "ro") -> dic
         response = client.messages.create(
             model=MODEL,
             max_tokens=4000,
-            system=REFINE_PROMPT + _language_line(lang),
+            system=REFINE_PROMPT + language_line(lang),
             output_config={
                 "effort": "low",
                 "format": {"type": "json_schema", "schema": REFINE_SCHEMA},
@@ -257,7 +293,7 @@ def answer_question(text: str, topic: str, lang: str = "ro"):
         response = client.messages.create(
             model=MODEL,
             max_tokens=2000,
-            system=TUTOR_PROMPT + _language_line(lang),
+            system=TUTOR_PROMPT + language_line(lang),
             output_config={"effort": "low"},
             messages=[{"role": "user", "content": f"Topic: {topic}\n\nQuestion:\n{text}"}],
         )

@@ -16,8 +16,10 @@ client = TestClient(app_module.app)
 
 @pytest.fixture(autouse=True)
 def reset_db():
-    app_module.db.update({"users": {}, "questions": [], "proposals": [], "submissions": [], "next_id": 1})
-    app_module.sessions.clear()
+    app_module.db.update({
+        "users": {}, "sessions": {}, "prefs": {}, "questions": [], "proposals": [], "submissions": [],
+        "messages": [], "assignments": [], "announcements": [], "bonuses": [], "next_id": 1,
+    })
 
 
 def login(name, role="student", code=None, password="parola-test"):
@@ -240,3 +242,163 @@ def test_trainer_reviews_submission():
     r = client.post(f"/api/submissions/{sid}/review", json=body, headers=trainer)
     assert r.json()["status"] == "reviewed"
     assert client.get("/api/submissions", headers=ana).json()[0]["feedback"] == "Super, adaugă README."
+
+
+# ---------------------------------------------------------------- sesiuni & preferințe
+
+def test_session_survives_restart_and_logout_ends_it():
+    ana = login("Ana")
+    token = ana["Authorization"].split()[1]
+    assert token not in str(app_module.db["sessions"])  # se salvează doar hash-ul
+    assert client.get("/api/me", headers=ana).json()["name"] == "Ana"
+    client.post("/api/logout", headers=ana)
+    assert client.get("/api/me", headers=ana).status_code == 401
+
+
+def test_prefs_are_saved():
+    ana = login("Ana")
+    r = client.patch("/api/me", json={"lang": "fr", "hide_from_leaderboard": True}, headers=ana)
+    assert r.json()["prefs"] == {"lang": "fr", "hide_from_leaderboard": True}
+    assert client.patch("/api/me", json={"lang": "xx"}, headers=ana).json()["prefs"]["lang"] == "fr"
+
+
+def test_errors_in_french():
+    r = client.post("/api/login", json={"name": "T", "role": "trainer", "code": "x"}, headers={"X-Lang": "fr"})
+    assert r.json()["detail"] == "Code formateur incorrect."
+
+
+# ---------------------------------------------------------------- mesaje directe
+
+def test_direct_messages_are_private():
+    ana, bob = login("Ana"), login("Bob")
+    trainer = login("Radu", "trainer", "secret")
+    client.post("/api/dm", json={"text": "Bună! Am o întrebare despre temă."}, headers=ana)
+    assert client.get("/api/dm", headers=bob).json()["messages"] == []
+    assert client.get("/api/dm/ana", headers=bob).status_code == 403
+    assert client.get("/api/dm/unread", headers=trainer).json()["unread"] == 1
+
+    threads = client.get("/api/dm", headers=trainer).json()["threads"]
+    ana_thread = next(t for t in threads if t["student_key"] == "ana")
+    assert ana_thread["unread"] == 1
+    assert len(client.get("/api/dm/ana", headers=trainer).json()["messages"]) == 1
+    assert client.get("/api/dm/unread", headers=trainer).json()["unread"] == 0  # citit
+
+    client.post("/api/dm/ana", json={"text": "Sigur, spune!"}, headers=trainer)
+    assert client.get("/api/dm/unread", headers=ana).json()["unread"] == 1
+    msgs = client.get("/api/dm", headers=ana).json()["messages"]
+    assert [m["from_role"] for m in msgs] == ["student", "trainer"]
+    assert client.get("/api/dm/unread", headers=ana).json()["unread"] == 0
+    assert client.post("/api/dm/nimeni", json={"text": "x"}, headers=trainer).status_code == 404
+
+
+# ---------------------------------------------------------------- puncte
+
+def test_points_follow_the_rules():
+    ana, bob, cris = login("Ana"), login("Bob"), login("Cris")
+    trainer = login("Radu", "trainer", "secret")
+    a = client.post("/api/assignments", json={"title": "Tema 1", "due_at": "2999-01-01T00:00:00Z", "points": 25},
+                    headers=trainer).json()
+    sid = submit(ana, note="gata", assignment_id=str(a["id"])).json()["id"]
+    submit(ana, note="din nou", assignment_id=str(a["id"]))           # a doua predare la aceeași temă nu mai punctează
+    client.post(f"/api/submissions/{sid}/review", json={"status": "reviewed"}, headers=trainer)
+    pid = client.post("/api/proposals", json={"title": "Quiz", "description": "Un quiz.", "audience": "Clasa",
+                                              "approved": True}, headers=ana).json()["id"]
+    assert client.post(f"/api/proposals/{pid}/vote", headers=ana).status_code == 400  # nu-ți votezi ideea
+    client.post(f"/api/proposals/{pid}/vote", headers=bob)
+    client.post(f"/api/proposals/{pid}/vote", headers=cris)
+    client.post(f"/api/proposals/{pid}/choose", headers=trainer)
+    for i in range(5):
+        client.post("/api/questions", json={"text": f"Întrebarea {i}?"}, headers=ana)
+    client.post("/api/points/bonus", json={"student_key": "ana", "points": 7, "reason": "Ajutor colegilor"},
+                headers=trainer)
+
+    me = client.get("/api/points/me", headers=ana).json()
+    # 10 predare + 5 la timp + 25 revizuit + 5 idee + 4 voturi + 30 aleasă + 6 întrebări (max 3/zi) + 7 bonus
+    assert me["total"] == 92
+    assert me["level"]["key"] == "apprentice"
+    assert {"first_homework", "first_idea", "chosen", "first_question"} <= set(me["badges"])
+
+
+def test_bonus_rules_and_access():
+    ana = login("Ana")
+    trainer = login("Radu", "trainer", "secret")
+    body = {"student_key": "ana", "points": 10, "reason": "x"}
+    assert client.post("/api/points/bonus", json=body, headers=ana).status_code == 403
+    assert client.post("/api/points/bonus", json={**body, "points": 0}, headers=trainer).status_code == 400
+    assert client.post("/api/points/bonus", json={**body, "reason": " "}, headers=trainer).status_code == 400
+    assert client.post("/api/points/bonus", json={**body, "student_key": "zz"}, headers=trainer).status_code == 404
+    assert client.get("/api/points/ana", headers=ana).status_code == 403
+
+
+def test_leaderboard_respects_hide():
+    ana, bob = login("Ana"), login("Bob")
+    trainer = login("Radu", "trainer", "secret")
+    client.patch("/api/me", json={"hide_from_leaderboard": True}, headers=ana)
+    names_bob = [r["name"] for r in client.get("/api/leaderboard", headers=bob).json()]
+    assert "Ana" not in names_bob and "Bob" in names_bob
+    assert any(r["me"] for r in client.get("/api/leaderboard", headers=ana).json())  # se vede pe sine
+    assert "Ana" in [r["name"] for r in client.get("/api/leaderboard", headers=trainer).json()]
+    assert "key" not in client.get("/api/leaderboard", headers=bob).json()[0]
+
+
+# ---------------------------------------------------------------- teme & anunțuri
+
+def test_assignments_and_announcements():
+    ana = login("Ana")
+    trainer = login("Radu", "trainer", "secret")
+    assert client.post("/api/assignments", json={"title": "T"}, headers=ana).status_code == 403
+    a = client.post("/api/assignments", json={"title": "Tema 2", "due_at": "2030-05-01T18:00"}, headers=trainer).json()
+    assert a["due_at"] == "2030-05-01T18:00:00+00:00"
+    assert client.get("/api/assignments", headers=ana).json()[0]["submitted"] is False
+    submit(ana, note="x", assignment_id=str(a["id"]))
+    assert client.get("/api/assignments", headers=ana).json()[0]["submitted"] is True
+    assert submit(ana, note="x", assignment_id="9999").status_code == 404
+
+    client.post("/api/announcements", json={"text": "Ora de joi începe la 18:30", "pinned": True}, headers=trainer)
+    assert client.get("/api/announcements", headers=ana).json()[0]["pinned"] is True
+    assert client.post("/api/announcements", json={"text": "x"}, headers=ana).status_code == 403
+
+
+# ---------------------------------------------------------------- AI News
+
+RSS = """<?xml version="1.0"?><rss version="2.0"><channel>
+<item><title>Startup launches new AI coding agent for beginners</title><link>https://example.com/agent</link>
+<description>&lt;p&gt;A free &lt;b&gt;app&lt;/b&gt; that builds apps&lt;/p&gt;</description><pubDate>Mon, 05 Oct 2026 10:00:00 GMT</pubDate></item>
+<item><title>AI company faces lawsuit over stock valuation</title><link>https://example.com/lawsuit</link>
+<description>Earnings news</description></item>
+<item><title>Evil link</title><link>javascript:alert(1)</link></item>
+</channel></rss>"""
+
+ATOM = """<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+<entry><title>Open-source model released with a new reasoning benchmark</title>
+<link rel="alternate" href="https://example.org/model"/><updated>2026-10-04T08:00:00Z</updated>
+<summary>Try the new model today</summary></entry>
+<entry><title>Startup launches new AI coding agent for beginners</title><link href="https://dup.example/x"/></entry>
+</feed>"""
+
+
+def test_news_parsing_filtering_and_dedupe(monkeypatch):
+    from src import news
+    monkeypatch.setenv("CUTIA_NEWS_FEEDS", "A|https://a.example/rss,B|https://b.example/atom")
+    fixtures = {"A": RSS, "B": ATOM}
+    items, errors = news.collect(lambda su: (news.parse_feed(fixtures[su[0]], su[0]), None))
+    titles = [it["title"] for it in items]
+    assert "Startup launches new AI coding agent for beginners" in titles
+    assert "Open-source model released with a new reasoning benchmark" in titles
+    assert not any("lawsuit" in t for t in titles)              # filtrat
+    assert len(titles) == 2                                       # duplicat scos, link javascript: ignorat
+    agent = next(it for it in items if "agent" in it["title"])
+    assert agent["summary"] == "A free app that builds apps"      # fără HTML
+    assert agent["category"] == "launch"
+
+
+def test_news_endpoint_without_ai(monkeypatch):
+    from src import news
+    monkeypatch.setattr(news, "_cache", {"at": 0.0, "items": [], "errors": [], "curated": {}})
+    monkeypatch.setattr(news, "_fetch", lambda su: (news.parse_feed(RSS, "Test"), None))
+    monkeypatch.setattr(news, "feeds", lambda: [("Test", "https://t.example/rss")])
+    ana = login("Ana")
+    data = client.get("/api/news", headers=ana).json()
+    assert data["curated"] is False
+    assert data["items"][0]["link"] == "https://example.com/agent"
+    assert client.get("/api/news").status_code == 401
