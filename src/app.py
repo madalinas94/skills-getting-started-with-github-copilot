@@ -54,7 +54,11 @@ except ImportError:  # rulare directă: python app.py
 
 DATA_FILE = Path(os.environ.get("CUTIA_DATA", current_dir.parent / "data" / "cutia.json"))
 UPLOAD_DIR = Path(os.environ.get("CUTIA_UPLOADS", DATA_FILE.parent / "uploads"))
-TRAINER_CODE = os.environ.get("TRAINER_CODE", "trainer")
+# Un cod de trainer scris în README sau în .env.example îl știe oricine: îl ignorăm
+WEAK_TRAINER_CODES = {"trainer", "schimba-ma", "secret", "parola", "password", "admin", "123456"}
+TRAINER_CODE = os.environ.get("TRAINER_CODE", "").strip()
+if TRAINER_CODE.lower() in WEAK_TRAINER_CODES and os.environ.get("CUTIA_ALLOW_WEAK_CODE") != "1" or len(TRAINER_CODE) < 6:
+    TRAINER_CODE = ""
 
 @asynccontextmanager
 async def lifespan(_app):
@@ -176,7 +180,11 @@ def save_db():
     if os.environ.get("CUTIA_PERSIST", "1") == "0":
         return
     DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
-    DATA_FILE.write_text(json.dumps(db, ensure_ascii=False, indent=2), encoding="utf-8")
+    # Scriem într-un fișier temporar și apoi îl înlocuim dintr-o mișcare:
+    # dacă serverul se oprește la jumătate, datele vechi rămân întregi
+    tmp = DATA_FILE.with_name(f"{DATA_FILE.name}.{uuid.uuid4().hex}.tmp")
+    tmp.write_text(json.dumps(db, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, DATA_FILE)
 
 
 def next_id() -> int:
@@ -246,8 +254,12 @@ def check_class_code(code: Optional[str]):
         fail(403, "wrong_class_code")
 
 
+def valid_trainer_code(code: Optional[str]) -> bool:
+    return bool(TRAINER_CODE and code and same(code.strip(), TRAINER_CODE))
+
+
 def role_for(email: str, trainer_code: Optional[str] = None) -> str:
-    if email in TRAINER_EMAILS or (trainer_code and same(trainer_code.strip(), TRAINER_CODE)):
+    if email in TRAINER_EMAILS or valid_trainer_code(trainer_code):
         return "trainer"
     return "student"
 
@@ -296,6 +308,12 @@ def require_student(user: dict = Depends(current_user)) -> dict:
     return user
 
 
+@app.get("/api/health")
+def health():
+    """Pentru hosting: serverul răspunde (fără date despre nimeni)."""
+    return {"ok": True}
+
+
 @app.get("/")
 def root():
     return RedirectResponse(url="/static/index.html")
@@ -309,7 +327,7 @@ def register(body: RegisterIn, request: Request):
     email = clean_email(body.email)
     if len(body.password) < MIN_PASSWORD:
         fail(400, "short_password")
-    if body.trainer_code and body.trainer_code.strip() and not same(body.trainer_code.strip(), TRAINER_CODE):
+    if body.trainer_code and body.trainer_code.strip() and not valid_trainer_code(body.trainer_code):
         fail(403, "wrong_code")
     role = role_for(email, body.trainer_code)
     if role == "student":
@@ -450,7 +468,7 @@ def supabase_register(body: RegisterIn, name: str, email: str, request: Request)
         week_ago = datetime.fromtimestamp(datetime.now(timezone.utc).timestamp() - 7 * 86400, timezone.utc).isoformat(timespec="seconds")
         for old in [e for e, p in pending.items() if p.get("at", "") < week_ago]:
             pending.pop(old)
-        is_trainer = bool(body.trainer_code and same(body.trainer_code.strip(), TRAINER_CODE))
+        is_trainer = valid_trainer_code(body.trainer_code)
         pending[email] = {
             "name": name, "role": "trainer" if is_trainer else "student",
             "class_ok": is_trainer or not CLASS_CODE or same((body.class_code or "").strip(), CLASS_CODE),

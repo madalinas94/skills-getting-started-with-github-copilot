@@ -3,7 +3,7 @@ import tempfile
 
 os.environ["CUTIA_PERSIST"] = "0"
 os.environ["CUTIA_AI"] = "off"
-os.environ["TRAINER_CODE"] = "secret"
+os.environ["TRAINER_CODE"] = "cod-trainer-test"
 os.environ["TRAINER_EMAILS"] = "radu@test.ro"
 os.environ.pop("CLASS_CODE", None)
 os.environ.pop("GOOGLE_CLIENT_ID", None)
@@ -46,7 +46,7 @@ def test_trainer_is_recognized_by_email_or_code():
     assert login("Radu", "trainer") is not None
     r = client.post("/api/register", json={"name": "T", "email": "t@x.ro", "password": "parola-buna", "trainer_code": "gresit"})
     assert r.status_code == 403
-    r = client.post("/api/register", json={"name": "T", "email": "t@x.ro", "password": "parola-buna", "trainer_code": "secret"})
+    r = client.post("/api/register", json={"name": "T", "email": "t@x.ro", "password": "parola-buna", "trainer_code": "cod-trainer-test"})
     assert r.json()["role"] == "trainer"
     r = client.post("/api/register", json={"name": "S", "email": "s@x.ro", "password": "parola-buna"})
     assert r.json()["role"] == "student"
@@ -709,7 +709,7 @@ def test_supabase_trainer_reset_sends_email_and_privacy_holds(fake_supabase):
     ha, hb = ({"Authorization": f"Bearer {x['token']}"} for x in (a, b))
     client.post("/api/questions", headers=ha, json={"text": "Cum pun cheia API în .env?", "category": "security"})
     assert client.get("/api/questions", headers=hb).json() == []
-    trainer = client.post("/api/register", json={"name": "Radu", "email": "radu2@test.ro", "password": "parola-buna", "trainer_code": "secret"}).json()
+    trainer = client.post("/api/register", json={"name": "Radu", "email": "radu2@test.ro", "password": "parola-buna", "trainer_code": "cod-trainer-test"}).json()
     assert trainer["role"] == "trainer"
     r = client.post("/api/students/ana@test.ro/reset-password", headers={"Authorization": f"Bearer {trainer['token']}"})
     assert r.json() == {"temporary_password": None, "email_sent": True}
@@ -821,3 +821,20 @@ def test_digest_is_due_once_a_day():
     today = digest_mod.today()
     assert digest_mod.due([{"date": today}]) is False
     assert digest_mod.next_run() > _dt.now(_tz.utc).isoformat()
+
+
+def test_weak_trainer_codes_are_ignored(monkeypatch):
+    # Codul din README / .env.example îl știe oricine: nu face pe nimeni trainer
+    monkeypatch.setattr(app_module, "TRAINER_CODE", "")
+    r = client.post("/api/register", json={"name": "X", "email": "x@x.ro", "password": "parola-buna", "trainer_code": "schimba-ma"})
+    assert r.status_code == 403
+    r = client.post("/api/register", json={"name": "X", "email": "x@x.ro", "password": "parola-buna", "trainer_code": ""})
+    assert r.json()["role"] == "student"
+
+
+def test_health_and_atomic_save(tmp_path, monkeypatch):
+    assert client.get("/api/health").json() == {"ok": True}
+    monkeypatch.setenv("CUTIA_PERSIST", "1")
+    monkeypatch.setattr(app_module, "DATA_FILE", tmp_path / "cutia.json")
+    app_module.save_db()
+    assert [f.name for f in tmp_path.iterdir()] == ["cutia.json"]  # fără fișiere .tmp rămase

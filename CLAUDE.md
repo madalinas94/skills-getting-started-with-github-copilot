@@ -75,6 +75,7 @@ src/static/vendor/        Three.js + RoundedBoxGeometry + RoomEnvironment (MIT),
 src/static/fonts/         Instrument Serif, Manrope, JetBrains Mono (OFL), incluse local
 tests/test_app.py         Teste API (acces cu două conturi, mesaje, puncte, upload, știri, limbi)
 tests/check_i18n.js       Verifică să nu lipsească nicio traducere
+render.yaml               Publicarea pe Render (un proces, disc permanent, fără chei)
 data/                     Date + fișiere încărcate (ignorat de git)
 ```
 
@@ -86,6 +87,13 @@ cp .env.example .env              # pune cheia API aici, dacă ai una
 uvicorn src.app:app --reload      # http://localhost:8000
 pytest                            # rulează după fiecare schimbare
 ```
+
+## Publicare (Render)
+
+- `render.yaml` descrie serverul: **un singur proces** uvicorn (datele stau în memorie + `CUTIA_DATA`, deci fără `--workers`), disc permanent în `/var/data`, `--proxy-headers` ca linkurile din emailuri să iasă cu `https://`, verificare pe `/api/health`.
+- În `render.yaml` nu se scrie nicio cheie sau cod: doar `sync: false`, iar valorile se completează în Render.
+- `requirements.txt` are versiuni fixate. Când schimbi o versiune, rulează `pytest` într-un mediu curat.
+- `TRAINER_CODE` nu are valoare implicită; codurile din `WEAK_TRAINER_CODES` și cele sub 6 caractere sunt ignorate.
 
 ## Convenții
 

@@ -78,7 +78,7 @@ Deschide http://localhost:8000.
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | – | Activează AI-ul (doar pe server). |
 | `TRAINER_EMAILS` | – | Emailurile trainerilor, separate prin virgulă. |
-| `TRAINER_CODE` | `trainer` | Codul cu care un trainer își poate face cont. Schimbă-l! |
+| `TRAINER_CODE` | – | Codul cu care un trainer își poate face cont (minim 6 caractere). Codurile știute de toți, ca `trainer` sau `schimba-ma`, sunt ignorate. |
 | `CLASS_CODE` | – | Dacă e setat, studenții au nevoie de el ca să-și facă cont. |
 | `SUPABASE_URL` | – | Adresa proiectului Supabase (`https://xxxx.supabase.co`). Împreună cu cheia de mai jos, pornește conturile prin Supabase. |
 | `SUPABASE_ANON_KEY` | – | Cheia **anon / publishable** a proiectului. Niciodată `service_role`. |
@@ -107,6 +107,26 @@ Datele (întrebări, teme, idei) rămân tot în `data/cutia.json`, legate de em
 
 **Teste:** `pytest` (acces cu două conturi, mesaje private, puncte, upload, știri, AI și toate cele 6 limbi).
 
+## Publică online (linkul live)
+
+Aplicația e pregătită pentru [Render](https://render.com) prin fișierul `render.yaml`.
+
+1. Fă-ți cont pe **render.com** cu contul de GitHub.
+2. **New → Blueprint**, alegi acest repo și apeși **Apply**.
+3. Render îți cere valorile secrete; le completezi doar acolo, niciodată în cod:
+   - `ANTHROPIC_API_KEY`: cheia ta API (opțional);
+   - `TRAINER_EMAILS`: emailul trainerului;
+   - `TRAINER_CODE`: un cod al tău de minim 6 caractere (opțional);
+   - `CLASS_CODE`: codul clasei (opțional);
+   - `SUPABASE_URL` și `SUPABASE_ANON_KEY`: din pașii de mai sus (opțional).
+4. După 2–3 minute primești linkul, de forma `https://cutia-clasei-xxxx.onrender.com`.
+5. Cu Supabase: pune linkul + `/static/index.html` la *Site URL* și *Redirect URLs* (Authentication → URL Configuration).
+6. Scrie linkul mai jos, la „Aplicația live”.
+
+De aici, fiecare `git push` publică automat versiunea nouă.
+
+**Cost:** datele (întrebări, teme, fișiere) stau pe un disc permanent, care cere planul **Starter** (aproximativ 7 $/lună plus 0,25 $/GB pentru disc). Pe planul Free, Render șterge fișierele la fiecare repornire, deci s-ar pierde tot ce scrie clasa.
+
 **Aplicația live:** încă nu e publicată online. Linkul apare aici după deploy.
 
 ## Securitate
@@ -119,6 +139,8 @@ Datele (întrebări, teme, idei) rămân tot în `data/cutia.json`, legate de em
 - Google: tokenul semnat de Google se verifică pe server (cu biblioteca oficială `google-auth`), doar pentru emailuri verificate.
 - Punctele se calculează pe server din activitatea reală, nu pot fi modificate din browser; nu îți poți vota propria idee.
 - Fișierele se salvează cu nume aleatorii și se descarcă doar ca atașament, după verificarea accesului.
+- Codul de trainer nu are valoare implicită: codurile știute de toți (din README sau `.env.example`) sunt ignorate, ca nimeni să nu devină trainer cu ele.
+- Datele se salvează printr-un fișier temporar înlocuit dintr-o mișcare, ca o oprire bruscă a serverului să nu strice fișierul.
 - Știrile din internet sunt tratate ca date: fără HTML, doar linkuri `http(s)`, iar AI-ul le primește ca date, nu ca instrucțiuni.
 
 ## Decizii tehnice (motiv → soluție)
@@ -152,4 +174,5 @@ src/static/vendor/       Three.js (licență MIT), inclus local
 src/static/fonts/        Fonturile (SIL Open Font License), incluse local
 tests/                   Teste (pytest) + verificarea traducerilor
 CLAUDE.md                Regulile proiectului pentru Claude
+render.yaml              Publicarea pe Render (disc permanent pentru date, fără chei în fișier)
 ```
