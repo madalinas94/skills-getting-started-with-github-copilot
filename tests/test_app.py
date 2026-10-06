@@ -1047,3 +1047,47 @@ def test_live_class_flow_and_privacy():
 
     end = client.post("/api/live/end", headers=ht).json()
     assert end == {"active": False, "last_ended_at": app_module.db["live_history"][-1]["ended_at"]}
+
+
+# ---------------------------------------------------------------- Demo Day + Kickstart kit
+
+def test_showcase_flow_points_and_safety():
+    ha, hb, ht = login("Ana"), login("Vlad"), login("Radu", "trainer")
+    assert client.post("/api/showcase", headers=ha, data={"title": "Fără linkuri"}).status_code == 400
+    assert client.post("/api/showcase", headers=ha, data={"title": "X", "live_url": "javascript:alert(1)"}).status_code == 400
+    fake = ("x.png", b"<svg onload=alert(1)>", "image/png")
+    assert client.post("/api/showcase", headers=ha, data={"title": "X", "live_url": "https://a.app"}, files={"image": fake}).status_code == 400
+    assert client.post("/api/showcase", headers=ht, data={"title": "X", "live_url": "https://a.app"}).status_code == 403
+    r = client.post("/api/showcase", headers=ha, data={"title": "Habit tracker", "description": "Făcut cu Claude", "live_url": "https://habit.app"},
+                    files={"image": ("s.png", PNG_1PX, "image/png")})
+    assert r.status_code == 201 and r.json()["has_image"]
+    sid = r.json()["id"]
+    img = client.get(f"/api/showcase/{sid}/image", headers=hb)
+    assert img.content == PNG_1PX and img.headers["content-type"] == "image/png" and img.headers["x-content-type-options"] == "nosniff"
+    assert client.get(f"/api/showcase/{sid}/image").status_code == 401
+
+    assert client.post(f"/api/showcase/{sid}/react", headers=ha, json={"emoji": "🔥"}).status_code == 400   # nu la propriul proiect
+    assert client.post(f"/api/showcase/{sid}/react", headers=hb, json={"emoji": "🔥"}).json()["reactions"]["🔥"] == 1
+    assert client.post(f"/api/showcase/{sid}/spotlight", headers=hb).status_code == 403
+    assert client.post(f"/api/showcase/{sid}/spotlight", headers=ht).json()["spotlight"] is True
+    pts = client.get("/api/points/me", headers=ha).json()
+    assert {"showcase", "spotlight"} <= {e["kind"] for e in pts["events"]} and "demo_day" in pts["badges"]
+    listed = client.get("/api/showcase", headers=hb).json()[0]
+    assert "author_key" not in listed and "@" not in _json.dumps(listed)
+    assert client.delete(f"/api/showcase/{sid}", headers=hb).status_code == 403
+    assert client.delete(f"/api/showcase/{sid}", headers=ha).status_code == 200
+
+
+def test_kickstart_only_for_chosen_ideas_and_cached(monkeypatch):
+    ha, ht = login("Ana"), login("Radu", "trainer")
+    p = client.post("/api/proposals", headers=ha, json={"title": "Teme", "description": "Notez temele", "audience": "Colegii", "approved": True}).json()
+    assert client.get(f"/api/proposals/{p['id']}/kickstart", headers=ha).status_code == 400
+    client.post(f"/api/proposals/{p['id']}/choose", headers=ht)
+    assert client.get(f"/api/proposals/{p['id']}/kickstart", headers=ha).json() == {"ai": False}   # fără AI: șablon în interfață
+    calls = []
+    monkeypatch.setattr(app_module.ai, "available", lambda: True)
+    monkeypatch.setattr(app_module.tools, "kickstart", lambda prop, lang: calls.append(lang) or {
+        "ai": True, "first_prompt": "P", "first_hour": ["a"], "later": ["b"], "stack": "HTML", "risk": "r"})
+    for _ in range(3):
+        assert client.get(f"/api/proposals/{p['id']}/kickstart", headers=login("Vlad")).json()["first_prompt"] == "P"
+    assert calls == ["ro"]

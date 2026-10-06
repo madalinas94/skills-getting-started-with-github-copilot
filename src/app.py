@@ -19,9 +19,10 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -138,6 +139,9 @@ MESSAGES = {
     "poll_closed": ("Votul s-a închis.", "Voting is closed.", "Le vote est clos.", "La votazione è chiusa.", "La votación está cerrada.", "Die Abstimmung ist geschlossen."),
     "poll_options": ("Scrie între 2 și 4 variante.", "Write between 2 and 4 options.", "Écris entre 2 et 4 options.", "Scrivi da 2 a 4 opzioni.", "Escribe entre 2 y 4 opciones.", "Schreib 2 bis 4 Optionen."),
     "no_ticket": ("Trainerul n-a pus încă întrebarea de final.", "The trainer hasn't posted the exit question yet.", "Le formateur n'a pas encore posé la question de fin.", "Il trainer non ha ancora posto la domanda finale.", "El formador aún no ha puesto la pregunta final.", "Der Trainer hat die Abschlussfrage noch nicht gestellt."),
+    "own_react": ("Nu poți reacționa la propriul proiect.", "You can't react to your own project.", "Tu ne peux pas réagir à ton propre projet.", "Non puoi reagire al tuo progetto.", "No puedes reaccionar a tu propio proyecto.", "Du kannst nicht auf dein eigenes Projekt reagieren."),
+    "need_link": ("Adaugă linkul live sau linkul repo-ului.", "Add the live link or the repo link.", "Ajoute le lien en ligne ou le lien du dépôt.", "Aggiungi il link live o quello del repo.", "Añade el enlace en vivo o el del repo.", "Füge den Live-Link oder den Repo-Link hinzu."),
+    "not_chosen": ("Kitul de start apare după ce trainerul alege ideea.", "The kickstart kit appears once the trainer chooses the idea.", "Le kit de démarrage apparaît quand le formateur choisit l'idée.", "Il kit di avvio appare quando il trainer sceglie l'idea.", "El kit de inicio aparece cuando el formador elige la idea.", "Das Starter-Kit erscheint, sobald der Trainer die Idee auswählt."),
     "no_announcement": ("Anunțul nu există.", "Announcement not found.", "Annonce introuvable.", "Annuncio non trovato.", "Anuncio no encontrado.", "Ankündigung nicht gefunden."),
 }
 FIELD_NAMES = {
@@ -201,6 +205,24 @@ def save_db():
     tmp = DATA_FILE.with_name(f"{DATA_FILE.name}.{uuid.uuid4().hex}.tmp")
     tmp.write_text(json.dumps(db, ensure_ascii=False, indent=2), encoding="utf-8")
     os.replace(tmp, DATA_FILE)
+
+
+# Fișierele încărcate (teme, capturi Demo Day): nume aleatoriu, conținutul doar prin API
+def put_blob(content: bytes) -> str:
+    stored = uuid.uuid4().hex
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    (UPLOAD_DIR / stored).write_bytes(content)
+    return stored
+
+
+def get_blob(stored: str) -> Optional[bytes]:
+    path = UPLOAD_DIR / stored
+    return path.read_bytes() if re.fullmatch(r"[0-9a-f]{32}", stored or "") and path.exists() else None
+
+
+def delete_blob(stored: str):
+    if re.fullmatch(r"[0-9a-f]{32}", stored or ""):
+        (UPLOAD_DIR / stored).unlink(missing_ok=True)
 
 
 def next_id() -> int:
@@ -850,11 +872,9 @@ async def create_submission(
             fail(400, "file_too_big", name)
         accepted.append((name, content))
 
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     stored_files = []
     for name, content in accepted:
-        stored = uuid.uuid4().hex
-        (UPLOAD_DIR / stored).write_bytes(content)
+        stored = put_blob(content)
         stored_files.append({"id": uuid.uuid4().hex[:12], "name": name, "size": len(content), "stored": stored})
 
     with _lock:
@@ -883,12 +903,13 @@ async def create_submission(
 def download_file(submission_id: int, file_id: str, user: dict = Depends(current_user)):
     sub = find_submission(submission_id, user)
     f = next((f for f in sub["files"] if f["id"] == file_id), None)
-    path = UPLOAD_DIR / f["stored"] if f else None
-    if not path or not path.exists():
+    content = get_blob(f["stored"]) if f else None
+    if content is None:
         fail(404, "no_submission")
     # Mereu descărcare, niciodată afișat în pagină (un .html încărcat nu poate rula cod)
-    return FileResponse(path, filename=f["name"], media_type="application/octet-stream",
-                        headers={"X-Content-Type-Options": "nosniff"})
+    return Response(content, media_type="application/octet-stream", headers={
+        "X-Content-Type-Options": "nosniff",
+        "Content-Disposition": f"attachment; filename*=UTF-8''{quote(f['name'])}"})
 
 
 @app.post("/api/submissions/{submission_id}/review")
@@ -1892,6 +1913,141 @@ def answer_ticket(body: TicketAnswerIn, user: dict = Depends(require_student)):
 
 def notify_all_students(kind: str, url: str = "/static/index.html"):
     """Notificări push (completat la secțiunea PWA)."""
+
+
+# ---------------------------------------------------------------- Demo Day (🌐 public)
+
+REACTIONS = ["🔥", "👏", "💡", "🤯"]
+MAX_SHOWCASE_PER_USER = 10
+
+
+def clean_link(url: str) -> str:
+    url = (url or "").strip()
+    if url and not re.match(r"^https?://", url, re.I):
+        fail(400, "bad_link")
+    return url
+
+
+def showcase_view(item: dict, user: dict) -> dict:
+    return {"id": item["id"], "title": item["title"], "description": item["description"], "author": item["author"],
+            "live_url": item["live_url"], "repo_url": item["repo_url"], "has_image": bool(item.get("image")),
+            "created_at": item["created_at"], "spotlight": item.get("spotlight", False), "mine": item["author_key"] == user["key"],
+            "reactions": {e: len(item["reactions"].get(e, [])) for e in REACTIONS},
+            "my_reactions": [e for e in REACTIONS if user["key"] in item["reactions"].get(e, [])]}
+
+
+def find_showcase(item_id: int) -> dict:
+    item = next((x for x in db.get("showcase", []) if x["id"] == item_id), None)
+    if item is None:
+        fail(404, "no_item")
+    return item
+
+
+@app.get("/api/showcase")
+def list_showcase(user: dict = Depends(current_user)):
+    items = sorted(db.get("showcase", []), key=lambda x: (x.get("spotlight", False), x["created_at"]), reverse=True)
+    return [showcase_view(x, user) for x in items]
+
+
+@app.post("/api/showcase", status_code=201)
+def add_showcase(title: str = Form(..., min_length=1, max_length=120), description: str = Form("", max_length=1500),
+                 live_url: str = Form("", max_length=300), repo_url: str = Form("", max_length=300),
+                 image: Optional[UploadFile] = File(None), user: dict = Depends(require_student)):
+    live, repo = clean_link(live_url), clean_link(repo_url)
+    if not live and not repo:
+        fail(400, "need_link")
+    img = read_image(image)
+    with _lock:
+        if sum(x["author_key"] == user["key"] for x in db.setdefault("showcase", [])) >= MAX_SHOWCASE_PER_USER:
+            fail(400, "too_many_posts", MAX_SHOWCASE_PER_USER)
+        item = {"id": next_id(), "author_key": user["key"], "author": user["name"], "title": title.strip(),
+                "description": description.strip(), "live_url": live, "repo_url": repo,
+                "image": {"stored": put_blob(img[1]), "type": img[0]} if img else None,
+                "reactions": {}, "spotlight": False, "created_at": now()}
+        db["showcase"].append(item)
+        save_db()
+    return showcase_view(item, user)
+
+
+@app.get("/api/showcase/{item_id}/image")
+def showcase_image(item_id: int, user: dict = Depends(current_user)):
+    item = find_showcase(item_id)
+    content = get_blob(item["image"]["stored"]) if item.get("image") else None
+    if content is None:
+        fail(404, "no_item")
+    # Doar PNG/JPEG/WebP verificate la încărcare; nosniff ca browserul să nu ghicească alt tip
+    return Response(content, media_type=item["image"]["type"],
+                    headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "private, max-age=3600"})
+
+
+class ReactIn(BaseModel):
+    emoji: str = Field(max_length=4)
+
+
+@app.post("/api/showcase/{item_id}/react")
+def react_showcase(item_id: int, body: ReactIn, user: dict = Depends(current_user)):
+    if body.emoji not in REACTIONS:
+        fail(400, "no_item")
+    with _lock:
+        item = find_showcase(item_id)
+        if item["author_key"] == user["key"]:
+            fail(400, "own_react")
+        people = item["reactions"].setdefault(body.emoji, [])
+        if user["key"] in people:
+            people.remove(user["key"])
+        else:
+            people.append(user["key"])
+        save_db()
+    return showcase_view(item, user)
+
+
+@app.post("/api/showcase/{item_id}/spotlight")
+def spotlight_showcase(item_id: int, user: dict = Depends(require_trainer)):
+    """Proiectul săptămânii: unul singur odată."""
+    with _lock:
+        item = find_showcase(item_id)
+        turn_on = not item.get("spotlight")
+        for x in db["showcase"]:
+            x["spotlight"] = False
+        item["spotlight"] = turn_on
+        if turn_on:
+            item["spotlight_at"] = now()
+        save_db()
+    return showcase_view(item, user)
+
+
+@app.delete("/api/showcase/{item_id}")
+def delete_showcase(item_id: int, user: dict = Depends(current_user)):
+    with _lock:
+        item = find_showcase(item_id)
+        if item["author_key"] != user["key"] and user["role"] != "trainer":
+            fail(403, "not_author")
+        db["showcase"].remove(item)
+        save_db()
+    if item.get("image"):
+        delete_blob(item["image"]["stored"])
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- Kickstart kit (idei alese)
+
+@app.get("/api/proposals/{proposal_id}/kickstart")
+def proposal_kickstart(proposal_id: int, user: dict = Depends(current_user)):
+    p = find_proposal(proposal_id)
+    if not p.get("chosen") or is_withdrawn(p):
+        fail(400, "not_chosen")
+    lang = current_lang.get()
+    cached = db.setdefault("kickstarts", {}).get(str(proposal_id), {}).get(lang)
+    if cached:
+        return cached
+    # O singură generare per idee și limbă; apoi o citește toată clasa din memorie
+    kit = tools.kickstart(p, lang) if ai.available() else None
+    if not kit:
+        return {"ai": False}
+    with _lock:
+        db["kickstarts"].setdefault(str(proposal_id), {})[lang] = kit
+        save_db()
+    return kit
 
 
 if __name__ == "__main__":

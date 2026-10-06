@@ -17,7 +17,10 @@ RULES = {
     "vote": 2,              # fiecare vot primit de la colegi
     "chosen": 30,           # idee aleasă de trainer
     "question": 2,          # întrebare pusă (maxim QUESTIONS_PER_DAY pe zi)
+    "showcase": 10,         # proiect arătat la Demo Day (maxim SHOWCASE_COUNTED)
+    "spotlight": 25,        # proiectul săptămânii, ales de trainer
 }
+SHOWCASE_COUNTED = 3
 QUESTIONS_PER_DAY = 3
 
 LEVELS = [  # (puncte minime, cheie de traducere)
@@ -85,6 +88,14 @@ def compute(db: dict) -> dict:
         if per_day[day] <= QUESTIONS_PER_DAY:
             add(q["author_key"], "question", RULES["question"], q["text"][:60], q["created_at"])
 
+    shown = defaultdict(int)
+    for item in sorted(db.get("showcase", []), key=lambda x: x["created_at"]):
+        shown[item["author_key"]] += 1
+        if shown[item["author_key"]] <= SHOWCASE_COUNTED:
+            add(item["author_key"], "showcase", RULES["showcase"], item["title"], item["created_at"])
+        if item.get("spotlight"):
+            add(item["author_key"], "spotlight", RULES["spotlight"], item["title"], item.get("spotlight_at") or item["created_at"])
+
     for b in db.get("bonuses", []):
         add(b["student_key"], "bonus", b["points"], b["reason"], b["created_at"])
 
@@ -105,5 +116,6 @@ def badges(key: str, db: dict, total: int) -> list:
         "chosen": any(p.get("chosen") for p in db.get("proposals", []) if p["author_key"] == key),
         "perfectionist": any(x.get("status") == "reviewed" and len(x.get("checklist", [])) == 6 for x in subs),
         "century": total >= 100,
+        "demo_day": any(x["author_key"] == key for x in db.get("showcase", [])),
     }
     return [k for k, ok in checks.items() if ok]

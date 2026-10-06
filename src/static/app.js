@@ -13,7 +13,7 @@ const INTRO_MS = 7000;
 const CHECKLIST = ["features", "privacy", "ai_consent", "github_readme", "no_keys", "trainer_access"];
 const BADGES = {
   first_question: "❓", first_homework: "📚", five_homework: "🔥", first_idea: "💡",
-  crowd_favorite: "🎉", chosen: "🏆", perfectionist: "💎", century: "💯",
+  crowd_favorite: "🎉", chosen: "🏆", perfectionist: "💎", century: "💯", demo_day: "🎬",
 };
 const NEWS_HUE = { launch: 330, tools: 190, models: 265, research: 150, industry: 35 };
 
@@ -576,6 +576,7 @@ function showView(name) {
   if (name === "points") loadPoints();
   if (name === "workshop") showWs(wsTab);
   if (name === "live") { loadLive(); scheduleLive(); }
+  if (name === "showcase") loadShowcase();
   if (name === "guide") { loadHall(); loadFaq(); }
   window.scrollTo({ top: 0, behavior: motionOff() ? "auto" : "smooth" });
 }
@@ -1725,6 +1726,7 @@ function proposalCard(p, rank) {
       onclick: () => act(`/api/proposals/${p.id}/vote`),
     }, `▲ ${p.votes}`));
   }
+  if (p.chosen && p.status !== "withdrawn") actions.append(el("button", { class: "small kick", onclick: () => openKickstart(p) }, t("kick.open")));
   if (p.mine && p.status !== "withdrawn") actions.append(withdrawControls(p));
   return el("article", { class: `item ${p.chosen ? "chosen" : ""} ${p.status === "withdrawn" ? "withdrawn" : ""}` },
     el("div", { class: "item-head" },
@@ -2569,6 +2571,109 @@ function liveRoom() {
 
   return el("div", {}, head, el("div", { class: "live-grid" }, el("div", { class: "live-col" }, stuck, poll, ticketCard), queue));
 }
+
+
+// ================================================================ Kickstart kit (idei alese)
+
+async function openKickstart(p) {
+  const list = (items) => el("ol", { class: "doctor-steps" }, ...items.map((x) => el("li", {}, x)));
+  openDrawer("kickstart", 280, [el("div", { class: "ico" }, "🚀"), el("h2", { id: "drawer-title" }, p.title), scanning(t("kick.loading"))]);
+  let kit;
+  try { kit = await api(`/api/proposals/${p.id}/kickstart`); } catch (err) { kit = { ai: false }; }
+  // Fără AI: un plan simplu construit din ce a scris studentul în propunere
+  const firstPrompt = kit.ai ? kit.first_prompt : t("kick.localPrompt", p.title, p.description, p.audience);
+  const firstHour = kit.ai ? kit.first_hour : t("kick.localHour").split(" | ");
+  const later = kit.ai ? kit.later : t("kick.localLater").split(" | ");
+  openDrawer("kickstart", 280, [
+    el("div", { class: "ico" }, "🚀"),
+    el("h2", { id: "drawer-title" }, p.title),
+    el("p", { class: "muted" }, t("kick.lead", p.author)),
+    el("h4", {}, t("kick.first")),
+    el("div", { class: "prompt-box" }, el("p", {}, firstPrompt), el("button", { type: "button", class: "small", onclick: () => copy(firstPrompt) }, t("byte.copyPrompt"))),
+    el("h4", {}, t("kick.hour")), list(firstHour),
+    el("h4", {}, t("kick.later")), list(later),
+    kit.ai ? el("p", {}, el("b", {}, t("kick.stack")), " ", kit.stack) : null,
+    kit.ai ? el("div", { class: "alarm soft" }, el("b", {}, t("kick.risk")), " ", kit.risk) : null,
+    el("h4", {}, t("kick.done")),
+    el("ul", { class: "doctor-steps" }, ...CHECKLIST.map((k) => el("li", {}, t("s.ck." + k)))),
+    el("div", { class: "row" }, el("button", { type: "button", class: "small", onclick: () => { closeDrawer(); showView("workshop"); showWs("repo"); } }, t("rc.checkBtn"))),
+  ]);
+}
+
+// ================================================================ Demo Day (public)
+
+let showcase = [];
+const imageUrls = {};
+
+async function loadShowcase() {
+  if (!auth) return;
+  try { showcase = await api("/api/showcase"); } catch (_) { return; }
+  renderShowcase();
+}
+
+// Imaginile cer autentificare: le luăm cu fetch și le punem ca blob local
+async function showcaseImage(item, img) {
+  if (imageUrls[item.id]) { img.src = imageUrls[item.id]; return; }
+  try {
+    const res = await fetch(`/api/showcase/${item.id}/image`, { headers: { Authorization: `Bearer ${auth.token}` } });
+    if (!res.ok) return;
+    imageUrls[item.id] = URL.createObjectURL(await res.blob());
+    img.src = imageUrls[item.id];
+  } catch (_) {}
+}
+
+function showcaseCard(item, big = false) {
+  const img = el("img", { alt: item.title, loading: "lazy" });
+  if (item.has_image) showcaseImage(item, img);
+  const react = (e) => el("button", { type: "button", class: `react ${item.my_reactions.includes(e) ? "on" : ""}`, disabled: item.mine, onclick: async () => {
+    try { Object.assign(item, await api(`/api/showcase/${item.id}/react`, { method: "POST", body: { emoji: e } })); renderShowcase(); } catch (err) { toast(err.message); }
+  } }, e, " ", el("b", {}, String(item.reactions[e])));
+  return el("article", { class: `show-card ${big ? "big" : ""} ${item.spotlight ? "spot" : ""}` },
+    el("div", { class: `shot ${item.has_image ? "" : "empty"}` }, item.has_image ? img : el("span", {}, "★"),
+      item.spotlight ? el("span", { class: "spot-pill" }, t("sc.spotlight")) : null),
+    el("div", { class: "show-body" },
+      el("div", { class: "meta mono muted small" }, `${item.author} · ${timeAgo(item.created_at)}`),
+      el("h3", {}, item.title),
+      item.description ? el("p", {}, item.description) : null,
+      el("div", { class: "row" },
+        safeLink(item.live_url) ? el("a", { class: "btn-link primary", href: item.live_url, target: "_blank", rel: "noopener noreferrer" }, t("sc.open")) : null,
+        safeLink(item.repo_url) ? el("a", { class: "btn-link", href: item.repo_url, target: "_blank", rel: "noopener noreferrer" }, "GitHub ↗") : null),
+      el("div", { class: "row reacts" }, ...["🔥", "👏", "💡", "🤯"].map(react),
+        isTrainer() ? el("button", { type: "button", class: `small ${item.spotlight ? "on" : "ghost"}`, onclick: async () => {
+          try { await api(`/api/showcase/${item.id}/spotlight`, { method: "POST" }); loadShowcase(); confetti(); } catch (err) { toast(err.message); }
+        } }, t(item.spotlight ? "sc.unspot" : "sc.spot")) : null,
+        item.mine || isTrainer() ? el("button", { type: "button", class: "small ghost", onclick: async () => {
+          if (!confirm(t("sc.deleteConfirm"))) return;
+          try { await api(`/api/showcase/${item.id}`, { method: "DELETE" }); loadShowcase(); } catch (err) { toast(err.message); }
+        } }, "✕") : null)));
+}
+
+function renderShowcase() {
+  const spot = showcase.find((x) => x.spotlight);
+  $("#spotlight").replaceChildren(...(spot ? [el("p", { class: "eyebrow mono" }, t("sc.weekTitle")), showcaseCard(spot, true)] : []));
+  const rest = showcase.filter((x) => !x.spotlight);
+  $("#showcase-list").replaceChildren(...(rest.length ? rest.map((x) => showcaseCard(x)) : spot ? [] : [el("div", { class: "empty" }, t("sc.empty"))]));
+}
+
+$("#sc-image").addEventListener("change", () => { const f = $("#sc-image").files[0]; $("#sc-image-name").textContent = f ? f.name : ""; });
+
+$("#showcase-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = new FormData();
+  [["title", "#sc-title"], ["description", "#sc-desc"], ["live_url", "#sc-live"], ["repo_url", "#sc-repo"]].forEach(([k, sel]) => form.append(k, $(sel).value));
+  if ($("#sc-image").files[0]) form.append("image", $("#sc-image").files[0]);
+  try {
+    const res = await fetch("/api/showcase", { method: "POST", body: form, headers: { "X-Lang": lang, Authorization: `Bearer ${auth.token}` } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(Array.isArray(data.detail) ? t("err.check") : data.detail || t("err.generic"));
+    ["#sc-title", "#sc-desc", "#sc-live", "#sc-repo", "#sc-image"].forEach((sel) => ($(sel).value = ""));
+    $("#sc-image-name").textContent = "";
+    toast(t("sc.published"));
+    confetti();
+    loadShowcase();
+    loadPoints();
+  } catch (err) { toast(err.message); }
+});
 
 // ================================================================ points & leaderboard
 
