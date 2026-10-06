@@ -536,6 +536,8 @@ function logout(expired = false) {
   auth = null;
   supaToken = null;
   digestData = null; digestDate = null;
+  live = null;
+  clearTimeout(livePollTimer);
   clearTimeout(digestPoll);
   if ("speechSynthesis" in window) speechSynthesis.cancel();
   speaking = false;
@@ -573,6 +575,7 @@ function showView(name) {
   if (name === "news" && !digestData) loadDigest();
   if (name === "points") loadPoints();
   if (name === "workshop") showWs(wsTab);
+  if (name === "live") { loadLive(); scheduleLive(); }
   if (name === "guide") { loadHall(); loadFaq(); }
   window.scrollTo({ top: 0, behavior: motionOff() ? "auto" : "smooth" });
 }
@@ -675,6 +678,8 @@ async function start(fromLogin = false) {
   await Promise.all([refresh(), intro]);
   loadNews();
   loadDigest();
+  loadLive();
+  scheduleLive();
   maybeOnboard();
 }
 
@@ -2420,6 +2425,149 @@ function renderHall() {
         if (!confirm(t("hall.deleteConfirm"))) return;
         try { await api(`/api/hall/${h.id}`, { method: "DELETE" }); loadHall(); } catch (err) { toast(err.message); }
       } }, "✕") : null))) : [el("div", { class: "empty" }, t("hall.empty"))]));
+}
+
+
+// ================================================================ Ora live (public, cât ține ora)
+
+let live = null, livePollTimer = null;
+
+async function loadLive() {
+  if (!auth) return;
+  const wasActive = live && live.active;
+  try { live = await api("/api/live"); } catch (_) { return; }
+  if (live.active && wasActive === false && !isTrainer()) toast(t("live.startedToast"));
+  renderLive();
+}
+
+function scheduleLive() {
+  clearTimeout(livePollTimer);
+  livePollTimer = setTimeout(async () => {
+    await loadLive();
+    if (auth) scheduleLive();
+  }, currentView === "live" ? 3000 : 20000);
+}
+
+async function liveAction(path, body = {}) {
+  try {
+    live = await api(path, { method: "POST", body });
+    renderLive();
+    return true;
+  } catch (err) { toast(err.message); return false; }
+}
+
+function renderLive() {
+  if (!auth) return;
+  const on = Boolean(live && live.active);
+  $("#live-badge").classList.toggle("hidden", !on);
+  const nav = document.querySelector('.nav-item[data-view="live"]');
+  if (nav) nav.classList.toggle("on-air", on);
+  $("#live-lead").textContent = t(on ? "live.leadOn" : "live.leadOff");
+  if (!live) return;
+  // Nu redesenăm cât timp cineva scrie în ecranul live (altfel pierde textul)
+  const active = document.activeElement;
+  if (active && $("#live-body").contains(active) && /INPUT|TEXTAREA/.test(active.tagName) && active.value) return;
+  $("#live-body").replaceChildren(on ? liveRoom() : liveOff());
+}
+
+function liveOff() {
+  if (isTrainer()) {
+    const title = el("input", { maxlength: 120, placeholder: t("live.titlePh") });
+    return el("form", { class: "card composer live-start", onsubmit: (e) => { e.preventDefault(); liveAction("/api/live/start", { title: title.value }); } },
+      el("div", { class: "composer-head" }, el("span", { class: "prompt mono live-dot" }, "●"), el("h2", {}, t("live.startTitle"))),
+      title, el("div", { class: "row end" }, el("button", { type: "submit", class: "primary glow" }, t("live.start"))));
+  }
+  const recent = live.last_ended_at && Date.now() - new Date(live.last_ended_at) < 3 * 3600 * 1000;
+  return el("div", { class: "card empty live-off" },
+    el("div", { class: "live-orb" }), el("h3", {}, t("live.offTitle")), el("p", { class: "muted" }, t("live.offText")),
+    recent ? el("div", { class: "live-after" }, el("p", {}, t("live.ended")),
+      el("button", { type: "button", class: "primary", onclick: () => showView("box") }, t("live.toBox"))) : null);
+}
+
+function liveRoom() {
+  const T = isTrainer();
+  const head = el("div", { class: "card live-head" },
+    el("span", { class: "on-air-pill mono" }, el("i"), "LIVE"),
+    el("div", {}, el("h2", {}, live.title || t("live.title")), el("p", { class: "muted small mono" }, t("live.started", timeAgo(live.started_at)))),
+    T ? el("button", { type: "button", class: "small ghost", onclick: () => { if (confirm(t("live.endConfirm"))) liveAction("/api/live/end"); } }, t("live.end")) : null);
+
+  // „M-am blocat”: studentul apasă, trainerul vede doar numărul
+  const stuck = T
+    ? el("div", { class: "card live-stuck trainer" },
+        el("b", { class: `stuck-num ${live.stuck ? "hot" : ""}` }, String(live.stuck)),
+        el("p", {}, t("live.stuckCount", live.stuck)), el("p", { class: "muted small" }, t("live.stuckPeak", live.stuck_peak)),
+        el("button", { type: "button", class: "small", onclick: () => liveAction("/api/live/stuck/reset") }, t("live.stuckReset")))
+    : el("div", { class: "card live-stuck" },
+        el("button", { type: "button", class: `stuck-btn ${live.me_stuck ? "on" : ""}`, onclick: () => liveAction("/api/live/stuck") },
+          t(live.me_stuck ? "live.unstuckBtn" : "live.stuckBtn")),
+        el("p", { class: "muted small" }, t("live.stuckAnon")),
+        live.stuck ? el("p", { class: "small" }, t("live.stuckCount", live.stuck)) : null);
+
+  const poll = el("div", { class: "card panel live-poll" }, el("div", { class: "panel-head" }, el("h3", {}, t("live.pollTitle"))));
+  if (T) {
+    const q = el("input", { maxlength: 200, placeholder: t("live.pollQ") });
+    const opts = [1, 2, 3, 4].map((i) => el("input", { maxlength: 80, placeholder: t("live.pollOpt", i) }));
+    poll.append(el("form", { class: "poll-form", onsubmit: async (e) => {
+      e.preventDefault();
+      if (await liveAction("/api/live/polls", { question: q.value, options: opts.map((o) => o.value) })) { q.value = ""; opts.forEach((o) => (o.value = "")); }
+    } }, q, el("div", { class: "poll-opts" }, ...opts), el("div", { class: "row end" }, el("button", { type: "submit", class: "small primary" }, t("live.pollStart")))));
+  }
+  if (!live.polls.length) poll.append(el("p", { class: "muted small" }, t("live.pollNone")));
+  live.polls.slice(0, 3).forEach((p) => {
+    const total = Math.max(1, p.total);
+    poll.append(el("div", { class: `poll ${p.open ? "open" : ""}` },
+      el("b", {}, p.question),
+      ...p.options.map((o, i) => p.results
+        ? el("div", { class: `poll-res ${p.my_vote === i ? "mine" : ""}` }, el("span", { class: "fill", style: `width:${Math.round((p.results[i] / total) * 100)}%` }),
+            el("span", { class: "lbl" }, o), el("span", { class: "mono" }, `${Math.round((p.results[i] / total) * 100)}%`))
+        : el("button", { type: "button", class: "poll-opt", onclick: () => liveAction(`/api/live/polls/${p.id}/vote`, { option: i }) }, o)),
+      el("div", { class: "row" }, el("span", { class: "muted small mono" }, t("live.pollVotes", p.total)),
+        T && p.open ? el("button", { type: "button", class: "small ghost", onclick: () => liveAction(`/api/live/polls/${p.id}/close`) }, t("live.pollClose")) : null,
+        !T && p.open && p.my_vote != null ? el("span", { class: "muted small" }, t("live.voteChange")) : null)));
+    if (!T && p.open && p.results) {
+      // poți schimba votul: butoanele rămân sub rezultate
+      poll.lastChild.append(el("div", { class: "chips" }, ...p.options.map((o, i) =>
+        el("button", { type: "button", class: `chip ${p.my_vote === i ? "on" : ""}`, onclick: () => liveAction(`/api/live/polls/${p.id}/vote`, { option: i }) }, o))));
+    }
+  });
+
+  const ticketCard = el("div", { class: "card panel live-ticket" }, el("div", { class: "panel-head" }, el("h3", {}, t("live.ticketTitle"))));
+  if (T) {
+    const q = el("input", { maxlength: 300, placeholder: t("live.ticketPh"), value: live.ticket ? live.ticket.question : "" });
+    ticketCard.append(el("form", { class: "row", onsubmit: (e) => { e.preventDefault(); liveAction("/api/live/ticket", { question: q.value }); } },
+      q, el("button", { type: "submit", class: "small" }, t("live.ticketSet"))));
+    if (live.ticket) {
+      ticketCard.append(el("p", { class: "muted small mono" }, t("live.ticketAnswers", live.ticket.count)),
+        el("div", { class: "ticket-answers" }, ...live.ticket.answers.map((a) => el("div", { class: "ticket-a" }, avatar(a.name), el("div", {}, el("b", {}, a.name), el("p", {}, a.text))))));
+    }
+  } else if (!live.ticket) {
+    ticketCard.append(el("p", { class: "muted small" }, t("live.ticketWait")));
+  } else {
+    const a = el("textarea", { rows: 2, maxlength: 1000 });
+    a.value = live.ticket.my_answer || "";
+    ticketCard.append(el("p", {}, el("b", {}, live.ticket.question)),
+      el("form", { onsubmit: (e) => { e.preventDefault(); liveAction("/api/live/ticket/answer", { text: a.value }).then((ok) => ok && toast(t("live.ticketSent"))); } },
+        a, el("div", { class: "row end" }, el("button", { type: "submit", class: "small primary" }, t("live.ticketSend")))));
+    if (live.ticket.my_answer) ticketCard.append(el("p", { class: "muted small" }, t("live.ticketSent")));
+  }
+
+  const text = el("input", { maxlength: 500, placeholder: t("live.queuePh") });
+  const anon = el("input", { type: "checkbox" });
+  const queue = el("div", { class: "card panel live-queue" },
+    el("div", { class: "panel-head" }, el("h3", {}, t("live.queueTitle")), el("span", { class: "muted small mono" }, String(live.queue.length))),
+    el("form", { class: "queue-form", onsubmit: async (e) => {
+      e.preventDefault();
+      if (await liveAction("/api/live/questions", { text: text.value, anonymous: anon.checked })) text.value = "";
+    } }, text, el("label", { class: "check small" }, anon, t("live.anon")), el("button", { type: "submit", class: "small primary" }, t("live.ask"))),
+    ...(live.queue.length ? live.queue.map((q) => el("div", { class: `queue-item ${q.answered ? "done" : ""}` },
+      el("button", { type: "button", class: `upvote ${q.upvoted ? "on" : ""}`, disabled: q.mine, onclick: () => liveAction(`/api/live/questions/${q.id}/upvote`) },
+        el("span", {}, "▲"), el("b", {}, String(q.upvotes))),
+      el("div", {}, el("p", {}, q.text), el("span", { class: "muted small" }, q.author || t("live.anon"), " · ", timeAgo(q.created_at))),
+      q.answered ? el("span", { class: "tag" }, t("live.answered")) : null,
+      T ? el("button", { type: "button", class: "small ghost", onclick: () => liveAction(`/api/live/questions/${q.id}/answered`) }, q.answered ? "↺" : t("live.markAnswered")) : null))
+      : [el("p", { class: "muted small" }, t("live.queueEmpty"))]));
+
+  return el("div", {}, head, el("div", { class: "live-grid" }, el("div", { class: "live-col" }, stuck, poll, ticketCard), queue));
 }
 
 // ================================================================ points & leaderboard

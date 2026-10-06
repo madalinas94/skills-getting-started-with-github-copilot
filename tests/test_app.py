@@ -22,7 +22,7 @@ def reset_db():
     app_module.db.update({
         "users": {}, "sessions": {}, "prefs": {}, "drafts": [], "questions": [], "proposals": [], "submissions": [],
         "messages": [], "assignments": [], "announcements": [], "bonuses": [], "next_id": 1,
-        "doctor": [], "hall": [], "live": None, "showcase": [], "faq": [], "challenges": {}, "push": {}, "kickstarts": {},
+        "doctor": [], "hall": [], "live": None, "live_history": [], "showcase": [], "faq": [], "challenges": {}, "push": {}, "kickstarts": {},
     })
     app_module._failed.clear()
     app_module._cooldowns.clear()
@@ -1008,3 +1008,42 @@ def test_hall_of_prompts_likes_and_ownership():
 def test_each_key_is_reported_once():
     assert [k for k, _ in repocheck.find_keys(FAKE_KEY)] == ["Anthropic"]
     assert [k for k, _ in repocheck.find_keys("sk-proj-" + "a" * 40)] == ["OpenAI"]
+
+
+# ---------------------------------------------------------------- Ora live
+
+def test_live_class_flow_and_privacy():
+    ha, hb, ht = login("Ana"), login("Vlad"), login("Radu", "trainer")
+    assert client.get("/api/live", headers=ha).json() == {"active": False, "last_ended_at": None}
+    assert client.post("/api/live/stuck", headers=ha).status_code == 409          # fără oră pornită
+    assert client.post("/api/live/start", headers=ha, json={}).status_code == 403  # doar trainerul pornește ora
+    assert client.post("/api/live/start", headers=ht, json={"title": "Supabase"}).json()["active"]
+
+    # „M-am blocat”: anonim, doar un număr
+    v = client.post("/api/live/stuck", headers=ha).json()
+    assert v["stuck"] == 1 and v["me_stuck"] and "Ana" not in _json.dumps(v)
+    assert client.get("/api/live", headers=ht).json()["stuck"] == 1
+
+    # Vot: rezultatele apar după ce votezi
+    client.post("/api/live/polls", headers=ht, json={"question": "Ați terminat?", "options": ["Da", "Aproape", ""]})
+    poll = client.get("/api/live", headers=ha).json()["polls"][0]
+    assert poll["options"] == ["Da", "Aproape"] and poll["results"] is None
+    assert client.post(f"/api/live/polls/{poll['id']}/vote", headers=ha, json={"option": 1}).json()["polls"][0]["results"] == [0, 1]
+    assert client.post("/api/live/polls", headers=ht, json={"question": "Gata?", "options": ["doar una"]}).status_code == 400
+
+    # Coada de întrebări: anonimatul ascunde numele de toți
+    q = client.post("/api/live/questions", headers=ha, json={"text": "Cum pun cheia în Render?", "anonymous": True}).json()["queue"][0]
+    assert q["author"] is None
+    assert client.post(f"/api/live/questions/{q['id']}/upvote", headers=ha).status_code == 400
+    assert client.post(f"/api/live/questions/{q['id']}/upvote", headers=hb).json()["queue"][0]["upvotes"] == 1
+    assert "Ana" not in _json.dumps(client.get("/api/live", headers=ht).json()["queue"])
+
+    # Biletul de ieșire: doar trainerul vede toate răspunsurile
+    client.post("/api/live/ticket", headers=ht, json={"question": "Ce ai învățat azi?"})
+    client.post("/api/live/ticket/answer", headers=ha, json={"text": "Cum ascund cheile"})
+    assert client.get("/api/live", headers=hb).json()["ticket"] == {"question": "Ce ai învățat azi?", "my_answer": None, "count": 1, "answers": None}
+    assert client.get("/api/live", headers=ha).json()["ticket"]["my_answer"] == "Cum ascund cheile"
+    assert client.get("/api/live", headers=ht).json()["ticket"]["answers"][0]["name"] == "Ana"
+
+    end = client.post("/api/live/end", headers=ht).json()
+    assert end == {"active": False, "last_ended_at": app_module.db["live_history"][-1]["ended_at"]}

@@ -134,6 +134,10 @@ MESSAGES = {
     "no_item": ("Nu există.", "Not found.", "Introuvable.", "Non trovato.", "No encontrado.", "Nicht gefunden."),
     "own_like": ("Nu-ți poți aprecia propriul prompt.", "You can't like your own prompt.", "Tu ne peux pas aimer ton propre prompt.", "Non puoi mettere like al tuo prompt.", "No puedes dar me gusta a tu propio prompt.", "Du kannst deinen eigenen Prompt nicht liken."),
     "too_many_posts": ("Ai atins limita de {}. Șterge unul mai vechi.", "You've reached the limit of {}. Delete an older one.", "Tu as atteint la limite de {}. Supprimes-en un ancien.", "Hai raggiunto il limite di {}. Eliminane uno vecchio.", "Has llegado al límite de {}. Borra uno anterior.", "Du hast das Limit von {} erreicht. Lösch einen älteren."),
+    "live_off": ("Nu e nicio oră live acum.", "There's no live class right now.", "Aucun cours en direct pour l'instant.", "Nessuna lezione live in questo momento.", "No hay ninguna clase en vivo ahora.", "Gerade läuft keine Live-Stunde."),
+    "poll_closed": ("Votul s-a închis.", "Voting is closed.", "Le vote est clos.", "La votazione è chiusa.", "La votación está cerrada.", "Die Abstimmung ist geschlossen."),
+    "poll_options": ("Scrie între 2 și 4 variante.", "Write between 2 and 4 options.", "Écris entre 2 et 4 options.", "Scrivi da 2 a 4 opzioni.", "Escribe entre 2 y 4 opciones.", "Schreib 2 bis 4 Optionen."),
+    "no_ticket": ("Trainerul n-a pus încă întrebarea de final.", "The trainer hasn't posted the exit question yet.", "Le formateur n'a pas encore posé la question de fin.", "Il trainer non ha ancora posto la domanda finale.", "El formador aún no ha puesto la pregunta final.", "Der Trainer hat die Abschlussfrage noch nicht gestellt."),
     "no_announcement": ("Anunțul nu există.", "Announcement not found.", "Annonce introuvable.", "Annuncio non trovato.", "Anuncio no encontrado.", "Ankündigung nicht gefunden."),
 }
 FIELD_NAMES = {
@@ -1658,6 +1662,236 @@ def hall_delete(item_id: int, user: dict = Depends(current_user)):
         db["hall"].remove(h)
         save_db()
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Ora live (🌐 public, doar cât ține ora): butonul anonim „M-am blocat”, voturi
+# rapide, coada de întrebări cu upvote și biletul de ieșire. Răspunsurile la
+# bilet le vede doar trainerul (și fiecare student pe al lui). Interfața
+# întreabă serverul la câteva secunde (fără websocket, ca să rămână simplu).
+# ---------------------------------------------------------------------------
+
+LIVE_KEEP = 12
+
+
+class LiveStartIn(BaseModel):
+    title: str = Field("", max_length=120)
+
+
+class PollIn(BaseModel):
+    question: str = Field(min_length=2, max_length=200)
+    options: list[str] = Field(max_length=4)
+
+
+class VoteIn(BaseModel):
+    option: int = Field(ge=0, le=3)
+
+
+class LiveQuestionIn(BaseModel):
+    text: str = Field(min_length=3, max_length=500)
+    anonymous: bool = False
+
+
+class TicketIn(BaseModel):
+    question: str = Field(min_length=3, max_length=300)
+
+
+class TicketAnswerIn(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+
+
+def live_session() -> dict:
+    live = db.get("live")
+    if not live:
+        fail(409, "live_off")
+    return live
+
+
+def live_view(user: dict) -> dict:
+    live = db.get("live")
+    history = db.get("live_history", [])
+    if not live:
+        return {"active": False, "last_ended_at": history[-1]["ended_at"] if history else None}
+    me, trainer = user["key"], user["role"] == "trainer"
+    polls = []
+    for p in live["polls"]:
+        voted = me in p["votes"]
+        counts = [sum(1 for v in p["votes"].values() if v == i) for i in range(len(p["options"]))]
+        show = trainer or voted or not p["open"]
+        polls.append({"id": p["id"], "question": p["question"], "options": p["options"], "open": p["open"],
+                      "my_vote": p["votes"].get(me), "results": counts if show else None, "total": len(p["votes"])})
+    queue = sorted(live["queue"], key=lambda q: (q["answered"], -len(q["upvoters"]), q["created_at"]))
+    ticket = live.get("ticket")
+    return {
+        "active": True, "id": live["id"], "title": live["title"], "started_at": live["started_at"],
+        "stuck": len(live["stuck"]), "me_stuck": me in live["stuck"], "stuck_peak": live["stuck_peak"],
+        "polls": polls[::-1],
+        "queue": [{"id": q["id"], "text": q["text"], "author": None if q["anonymous"] else q["author"],
+                   "upvotes": len(q["upvoters"]), "upvoted": me in q["upvoters"], "mine": q["author_key"] == me,
+                   "answered": q["answered"], "created_at": q["created_at"]} for q in queue],
+        "ticket": None if not ticket else {
+            "question": ticket["question"], "my_answer": (ticket["answers"].get(me) or {}).get("text"),
+            "count": len(ticket["answers"]),
+            # Biletele de ieșire le vede doar trainerul
+            "answers": [{"name": a["name"], "text": a["text"], "at": a["at"]} for a in ticket["answers"].values()] if trainer else None},
+    }
+
+
+@app.get("/api/live")
+def get_live(user: dict = Depends(current_user)):
+    return live_view(user)
+
+
+@app.post("/api/live/start")
+def start_live(body: LiveStartIn, user: dict = Depends(require_trainer)):
+    with _lock:
+        if not db.get("live"):
+            db["live"] = {"id": next_id(), "title": body.title.strip(), "started_at": now(), "stuck": [], "stuck_peak": 0,
+                          "polls": [], "queue": [], "ticket": None}
+            save_db()
+    notify_all_students("push_live", url="/static/index.html#live")
+    return live_view(user)
+
+
+@app.post("/api/live/end")
+def end_live(user: dict = Depends(require_trainer)):
+    with _lock:
+        live = live_session()
+        live["ended_at"] = now()
+        # Păstrăm ora în istoric (pentru recapitulare și misiunile săptămânii)
+        db.setdefault("live_history", []).append(live)
+        db["live_history"] = db["live_history"][-LIVE_KEEP:]
+        db["live"] = None
+        save_db()
+    return live_view(user)
+
+
+@app.post("/api/live/stuck")
+def toggle_stuck(user: dict = Depends(require_student)):
+    with _lock:
+        live = live_session()
+        if user["key"] in live["stuck"]:
+            live["stuck"].remove(user["key"])
+        else:
+            live["stuck"].append(user["key"])
+            live.setdefault("stuck_log", []).append({"key": user["key"], "at": now()})
+        live["stuck_peak"] = max(live["stuck_peak"], len(live["stuck"]))
+        save_db()
+    return live_view(user)
+
+
+@app.post("/api/live/stuck/reset")
+def reset_stuck(user: dict = Depends(require_trainer)):
+    with _lock:
+        live_session()["stuck"] = []
+        save_db()
+    return live_view(user)
+
+
+@app.post("/api/live/polls")
+def create_poll(body: PollIn, user: dict = Depends(require_trainer)):
+    options = [o.strip()[:80] for o in body.options if o.strip()]
+    if not 2 <= len(options) <= 4:
+        fail(400, "poll_options")
+    with _lock:
+        live = live_session()
+        for p in live["polls"]:
+            p["open"] = False  # un singur vot deschis odată
+        live["polls"].append({"id": next_id(), "question": body.question.strip(), "options": options, "votes": {},
+                              "open": True, "created_at": now()})
+        save_db()
+    return live_view(user)
+
+
+def find_poll(live: dict, poll_id: int) -> dict:
+    poll = next((p for p in live["polls"] if p["id"] == poll_id), None)
+    if poll is None:
+        fail(404, "no_item")
+    return poll
+
+
+@app.post("/api/live/polls/{poll_id}/vote")
+def vote_poll(poll_id: int, body: VoteIn, user: dict = Depends(require_student)):
+    with _lock:
+        poll = find_poll(live_session(), poll_id)
+        if not poll["open"]:
+            fail(400, "poll_closed")
+        if body.option >= len(poll["options"]):
+            fail(400, "poll_options")
+        poll["votes"][user["key"]] = body.option
+        save_db()
+    return live_view(user)
+
+
+@app.post("/api/live/polls/{poll_id}/close")
+def close_poll(poll_id: int, user: dict = Depends(require_trainer)):
+    with _lock:
+        find_poll(live_session(), poll_id)["open"] = False
+        save_db()
+    return live_view(user)
+
+
+@app.post("/api/live/questions", status_code=201)
+def ask_live(body: LiveQuestionIn, user: dict = Depends(current_user)):
+    with _lock:
+        live = live_session()
+        live["queue"].append({"id": next_id(), "text": body.text.strip(), "author_key": user["key"], "author": user["name"],
+                              "anonymous": body.anonymous, "upvoters": [], "answered": False, "created_at": now()})
+        save_db()
+    return live_view(user)
+
+
+def find_live_question(live: dict, qid: int) -> dict:
+    q = next((x for x in live["queue"] if x["id"] == qid), None)
+    if q is None:
+        fail(404, "no_item")
+    return q
+
+
+@app.post("/api/live/questions/{qid}/upvote")
+def upvote_live(qid: int, user: dict = Depends(current_user)):
+    with _lock:
+        q = find_live_question(live_session(), qid)
+        if q["author_key"] == user["key"]:
+            fail(400, "own_vote")
+        if user["key"] in q["upvoters"]:
+            q["upvoters"].remove(user["key"])
+        else:
+            q["upvoters"].append(user["key"])
+        save_db()
+    return live_view(user)
+
+
+@app.post("/api/live/questions/{qid}/answered")
+def answered_live(qid: int, user: dict = Depends(require_trainer)):
+    with _lock:
+        q = find_live_question(live_session(), qid)
+        q["answered"] = not q["answered"]
+        save_db()
+    return live_view(user)
+
+
+@app.post("/api/live/ticket")
+def set_ticket(body: TicketIn, user: dict = Depends(require_trainer)):
+    with _lock:
+        live_session()["ticket"] = {"question": body.question.strip(), "answers": {}, "created_at": now()}
+        save_db()
+    return live_view(user)
+
+
+@app.post("/api/live/ticket/answer")
+def answer_ticket(body: TicketAnswerIn, user: dict = Depends(require_student)):
+    with _lock:
+        ticket = live_session().get("ticket")
+        if not ticket:
+            fail(400, "no_ticket")
+        ticket["answers"][user["key"]] = {"name": user["name"], "text": body.text.strip(), "at": now()}
+        save_db()
+    return live_view(user)
+
+
+def notify_all_students(kind: str, url: str = "/static/index.html"):
+    """Notificări push (completat la secțiunea PWA)."""
 
 
 if __name__ == "__main__":
