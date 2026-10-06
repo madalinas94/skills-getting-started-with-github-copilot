@@ -13,7 +13,7 @@ const INTRO_MS = 7000;
 const CHECKLIST = ["features", "privacy", "ai_consent", "github_readme", "no_keys", "trainer_access"];
 const BADGES = {
   first_question: "❓", first_homework: "📚", five_homework: "🔥", first_idea: "💡",
-  crowd_favorite: "🎉", chosen: "🏆", perfectionist: "💎", century: "💯", demo_day: "🎬",
+  crowd_favorite: "🎉", chosen: "🏆", perfectionist: "💎", century: "💯", demo_day: "🎬", streak_7: "📆", quest_master: "🗺",
 };
 const NEWS_HUE = { launch: 330, tools: 190, models: 265, research: 150, industry: 35 };
 
@@ -537,6 +537,8 @@ function logout(expired = false) {
   supaToken = null;
   digestData = null; digestDate = null;
   live = null;
+  quests = null;
+  recap = null;
   clearTimeout(livePollTimer);
   clearTimeout(digestPoll);
   if ("speechSynthesis" in window) speechSynthesis.cancel();
@@ -573,7 +575,7 @@ function showView(name) {
   if (name === "messages") loadChat();
   if (name === "news" && !newsData && !newsLoading) loadNews();
   if (name === "news" && !digestData) loadDigest();
-  if (name === "points") loadPoints();
+  if (name === "points") { loadPoints(); loadQuests(); }
   if (name === "workshop") showWs(wsTab);
   if (name === "live") { loadLive(); scheduleLive(); }
   if (name === "showcase") loadShowcase();
@@ -681,6 +683,8 @@ async function start(fromLogin = false) {
   loadDigest();
   loadLive();
   scheduleLive();
+  loadQuests();
+  loadRecap();
   maybeOnboard();
 }
 
@@ -863,6 +867,7 @@ function renderLevelCard() {
       el("b", {}, `${t("pt.level", myPoints.level.index)} · ${t("lvl." + myPoints.level.key)}`),
       el("div", { class: "xp" }, el("i", { style: `width:${prog.pct}%` })),
       el("small", {}, prog.text)),
+    quests && quests.streak.current ? el("div", { class: "streak-chip", title: t("qs.streakTitle") }, "🔥 ", el("b", {}, String(quests.streak.current)), " ", t(quests.streak.current === 1 ? "qs.day1" : "qs.days")) : null,
     el("button", { class: "ghost big-btn", onclick: () => showView("points") }, el("span", { class: "big" }, `⚡ ${myPoints.total}`)));
 }
 
@@ -2139,7 +2144,12 @@ function challengeCard(d) {
     box.addEventListener("change", () => {
       done = box.checked ? [...done, i] : done.filter((x) => x !== i);
       try { localStorage.setItem(key, JSON.stringify(done)); } catch (_) {}
-      if (done.length === steps.length) { toast(t("byte.challengeDone")); confetti(); }
+      if (done.length === steps.length) {
+        toast(t("byte.challengeDone"));
+        confetti();
+        // Se numără la misiunea săptămânii „Provocarea lui Byte”
+        if (!isTrainer()) api("/api/challenge", { method: "POST", body: { date: d.date } }).then(loadQuests).catch(() => {});
+      }
     });
     list.append(el("li", {}, el("label", {}, box, el("span", {}, step))));
   });
@@ -2251,7 +2261,7 @@ function renderRepoResult() {
   const alarm = r.checks.some((c) => c.key.startsWith("no_keys") && c.status === "fail");
   $("#repo-result").replaceChildren(el("div", { class: "card panel rc" },
     el("div", { class: "rc-head" },
-      el("div", { class: `ring ${pct === 100 ? "full" : ""}`, style: `--p:${pct}` }, el("b", {}, `${r.passed}/${r.total}`)),
+      el("div", { class: `score-ring ${pct === 100 ? "full" : ""}`, style: `--p:${pct}` }, el("b", {}, `${r.passed}/${r.total}`)),
       el("div", {},
         el("h3", {}, el("a", { href: r.url, target: "_blank", rel: "noopener noreferrer" }, r.repo)),
         el("p", { class: "muted small mono" }, `${r.head} · ${timeAgo(r.checked_at)}`),
@@ -2387,7 +2397,7 @@ function renderLab() {
   } }, t("hall.share")));
   $("#pl-result").replaceChildren(el("div", { class: "card panel lab" },
     el("div", { class: "rc-head" },
-      el("div", { class: `ring ${total >= 16 ? "full" : ""}`, style: `--p:${total * 5}` }, el("b", {}, `${total}/20`)),
+      el("div", { class: `score-ring ${total >= 16 ? "full" : ""}`, style: `--p:${total * 5}` }, el("b", {}, `${total}/20`)),
       el("div", {}, el("h3", {}, t(total >= 16 ? "pl.great" : total >= 10 ? "pl.good" : "pl.weak")), r.verdict ? el("p", {}, r.verdict) : null)),
     r.had_key ? el("div", { class: "alarm" }, t("doc.keyFound")) : null,
     bars,
@@ -2401,7 +2411,110 @@ function renderLab() {
 
 // ---------------------------------------------------------------- Întrebări frecvente (public, în Ghid)
 
-async function loadFaq() {}  // completat mai jos, la „Recap & FAQ”
+let faq = [];
+
+async function loadFaq() {
+  if (!auth) return;
+  try { faq = await api("/api/faq"); } catch (_) { faq = []; }
+  renderFaq();
+}
+
+function faqEditor(item, onDone) {
+  const q = el("input", { maxlength: 300, value: item ? item.q : "", placeholder: t("faq.qPh") });
+  const a = el("textarea", { rows: 3, maxlength: 3000, placeholder: t("faq.aPh") });
+  a.value = item ? item.a : "";
+  return el("form", { class: "card composer faq-form", onsubmit: async (e) => {
+    e.preventDefault();
+    try {
+      await api(item && item.id ? `/api/faq/${item.id}` : "/api/faq", { method: item && item.id ? "PUT" : "POST", body: { q: q.value, a: a.value } });
+      toast(t("faq.saved"));
+      if (onDone) onDone();
+      loadFaq();
+    } catch (err) { toast(err.message); }
+  } }, q, a, el("div", { class: "row end" }, el("button", { type: "submit", class: "small primary" }, t(item && item.id ? "faq.save" : "faq.add"))));
+}
+
+function renderFaq() {
+  $("#faq-trainer").replaceChildren(...(isTrainer() ? [faqEditor(null)] : []));
+  $("#faq-list").replaceChildren(...(faq.length ? faq.map((f) => {
+    const item = el("details", { class: "faq-item" }, el("summary", {}, f.q), el("div", { class: "md-wrap" }, renderMd(f.a)));
+    if (isTrainer()) item.append(el("div", { class: "row" },
+      el("button", { type: "button", class: "small ghost", onclick: () => item.replaceWith(faqEditor(f)) }, t("faq.edit")),
+      el("button", { type: "button", class: "small ghost", onclick: async () => {
+        if (!confirm(t("faq.deleteConfirm"))) return;
+        try { await api(`/api/faq/${f.id}`, { method: "DELETE" }); loadFaq(); } catch (err) { toast(err.message); }
+      } }, "✕")));
+    return item;
+  }) : [el("div", { class: "empty" }, t("faq.empty"))]));
+}
+
+// ---------------------------------------------------------------- Serii și misiuni săptămânale (student)
+
+let quests = null;
+
+async function loadQuests() {
+  if (!auth || isTrainer()) return;
+  try { quests = await api("/api/quests"); } catch (_) { return; }
+  renderLevelCard();
+  if (currentView === "points") renderPoints();
+}
+
+function questsCard() {
+  if (!quests) return el("span");
+  const s = quests.streak;
+  const end = new Date(quests.week_end + "T23:59:59");
+  const daysLeft = Math.max(0, Math.ceil((end - Date.now()) / 86400000));
+  return el("div", { class: "card panel quests" },
+    el("div", { class: "quests-head" },
+      el("div", { class: `flame ${s.today ? "lit" : ""}` }, el("span", {}, "🔥"), el("b", {}, String(s.current))),
+      el("div", {}, el("h3", {}, t(s.current === 1 ? "qs.streak1" : "qs.streak", s.current)), el("p", { class: "muted small" },
+        s.today ? t("qs.todayDone") : s.current ? t("qs.keepGoing") : t("qs.start"), " · ", t("qs.best", s.best)))),
+    el("div", { class: "panel-head" }, el("h3", {}, t("qs.title")), el("span", { class: "muted small mono" }, t("qs.left", daysLeft))),
+    el("div", { class: "quest-list" }, ...quests.quests.map((q) => el("div", { class: `quest ${q.done ? "done" : ""}` },
+      el("span", { class: "q-ico" }, q.done ? "✓" : QUEST_ICON[q.key]),
+      el("div", {}, el("b", {}, t("qs.q." + q.key, q.target)),
+        el("div", { class: "xp" }, el("i", { style: `width:${Math.round((q.progress / q.target) * 100)}%` }))),
+      el("span", { class: "mono small" }, q.done ? `+${quests.reward}` : `${q.progress}/${q.target}`)))));
+}
+const QUEST_ICON = { ask: "?", homework: "⇪", byte: "⏱", lab: "🧪", live: "●", idea: "✦", showcase: "★", doctor: "🩺" };
+
+// ---------------------------------------------------------------- Recap săptămânal (trainer, pe Acasă)
+
+let recap = null;
+
+async function loadRecap(refresh = false) {
+  if (!auth || !isTrainer()) return;
+  if (refresh) $("#recap-card").replaceChildren(scanning(t("rec.loading")));
+  try { recap = await api(`/api/recap${refresh ? "?refresh=true" : ""}`); } catch (err) { if (refresh) toast(err.message); }
+  renderRecap();
+}
+
+function renderRecap() {
+  const card = $("#recap-card");
+  card.classList.toggle("hidden", !isTrainer() || !recap);
+  if (!recap || !isTrainer()) return;
+  const st = recap.stats;
+  const stat = (n, label, view) => el("button", { type: "button", class: "recap-stat", onclick: view ? () => showView(view) : null }, el("b", {}, String(n)), el("span", {}, label));
+  const publish = (s) => {
+    const box = el("div", { class: "faq-suggest" }, el("b", {}, s.q), el("p", { class: "small muted" }, trunc(s.a, 220)),
+      el("button", { type: "button", class: "small", onclick: () => box.replaceWith(faqEditor({ q: s.q, a: s.a }, () => loadRecap())) }, t("rec.toFaq")));
+    return box;
+  };
+  card.replaceChildren(
+    el("div", { class: "panel-head" }, el("h3", {}, t("rec.title")),
+      el("button", { type: "button", class: "link-btn", onclick: () => loadRecap(true) }, t(cfg.ai ? "rec.refreshAi" : "rec.refresh"))),
+    el("div", { class: "recap-stats" },
+      stat(st.active + "/" + st.students, t("rec.active")), stat(st.questions_new, t("rec.qNew"), "questions"),
+      stat(st.questions_open, t("rec.qOpen"), "questions"), stat(st.to_review, t("rec.review"), "submissions"),
+      stat(st.ideas_new, t("rec.ideas"), "box"), stat(st.projects_new, t("rec.projects"), "showcase"),
+      stat(st.live_classes, t("rec.live"), "live"), stat(st.stuck_peak, t("rec.stuck"))),
+    recap.topics.length ? el("div", { class: "chips" }, el("span", { class: "muted small" }, t("rec.topics")),
+      ...recap.topics.map((x) => { const tp = topic(x.key); return el("span", { class: "chip", style: `--h:${tp.hue}` }, `${tp.icon} ${tp.title} · ${x.count}`); })) : null,
+    recap.ai ? el("div", { class: "recap-ai" }, el("p", {}, recap.ai.summary),
+      el("h4", {}, t("rec.focus")), el("ul", {}, ...recap.ai.focus.map((f) => el("li", {}, f)))) : null,
+    recap.inactive.length ? el("p", { class: "small" }, el("b", {}, t("rec.inactive")), " ", recap.inactive.join(", ")) : null,
+    recap.faq_suggestions.length ? el("div", {}, el("h4", {}, t("rec.faq")), el("div", { class: "faq-suggests" }, ...recap.faq_suggestions.map(publish))) : null);
+}
 
 // ---------------------------------------------------------------- Hall of Prompts (public, în Ghid)
 
@@ -2725,6 +2838,7 @@ function renderPoints() {
           el("h2", {}, t("lvl." + myPoints.level.key)),
           el("div", { class: "xp" }, el("i", { style: `width:${prog.pct}%` })),
           el("p", {}, prog.text))),
+      questsCard(),
       el("div", { class: "card panel", style: "margin-bottom:1rem" },
         el("div", { class: "panel-head" }, el("h3", {}, t("pt.badges"))),
         el("div", { class: "badges" }, Object.entries(BADGES).map(([k, icon]) =>
@@ -2738,7 +2852,7 @@ function renderPoints() {
         el("div", { class: "card panel" },
           el("div", { class: "panel-head" }, el("h3", {}, t("pt.history"))),
           ...(myPoints.events.length ? myPoints.events.map((ev) => el("div", { class: "event" },
-            el("span", { title: ev.ref || "" }, `${t("rule." + ev.kind)}${ev.ref ? " · " + ev.ref : ""}`),
+            el("span", { title: ev.ref || "" }, `${t("rule." + ev.kind)}${ev.ref ? " · " + (ev.kind === "quest" ? t("qs.n." + ev.ref) : ev.ref) : ""}`),
             el("b", { class: ev.points < 0 ? "neg" : "" }, `${ev.points > 0 ? "+" : ""}${ev.points}`)))
             : [el("div", { class: "empty" }, t("pt.noHistory"))]))));
   }
@@ -3060,6 +3174,7 @@ setInterval(() => {
   if (!document.querySelector(".answer-form:not(.hidden)") && aiPending.size === 0) loadQuestions().catch(() => {});
   if (!document.querySelector(".review-form:not(.hidden)")) loadSubmissions().catch(() => {});
   loadProposals().catch(() => {});
+  loadQuests();
   loadAssignments().catch(() => {});
   loadAnnouncements().catch(() => {});
   loadPoints();

@@ -22,7 +22,7 @@ def reset_db():
     app_module.db.update({
         "users": {}, "sessions": {}, "prefs": {}, "drafts": [], "questions": [], "proposals": [], "submissions": [],
         "messages": [], "assignments": [], "announcements": [], "bonuses": [], "next_id": 1,
-        "doctor": [], "hall": [], "live": None, "live_history": [], "showcase": [], "faq": [], "challenges": {}, "push": {}, "kickstarts": {},
+        "doctor": [], "hall": [], "live": None, "live_history": [], "showcase": [], "faq": [], "challenges": {}, "push": {}, "kickstarts": {}, "lab_log": {}, "recaps": {}, "digests": [],
     })
     app_module._failed.clear()
     app_module._cooldowns.clear()
@@ -372,7 +372,8 @@ def test_direct_messages_are_private():
 
 # ---------------------------------------------------------------- puncte
 
-def test_points_follow_the_rules():
+def test_points_follow_the_rules(monkeypatch):
+    monkeypatch.setattr(app_module.points, "QUESTS_PER_WEEK", 0)  # misiunile au testul lor
     ana, bob, cris = login("Ana"), login("Bob"), login("Cris")
     trainer = login("Radu", "trainer")
     a = client.post("/api/assignments", json={"title": "Tema 1", "due_at": "2999-01-01T00:00:00Z", "points": 25},
@@ -516,7 +517,8 @@ def make_proposal(headers, title="Quiz"):
     return client.post("/api/proposals", json=body, headers=headers).json()["id"]
 
 
-def test_author_can_withdraw_and_restore_a_proposal():
+def test_author_can_withdraw_and_restore_a_proposal(monkeypatch):
+    monkeypatch.setattr(app_module.points, "QUESTS_PER_WEEK", 0)
     ana, bob = login("Ana"), login("Bob")
     trainer = login("Radu", "trainer")
     pid = make_proposal(ana)
@@ -1091,3 +1093,61 @@ def test_kickstart_only_for_chosen_ideas_and_cached(monkeypatch):
     for _ in range(3):
         assert client.get(f"/api/proposals/{p['id']}/kickstart", headers=login("Vlad")).json()["first_prompt"] == "P"
     assert calls == ["ro"]
+
+
+# ---------------------------------------------------------------- Serii, misiuni, recap, FAQ
+
+def test_weekly_quests_and_streak(monkeypatch):
+    from src import points as P
+    monkeypatch.setattr(P, "quests_for", lambda week: [("ask", "question", 2), ("lab", "prompt_lab", 3), ("byte", "challenge", 2), ("idea", "idea", 1)])
+    h = login("Ana")
+    q = client.get("/api/quests", headers=h).json()
+    assert q["streak"] == {"current": 0, "best": 0, "today": False} and all(not x["done"] for x in q["quests"])
+    for text in ["Cum fac deploy pe Render?", "Ce e un mediu virtual?"]:
+        client.post("/api/questions", headers=h, json={"text": text, "category": "deploy"})
+    q = client.get("/api/quests", headers=h).json()
+    ask = next(x for x in q["quests"] if x["key"] == "ask")
+    assert ask["done"] and ask["progress"] == 2 and q["streak"]["current"] == 1 and q["streak"]["today"]
+    assert {"kind": "quest", "points": 5} .items() <= next(e for e in client.get("/api/points/me", headers=h).json()["events"] if e["kind"] == "quest").items()
+    # Byte: doar azi sau o zi cu briefing; nu în viitor
+    today = P.today().isoformat()
+    assert client.post("/api/challenge", headers=h, json={"date": "2099-01-01"}).status_code == 400
+    assert client.post("/api/challenge", headers=h, json={"date": "2020-01-01"}).status_code == 400
+    assert client.post("/api/challenge", headers=h, json={"date": today}).status_code == 200
+    assert client.get("/api/quests", headers=login("Radu", "trainer")).status_code == 403
+
+
+def test_streak_counts_consecutive_days():
+    from src import points as P
+    from datetime import timedelta as td
+    d = P.today()
+    acts = [("question", (d - td(days=i)).isoformat()) for i in (1, 2, 3)] + [("question", (d - td(days=9)).isoformat())]
+    assert P.streaks(acts) == {"current": 3, "best": 3, "today": False}
+
+
+def test_recap_is_trainer_only_and_sends_no_names(monkeypatch):
+    ha, hb, ht = login("Ana"), login("Vlad"), login("Radu", "trainer")
+    client.post("/api/questions", headers=ha, json={"text": "Cum ascund cheia API?", "category": "security"})
+    qid = client.get("/api/questions", headers=ht).json()[0]["id"]
+    assert client.post(f"/api/questions/{qid}/answer", headers=ht, json={"text": "O pui în .env, iar .env în .gitignore."}).status_code == 200
+    assert client.get("/api/recap", headers=ha).status_code == 403
+    r = client.get("/api/recap", headers=ht).json()
+    assert r["stats"]["questions_new"] == 1 and r["stats"]["students"] == 2 and r["inactive"] == ["Vlad"]
+    assert r["faq_suggestions"] == [{"q": "Cum ascund cheia API?", "a": "O pui în .env, iar .env în .gitignore."}]
+    sent = {}
+    monkeypatch.setattr(app_module.ai, "available", lambda: True)
+    monkeypatch.setattr(app_module.tools, "recap", lambda activity, lang: sent.update(activity=activity) or
+                        {"summary": "S", "focus": ["F"], "faq": [{"q": "Q", "a": "A"}]})
+    r = client.get("/api/recap?refresh=true", headers=ht).json()
+    assert r["ai"]["summary"] == "S" and r["faq_suggestions"] == [{"q": "Q", "a": "A"}]
+    assert "Ana" not in _json.dumps(sent) and "Vlad" not in _json.dumps(sent) and "@" not in _json.dumps(sent)
+
+
+def test_faq_public_read_trainer_write():
+    ha, ht = login("Ana"), login("Radu", "trainer")
+    assert client.post("/api/faq", headers=ha, json={"q": "Întrebare?", "a": "Răspuns"}).status_code == 403
+    f = client.post("/api/faq", headers=ht, json={"q": "Unde pun cheia API?", "a": "În .env, pe server."}).json()
+    assert client.get("/api/faq", headers=ha).json()[0]["q"] == "Unde pun cheia API?"
+    assert client.put(f"/api/faq/{f['id']}", headers=ha, json={"q": "x?", "a": "y"}).status_code == 403
+    assert client.put(f"/api/faq/{f['id']}", headers=ht, json={"q": "Unde stă cheia API?", "a": "În .env."}).json()["q"] == "Unde stă cheia API?"
+    assert client.delete(f"/api/faq/{f['id']}", headers=ht).status_code == 200

@@ -16,7 +16,7 @@ import secrets
 import re
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
@@ -142,6 +142,7 @@ MESSAGES = {
     "own_react": ("Nu poți reacționa la propriul proiect.", "You can't react to your own project.", "Tu ne peux pas réagir à ton propre projet.", "Non puoi reagire al tuo progetto.", "No puedes reaccionar a tu propio proyecto.", "Du kannst nicht auf dein eigenes Projekt reagieren."),
     "need_link": ("Adaugă linkul live sau linkul repo-ului.", "Add the live link or the repo link.", "Ajoute le lien en ligne ou le lien du dépôt.", "Aggiungi il link live o quello del repo.", "Añade el enlace en vivo o el del repo.", "Füge den Live-Link oder den Repo-Link hinzu."),
     "not_chosen": ("Kitul de start apare după ce trainerul alege ideea.", "The kickstart kit appears once the trainer chooses the idea.", "Le kit de démarrage apparaît quand le formateur choisit l'idée.", "Il kit di avvio appare quando il trainer sceglie l'idea.", "El kit de inicio aparece cuando el formador elige la idea.", "Das Starter-Kit erscheint, sobald der Trainer die Idee auswählt."),
+    "bad_date": ("Data nu e corectă.", "That date isn't right.", "La date n'est pas correcte.", "La data non è corretta.", "La fecha no es correcta.", "Das Datum stimmt nicht."),
     "no_announcement": ("Anunțul nu există.", "Announcement not found.", "Annonce introuvable.", "Annuncio non trovato.", "Anuncio no encontrado.", "Ankündigung nicht gefunden."),
 }
 FIELD_NAMES = {
@@ -1614,6 +1615,11 @@ class PromptIn(BaseModel):
 @app.post("/api/prompt-lab")
 def prompt_lab(body: PromptIn, user: dict = Depends(current_user)):
     cooldown(user, "prompt", 5)
+    with _lock:  # pentru misiunea „Prompt Lab” (doar data, nu și promptul)
+        log = db.setdefault("lab_log", {}).setdefault(user["key"], [])
+        log.append(now())
+        del log[:-60]
+        save_db()
     clean, had_key = tools.redact(body.prompt.strip())
     result = tools.lab(clean, current_lang.get()) if ai.available() else tools.score_local(clean)
     return {**result, "had_key": had_key}
@@ -2048,6 +2054,133 @@ def proposal_kickstart(proposal_id: int, user: dict = Depends(current_user)):
         db["kickstarts"].setdefault(str(proposal_id), {})[lang] = kit
         save_db()
     return kit
+
+
+# ---------------------------------------------------------------- Serii, misiuni, provocarea lui Byte
+
+class ChallengeIn(BaseModel):
+    date: str = Field(min_length=10, max_length=10)
+
+
+@app.post("/api/challenge")
+def challenge_done(body: ChallengeIn, user: dict = Depends(require_student)):
+    """Provocarea de 15 minute din briefing-ul lui Byte, bifată până la capăt."""
+    try:
+        day = datetime.fromisoformat(body.date).date()
+    except ValueError:
+        fail(400, "bad_date")
+    # Doar azi sau o zi pentru care există briefing (nu în viitor, nu inventată)
+    if day > points.today() or (day != points.today() and body.date not in {d["date"] for d in db.get("digests", [])}):
+        fail(400, "bad_date")
+    with _lock:
+        days = db.setdefault("challenges", {}).setdefault(user["key"], [])
+        if body.date not in days:
+            days.append(body.date)
+            save_db()
+    return {"ok": True}
+
+
+@app.get("/api/quests")
+def my_quests(user: dict = Depends(require_student)):
+    acts = points.activity(db).get(user["key"], [])
+    week = points.week_id(points.today())
+    start = points.today() - timedelta(days=points.today().weekday())
+    return {"streak": points.streaks(acts), "week": week, "week_start": start.isoformat(),
+            "week_end": (start + timedelta(days=6)).isoformat(), "reward": points.RULES["quest"],
+            "quests": points.quest_progress(acts, week)}
+
+
+# ---------------------------------------------------------------- Recap săptămânal (trainer) + FAQ (public)
+
+class FaqIn(BaseModel):
+    q: str = Field(min_length=3, max_length=300)
+    a: str = Field(min_length=1, max_length=3000)
+
+
+def find_faq(faq_id: int) -> dict:
+    f = next((x for x in db.get("faq", []) if x["id"] == faq_id), None)
+    if f is None:
+        fail(404, "no_item")
+    return f
+
+
+@app.get("/api/faq")
+def list_faq(user: dict = Depends(current_user)):
+    return [{k: f[k] for k in ("id", "q", "a", "created_at")} for f in db.get("faq", [])]
+
+
+@app.post("/api/faq", status_code=201)
+def add_faq(body: FaqIn, user: dict = Depends(require_trainer)):
+    with _lock:
+        f = {"id": next_id(), "q": body.q.strip(), "a": body.a.strip(), "created_at": now()}
+        db.setdefault("faq", []).append(f)
+        save_db()
+    return f
+
+
+@app.put("/api/faq/{faq_id}")
+def edit_faq(faq_id: int, body: FaqIn, user: dict = Depends(require_trainer)):
+    with _lock:
+        f = find_faq(faq_id)
+        f.update(q=body.q.strip(), a=body.a.strip())
+        save_db()
+    return f
+
+
+@app.delete("/api/faq/{faq_id}")
+def delete_faq(faq_id: int, user: dict = Depends(require_trainer)):
+    with _lock:
+        db["faq"].remove(find_faq(faq_id))
+        save_db()
+    return {"ok": True}
+
+
+@app.get("/api/recap")
+def weekly_recap(refresh: bool = False, user: dict = Depends(require_trainer)):
+    """Ce s-a întâmplat în ultimele 7 zile + ce merită repetat + întrebări frecvente propuse."""
+    from collections import Counter
+    since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat(timespec="seconds")
+    students = known_students()
+    questions = db.get("questions", [])
+    new_q = [q for q in questions if q["created_at"] >= since]
+    acts = points.activity(db)
+    active = {k for k in students if any(at >= since[:10] for _, at in acts.get(k, []))}
+    lives = [x for x in db.get("live_history", []) if x["started_at"] >= since]
+    stats = {
+        "questions_new": len(new_q),
+        "questions_open": sum(1 for q in questions if not q.get("answer")),
+        "to_review": sum(1 for x in db.get("submissions", []) if x["status"] in ("sent", "received")),
+        "students": len(students), "active": len(active),
+        "ideas_new": sum(1 for p in db.get("proposals", []) if p["created_at"] >= since),
+        "projects_new": sum(1 for x in db.get("showcase", []) if x["created_at"] >= since),
+        "live_classes": len(lives), "stuck_peak": max((x.get("stuck_peak", 0) for x in lives), default=0),
+        "doctor_uses": sum(1 for x in db.get("doctor", []) if x["created_at"] >= since),
+    }
+    topics = Counter(q["category"] for q in new_q).most_common(5)
+    inactive = sorted((students[k] for k in students if k not in active), key=str.casefold)
+    answered = [q for q in questions if q.get("answer") and (q.get("answered_at") or "") >= since]
+    known = {f["q"].strip().casefold() for f in db.get("faq", [])}
+    # Fără AI: întrebările cu răspuns din săptămâna asta, ca propuneri de FAQ (trainerul le poate edita)
+    local_faq = [{"q": q["text"][:300], "a": q["answer"][:3000]} for q in answered if q["text"].strip().casefold() not in known][:5]
+
+    lang = current_lang.get()
+    cache_key = f"{points.week_id(points.today())}:{lang}"
+    ai_part = db.setdefault("recaps", {}).get(cache_key)
+    if (refresh or not ai_part) and ai.available() and (answered or new_q):
+        if refresh:  # reîmprospătarea manuală, cel mult o dată pe minut
+            cooldown(user, "recap", 60)
+        # Doar texte, fără nume de studenți
+        activity_payload = {"answered": [{"topic": q["category"], "q": q["text"][:400], "a": q["answer"][:600]} for q in answered[:20]],
+                            "unanswered_topics": Counter(q["category"] for q in questions if not q.get("answer")).most_common(5),
+                            "topics": topics, "numbers": stats}
+        fresh = tools.recap(activity_payload, lang)
+        if fresh:
+            ai_part = fresh
+            with _lock:
+                db["recaps"][cache_key] = fresh
+                save_db()
+    return {"since": since, "stats": stats, "topics": [{"key": k, "count": n} for k, n in topics],
+            "inactive": inactive, "ai": ai_part, "faq_suggestions": (ai_part or {}).get("faq") or local_faq}
 
 
 if __name__ == "__main__":
