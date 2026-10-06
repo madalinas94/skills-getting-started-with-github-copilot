@@ -22,8 +22,10 @@ def reset_db():
     app_module.db.update({
         "users": {}, "sessions": {}, "prefs": {}, "drafts": [], "questions": [], "proposals": [], "submissions": [],
         "messages": [], "assignments": [], "announcements": [], "bonuses": [], "next_id": 1,
+        "doctor": [], "hall": [], "live": None, "showcase": [], "faq": [], "challenges": {}, "push": {}, "kickstarts": {},
     })
     app_module._failed.clear()
+    app_module._cooldowns.clear()
 
 
 def email_for(name):
@@ -553,6 +555,7 @@ def test_drafts_are_private_and_limited():
 
 # ---------------------------------------------------------------- Supabase Auth (cu un Supabase fals)
 
+import base64
 import json as _json
 import httpx
 from src import supa
@@ -838,3 +841,170 @@ def test_health_and_atomic_save(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, "DATA_FILE", tmp_path / "cutia.json")
     app_module.save_db()
     assert [f.name for f in tmp_path.iterdir()] == ["cutia.json"]  # fără fișiere .tmp rămase
+
+
+# ---------------------------------------------------------------- Atelier: Verifică repo-ul (GitHub fals)
+
+from src import repocheck
+
+FAKE_KEY = "sk-ant-api03-" + "x" * 40
+
+
+class FakeGitHub:
+    def __init__(self, files, history=None):
+        self.files, self.history, self.calls = files, history or [], []
+
+    def handler(self, request):
+        self.calls.append(str(request.url))
+        host, path = request.url.host, request.url.path
+        if host == "raw.githubusercontent.com":
+            name = path.split("/", 4)[4]
+            return httpx.Response(200, text=self.files[name]) if name in self.files else httpx.Response(404)
+        if path == "/repos/ana/app":
+            return httpx.Response(200, json={"default_branch": "main"})
+        if path == "/repos/ana/app/commits/main":
+            return httpx.Response(200, json={"sha": "abc1234567"})
+        if path == "/repos/ana/app/git/trees/abc1234567":
+            return httpx.Response(200, json={"tree": [{"path": p, "type": "blob", "size": len(c)} for p, c in self.files.items()]})
+        if path == "/repos/ana/app/commits":
+            return httpx.Response(200, json=[{"sha": f"c{i}000000"} for i in range(len(self.history))])
+        if path.startswith("/repos/ana/app/commits/c"):
+            i = int(path.rsplit("/", 1)[1][1])
+            return httpx.Response(200, json={"files": [{"filename": "app.py", "patch": self.history[i]}]})
+        return httpx.Response(404)
+
+
+GOOD_README = "# App\n## Ce face\nAjută clasa.\n## Cum se pornește\npip install -r requirements.txt\n## Funcții în plus\nTeme.\nLive: https://app.onrender.com\n"
+
+
+@pytest.fixture
+def github(monkeypatch):
+    def make(files, history=None):
+        fake = FakeGitHub(files, history)
+        monkeypatch.setattr(repocheck, "_transport", httpx.MockTransport(fake.handler))
+        monkeypatch.setattr(repocheck, "_cache", {})
+        return fake
+    return make
+
+
+def test_repo_check_clean_repo(github):
+    github({"README.md": GOOD_README, ".gitignore": "data/\n.env\n", "app.py": "import os\nKEY = os.environ['X']\n", ".env.example": "ANTHROPIC_API_KEY=\n"},
+           ["+import os"])
+    r = client.post("/api/repo-check", headers=login("Ana"), json={"url": "https://github.com/ana/app"})
+    assert r.status_code == 200, r.text
+    status = {c["key"]: c["status"] for c in r.json()["checks"]}
+    assert status == {"readme": "ok", "readme_what": "ok", "readme_run": "ok", "readme_extras": "ok", "live_link": "ok",
+                      "gitignore_env": "ok", "no_env_file": "ok", "no_keys_now": "ok", "no_keys_history": "ok", "trainer_access": "manual"}
+    assert r.json()["passed"] == r.json()["total"] == 9
+
+
+def test_repo_check_finds_keys_env_and_history(github):
+    github({"README.md": "# App", "app.py": f"KEY = '{FAKE_KEY}'\n", ".env": f"ANTHROPIC_API_KEY={FAKE_KEY}\n"},
+           [f"+KEY = '{FAKE_KEY}'", "-old line"])
+    r = client.post("/api/repo-check", headers=login("Ana"), json={"url": "https://github.com/ana/app.git"}).json()
+    checks = {c["key"]: c for c in r["checks"]}
+    assert checks["gitignore_env"]["status"] == "fail"
+    assert checks["no_env_file"]["detail"] == [".env"]
+    assert {d["file"] for d in checks["no_keys_now"]["detail"]} == {"app.py", ".env"}
+    assert checks["no_keys_history"]["detail"][0]["commit"] == "c000000"
+    # Cheia nu apare niciodată întreagă în răspuns
+    assert FAKE_KEY not in _json.dumps(r) and checks["no_keys_now"]["detail"][0]["masked"].startswith("sk-ant")
+
+
+def test_repo_check_rejects_other_hosts_and_needs_login(github):
+    fake = github({})
+    h = login("Ana")
+    for url in ["https://evil.example/ana/app", "http://169.254.169.254/latest", "https://github.com/ana", "javascript:alert(1)"]:
+        assert client.post("/api/repo-check", headers=h, json={"url": url + "?" * 0}).status_code in (400, 422), url
+    assert fake.calls == []  # nu am întrebat nimic în afara GitHub-ului
+    assert client.post("/api/repo-check", json={"url": "https://github.com/ana/app"}).status_code == 401
+
+
+def test_repo_check_missing_repo_and_cooldown(github):
+    github({})
+    h = login("Ana")
+    r = client.post("/api/repo-check", headers=h, json={"url": "https://github.com/nimeni/nimic"})
+    assert r.status_code == 404
+    assert client.post("/api/repo-check", headers=h, json={"url": "https://github.com/nimeni/nimic"}).status_code == 429
+
+
+def test_find_keys_detects_supabase_service_role():
+    payload = base64.urlsafe_b64encode(_json.dumps({"role": "service_role"}).encode()).decode().rstrip("=")
+    token = f"eyJhbGciOiJIUzI1NiJ9.{payload}.signaturesignature"
+    assert repocheck.find_keys(f"const k = '{token}'")[0][0] == "Supabase service_role"
+    anon = base64.urlsafe_b64encode(_json.dumps({"role": "anon"}).encode()).decode().rstrip("=")
+    assert repocheck.find_keys(f"eyJhbGciOiJIUzI1NiJ9.{anon}.signaturesignature") == []
+
+
+# ---------------------------------------------------------------- Error Doctor + Prompt Lab + Hall
+
+PNG_1PX = bytes.fromhex("89504e470d0a1a0a0000000d4948445200000001000000010806000000"
+                        "1f15c4890000000d49444154789c6360000002000100ffff03000006000557bfabd40000000049454e44ae426082")
+
+
+def test_doctor_local_hides_keys_and_is_private():
+    ha, hb = login("Ana"), login("Vlad")
+    r = client.post("/api/doctor", headers=ha, data={"text": f"Error: invalid x-api-key {FAKE_KEY}"})
+    assert r.status_code == 201, r.text
+    d = r.json()
+    assert d["ai"] is False and d["local"] == "api_key" and d["had_key"] is True
+    assert FAKE_KEY not in _json.dumps(app_module.db["doctor"]) and "[KEY HIDDEN]" in d["excerpt"]
+    assert len(client.get("/api/doctor", headers=ha).json()) == 1
+    assert client.get("/api/doctor", headers=hb).json() == []                      # Vlad nu vede istoricul Anei
+    assert client.delete(f"/api/doctor/{d['id']}", headers=hb).status_code == 404
+    assert client.delete(f"/api/doctor/{d['id']}", headers=ha).status_code == 200
+
+
+def test_doctor_validates_input_and_uses_ai(monkeypatch):
+    h = login("Ana")
+    assert client.post("/api/doctor", headers=h, data={"text": ""}).status_code == 400
+    fake_png = ("x.png", b"<svg onload=alert(1)>", "image/png")
+    assert client.post("/api/doctor", headers=h, data={"text": "x"}, files={"image": fake_png}).status_code == 400
+    seen = {}
+
+    def fake_diagnose(text, image, lang):
+        seen.update(text=text, image=image, lang=lang)
+        return {"title": "Lipsește modulul", "explain": "E", "cause": "C", "steps": ["pip install x"], "prompt": "P", "severity": "easy"}
+    monkeypatch.setattr(app_module.ai, "available", lambda: True)
+    monkeypatch.setattr(app_module.tools, "diagnose", fake_diagnose)
+    r = client.post("/api/doctor", headers={**h, "X-Lang": "en"}, data={"text": "No module named x"},
+                    files={"image": ("s.png", PNG_1PX, "image/png")})
+    assert r.status_code == 201 and r.json()["ai"] and r.json()["result"]["title"] == "Lipsește modulul"
+    assert seen["image"][0] == "image/png" and seen["lang"] == "en"
+    assert client.post("/api/doctor", headers=h, data={"text": "again"}).status_code == 429  # pauză între cereri
+
+
+def test_local_error_patterns():
+    from src import tools
+    cases = {"ModuleNotFoundError: No module named 'fastapi'": "module_missing", "Error: listen EADDRINUSE :::3000": "port_busy",
+             "! [rejected] main -> main (fetch first)": "git_rejected", "SyntaxError: Unexpected token '}'": "syntax",
+             "TypeError: Cannot read properties of undefined": "undefined", "ceva ciudat": "generic"}
+    for text, key in cases.items():
+        assert tools.local_match(text) == key, text
+
+
+def test_prompt_lab_local_scores():
+    h = login("Ana")
+    weak = client.post("/api/prompt-lab", headers=h, json={"prompt": "fa o aplicatie"}).json()
+    strong = client.post("/api/prompt-lab", headers=login("Vlad"), json={"prompt":
+        "Am o aplicație pentru clasa mea de vibe coding, folosesc FastAPI. Vreau să adaugi un buton de export. "
+        "Fără librării noi, doar pas cu pas. Exemplu: „Export CSV” descarcă întrebările."}).json()
+    assert weak["ai"] is False and sum(weak["scores"].values()) < sum(strong["scores"].values())
+    assert all(0 <= v <= 5 for v in strong["scores"].values())
+
+
+def test_hall_of_prompts_likes_and_ownership():
+    ha, hb, ht = login("Ana"), login("Vlad"), login("Radu", "trainer")
+    h = client.post("/api/hall", headers=ha, json={"title": "Debug pas cu pas", "prompt": f"Explică eroarea pas cu pas {FAKE_KEY}"}).json()
+    assert FAKE_KEY not in h["prompt"]
+    assert client.post(f"/api/hall/{h['id']}/like", headers=ha).status_code == 400        # nu-ți dai like singur
+    assert client.post(f"/api/hall/{h['id']}/like", headers=hb).json()["likes"] == 1
+    listed = client.get("/api/hall", headers=hb).json()[0]
+    assert listed["author"] == "Ana" and listed["liked"] and "author_key" not in listed and "@" not in _json.dumps(listed)
+    assert client.delete(f"/api/hall/{h['id']}", headers=hb).status_code == 403
+    assert client.delete(f"/api/hall/{h['id']}", headers=ht).status_code == 200            # trainerul poate modera
+
+
+def test_each_key_is_reported_once():
+    assert [k for k, _ in repocheck.find_keys(FAKE_KEY)] == ["Anthropic"]
+    assert [k for k, _ in repocheck.find_keys("sk-proj-" + "a" * 40)] == ["OpenAI"]

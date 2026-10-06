@@ -558,8 +558,8 @@ function logout(expired = false) {
 // ================================================================ shell
 
 const VIEW_SPACE = {
-  home: null, messages: "private", questions: "private", submissions: "private",
-  box: "public", news: "public", points: "public", guide: "public",
+  home: null, messages: "private", questions: "private", submissions: "private", workshop: "private",
+  live: "public", box: "public", showcase: "public", news: "public", points: "public", guide: "public",
 };
 
 function showView(name) {
@@ -572,6 +572,8 @@ function showView(name) {
   if (name === "news" && !newsData && !newsLoading) loadNews();
   if (name === "news" && !digestData) loadDigest();
   if (name === "points") loadPoints();
+  if (name === "workshop") showWs(wsTab);
+  if (name === "guide") { loadHall(); loadFaq(); }
   window.scrollTo({ top: 0, behavior: motionOff() ? "auto" : "smooth" });
 }
 
@@ -1485,7 +1487,9 @@ function submissionCard(x) {
     el("h3", {}, x.title));
   if (x.note) card.append(el("p", { class: "item-text" }, x.note));
   // Serverul acceptă doar linkuri http(s); verificăm și aici înainte să-l facem clicabil
-  if (safeLink(x.link)) card.append(el("a", { class: "sub-link", href: x.link, target: "_blank", rel: "noopener noreferrer" }, "↗ ", x.link));
+  if (safeLink(x.link)) card.append(el("div", { class: "row" },
+    el("a", { class: "sub-link", href: x.link, target: "_blank", rel: "noopener noreferrer" }, "↗ ", x.link),
+    /github\.com\//.test(x.link) ? el("button", { type: "button", class: "small ghost", onclick: () => checkRepoFrom(x.link) }, t("rc.checkBtn")) : null));
   if (x.files.length) {
     card.append(el("div", { class: "file-list" }, x.files.map((f) =>
       el("span", { class: "file-chip" }, "📄 ", el("span", { class: "n" }, f.name), el("span", { class: "sz" }, formatSize(f.size)),
@@ -2172,6 +2176,252 @@ async function rerunDigest() {
   } catch (err) { toast(err.message); }
 }
 
+
+// ================================================================ Atelier (privat): repo, Error Doctor, Prompt Lab
+
+let wsTab = "repo", repoResult = null;
+
+function showWs(tab) {
+  wsTab = tab;
+  document.querySelectorAll(".ws-tabs button").forEach((b) => {
+    b.classList.toggle("on", b.dataset.ws === tab);
+    b.setAttribute("aria-selected", String(b.dataset.ws === tab));
+  });
+  ["repo", "doctor", "prompt"].forEach((k) => $(`#ws-${k}`).classList.toggle("hidden", k !== tab));
+  if (tab === "doctor") loadDoctorHistory();
+}
+document.querySelectorAll(".ws-tabs button").forEach((b) => b.addEventListener("click", () => showWs(b.dataset.ws)));
+$("#s-link-check").addEventListener("click", () => {
+  const url = $("#s-link").value.trim();
+  if (url) checkRepoFrom(url);
+  else $("#s-link").focus();
+});
+
+function checkRepoFrom(url) {
+  showView("workshop");
+  showWs("repo");
+  $("#repo-url").value = url;
+  runRepoCheck(url);
+}
+
+$("#repo-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  runRepoCheck($("#repo-url").value.trim());
+});
+
+function scanning(text) {
+  return el("div", { class: "card panel scan-card" }, el("span", { class: "scan-line" }), el("span", {}, text, el("span", { class: "dots" })));
+}
+
+async function runRepoCheck(url) {
+  const box = $("#repo-result");
+  box.replaceChildren(scanning(t("rc.checking")));
+  try {
+    repoResult = await api("/api/repo-check", { method: "POST", body: { url } });
+    renderRepoResult();
+    if (repoResult.passed === repoResult.total) confetti();
+  } catch (err) {
+    box.replaceChildren(el("p", { class: "error" }, err.message));
+  }
+}
+
+function renderRepoResult() {
+  const r = repoResult;
+  if (!r) return;
+  const ICON = { ok: "✓", warn: "!", fail: "✕", manual: "☐" };
+  const pct = Math.round((r.passed / Math.max(1, r.total)) * 100);
+  const details = (c) => {
+    const lines = [];
+    if (c.key === "live_link" && safeLink(c.detail)) lines.push(el("a", { href: c.detail, target: "_blank", rel: "noopener noreferrer", class: "small" }, c.detail));
+    if (c.key === "no_env_file") (c.detail || []).forEach((f) => lines.push(el("code", {}, f)));
+    if (c.key === "no_keys_now") (c.detail || []).forEach((d) => lines.push(el("code", {}, `${d.file} · ${d.kind} · ${d.masked}`)));
+    if (c.key === "no_keys_history") {
+      (c.detail || []).forEach((d) => lines.push(el("code", {}, `${d.commit} · ${d.file} · ${d.kind} · ${d.masked}`)));
+      lines.push(el("span", { class: "muted small" }, t("rc.scanned", c.scanned)));
+    }
+    return lines;
+  };
+  const alarm = r.checks.some((c) => c.key.startsWith("no_keys") && c.status === "fail");
+  $("#repo-result").replaceChildren(el("div", { class: "card panel rc" },
+    el("div", { class: "rc-head" },
+      el("div", { class: `ring ${pct === 100 ? "full" : ""}`, style: `--p:${pct}` }, el("b", {}, `${r.passed}/${r.total}`)),
+      el("div", {},
+        el("h3", {}, el("a", { href: r.url, target: "_blank", rel: "noopener noreferrer" }, r.repo)),
+        el("p", { class: "muted small mono" }, `${r.head} · ${timeAgo(r.checked_at)}`),
+        el("p", {}, r.passed === r.total ? t("rc.allGood") : t("rc.score", r.passed, r.total)))),
+    alarm ? el("div", { class: "alarm" }, t("rc.keyAlarm")) : null,
+    el("ul", { class: "rc-list" }, ...r.checks.map((c, i) => el("li", { class: `rc-row ${c.status}`, style: `animation-delay:${i * 50}ms` },
+      el("span", { class: "rc-ico" }, ICON[c.status]),
+      el("div", {}, el("b", {}, t("rc.k." + c.key)),
+        c.status !== "ok" ? el("p", { class: "muted small" }, t("rc.f." + c.key)) : null,
+        ...details(c))))),
+    isTrainer() ? null : el("div", { class: "row end" }, el("button", { type: "button", class: "small", onclick: () => {
+      showView("submissions");
+      $("#s-link").value = r.url;
+      $("#s-link").dispatchEvent(new Event("input"));
+    } }, t("rc.useInSubmit")))));
+}
+
+
+// ---------------------------------------------------------------- Error Doctor
+
+let doctorHistory = [], doctorLoaded = false;
+
+$("#doc-image").addEventListener("change", () => {
+  const f = $("#doc-image").files[0];
+  $("#doc-image-name").textContent = f ? f.name : "";
+});
+
+// Lipești o captură direct din clipboard (Ctrl+V) în câmpul de eroare
+$("#doc-text").addEventListener("paste", (e) => {
+  const item = [...(e.clipboardData ? e.clipboardData.items : [])].find((i) => i.type.startsWith("image/"));
+  if (!item) return;
+  const file = item.getAsFile();
+  const dt = new DataTransfer();
+  dt.items.add(new File([file], "screenshot.png", { type: file.type }));
+  $("#doc-image").files = dt.files;
+  $("#doc-image-name").textContent = "📷 screenshot.png";
+});
+
+$("#doctor-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = new FormData();
+  form.append("text", $("#doc-text").value);
+  if ($("#doc-image").files[0]) form.append("image", $("#doc-image").files[0]);
+  $("#doc-result").replaceChildren(scanning(t("doc.thinking")));
+  try {
+    const res = await fetch("/api/doctor", { method: "POST", body: form, headers: { "X-Lang": lang, Authorization: `Bearer ${auth.token}` } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || t("err.generic"));
+    $("#doc-image").value = "";
+    $("#doc-image-name").textContent = "";
+    doctorHistory.unshift(data);
+    renderDoctorResult(data);
+    renderDoctorHistory();
+  } catch (err) {
+    $("#doc-result").replaceChildren(el("p", { class: "error" }, err.message));
+  }
+});
+
+function doctorCard(d) {
+  const r = d.result;
+  const title = r ? r.title : t(`doc.l.${d.local}.t`);
+  const prompt = r ? r.prompt : t("doc.localPrompt", d.excerpt || "…");
+  const steps = r ? r.steps : t(`doc.l.${d.local}.s`).split(" | ");
+  const sev = r ? r.severity : null;
+  return el("div", { class: "card panel doctor-card" },
+    el("div", { class: "doctor-head" },
+      el("span", { class: "doctor-ico" }, "🩺"),
+      el("div", {}, el("h3", {}, title),
+        el("p", { class: "muted small mono" }, `${timeAgo(d.created_at)}${d.image ? " · 📷" : ""} · ${r ? "AI" : t("doc.localTag")}`)),
+      sev ? el("span", { class: `sev ${sev}` }, t("doc.sev." + sev)) : null),
+    d.had_key ? el("div", { class: "alarm" }, t("doc.keyFound")) : null,
+    r ? el("p", {}, r.explain) : el("p", {}, t(`doc.l.${d.local}.e`)),
+    r && r.cause ? el("p", { class: "muted" }, el("b", {}, t("doc.cause")), " ", r.cause) : null,
+    el("h4", {}, t("doc.steps")),
+    el("ol", { class: "doctor-steps" }, ...steps.map((s) => el("li", {}, s))),
+    el("div", { class: "prompt-box" }, el("span", { class: "mono small muted" }, t("doc.promptLabel")), el("p", {}, prompt),
+      el("button", { type: "button", class: "small", onclick: () => copy(prompt) }, t("byte.copyPrompt"))),
+    r ? null : el("p", { class: "muted small" }, t("doc.localHint")));
+}
+
+function renderDoctorResult(d) {
+  $("#doc-result").replaceChildren(doctorCard(d));
+}
+
+async function loadDoctorHistory() {
+  if (doctorLoaded || !auth) return;
+  try { doctorHistory = await api("/api/doctor"); doctorLoaded = true; } catch (_) {}
+  renderDoctorHistory();
+}
+
+function renderDoctorHistory() {
+  $("#doc-history").replaceChildren(...(doctorHistory.length ? doctorHistory.map((d) => el("div", { class: "mini" },
+    el("button", { type: "button", class: "mini-main", onclick: () => renderDoctorResult(d) },
+      el("span", { class: "k" }, "🩺"), el("span", { class: "t" }, d.result ? d.result.title : t(`doc.l.${d.local}.t`)),
+      el("span", { class: "muted small" }, timeAgo(d.created_at))),
+    el("button", { type: "button", class: "icon-btn", "aria-label": t("doc.delete"), onclick: async () => {
+      try {
+        await api(`/api/doctor/${d.id}`, { method: "DELETE" });
+        doctorHistory = doctorHistory.filter((x) => x.id !== d.id);
+        renderDoctorHistory();
+      } catch (err) { toast(err.message); }
+    } }, "✕"))) : [el("div", { class: "empty" }, t("doc.noHistory"))]));
+}
+
+// ---------------------------------------------------------------- Prompt Lab
+
+let lastLab = null;
+
+$("#prompt-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const prompt = $("#pl-text").value.trim();
+  $("#pl-result").replaceChildren(scanning(t("pl.thinking")));
+  try {
+    lastLab = { prompt, ...(await api("/api/prompt-lab", { method: "POST", body: { prompt } })) };
+    renderLab();
+  } catch (err) { $("#pl-result").replaceChildren(el("p", { class: "error" }, err.message)); }
+});
+
+function renderLab() {
+  const r = lastLab;
+  const total = Object.values(r.scores).reduce((a, b) => a + b, 0);
+  const improved = r.improved || t("pl.skeleton", r.prompt);
+  const tips = r.ai ? r.tips : r.tips.map((c) => t("pl.tip." + c));
+  const bars = el("div", { class: "lab-bars" }, ...Object.entries(r.scores).map(([k, v]) => el("div", { class: "lab-bar" },
+    el("span", {}, t("pl.c." + k)), el("span", { class: "track" }, el("i", { style: `width:${v * 20}%` })), el("b", { class: "mono" }, `${v}/5`))));
+  const shareTitle = el("input", { maxlength: 80, placeholder: t("hall.titlePh") });
+  const share = el("div", { class: "row" }, shareTitle, el("button", { type: "button", class: "small", onclick: async () => {
+    try {
+      await api("/api/hall", { method: "POST", body: { title: shareTitle.value || t("hall.untitled"), prompt: improved } });
+      toast(t("hall.shared"));
+      loadHall();
+    } catch (err) { toast(err.message); }
+  } }, t("hall.share")));
+  $("#pl-result").replaceChildren(el("div", { class: "card panel lab" },
+    el("div", { class: "rc-head" },
+      el("div", { class: `ring ${total >= 16 ? "full" : ""}`, style: `--p:${total * 5}` }, el("b", {}, `${total}/20`)),
+      el("div", {}, el("h3", {}, t(total >= 16 ? "pl.great" : total >= 10 ? "pl.good" : "pl.weak")), r.verdict ? el("p", {}, r.verdict) : null)),
+    r.had_key ? el("div", { class: "alarm" }, t("doc.keyFound")) : null,
+    bars,
+    tips.length ? el("ul", { class: "lab-tips" }, ...tips.map((x) => el("li", {}, x))) : null,
+    el("div", { class: "prompt-box" }, el("span", { class: "mono small muted" }, t(r.ai ? "pl.improved" : "pl.template")), el("p", {}, improved),
+      el("div", { class: "row" },
+        el("button", { type: "button", class: "small", onclick: () => copy(improved) }, t("byte.copyPrompt")),
+        el("button", { type: "button", class: "small ghost", onclick: () => { $("#pl-text").value = improved; $("#pl-text").focus(); } }, t("pl.useIt")))),
+    el("h4", {}, t("hall.shareTitle")), share));
+}
+
+// ---------------------------------------------------------------- Întrebări frecvente (public, în Ghid)
+
+async function loadFaq() {}  // completat mai jos, la „Recap & FAQ”
+
+// ---------------------------------------------------------------- Hall of Prompts (public, în Ghid)
+
+let hall = [];
+
+async function loadHall() {
+  if (!auth) return;
+  try { hall = await api("/api/hall"); } catch (_) { hall = []; }
+  renderHall();
+}
+
+function renderHall() {
+  $("#hall-list").replaceChildren(...(hall.length ? hall.map((h) => el("article", { class: "hall-card" },
+    el("div", { class: "meta mono muted small" }, `${h.author} · ${timeAgo(h.created_at)}`),
+    el("h3", {}, h.title),
+    el("p", { class: "mono small hall-prompt" }, h.prompt),
+    el("div", { class: "row" },
+      el("button", { type: "button", class: `small ${h.liked ? "on" : "ghost"}`, disabled: h.mine, onclick: async () => {
+        try { Object.assign(h, await api(`/api/hall/${h.id}/like`, { method: "POST" })); renderHall(); } catch (err) { toast(err.message); }
+      } }, `♥ ${h.likes}`),
+      el("button", { type: "button", class: "small ghost", onclick: () => copy(h.prompt) }, t("byte.copyPrompt")),
+      h.mine || isTrainer() ? el("button", { type: "button", class: "small ghost", onclick: async () => {
+        if (!confirm(t("hall.deleteConfirm"))) return;
+        try { await api(`/api/hall/${h.id}`, { method: "DELETE" }); loadHall(); } catch (err) { toast(err.message); }
+      } }, "✕") : null))) : [el("div", { class: "empty" }, t("hall.empty"))]));
+}
+
 // ================================================================ points & leaderboard
 
 async function loadPoints() {
@@ -2458,8 +2708,8 @@ function passwordForm() {
 let paletteItems = [], paletteIndex = 0;
 
 function paletteActions() {
-  const views = ["home", "messages", "questions", "submissions", "box", "news", "points", "guide"];
-  const icons = { home: "⌂", messages: "✉", questions: "?", submissions: "⇪", box: "✦", news: "◉", points: "⚡", guide: "#" };
+  const views = ["home", "messages", "questions", "submissions", "workshop", "live", "box", "showcase", "news", "points", "guide"];
+  const icons = { home: "⌂", messages: "✉", questions: "?", submissions: "⇪", workshop: "⚒", live: "●", box: "✦", showcase: "★", news: "◉", points: "⚡", guide: "#" };
   const items = views.map((v) => ({ icon: icons[v], label: t("k.go", t("nav." + v)), run: () => showView(v) }));
   items.push({ icon: "🤖", label: t("byte.palette"), run: () => showView("news") });
   if (!isTrainer()) {

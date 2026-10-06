@@ -44,10 +44,12 @@ def load_env_file(path: Path):
 load_env_file(current_dir.parent / ".env")
 
 try:
-    from . import ai, digest, news, points, supa
+    from . import ai, digest, news, points, repocheck, supa, tools
 except ImportError:  # rulare directă: python app.py
     import ai
     import digest
+    import repocheck
+    import tools
     import news
     import points
     import supa
@@ -122,6 +124,16 @@ MESSAGES = {
     "auth_down": ("Serviciul de conturi (Supabase) nu răspunde. Încearcă peste un minut.", "The account service (Supabase) isn't responding. Try again in a minute.", "Le service de comptes (Supabase) ne répond pas. Réessaie dans une minute.", "Il servizio account (Supabase) non risponde. Riprova tra un minuto.", "El servicio de cuentas (Supabase) no responde. Inténtalo en un minuto.", "Der Kontodienst (Supabase) antwortet nicht. Versuch es in einer Minute."),
     "link_expired": ("Linkul a expirat sau a fost deja folosit. Cere unul nou.", "This link has expired or was already used. Ask for a new one.", "Ce lien a expiré ou a déjà été utilisé. Demandes-en un nouveau.", "Il link è scaduto o è già stato usato. Chiedine uno nuovo.", "El enlace ha caducado o ya se usó. Pide uno nuevo.", "Der Link ist abgelaufen oder wurde schon benutzt. Fordere einen neuen an."),
     "supabase_off": ("Conturile Supabase nu sunt configurate pe server.", "Supabase accounts aren't configured on the server.", "Les comptes Supabase ne sont pas configurés sur le serveur.", "Gli account Supabase non sono configurati sul server.", "Las cuentas de Supabase no están configuradas en el servidor.", "Supabase-Konten sind auf dem Server nicht eingerichtet."),
+    "not_github": ("Pune linkul repo-ului de GitHub, de forma https://github.com/nume/repo.", "Paste your GitHub repo link, like https://github.com/name/repo.", "Colle le lien de ton dépôt GitHub, comme https://github.com/nom/depot.", "Incolla il link del repo GitHub, tipo https://github.com/nome/repo.", "Pega el enlace de tu repo de GitHub, como https://github.com/nombre/repo.", "Füge den Link zu deinem GitHub-Repo ein, z. B. https://github.com/name/repo."),
+    "repo_not_found": ("Nu găsesc repo-ul. Verifică linkul sau fă-l public (Settings → General → Danger Zone → Change visibility).", "Can't find that repo. Check the link or make it public (Settings → General → Danger Zone → Change visibility).", "Dépôt introuvable. Vérifie le lien ou rends-le public (Settings → General → Danger Zone → Change visibility).", "Repo non trovato. Controlla il link o rendilo pubblico (Settings → General → Danger Zone → Change visibility).", "No encuentro el repo. Revisa el enlace o hazlo público (Settings → General → Danger Zone → Change visibility).", "Repo nicht gefunden. Prüf den Link oder mach es öffentlich (Settings → General → Danger Zone → Change visibility)."),
+    "github_busy": ("GitHub ne-a limitat cererile. Mai încearcă peste câteva minute.", "GitHub is limiting our requests. Try again in a few minutes.", "GitHub limite nos requêtes. Réessaie dans quelques minutes.", "GitHub sta limitando le richieste. Riprova tra qualche minuto.", "GitHub está limitando las peticiones. Inténtalo en unos minutos.", "GitHub begrenzt gerade die Anfragen. Versuch es in ein paar Minuten."),
+    "github_down": ("Nu am putut citi repo-ul de pe GitHub acum. Încearcă din nou.", "Couldn't read the repo from GitHub right now. Try again.", "Impossible de lire le dépôt sur GitHub. Réessaie.", "Impossibile leggere il repo da GitHub ora. Riprova.", "No se pudo leer el repo de GitHub. Inténtalo de nuevo.", "Das Repo konnte gerade nicht von GitHub gelesen werden. Versuch es nochmal."),
+    "slow_down": ("Încă puțin: poți încerca din nou peste {} secunde.", "Hang on: you can try again in {} seconds.", "Un instant : tu pourras réessayer dans {} secondes.", "Un attimo: puoi riprovare tra {} secondi.", "Un momento: puedes intentarlo en {} segundos.", "Moment: du kannst es in {} Sekunden wieder versuchen."),
+    "need_error": ("Lipește mesajul de eroare sau adaugă o captură de ecran.", "Paste the error message or add a screenshot.", "Colle le message d'erreur ou ajoute une capture d'écran.", "Incolla il messaggio di errore o aggiungi uno screenshot.", "Pega el mensaje de error o añade una captura.", "Füge die Fehlermeldung oder einen Screenshot ein."),
+    "bad_image": ("Captura trebuie să fie PNG, JPG sau WebP, de maxim 5 MB.", "The screenshot must be PNG, JPG or WebP, max 5 MB.", "La capture doit être en PNG, JPG ou WebP, 5 Mo max.", "Lo screenshot deve essere PNG, JPG o WebP, max 5 MB.", "La captura debe ser PNG, JPG o WebP, de 5 MB como máximo.", "Der Screenshot muss PNG, JPG oder WebP sein, max. 5 MB."),
+    "no_item": ("Nu există.", "Not found.", "Introuvable.", "Non trovato.", "No encontrado.", "Nicht gefunden."),
+    "own_like": ("Nu-ți poți aprecia propriul prompt.", "You can't like your own prompt.", "Tu ne peux pas aimer ton propre prompt.", "Non puoi mettere like al tuo prompt.", "No puedes dar me gusta a tu propio prompt.", "Du kannst deinen eigenen Prompt nicht liken."),
+    "too_many_posts": ("Ai atins limita de {}. Șterge unul mai vechi.", "You've reached the limit of {}. Delete an older one.", "Tu as atteint la limite de {}. Supprimes-en un ancien.", "Hai raggiunto il limite di {}. Eliminane uno vecchio.", "Has llegado al límite de {}. Borra uno anterior.", "Du hast das Limit von {} erreicht. Lösch einen älteren."),
     "no_announcement": ("Anunțul nu există.", "Announcement not found.", "Annonce introuvable.", "Annuncio non trovato.", "Anuncio no encontrado.", "Ankündigung nicht gefunden."),
 }
 FIELD_NAMES = {
@@ -1463,6 +1475,189 @@ def rerun_digest(user: dict = Depends(require_trainer)):
         _digest_state["manual_at"] = time.time()
         run_digest_in_background()
     return {"generating": _digest_state["running"]}
+
+
+# ---------------------------------------------------------------------------
+# Atelier (🔒 privat): unelte pentru student. „Verifică repo-ul” citește un
+# repo public de pe GitHub și verifică lista „Gata când” a trainerului.
+# ---------------------------------------------------------------------------
+
+_cooldowns: dict = {}
+
+
+def cooldown(user: dict, action: str, seconds: int):
+    """Limită simplă per utilizator, ca să nu consumăm GitHub/AI-ul cu click-uri repetate."""
+    import time
+    key = (user["key"], action)
+    wait = int(_cooldowns.get(key, 0) + seconds - time.time())
+    if wait > 0:
+        fail(429, "slow_down", wait)
+    _cooldowns[key] = time.time()
+
+
+class RepoCheckIn(BaseModel):
+    url: str = Field(min_length=10, max_length=300)
+
+
+@app.post("/api/repo-check")
+def repo_check(body: RepoCheckIn, user: dict = Depends(current_user)):
+    try:
+        repocheck.parse_url(body.url)
+    except repocheck.RepoError:
+        fail(400, "not_github")
+    cooldown(user, "repo", 15)
+    try:
+        return repocheck.check(body.url)
+    except repocheck.RepoError as err:
+        fail({"not_github": 400, "not_found": 404, "github_busy": 429}.get(err.code, 502),
+             {"not_found": "repo_not_found"}.get(err.code, err.code))
+
+
+# ---------------------------------------------------------------- Error Doctor (privat)
+
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+DOCTOR_KEEP = 20
+
+
+def image_type(data: bytes) -> Optional[str]:
+    """Tipul imaginii după primii octeți (nu după nume): PNG, JPEG sau WebP."""
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
+def read_image(upload: Optional[UploadFile]):
+    if upload is None or not upload.filename:
+        return None
+    data = upload.file.read(MAX_IMAGE_BYTES + 1)
+    kind = image_type(data)
+    if len(data) > MAX_IMAGE_BYTES or not kind:
+        fail(400, "bad_image")
+    return kind, data
+
+
+def doctor_view(e: dict) -> dict:
+    return {k: e[k] for k in ("id", "created_at", "excerpt", "had_key", "ai", "result", "local", "image")}
+
+
+@app.post("/api/doctor", status_code=201)
+def doctor(text: str = Form("", max_length=8000), image: Optional[UploadFile] = File(None), user: dict = Depends(current_user)):
+    text = text.strip()
+    img = read_image(image)
+    if not text and not img:
+        fail(400, "need_error")
+    cooldown(user, "doctor", 8)
+    # Cheile lipite din greșeală nu ajung nici la Claude, nici în baza de date
+    clean, had_key = tools.redact(text)
+    result = tools.diagnose(clean, img, current_lang.get()) if ai.available() else None
+    entry = {"id": next_id(), "author_key": user["key"], "created_at": now(), "excerpt": clean[:400], "had_key": had_key,
+             "ai": bool(result), "result": result, "local": None if result else tools.local_match(clean), "image": bool(img)}
+    with _lock:
+        mine = [e for e in db.setdefault("doctor", []) if e["author_key"] == user["key"]]
+        drop = {e["id"] for e in mine[:-(DOCTOR_KEEP - 1)]} if len(mine) >= DOCTOR_KEEP else set()
+        db["doctor"] = [e for e in db["doctor"] if e["id"] not in drop] + [entry]
+        save_db()
+    return doctor_view(entry)
+
+
+@app.get("/api/doctor")
+def doctor_history(user: dict = Depends(current_user)):
+    return [doctor_view(e) for e in reversed(db.get("doctor", [])) if e["author_key"] == user["key"]]
+
+
+@app.delete("/api/doctor/{entry_id}")
+def doctor_delete(entry_id: int, user: dict = Depends(current_user)):
+    with _lock:
+        before = len(db.get("doctor", []))
+        db["doctor"] = [e for e in db.get("doctor", []) if not (e["id"] == entry_id and e["author_key"] == user["key"])]
+        if len(db["doctor"]) == before:
+            fail(404, "no_item")
+        save_db()
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- Prompt Lab + Hall of Prompts (public)
+
+class PromptIn(BaseModel):
+    prompt: str = Field(min_length=5, max_length=6000)
+
+
+@app.post("/api/prompt-lab")
+def prompt_lab(body: PromptIn, user: dict = Depends(current_user)):
+    cooldown(user, "prompt", 5)
+    clean, had_key = tools.redact(body.prompt.strip())
+    result = tools.lab(clean, current_lang.get()) if ai.available() else tools.score_local(clean)
+    return {**result, "had_key": had_key}
+
+
+class HallIn(BaseModel):
+    title: str = Field(min_length=1, max_length=80)
+    prompt: str = Field(min_length=10, max_length=3000)
+    note: str = Field("", max_length=300)
+
+
+MAX_HALL_PER_USER = 30
+
+
+def hall_view(h: dict, user: dict) -> dict:
+    return {"id": h["id"], "title": h["title"], "prompt": h["prompt"], "note": h["note"], "author": h["author"],
+            "created_at": h["created_at"], "likes": len(h["likes"]), "liked": user["key"] in h["likes"],
+            "mine": h["author_key"] == user["key"]}
+
+
+@app.get("/api/hall")
+def hall_list(user: dict = Depends(current_user)):
+    items = sorted(db.get("hall", []), key=lambda h: (len(h["likes"]), h["created_at"]), reverse=True)
+    return [hall_view(h, user) for h in items]
+
+
+@app.post("/api/hall", status_code=201)
+def hall_add(body: HallIn, user: dict = Depends(current_user)):
+    prompt, _ = tools.redact(body.prompt.strip())
+    with _lock:
+        if sum(h["author_key"] == user["key"] for h in db.setdefault("hall", [])) >= MAX_HALL_PER_USER:
+            fail(400, "too_many_posts", MAX_HALL_PER_USER)
+        h = {"id": next_id(), "author_key": user["key"], "author": user["name"], "title": body.title.strip(), "prompt": prompt,
+             "note": body.note.strip(), "likes": [], "created_at": now()}
+        db["hall"].append(h)
+        save_db()
+    return hall_view(h, user)
+
+
+def find_hall(item_id: int) -> dict:
+    h = next((x for x in db.get("hall", []) if x["id"] == item_id), None)
+    if h is None:
+        fail(404, "no_item")
+    return h
+
+
+@app.post("/api/hall/{item_id}/like")
+def hall_like(item_id: int, user: dict = Depends(current_user)):
+    with _lock:
+        h = find_hall(item_id)
+        if h["author_key"] == user["key"]:
+            fail(400, "own_like")
+        if user["key"] in h["likes"]:
+            h["likes"].remove(user["key"])
+        else:
+            h["likes"].append(user["key"])
+        save_db()
+    return hall_view(h, user)
+
+
+@app.delete("/api/hall/{item_id}")
+def hall_delete(item_id: int, user: dict = Depends(current_user)):
+    with _lock:
+        h = find_hall(item_id)
+        if h["author_key"] != user["key"] and user["role"] != "trainer":
+            fail(403, "not_author")
+        db["hall"].remove(h)
+        save_db()
+    return {"ok": True}
 
 
 if __name__ == "__main__":

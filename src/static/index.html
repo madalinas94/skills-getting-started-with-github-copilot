@@ -119,9 +119,12 @@
       <button class="nav-item" data-view="messages"><span class="nav-ico">✉</span><span class="nav-text" data-i18n="nav.messages"></span><span id="m-badge" class="badge hidden"></span></button>
       <button class="nav-item" data-view="questions"><span class="nav-ico">?</span><span class="nav-text" data-i18n="nav.questions"></span><span id="q-badge" class="badge hidden"></span></button>
       <button class="nav-item" data-view="submissions"><span class="nav-ico">⇪</span><span class="nav-text" data-i18n="nav.submissions"></span><span id="s-badge" class="badge hidden"></span></button>
+      <button class="nav-item" data-view="workshop"><span class="nav-ico">⚒</span><span class="nav-text" data-i18n="nav.workshop"></span></button>
 
       <p class="nav-label public" data-i18n="nav.public"></p>
+      <button class="nav-item" data-view="live"><span class="nav-ico live-dot">●</span><span class="nav-text" data-i18n="nav.live"></span><span id="live-badge" class="badge hidden" data-i18n="live.badge"></span></button>
       <button class="nav-item" data-view="box"><span class="nav-ico">✦</span><span class="nav-text" data-i18n="nav.box"></span><span id="p-badge" class="badge soft hidden"></span></button>
+      <button class="nav-item" data-view="showcase"><span class="nav-ico">★</span><span class="nav-text" data-i18n="nav.showcase"></span></button>
       <button class="nav-item" data-view="news"><span class="nav-ico">◉</span><span class="nav-text" data-i18n="nav.news"></span></button>
       <button class="nav-item" data-view="points"><span class="nav-ico">⚡</span><span class="nav-text" data-i18n="nav.points"></span></button>
       <button class="nav-item" data-view="guide"><span class="nav-ico">#</span><span class="nav-text" data-i18n="nav.guide"></span></button>
@@ -259,7 +262,10 @@
             <input id="s-title" maxlength="200" required data-i18n-placeholder="s.fTitlePh">
           </label>
           <label><span data-i18n="s.fLink"></span>
-            <input id="s-link" type="url" maxlength="500" data-i18n-placeholder="s.fLinkPh">
+            <span class="input-with-btn">
+              <input id="s-link" type="url" maxlength="500" data-i18n-placeholder="s.fLinkPh">
+              <button type="button" id="s-link-check" class="small ghost" data-i18n="rc.checkBtn"></button>
+            </span>
           </label>
           <label><span data-i18n="s.fNote"></span>
             <textarea id="s-note" rows="3" maxlength="4000" data-i18n-placeholder="s.fNotePh"></textarea>
@@ -442,6 +448,91 @@
         <div id="news-list" class="news-grid"></div>
       </section>
 
+      <!-- ------------------------- Atelier (privat): Verifică repo-ul, Error Doctor, Prompt Lab -->
+      <section id="view-workshop" class="view hidden">
+        <div class="view-head">
+          <span class="space private" data-space="private"></span>
+          <h1 data-i18n="ws.title"></h1>
+          <p class="muted" data-i18n="ws.lead"></p>
+        </div>
+        <div class="ws-tabs" role="tablist">
+          <button type="button" role="tab" data-ws="repo"><b>🔍</b><span data-i18n="ws.repo"></span><small data-i18n="ws.repoD"></small></button>
+          <button type="button" role="tab" data-ws="doctor"><b>🩺</b><span data-i18n="ws.doctor"></span><small data-i18n="ws.doctorD"></small></button>
+          <button type="button" role="tab" data-ws="prompt"><b>🧪</b><span data-i18n="ws.prompt"></span><small data-i18n="ws.promptD"></small></button>
+        </div>
+
+        <div id="ws-repo" class="ws-pane">
+          <form id="repo-form" class="card composer">
+            <label><span data-i18n="rc.label"></span>
+              <input id="repo-url" type="url" maxlength="300" placeholder="https://github.com/…/cutia-clasei-…" autocomplete="off">
+            </label>
+            <p class="muted small" data-i18n="rc.hint"></p>
+            <div class="row end"><button type="submit" class="primary" data-i18n="rc.run"></button></div>
+          </form>
+          <div id="repo-result"></div>
+        </div>
+
+        <div id="ws-doctor" class="ws-pane hidden">
+          <form id="doctor-form" class="card composer">
+            <label><span data-i18n="doc.label"></span>
+              <textarea id="doc-text" rows="6" maxlength="8000" class="mono" data-i18n-placeholder="doc.ph"></textarea>
+            </label>
+            <div class="row">
+              <label class="file-pick"><input id="doc-image" type="file" accept="image/png,image/jpeg,image/webp"><span data-i18n="doc.image"></span></label>
+              <span id="doc-image-name" class="muted small mono"></span>
+              <button type="submit" class="primary" data-i18n="doc.run"></button>
+            </div>
+            <p class="muted small" data-i18n="doc.privacy"></p>
+          </form>
+          <div id="doc-result"></div>
+          <div class="card panel"><div class="panel-head"><h3 data-i18n="doc.history"></h3></div><div id="doc-history" class="mini-list"></div></div>
+        </div>
+
+        <div id="ws-prompt" class="ws-pane hidden">
+          <form id="prompt-form" class="card composer">
+            <label><span data-i18n="pl.label"></span>
+              <textarea id="pl-text" rows="6" maxlength="6000" data-i18n-placeholder="pl.ph"></textarea>
+            </label>
+            <div class="row end"><button type="submit" class="primary" data-i18n="pl.run"></button></div>
+          </form>
+          <div id="pl-result"></div>
+        </div>
+      </section>
+
+      <!-- ------------------------- Ora live (public, în timpul orei) -->
+      <section id="view-live" class="view hidden">
+        <div class="view-head">
+          <span class="space public" data-space="public"></span>
+          <h1 data-i18n="live.title"></h1>
+          <p class="muted" id="live-lead"></p>
+        </div>
+        <div id="live-body"></div>
+      </section>
+
+      <!-- ------------------------- Demo Day (public) -->
+      <section id="view-showcase" class="view hidden">
+        <div class="view-head">
+          <span class="space public" data-space="public"></span>
+          <h1 data-i18n="sc.title"></h1>
+          <p class="muted" data-i18n="sc.lead"></p>
+        </div>
+        <div id="spotlight"></div>
+        <form id="showcase-form" class="card composer student-only">
+          <div class="composer-head"><span class="prompt mono">★</span><h2 data-i18n="sc.new"></h2></div>
+          <div class="row two">
+            <label><span data-i18n="sc.fTitle"></span><input id="sc-title" maxlength="120" required></label>
+            <label><span data-i18n="sc.fLive"></span><input id="sc-live" type="url" maxlength="300" placeholder="https://…"></label>
+          </div>
+          <label><span data-i18n="sc.fDesc"></span><textarea id="sc-desc" rows="3" maxlength="1500" data-i18n-placeholder="sc.fDescPh"></textarea></label>
+          <div class="row two">
+            <label><span data-i18n="sc.fRepo"></span><input id="sc-repo" type="url" maxlength="300" placeholder="https://github.com/…"></label>
+            <label class="file-pick"><input id="sc-image" type="file" accept="image/png,image/jpeg,image/webp"><span data-i18n="sc.fImage"></span></label>
+          </div>
+          <div class="row end"><span id="sc-image-name" class="muted small mono"></span><button type="submit" class="primary glow" data-i18n="sc.publish"></button></div>
+        </form>
+        <div id="showcase-list" class="showcase-grid"></div>
+      </section>
+
       <!-- ------------------------- Puncte & clasament (public) -->
       <section id="view-points" class="view hidden">
         <div class="view-head">
@@ -480,6 +571,14 @@
         </div>
         <div id="heat" class="card heat hidden"></div>
         <div id="topic-grid" class="topic-grid"></div>
+
+        <h2 class="section-title" data-i18n="faq.title"></h2>
+        <div id="faq-trainer" class="trainer-only"></div>
+        <div id="faq-list" class="faq-list"></div>
+
+        <h2 class="section-title" data-i18n="hall.title"></h2>
+        <p class="muted" data-i18n="hall.lead"></p>
+        <div id="hall-list" class="hall-grid"></div>
       </section>
     </main>
 
