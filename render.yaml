@@ -1,30 +1,23 @@
 # Publicare pe Render (render.com → New → Blueprint → alegi acest repo).
-# Datele (întrebări, teme, idei, fișiere) stau pe un disc permanent montat în /var/data,
-# altfel s-ar pierde la fiecare repornire. Cheile NU se scriu aici: le completezi în
-# Render, la „Environment” (sync: false = Render ți le cere la prima publicare).
+# Datele (întrebări, teme, idei) și fișierele stau în Supabase, deci planul gratuit
+# ajunge: serverul poate fi repornit oricând fără să se piardă nimic.
+# Cheile NU se scriu aici: le completezi în Render, la „Environment”
+# (sync: false = Render ți le cere la prima publicare).
 services:
   - type: web
     name: cutia-clasei
     runtime: python
-    plan: starter            # discul permanent cere planul Starter (planul Free nu păstrează datele)
+    plan: free               # datele stau în Supabase, nu pe discul serverului
     region: frankfurt        # cel mai aproape de România
     buildCommand: pip install -r requirements.txt
-    # Un singur proces: datele stau în memorie + fișierul JSON de pe disc.
+    # Un singur proces: datele stau în memorie și se salvează în Supabase.
     # --proxy-headers: în spatele Render, linkurile din emailuri ies cu https://
     startCommand: uvicorn src.app:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips "*"
     healthCheckPath: /api/health
     autoDeploy: true         # fiecare push pe GitHub publică automat versiunea nouă
-    disk:
-      name: cutia-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.15
-      - key: CUTIA_DATA
-        value: /var/data/cutia.json
-      - key: CUTIA_UPLOADS
-        value: /var/data/uploads
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: TRAINER_EMAILS
@@ -36,6 +29,8 @@ services:
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY   # doar pe server: pentru datele și fișierele aplicației
         sync: false
       - key: VAPID_PUBLIC_KEY
         sync: false

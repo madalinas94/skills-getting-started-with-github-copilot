@@ -8,8 +8,8 @@
 
 | Spațiu | Ce găsești |
 | --- | --- |
-| 🔒 **Privat** (doar tu și trainerul) | **Mesaje directe:** chat privat cu trainerul. **Întrebări:** pe topicuri, cu răspuns rapid de la AI și răspunsul oficial al trainerului. **Teme & proiecte:** predai fișiere, linkul GitHub și checklist-ul temei, pentru temele anunțate de trainer (cu termen); primești feedback. |
-| 🌐 **Public** (toată clasa) | **Cutia de idei:** AI-ul retușează ideea și cere detalii doar unde lipsesc; tu aprobi; clasa votează; trainerul alege. **AI News:** știri din lumea AI, filtrate pentru clasă. **Puncte & clasament:** niveluri, badge-uri, podium. **Ghid de vibe coding:** 15 topicuri cu prompturi de copiat. |
+| 🔒 **Privat** (doar tu și trainerul) | **Mesaje directe:** chat privat cu trainerul. **Întrebări:** pe topicuri, cu răspuns rapid de la AI și răspunsul oficial al trainerului. **Teme & proiecte:** predai fișiere, linkul GitHub și checklist-ul temei, pentru temele anunțate de trainer (cu termen); primești feedback. **Atelier:** Verifică repo-ul, Error Doctor, Prompt Lab. |
+| 🌐 **Public** (toată clasa) | **Ora live:** „M-am blocat” anonim, vot rapid, întrebări cu ▲, bilet de ieșire. **Cutia de idei:** AI-ul retușează ideea și cere detalii doar unde lipsesc; tu aprobi; clasa votează; trainerul alege; ideea aleasă primește un kit de start. **Demo Day:** aplicațiile terminate ale clasei. **AI News:** briefing-ul zilei de la Byte + știri filtrate. **Puncte & clasament:** niveluri, badge-uri, serii, misiuni săptămânale. **Ghid de vibe coding:** 15 topicuri, întrebări frecvente, Hall of Prompts. |
 
 ### Minimul obligatoriu
 
@@ -27,6 +27,17 @@
 - **Robotul de bun venit (3D):** un robot construit în Three.js urcă pe ecran, îți face cu mâna, te urmărește cu privirea și îți spune „Salut, Madalina!”. După 7 secunde se deschide interfața (sau apeși „Sari peste”). Se poate opri din Setări și nu apare dacă ai animațiile oprite.
 - **Propunerile mele:** trimiți câte propuneri vrei și le vezi pe toate într-un loc. O propunere se poate **retrage** (de exemplu „✓ Am rezolvat problema”, cu un mesaj opțional): iese din cutia publică, dar autorul și trainerul o văd în continuare, iar autorul o poate pune înapoi oricând.
 - **Ciorne:** propunerile la care lucrezi se salvează automat pe server (cel mult 20 per student), le continui oricând din „Ciornele mele”. Textul nescris din întrebări, mesaje și teme rămâne în browser până îl trimiți și se șterge la „Ieși”, ca să nu-l vadă următorul pe un calculator comun.
+- **Atelier** (🔒 privat), trei unelte pentru student:
+  - **Verifică repo-ul:** lipești linkul de GitHub și primești lista „Gata când” a trainerului bifată automat: README cu „ce face / cum se pornește / funcții în plus”, link live, `.env` în `.gitignore`, niciun `.env` urcat și **nicio cheie API în cod sau în istoricul commiturilor** (cheile găsite apar mascate, cu sfatul să le regenerezi). Butonul apare și la predarea temei, iar trainerul îl are la fiecare temă cu link GitHub.
+  - **Error Doctor 🩺:** lipești o eroare sau o captură de ecran (și cu Ctrl+V); primești ce înseamnă, cauza probabilă, pașii și promptul gata de pus în Claude Code. Cheile API lipite din greșeală se ascund înainte de orice. Fără AI recunoaște cele mai dese 12 tipuri de erori.
+  - **Prompt Lab 🧪:** notează promptul pe 4 criterii (context, obiectiv, reguli, exemple), dă sfaturi și o variantă mai bună; cele mai bune ajung în **Hall of Prompts** (public, în Ghid), cu ♥.
+- **Ora live 🔴:** trainerul pornește ora; studenții văd „LIVE” în meniu și primesc notificare. Butonul **„🙋 M-am blocat”** e anonim (trainerul vede doar câți sunt), **vot rapid** cu rezultate după ce votezi, **coada de întrebări** (și anonime) cu ▲, iar la final **biletul de ieșire** (răspunsurile le vede doar trainerul). După oră, clasa e trimisă spre Cutia de idei.
+- **Demo Day ★:** aplicațiile terminate, cu link live, repo și captură; colegii reacționează (🔥👏💡🤯), trainerul alege **proiectul săptămânii**. +10 puncte per proiect (max 3), +25 pentru proiectul săptămânii.
+- **Kit de start 🚀:** la o idee aleasă de trainer: primul prompt de pus în Claude, planul pentru prima oră, ce urmează și lista „Gata când”.
+- **Serii și misiuni săptămânale:** 🔥 zile la rând în care ai lucrat, plus 4 misiuni pe săptămână (aceleași pentru toată clasa, altele în fiecare săptămână), +5 puncte fiecare. Badge-uri noi: „De neoprit” (7 zile) și „Maestrul misiunilor”.
+- **Recap-ul săptămânii (trainer):** pe Acasă, cifrele ultimelor 7 zile, subiectele, cine n-a mai intrat și, cu AI, un rezumat și ce merită reluat la ora următoare. La Claude ajung doar textele întrebărilor și răspunsurilor, niciodată nume.
+- **Întrebări frecvente:** trainerul publică răspunsuri (și din propunerile recap-ului); toată clasa le vede în Ghid.
+- **Aplicație pe telefon 📲:** se instalează pe ecranul principal (Android, iPhone, calculator), se deschide și fără internet (ultima versiune), cu **notificări push**: răspunsul trainerului, mesaje, feedback, idee aleasă, temă nouă, ora live, briefing-ul lui Byte. Notificările sunt în limba fiecăruia, fără conținut privat pe ecranul blocat.
 - **Conturi prin Supabase Auth** (recomandat): confirmare pe email la cont nou, „Ai uitat parola?” cu link pe email, „Continuă cu Google” și parole păstrate de Supabase, nu de noi. Serverul verifică la Supabase fiecare token înainte să te lase să intri.
 - **Fără Supabase:** conturi cu email + parolă (sau **Google**, dacă e configurat). Trainerul e recunoscut după email. Cod de clasă opțional, ca doar colegii tăi să-și poată face cont.
 - **Numele tău, automat:** sesiunea rămâne activă (și după repornirea serverului). Aplicația te salută pe nume peste tot, iar la revenire îți spune „Bine ai revenit, Madalina!”.
@@ -82,7 +93,10 @@ Deschide http://localhost:8000.
 | `CLASS_CODE` | – | Dacă e setat, studenții au nevoie de el ca să-și facă cont. |
 | `SUPABASE_URL` | – | Adresa proiectului Supabase (`https://xxxx.supabase.co`). Împreună cu cheia de mai jos, pornește conturile prin Supabase. |
 | `SUPABASE_ANON_KEY` | – | Cheia **anon / publishable** a proiectului. Niciodată `service_role`. |
+| `SUPABASE_SECRET_KEY` | – | Doar pe server: datele și fișierele aplicației în Supabase (vezi mai jos). |
 | `GOOGLE_CLIENT_ID` | – | Fără Supabase: activează „Continuă cu Google” (Client ID din Google Cloud Console). |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | – | Notificările push. Le generezi o dată cu `python -m src.webpush`. |
+| `GITHUB_TOKEN` | – | Opțional, pentru „Verifică repo-ul”: un token doar de citire ridică limita GitHub de la 60 la 5000 de cereri pe oră. |
 | `CUTIA_AI` | `auto` | `auto` / `on` / `off` |
 | `CUTIA_MODEL` | `claude-opus-5-5` | Modelul Claude. |
 | `CUTIA_DATA` | `data/cutia.json` | Unde se salvează datele. |
@@ -103,7 +117,16 @@ Deschide http://localhost:8000.
 5. (opțional) **Google**: în *Sign In / Providers → Google* pui Client ID și Secret din Google Cloud Console; butonul „Continuă cu Google” apare singur.
 6. Repornește serverul. Pe pagina de intrare apare „🔐 conturi securizate prin Supabase”.
 
-Datele (întrebări, teme, idei) rămân tot în `data/cutia.json`, legate de email; dacă aveai deja cont cu același email, îți păstrezi tot.
+### Toate datele în Supabase (recomandat pentru publicare)
+
+Pe lângă conturi, Supabase poate păstra **toate datele** (întrebări, teme, idei, mesaje, puncte) și **fișierele** (teme, capturi). Așa serverul poate fi repornit oricând fără să se piardă nimic, iar Render merge pe planul gratuit.
+
+1. În Supabase → **SQL Editor**, lipește conținutul fișierului `supabase/schema.sql` și apasă **Run**. Se creează tabelul `cutia_state` (cu Row Level Security pornit și fără politici: browserul nu poate citi nimic din el) și bucket-ul privat `cutia-files`.
+2. **Project Settings → API Keys**: copiază cheia **secret** (`sb_secret_…`) în `SUPABASE_SECRET_KEY`. Ea stă **doar pe server** (`.env` sau Render → Environment), niciodată în cod, în browser sau pe GitHub.
+3. Repornește serverul. La prima pornire, dacă tabelul e gol și ai date în `data/cutia.json`, se mută singure. Pentru fișierele vechi: `python -m src.store migrate`.
+4. `GET /api/health` arată `"storage": "supabase"`.
+
+Fără `SUPABASE_SECRET_KEY`, datele rămân în `data/cutia.json`, ca până acum.
 
 **Teste:** `pytest` (acces cu două conturi, mesaje private, puncte, upload, știri, AI și toate cele 6 limbi).
 
@@ -118,14 +141,15 @@ Aplicația e pregătită pentru [Render](https://render.com) prin fișierul `ren
    - `TRAINER_EMAILS`: emailul trainerului;
    - `TRAINER_CODE`: un cod al tău de minim 6 caractere (opțional);
    - `CLASS_CODE`: codul clasei (opțional);
-   - `SUPABASE_URL` și `SUPABASE_ANON_KEY`: din pașii de mai sus (opțional).
+   - `SUPABASE_URL`, `SUPABASE_ANON_KEY` și `SUPABASE_SECRET_KEY`: din pașii de mai sus;
+   - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`: pentru notificări (opțional).
 4. După 2–3 minute primești linkul, de forma `https://cutia-clasei-xxxx.onrender.com`.
 5. Cu Supabase: pune linkul + `/static/index.html` la *Site URL* și *Redirect URLs* (Authentication → URL Configuration).
 6. Scrie linkul mai jos, la „Aplicația live”.
 
 De aici, fiecare `git push` publică automat versiunea nouă.
 
-**Cost:** datele (întrebări, teme, fișiere) stau pe un disc permanent, care cere planul **Starter** (aproximativ 7 $/lună plus 0,25 $/GB pentru disc). Pe planul Free, Render șterge fișierele la fiecare repornire, deci s-ar pierde tot ce scrie clasa.
+**Cost: 0.** Datele și fișierele stau în Supabase, deci Render merge pe planul **Free**. Pe planul gratuit, serverul „adoarme” după 15 minute fără vizite și se trezește în ~1 minut la prima vizită; datele nu se pierd (se scriu în Supabase la fiecare schimbare și la oprire). Briefing-ul lui Byte se face la prima vizită de după ora 7. Proiectele Supabase gratuite se pun pe pauză după o săptămână fără activitate; le repornești din panoul Supabase.
 
 **Aplicația live:** încă nu e publicată online. Linkul apare aici după deploy.
 
@@ -136,6 +160,11 @@ De aici, fiecare `git push` publică automat versiunea nouă.
 - Sesiunile se salvează doar ca hash, iar parolele ca hash PBKDF2. „Ieși” închide sesiunea pe server.
 - După 5 parole greșite, contul se blochează 10 minute. Același mesaj pentru email greșit și parolă greșită, ca să nu se poată afla cine are cont.
 - Supabase: parolele stau la Supabase, nu la noi. Orice token venit din browser (linkul din email, Google) e verificat de server la Supabase înainte de a deschide o sesiune, iar din bara de adrese e șters imediat. Pe server stă doar anon key, niciodată `service_role`. Emailul din `TRAINER_EMAILS` dă rol de trainer doar dacă emailul e dovedit (confirmare pe email sau Google).
+- Datele în Supabase: tabelul are Row Level Security fără nicio politică, deci cheia publică nu poate citi nimic; serverul folosește cheia secretă, ținută doar în variabilele lui de mediu. Dacă Supabase nu răspunde la pornire, serverul nu pornește (nu riscăm să suprascriem datele cu nimic).
+- „Verifică repo-ul” vorbește doar cu `api.github.com` și `raw.githubusercontent.com`, cu owner/repo validate strict; cheile găsite se arată mascate.
+- Error Doctor și Prompt Lab ascund cheile API din text înainte să-l salveze sau să-l trimită la Claude.
+- Notificările push sunt criptate pentru fiecare dispozitiv (RFC 8291) și semnate cu cheia serverului (VAPID); textul lor e generic.
+- Capturile (Error Doctor, Demo Day) se acceptă doar ca PNG/JPEG/WebP verificate după conținut și se servesc cu `nosniff`, doar celor logați.
 - Google: tokenul semnat de Google se verifică pe server (cu biblioteca oficială `google-auth`), doar pentru emailuri verificate.
 - Punctele se calculează pe server din activitatea reală, nu pot fi modificate din browser; nu îți poți vota propria idee.
 - Fișierele se salvează cu nume aleatorii și se descarcă doar ca atașament, după verificarea accesului.
@@ -165,7 +194,13 @@ src/app.py               API (FastAPI): conturi, mesaje, întrebări, teme, idei
 src/ai.py                Modulul AI (Claude): retușarea ideilor + tutorul pentru întrebări
 src/news.py              AI News: surse RSS/Atom, filtrare, cache, alegere cu Claude
 src/digest.py            Byte: briefing-ul zilei (ultimele 24h, scris de Claude o dată pe zi)
-src/points.py            Puncte, niveluri și badge-uri
+src/points.py            Puncte, niveluri, badge-uri, serii și misiuni săptămânale
+src/repocheck.py         „Verifică repo-ul”: README, .env, chei API în cod și în istoric
+src/tools.py             Error Doctor, Prompt Lab, kit de start, recap (cu Claude + variante locale)
+src/store.py             Datele și fișierele în Supabase (Postgres + Storage), scriere în fundal
+src/webpush.py           Notificări push (RFC 8291 + VAPID)
+src/static/sw.js         Service worker: aplicația instalabilă, offline, notificări
+supabase/schema.sql      Tabelul și bucket-ul din Supabase (rulat o dată)
 src/supa.py              Conturi prin Supabase Auth (opțional): verificare token, resetare parolă
 src/static/              Interfața: index.html, app.js, styles.css
 src/static/i18n/         Textele în 6 limbi (ro, en, fr, it, es, de)

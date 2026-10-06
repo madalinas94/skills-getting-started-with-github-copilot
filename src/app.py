@@ -15,6 +15,7 @@ import os
 import secrets
 import re
 import threading
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -45,8 +46,9 @@ def load_env_file(path: Path):
 load_env_file(current_dir.parent / ".env")
 
 try:
-    from . import ai, digest, news, points, repocheck, supa, tools, webpush
+    from . import ai, digest, news, points, repocheck, store, supa, tools, webpush
 except ImportError:  # rulare directă: python app.py
+    import store
     import webpush
     import ai
     import digest
@@ -68,6 +70,8 @@ if TRAINER_CODE.lower() in WEAK_TRAINER_CODES and os.environ.get("CUTIA_ALLOW_WE
 async def lifespan(_app):
     start_byte()  # robotul de știri (definit mai jos, la „Byte”)
     yield
+    if _writer is not None:  # la oprire (de ex. Render adoarme serverul), scriem tot ce a rămas
+        _writer.flush()
 
 
 app = FastAPI(title="Cutia Clasei API",
@@ -200,16 +204,48 @@ db = {
 SESSION_DAYS = 60
 
 
-def load_db():
+_writer = None  # scrierea în Supabase, dacă e configurat (vezi src/store.py)
+
+
+def load_local() -> dict:
     if DATA_FILE.exists():
         try:
-            db.update(json.loads(DATA_FILE.read_text(encoding="utf-8")))
+            return json.loads(DATA_FILE.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             pass
+    return {}
+
+
+def load_db():
+    global _writer
+    if os.environ.get("CUTIA_PERSIST", "1") != "0" and store.enabled():
+        # Cu Supabase nu pornim niciodată cu date goale: dacă nu răspunde, serverul nu pornește
+        # (gazda îl repornește), ca să nu suprascriem datele bune cu nimic
+        for attempt in range(3):
+            try:
+                remote = store.load()
+                break
+            except store.StoreError as err:
+                if attempt == 2:
+                    raise RuntimeError(f"Supabase nu răspunde ({err}). Verifică SUPABASE_URL, SUPABASE_SECRET_KEY și supabase/schema.sql.")
+                time.sleep(2)
+        _writer = store.Writer(db, _lock)
+        if remote:
+            db.update(remote)
+            _writer.remember()
+        else:
+            # Prima pornire cu Supabase: mutăm automat datele locale, dacă există
+            db.update(load_local())
+            _writer.mark()
+        return
+    db.update(load_local())
 
 
 def save_db():
     if os.environ.get("CUTIA_PERSIST", "1") == "0":
+        return
+    if _writer is not None:
+        _writer.mark()
         return
     DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
     # Scriem într-un fișier temporar și apoi îl înlocuim dintr-o mișcare:
@@ -220,20 +256,35 @@ def save_db():
 
 
 # Fișierele încărcate (teme, capturi Demo Day): nume aleatoriu, conținutul doar prin API
+# Cu Supabase, fișierele stau în bucket-ul privat; altfel, în data/uploads.
 def put_blob(content: bytes) -> str:
     stored = uuid.uuid4().hex
+    if store.enabled():
+        store.put_file(stored, content)
+        return stored
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     (UPLOAD_DIR / stored).write_bytes(content)
     return stored
 
 
 def get_blob(stored: str) -> Optional[bytes]:
+    if not re.fullmatch(r"[0-9a-f]{32}", stored or ""):
+        return None
+    if store.enabled():
+        try:
+            return store.get_file(stored)
+        except store.StoreError:
+            return None
     path = UPLOAD_DIR / stored
-    return path.read_bytes() if re.fullmatch(r"[0-9a-f]{32}", stored or "") and path.exists() else None
+    return path.read_bytes() if path.exists() else None
 
 
 def delete_blob(stored: str):
-    if re.fullmatch(r"[0-9a-f]{32}", stored or ""):
+    if not re.fullmatch(r"[0-9a-f]{32}", stored or ""):
+        return
+    if store.enabled():
+        store.delete_file(stored)
+    else:
         (UPLOAD_DIR / stored).unlink(missing_ok=True)
 
 
@@ -361,7 +412,8 @@ def require_student(user: dict = Depends(current_user)) -> dict:
 @app.get("/api/health")
 def health():
     """Pentru hosting: serverul răspunde (fără date despre nimeni)."""
-    return {"ok": True}
+    return {"ok": True, "storage": "supabase" if _writer is not None else "file",
+            "storage_error": bool(_writer and _writer.last_error)}
 
 
 @app.get("/")

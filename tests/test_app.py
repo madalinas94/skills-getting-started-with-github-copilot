@@ -838,7 +838,7 @@ def test_weak_trainer_codes_are_ignored(monkeypatch):
 
 
 def test_health_and_atomic_save(tmp_path, monkeypatch):
-    assert client.get("/api/health").json() == {"ok": True}
+    assert client.get("/api/health").json() == {"ok": True, "storage": "file", "storage_error": False}
     monkeypatch.setenv("CUTIA_PERSIST", "1")
     monkeypatch.setattr(app_module, "DATA_FILE", tmp_path / "cutia.json")
     app_module.save_db()
@@ -1241,3 +1241,101 @@ def test_expired_subscription_is_removed(push):
     client.post("/api/push/subscribe", headers=ha, json=FakeBrowser("https://push.example/gone").sub)
     client.post("/api/live/start", headers=ht, json={})
     assert app_module.db["push"]["ana@test.ro"] == []
+
+
+# ---------------------------------------------------------------- Date și fișiere în Supabase (Supabase fals)
+
+from src import store
+
+
+class FakeSupabaseDB:
+    """Imită PostgREST (tabelul cutia_state) și Storage (bucket-ul cutia-files)."""
+
+    def __init__(self, rows=None, down=False):
+        self.rows, self.files, self.writes, self.down, self.headers = dict(rows or {}), {}, [], down, []
+
+    def handler(self, request):
+        self.headers.append(dict(request.headers))
+        if self.down:
+            raise httpx.ConnectError("down")
+        path = request.url.path
+        if path == "/rest/v1/cutia_state" and request.method == "GET":
+            return httpx.Response(200, json=[{"name": k, "data": v} for k, v in self.rows.items()])
+        if path == "/rest/v1/cutia_state" and request.method == "POST":
+            rows = _json.loads(request.content)
+            self.writes.append(sorted(r["name"] for r in rows))
+            self.rows.update({r["name"]: r["data"] for r in rows})
+            return httpx.Response(201)
+        if path.startswith("/storage/v1/object/cutia-files/"):
+            name = path.rsplit("/", 1)[1]
+            if request.method == "POST":
+                self.files[name] = request.content
+                return httpx.Response(200, json={"Key": name})
+            if request.method == "GET":
+                return httpx.Response(200, content=self.files[name]) if name in self.files else httpx.Response(400, json={"error": "not_found"})
+            if request.method == "DELETE":
+                self.files.pop(name, None)
+                return httpx.Response(200, json=[])
+        return httpx.Response(404)
+
+
+@pytest.fixture
+def supa_db(monkeypatch, tmp_path):
+    def make(rows=None, down=False, local=None):
+        fake = FakeSupabaseDB(rows, down)
+        monkeypatch.setenv("SUPABASE_URL", "https://proiect.supabase.co")
+        monkeypatch.setenv("SUPABASE_SECRET_KEY", "sb_secret_testkey_123456789")
+        monkeypatch.setenv("CUTIA_PERSIST", "1")
+        monkeypatch.setattr(store, "_transport", httpx.MockTransport(fake.handler))
+        monkeypatch.setattr(store.Writer, "mark", lambda self: self.dirty.set())  # fără fir în fundal în teste
+        monkeypatch.setattr(app_module.time, "sleep", lambda s: None)
+        data_file = tmp_path / "cutia.json"
+        if local is not None:
+            data_file.write_text(_json.dumps(local))
+        monkeypatch.setattr(app_module, "DATA_FILE", data_file)
+        monkeypatch.setattr(app_module, "_writer", None)
+        return fake
+    return make
+
+
+def test_supabase_storage_loads_and_writes_only_changes(supa_db):
+    fake = supa_db(rows={"users": {}, "questions": [], "sessions": {}})
+    app_module.load_db()
+    assert app_module._writer is not None and fake.writes == []
+    h = login("Ana")
+    client.post("/api/questions", headers=h, json={"text": "Unde stau datele?", "category": "data"})
+    app_module._writer.flush()
+    assert set(fake.writes[-1]) <= {"users", "sessions", "questions", "next_id", "prefs"} and "questions" in fake.writes[-1]
+    assert fake.rows["questions"][0]["text"] == "Unde stau datele?"
+    app_module._writer.flush()
+    assert len(fake.writes) == 1                                  # nimic nou, nimic de scris
+    # Cheia secretă merge doar ca apikey (cheile noi sb_secret_ nu sunt JWT) și nu ajunge în browser
+    assert fake.headers[-1]["apikey"] == "sb_secret_testkey_123456789" and "authorization" not in fake.headers[-1]
+    assert "sb_secret" not in client.get("/api/config").text
+    assert client.get("/api/health").json()["storage"] == "supabase"
+
+
+def test_supabase_first_start_moves_local_data(supa_db):
+    fake = supa_db(rows={}, local={"faq": [{"id": 1, "q": "Q?", "a": "A", "created_at": "2026-01-01"}], "next_id": 2})
+    app_module.load_db()
+    app_module._writer.flush()
+    assert fake.rows["faq"][0]["q"] == "Q?"
+
+
+def test_supabase_down_never_starts_empty(supa_db):
+    fake = supa_db(down=True)
+    with pytest.raises(RuntimeError):
+        app_module.load_db()
+    assert fake.writes == []
+
+
+def test_files_go_to_private_bucket(supa_db):
+    fake = supa_db(rows={"users": {}})
+    app_module.load_db()
+    h = login("Ana")
+    sid = client.post("/api/showcase", headers=h, data={"title": "X", "live_url": "https://x.app"},
+                      files={"image": ("s.png", PNG_1PX, "image/png")}).json()["id"]
+    assert list(fake.files.values()) == [PNG_1PX]
+    assert client.get(f"/api/showcase/{sid}/image", headers=login("Vlad")).content == PNG_1PX
+    client.delete(f"/api/showcase/{sid}", headers=h)
+    assert fake.files == {}

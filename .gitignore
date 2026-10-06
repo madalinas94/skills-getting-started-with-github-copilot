@@ -26,6 +26,7 @@
 ######################
 *.log
 *.sql
+!supabase/schema.sql
 *.sqlite
 
 # OS generated files #
