@@ -480,7 +480,11 @@ async function handleSupabaseReturn() {
 }
 
 // Linkul deschis în același tab (doar se schimbă #...) ajunge tot aici
-window.addEventListener("hashchange", () => handleSupabaseReturn());
+window.addEventListener("hashchange", () => {
+  const view = location.hash.slice(1);
+  if (isLoggedIn() && Object.prototype.hasOwnProperty.call(VIEW_SPACE, view)) showView(view);
+  else handleSupabaseReturn();
+});
 
 // ---------------------------------------------------------------- Google (doar dacă serverul are GOOGLE_CLIENT_ID)
 let googleReady = false;
@@ -641,10 +645,14 @@ async function start(fromLogin = false) {
   let me;
   try {
     me = await api("/api/me");
-  } catch (_) {
-    logout(true);
-    return;
+  } catch (err) {
+    // Doar o sesiune expirată te scoate din cont; fără internet, aplicația se deschide cu ce știe
+    if (err.status === 401 || !auth) { logout(true); return; }
+    me = { name: auth.name, role: auth.role, email: auth.email, prefs: auth.prefs || {}, has_password: auth.has_password };
+    toast(t("app.offline"));
   }
+  // Setările serverului (AI, notificări) pot lipsi dacă pagina s-a deschis fără internet
+  api("/api/config").then((c) => { cfg = c; }).catch(() => {});
   // Limba aleasă pe alt dispozitiv te urmează, dacă aici n-ai ales alta
   let localLang = null;
   try { localLang = localStorage.getItem("cutia-lang"); } catch (_) {}
@@ -674,7 +682,9 @@ async function start(fromLogin = false) {
   renderSubmissionForm();
   renderMessages();
   restoreLocalDrafts();
-  showView("home");
+  // Linkurile din notificări deschid direct ecranul potrivit (#live, #questions, …)
+  const fromLink = location.hash.slice(1);
+  showView(Object.prototype.hasOwnProperty.call(VIEW_SPACE, fromLink) ? fromLink : "home");
   let seenThisSession = false;
   try { seenThisSession = Boolean(sessionStorage.getItem("cutia-intro-done")); } catch (_) {}
   const intro = introEnabled() && !motionOff() && (fromLogin || !seenThisSession) ? playIntro() : Promise.resolve();
@@ -3011,6 +3021,7 @@ function openSettings() {
         openSettings();
       })),
   ];
+  if (auth) body.push(appGroup());
   if (auth) body.push(passwordForm());
   if (auth && !isTrainer()) {
     const box = el("input", { type: "checkbox" });
@@ -3068,6 +3079,93 @@ function passwordForm() {
     } catch (err) { error.textContent = err.message; }
   });
   return form;
+}
+
+
+// ================================================================ Aplicație instalabilă (PWA) + notificări push
+
+let installPrompt = null, swReg = null;
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").then((reg) => { swReg = reg; }).catch(() => {});
+  // Click pe o notificare când aplicația e deja deschisă
+  navigator.serviceWorker.addEventListener("message", (e) => {
+    if (e.data && e.data.view && isLoggedIn() && Object.prototype.hasOwnProperty.call(VIEW_SPACE, e.data.view)) showView(e.data.view);
+  });
+}
+// Revine internetul: reîncărcăm setările serverului și datele
+window.addEventListener("online", () => {
+  api("/api/config").then((c) => { cfg = c; }).catch(() => {});
+  if (isLoggedIn()) refresh().catch(() => {});
+});
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installPrompt = e; });
+window.addEventListener("appinstalled", () => { installPrompt = null; toast(t("app.installed")); });
+
+const isStandalone = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+
+async function pushSubscription() {
+  if (!pushSupported()) return null;
+  const reg = swReg || await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+
+function keyBytes(b64) {
+  const raw = atob((b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+
+async function enablePush() {
+  if (await Notification.requestPermission() !== "granted") { toast(t("app.denied")); return false; }
+  const reg = swReg || await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(cfg.push_key) });
+  await api("/api/push/subscribe", { method: "POST", body: sub.toJSON() });
+  toast(t("app.pushOn"));
+  return true;
+}
+
+async function disablePush() {
+  const sub = await pushSubscription();
+  if (sub) {
+    await api("/api/push/unsubscribe", { method: "POST", body: { endpoint: sub.endpoint } }).catch(() => {});
+    await sub.unsubscribe();
+  }
+  toast(t("app.pushOff"));
+}
+
+function appGroup() {
+  const status = el("p", { class: "muted small" });
+  const group = el("div", { class: "set-group" }, el("h4", {}, t("app.title")));
+  // Instalare: Android/Chrome au buton; pe iPhone se face din Safari → Partajează
+  if (isStandalone()) group.append(el("p", { class: "small" }, t("app.isInstalled")));
+  else if (installPrompt) group.append(el("button", { type: "button", class: "primary small", onclick: async () => {
+    installPrompt.prompt();
+    await installPrompt.userChoice;
+    installPrompt = null;
+    openSettings();
+  } }, t("app.install")));
+  else group.append(el("p", { class: "small" }, t(isIOS() ? "app.iosHint" : "app.browserHint")));
+  if (!cfg.push_key || !pushSupported()) {
+    group.append(el("p", { class: "muted small" }, t(cfg.push_key ? (isIOS() && !isStandalone() ? "app.iosPush" : "app.noPush") : "app.pushOffServer")));
+    return group;
+  }
+  const btn = el("button", { type: "button", class: "small" });
+  const refresh = async () => {
+    const on = Boolean(await pushSubscription()) && Notification.permission === "granted";
+    btn.textContent = t(on ? "app.disable" : "app.enable");
+    btn.dataset.on = on ? "1" : "";
+    status.textContent = t(Notification.permission === "denied" ? "app.blocked" : on ? "app.onText" : "app.offText");
+  };
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    try { if (btn.dataset.on) await disablePush(); else await enablePush(); } catch (err) { toast(err.message || t("err.generic")); }
+    btn.disabled = false;
+    refresh();
+  });
+  refresh();
+  group.append(el("div", { class: "row" }, btn), status);
+  return group;
 }
 
 // ================================================================ command palette (Ctrl+K)

@@ -37,3 +37,11 @@ services:
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false

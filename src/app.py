@@ -45,8 +45,9 @@ def load_env_file(path: Path):
 load_env_file(current_dir.parent / ".env")
 
 try:
-    from . import ai, digest, news, points, repocheck, supa, tools
+    from . import ai, digest, news, points, repocheck, supa, tools, webpush
 except ImportError:  # rulare directă: python app.py
+    import webpush
     import ai
     import digest
     import repocheck
@@ -143,6 +144,14 @@ MESSAGES = {
     "need_link": ("Adaugă linkul live sau linkul repo-ului.", "Add the live link or the repo link.", "Ajoute le lien en ligne ou le lien du dépôt.", "Aggiungi il link live o quello del repo.", "Añade el enlace en vivo o el del repo.", "Füge den Live-Link oder den Repo-Link hinzu."),
     "not_chosen": ("Kitul de start apare după ce trainerul alege ideea.", "The kickstart kit appears once the trainer chooses the idea.", "Le kit de démarrage apparaît quand le formateur choisit l'idée.", "Il kit di avvio appare quando il trainer sceglie l'idea.", "El kit de inicio aparece cuando el formador elige la idea.", "Das Starter-Kit erscheint, sobald der Trainer die Idee auswählt."),
     "bad_date": ("Data nu e corectă.", "That date isn't right.", "La date n'est pas correcte.", "La data non è corretta.", "La fecha no es correcta.", "Das Datum stimmt nicht."),
+    "bad_subscription": ("Abonamentul pentru notificări nu e valid.", "The notification subscription isn't valid.", "L'abonnement aux notifications n'est pas valide.", "L'iscrizione alle notifiche non è valida.", "La suscripción a notificaciones no es válida.", "Das Benachrichtigungs-Abo ist ungültig."),
+    "push_answer": ("Trainerul ți-a răspuns la o întrebare.", "The trainer answered one of your questions.", "Le formateur a répondu à une de tes questions.", "Il trainer ha risposto a una tua domanda.", "El formador respondió a una de tus preguntas.", "Der Trainer hat eine deiner Fragen beantwortet."),
+    "push_dm": ("Ai un mesaj nou.", "You have a new message.", "Tu as un nouveau message.", "Hai un nuovo messaggio.", "Tienes un mensaje nuevo.", "Du hast eine neue Nachricht."),
+    "push_feedback": ("Ai feedback nou la o temă.", "You have new feedback on your homework.", "Tu as un nouveau retour sur un devoir.", "Hai un nuovo feedback su un compito.", "Tienes comentarios nuevos sobre una tarea.", "Du hast neues Feedback zu einer Hausaufgabe."),
+    "push_chosen": ("Ideea ta a fost aleasă! 🏆", "Your idea was chosen! 🏆", "Ton idée a été choisie ! 🏆", "La tua idea è stata scelta! 🏆", "¡Tu idea fue elegida! 🏆", "Deine Idee wurde gewählt! 🏆"),
+    "push_assignment": ("Temă nouă de la trainer.", "New homework from the trainer.", "Nouveau devoir du formateur.", "Nuovo compito dal trainer.", "Nueva tarea del formador.", "Neue Hausaufgabe vom Trainer."),
+    "push_live": ("🔴 Ora live a început. Intră!", "🔴 The live class has started. Join in!", "🔴 Le cours en direct a commencé. Rejoins-nous !", "🔴 La lezione live è iniziata. Entra!", "🔴 La clase en vivo ha empezado. ¡Entra!", "🔴 Die Live-Stunde hat begonnen. Komm rein!"),
+    "push_digest": ("📰 Briefing-ul zilei de la Byte e gata.", "📰 Byte's daily briefing is ready.", "📰 Le briefing du jour de Byte est prêt.", "📰 Il briefing del giorno di Byte è pronto.", "📰 El briefing del día de Byte está listo.", "📰 Bytes Tagesbriefing ist fertig."),
     "no_announcement": ("Anunțul nu există.", "Announcement not found.", "Annonce introuvable.", "Annuncio non trovato.", "Anuncio no encontrado.", "Ankündigung nicht gefunden."),
 }
 FIELD_NAMES = {
@@ -172,6 +181,8 @@ async def language_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+import mimetypes
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 app.mount("/static", StaticFiles(directory=current_dir / "static"), name="static")
 
 # ---------------------------------------------------------------------------
@@ -678,7 +689,7 @@ def config():
     # Adresa Supabase e publică (o vede oricum browserul la Google); anon key rămâne pe server
     sb = {"url": supa.url(), "google": supa.google_enabled()} if supa.enabled() else None
     return {"ai": ai.available(), "topics": TOPICS, "google_client_id": None if sb else (GOOGLE_CLIENT_ID or None),
-            "class_code_required": bool(CLASS_CODE), "supabase": sb}
+            "class_code_required": bool(CLASS_CODE), "supabase": sb, "push_key": webpush.public_key() if webpush.enabled() else None}
 
 
 # ---------------------------------------------------------------------------
@@ -761,6 +772,7 @@ def answer_question(question_id: int, body: AnswerIn, user: dict = Depends(requi
         q["answer"] = body.text.strip()
         q["answered_at"] = now()
         save_db()
+    notify([q["author_key"]], "push_answer", "questions")
     return question_view(q, user)
 
 
@@ -921,6 +933,7 @@ def review_submission(submission_id: int, body: ReviewIn, user: dict = Depends(r
         sub["feedback"] = body.feedback.strip() or None
         sub["reviewed_at"] = now()
         save_db()
+    notify([sub["author_key"]], "push_feedback", "submissions")
     return submission_view(sub, user)
 
 
@@ -1022,6 +1035,8 @@ def toggle_chosen(proposal_id: int, user: dict = Depends(require_trainer)):
         p["chosen"] = not p["chosen"]
         p["chosen_at"] = now() if p["chosen"] else None
         save_db()
+    if p["chosen"]:
+        notify([p["author_key"]], "push_chosen", "box")
     return proposal_view(p, user)
 
 
@@ -1209,6 +1224,7 @@ def get_thread(student_key: str, user: dict = Depends(require_trainer)):
 def send_to_trainer(body: MessageIn, user: dict = Depends(require_student)):
     with _lock:
         m = add_message(user["key"], user, body.text)
+    notify([k for k, u in db["users"].items() if u.get("role") == "trainer"], "push_dm", "messages")
     return thread_view(user["key"], user)[-1] if m else None
 
 
@@ -1218,6 +1234,7 @@ def send_to_student(student_key: str, body: MessageIn, user: dict = Depends(requ
         fail(404, "no_student")
     with _lock:
         add_message(student_key, user, body.text)
+    notify([student_key], "push_dm", "messages")
     return thread_view(student_key, user)[-1]
 
 
@@ -1267,6 +1284,7 @@ def create_assignment(body: AssignmentIn, user: dict = Depends(require_trainer))
              "due_at": parse_due(body.due_at), "points": body.points, "created_at": now()}
         db["assignments"].append(a)
         save_db()
+    notify(list(known_students()), "push_assignment", "submissions")
     return a
 
 
@@ -1423,12 +1441,15 @@ _digest_write_lock = threading.Lock()
 def make_digest(fetcher=None) -> dict:
     items, errors = news.collect(fetcher, limit=digest.SCAN_LIMIT)
     d = digest.build(items, len(news.feeds()), errors)
+    first_today = not any(x["date"] == d["date"] for x in db.get("digests", []))
     with _lock:
         kept = [x for x in db.setdefault("digests", []) if x["date"] != d["date"]] + [d]
         db["digests"] = sorted(kept, key=lambda x: x["date"])[-digest.KEEP_DAYS:]
         save_db()
     for lang in DIGEST_LANGS:
         digest_view(d, lang)
+    if first_today:
+        notify(list(db["users"]), "push_digest", "news")
     return d
 
 
@@ -1776,7 +1797,7 @@ def start_live(body: LiveStartIn, user: dict = Depends(require_trainer)):
             db["live"] = {"id": next_id(), "title": body.title.strip(), "started_at": now(), "stuck": [], "stuck_peak": 0,
                           "polls": [], "queue": [], "ticket": None}
             save_db()
-    notify_all_students("push_live", url="/static/index.html#live")
+    notify(list(known_students()), "push_live", "live")
     return live_view(user)
 
 
@@ -1917,8 +1938,6 @@ def answer_ticket(body: TicketAnswerIn, user: dict = Depends(require_student)):
     return live_view(user)
 
 
-def notify_all_students(kind: str, url: str = "/static/index.html"):
-    """Notificări push (completat la secțiunea PWA)."""
 
 
 # ---------------------------------------------------------------- Demo Day (🌐 public)
@@ -2181,6 +2200,79 @@ def weekly_recap(refresh: bool = False, user: dict = Depends(require_trainer)):
                 save_db()
     return {"since": since, "stats": stats, "topics": [{"key": k, "count": n} for k, n in topics],
             "inactive": inactive, "ai": ai_part, "faq_suggestions": (ai_part or {}).get("faq") or local_faq}
+
+
+# ---------------------------------------------------------------------------
+# Notificări push (PWA): abonamentele fiecărui utilizator (max 5 dispozitive).
+# Textul notificării e generic, fără conținut privat pe ecranul blocat.
+# ---------------------------------------------------------------------------
+
+from concurrent.futures import ThreadPoolExecutor
+
+MAX_DEVICES = 5
+_push_pool = ThreadPoolExecutor(max_workers=4)
+
+
+class PushKeysIn(BaseModel):
+    p256dh: str = Field(min_length=80, max_length=100)
+    auth: str = Field(min_length=16, max_length=32)
+
+
+class PushSubIn(BaseModel):
+    endpoint: str = Field(min_length=20, max_length=1000)
+    keys: PushKeysIn
+
+
+class PushOutIn(BaseModel):
+    endpoint: str = Field(min_length=20, max_length=1000)
+
+
+@app.post("/api/push/subscribe")
+def push_subscribe(body: PushSubIn, user: dict = Depends(current_user)):
+    if not body.endpoint.startswith("https://"):
+        fail(400, "bad_subscription")
+    try:
+        if len(webpush.unb64u(body.keys.p256dh)) != 65 or len(webpush.unb64u(body.keys.auth)) != 16:
+            raise ValueError
+    except ValueError:
+        fail(400, "bad_subscription")
+    with _lock:
+        subs = [x for x in db.setdefault("push", {}).get(user["key"], []) if x["endpoint"] != body.endpoint]
+        subs.append({"endpoint": body.endpoint, "keys": body.keys.model_dump(), "at": now()})
+        db["push"][user["key"]] = subs[-MAX_DEVICES:]
+        save_db()
+    return {"ok": True, "devices": len(db["push"][user["key"]])}
+
+
+@app.post("/api/push/unsubscribe")
+def push_unsubscribe(body: PushOutIn, user: dict = Depends(current_user)):
+    with _lock:
+        db.setdefault("push", {})[user["key"]] = [x for x in db["push"].get(user["key"], []) if x["endpoint"] != body.endpoint]
+        save_db()
+    return {"ok": True}
+
+
+def _deliver(user_key: str, sub: dict, message: dict):
+    try:
+        webpush.send(sub, message)
+    except webpush.Gone:
+        with _lock:
+            db["push"][user_key] = [x for x in db["push"].get(user_key, []) if x["endpoint"] != sub["endpoint"]]
+            save_db()
+    except Exception:
+        pass  # o notificare pierdută nu strică nimic
+
+
+def notify(user_keys: list, kind: str, view: str):
+    """Trimite o notificare fiecărui utilizator, în limba lui, pe toate dispozitivele abonate."""
+    if not webpush.enabled():
+        return
+    for key in set(user_keys):
+        lang = db["prefs"].get(key, {}).get("lang") or "ro"
+        text = MESSAGES[kind][ai.LANGS.index(lang) if lang in ai.LANGS else 0]
+        message = {"title": "Cutia Clasei", "body": text, "url": f"/static/index.html#{view}", "tag": kind}
+        for sub in list(db.get("push", {}).get(key, [])):
+            _push_pool.submit(_deliver, key, sub, message)
 
 
 if __name__ == "__main__":

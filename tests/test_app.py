@@ -1151,3 +1151,93 @@ def test_faq_public_read_trainer_write():
     assert client.put(f"/api/faq/{f['id']}", headers=ha, json={"q": "x?", "a": "y"}).status_code == 403
     assert client.put(f"/api/faq/{f['id']}", headers=ht, json={"q": "Unde stă cheia API?", "a": "În .env."}).json()["q"] == "Unde stă cheia API?"
     assert client.delete(f"/api/faq/{f['id']}", headers=ht).status_code == 200
+
+
+# ---------------------------------------------------------------- Notificări push (PWA)
+
+from src import webpush
+from cryptography.hazmat.primitives import hashes as _hashes, serialization as _ser
+from cryptography.hazmat.primitives.asymmetric import ec as _ec
+from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM as _AESGCM
+
+
+class FakeBrowser:
+    """Un browser abonat: are cheile lui și poate decripta ce primește (RFC 8291)."""
+
+    def __init__(self, endpoint):
+        self.key = _ec.generate_private_key(_ec.SECP256R1())
+        self.public = self.key.public_key().public_bytes(_ser.Encoding.X962, _ser.PublicFormat.UncompressedPoint)
+        self.auth = os.urandom(16)
+        self.sub = {"endpoint": endpoint, "keys": {"p256dh": webpush.b64u(self.public), "auth": webpush.b64u(self.auth)}}
+
+    def decrypt(self, body):
+        salt, idlen = body[:16], body[20]
+        as_public = body[21:21 + idlen]
+        shared = self.key.exchange(_ec.ECDH(), _ec.EllipticCurvePublicKey.from_encoded_point(_ec.SECP256R1(), as_public))
+        ikm = webpush._hkdf(self.auth, shared, b"WebPush: info\x00" + self.public + as_public, 32)
+        cek = webpush._hkdf(salt, ikm, b"Content-Encoding: aes128gcm\x00", 16)
+        nonce = webpush._hkdf(salt, ikm, b"Content-Encoding: nonce\x00", 12)
+        plain = _AESGCM(cek).decrypt(nonce, body[21 + idlen:], None)
+        assert plain.endswith(b"\x02")
+        return _json.loads(plain[:-1])
+
+
+@pytest.fixture
+def push(monkeypatch):
+    pub, priv = webpush.generate_keys()
+    monkeypatch.setenv("VAPID_PUBLIC_KEY", pub)
+    monkeypatch.setenv("VAPID_PRIVATE_KEY", priv)
+    monkeypatch.setenv("VAPID_SUBJECT", "mailto:radu@test.ro")
+    sent = []
+
+    def handler(request):
+        sent.append(request)
+        return httpx.Response(410 if "gone" in str(request.url) else 201)
+    monkeypatch.setattr(webpush, "_transport", httpx.MockTransport(handler))
+
+    class Now:  # trimitem pe loc, nu în fundal, ca testul să vadă rezultatul
+        def submit(self, fn, *args):
+            fn(*args)
+    monkeypatch.setattr(app_module, "_push_pool", Now())
+    return sent
+
+
+def test_push_message_is_encrypted_and_signed(push):
+    browser = FakeBrowser("https://push.example/abc")
+    webpush.send(browser.sub, {"title": "Cutia Clasei", "body": "Salut"})
+    req = push[0]
+    assert req.headers["content-encoding"] == "aes128gcm" and b"Salut" not in req.content
+    assert browser.decrypt(req.content) == {"title": "Cutia Clasei", "body": "Salut"}
+    # Semnătura VAPID se verifică cu cheia publică a serverului
+    jwt = req.headers["authorization"].split("t=")[1].split(",")[0]
+    head, claims, sig = jwt.split(".")
+    assert _json.loads(webpush.unb64u(claims))["aud"] == "https://push.example"
+    raw = webpush.unb64u(sig)
+    server_key = _ec.EllipticCurvePublicKey.from_encoded_point(_ec.SECP256R1(), webpush.unb64u(os.environ["VAPID_PUBLIC_KEY"]))
+    server_key.verify(encode_dss_signature(int.from_bytes(raw[:32], "big"), int.from_bytes(raw[32:], "big")),
+                      f"{head}.{claims}".encode(), _ec.ECDSA(_hashes.SHA256()))
+
+
+def test_push_reaches_the_right_person_in_their_language(push):
+    ha, hb, ht = login("Ana"), login("Vlad"), login("Radu", "trainer")
+    assert client.get("/api/config").json()["push_key"] == os.environ["VAPID_PUBLIC_KEY"]
+    ana, vlad = FakeBrowser("https://push.example/ana"), FakeBrowser("https://push.example/vlad")
+    assert client.post("/api/push/subscribe", headers=ha, json=ana.sub).json()["devices"] == 1
+    client.post("/api/push/subscribe", headers=hb, json=vlad.sub)
+    assert client.post("/api/push/subscribe", headers=ha, json={**ana.sub, "endpoint": "http://insecure.example/x"}).status_code == 400
+    client.patch("/api/me", headers=ha, json={"lang": "en"})
+    client.post("/api/questions", headers=ha, json={"text": "Cum fac deploy?", "category": "deploy"})
+    qid = client.get("/api/questions", headers=ht).json()[0]["id"]
+    client.post(f"/api/questions/{qid}/answer", headers=ht, json={"text": "Cu Render."})
+    assert [str(r.url) for r in push] == ["https://push.example/ana"]                   # doar Ana, nu și Vlad
+    msg = ana.decrypt(push[0].content)
+    assert msg["body"] == "The trainer answered one of your questions." and msg["url"].endswith("#questions")
+    assert "Render" not in _json.dumps(msg)                                                # fără conținut privat
+
+
+def test_expired_subscription_is_removed(push):
+    ha, ht = login("Ana"), login("Radu", "trainer")
+    client.post("/api/push/subscribe", headers=ha, json=FakeBrowser("https://push.example/gone").sub)
+    client.post("/api/live/start", headers=ht, json={})
+    assert app_module.db["push"]["ana@test.ro"] == []
