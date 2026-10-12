@@ -3,3 +3,5 @@ data/*.json
 __pycache__/
 .pytest_cache/
 analizor-cheltuieli.zip
+*.zip
+penny_*.png
