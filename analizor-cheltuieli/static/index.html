@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Analizor de cheltuieli</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">Σ</span>
+    <div>
+      <h1>Analizor de cheltuieli</h1>
+      <p class="sub">Card · extras de cont · bonuri cash — într-un singur loc</p>
+    </div>
+  </div>
+  <div class="top-right">
+    <span id="aiStatus" class="pill">…</span>
+    <span id="aiCost" class="pill muted" title="Cost estimat al apelurilor către Claude în această sesiune"></span>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- ======================= coloana stângă ======================= -->
+  <aside class="side">
+    <section class="card">
+      <h2>1. Încarcă fișiere</h2>
+      <label id="drop" class="drop" tabindex="0">
+        <input id="fileInput" type="file" multiple accept=".csv,.pdf,.jpg,.jpeg,.png,.webp">
+        <strong>Trage fișierele aici</strong>
+        <span>sau apasă pentru a alege · CSV, PDF, JPG/PNG</span>
+      </label>
+      <div id="uploadReports" class="reports"></div>
+      <details class="manual">
+        <summary>Adaugă manual o tranzacție (ex. bon)</summary>
+        <form id="manualForm">
+          <div class="row2">
+            <label>Data<input name="date" placeholder="14.03.2026" required></label>
+            <label>Sumă<input name="amount" placeholder="73,50" required></label>
+          </div>
+          <label>Descriere<input name="description" placeholder="Magazin alimentar" required></label>
+          <div class="row2">
+            <label>Monedă<select name="currency"><option>RON</option><option>EUR</option><option>USD</option></select></label>
+            <label>Tip<select name="direction"><option value="debit">Cheltuială</option><option value="credit">Încasare</option></select></label>
+          </div>
+          <label>Categorie<select name="category" id="manualCat"><option value="">Alege AI-ul / automat</option></select></label>
+          <button class="btn primary" type="submit">Adaugă</button>
+        </form>
+      </details>
+    </section>
+
+    <section class="card chat">
+      <h2>2. Întreabă</h2>
+      <div id="suggestions" class="chips"></div>
+      <div id="chatLog" class="chat-log" aria-live="polite"></div>
+      <form id="askForm" class="ask">
+        <input id="question" autocomplete="off" placeholder="Cât am cheltuit pe mâncare în martie?">
+        <button class="btn primary" type="submit" id="askBtn">Întreabă</button>
+      </form>
+    </section>
+  </aside>
+
+  <!-- ======================= coloana principală ======================= -->
+  <section class="content">
+    <div class="toolbar card">
+      <div class="field">
+        <span class="lbl">Afișează în</span>
+        <div class="seg" id="displayCur" role="radiogroup">
+          <button data-v="RON" class="on">RON</button><button data-v="EUR">EUR</button><button data-v="USD">USD</button>
+        </div>
+      </div>
+      <label class="field"><span class="lbl">Lună</span><select id="monthSel"></select></label>
+      <label class="field"><span class="lbl">Moneda tranzacției</span>
+        <select id="curFilter"><option value="">Toate</option><option>RON</option><option>EUR</option><option>USD</option></select>
+      </label>
+      <label class="field"><span class="lbl">Sursă</span>
+        <select id="srcFilter"><option value="">Toate</option><option value="card_csv">Card (CSV)</option><option value="extras_pdf">Extras (PDF)</option><option value="bon">Bon numerar</option></select>
+      </label>
+      <label class="field"><span class="lbl">Categorie</span><select id="catFilter"><option value="">Toate</option></select></label>
+      <label class="field grow"><span class="lbl">Caută</span><input id="search" placeholder="ex. lidl"></label>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi card"><span>Cheltuieli</span><strong id="kSpend">–</strong><em id="kSpendN"></em></div>
+      <div class="kpi card"><span>Încasări</span><strong id="kIncome" class="pos">–</strong><em id="kIncomeN"></em></div>
+      <div class="kpi card"><span>Sold net</span><strong id="kNet">–</strong><em>încasări − cheltuieli</em></div>
+      <div class="kpi card"><span>Duplicate excluse</span><strong id="kDup">0</strong><em>card ↔ extras</em></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2 id="chartTitle">Cheltuieli pe categorii</h2>
+        <span class="hint">Click pe o categorie ca să filtrezi tabelul</span>
+      </div>
+      <div id="chart" class="bars"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Tranzacții <span id="txCount" class="count"></span></h2>
+        <div class="actions">
+          <label class="check"><input type="checkbox" id="showDup"> arată duplicatele</label>
+          <button class="btn ghost" id="exportBtn">Export CSV</button>
+          <button class="btn ghost danger" id="resetBtn">Șterge tot</button>
+        </div>
+      </div>
+      <div id="highlightBar" class="highlight-bar" hidden>
+        <span id="highlightText"></span><button class="btn ghost" id="clearHighlight">Arată toate</button>
+      </div>
+      <div class="table-wrap">
+        <table id="txTable">
+          <thead><tr>
+            <th data-sort="date">Data</th><th data-sort="description">Descriere</th>
+            <th data-sort="conv" class="num">Sumă</th><th class="num">Original</th>
+            <th data-sort="category">Categorie</th><th data-sort="source">Sursă</th><th></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="empty" class="empty">Nicio tranzacție încă. Încarcă <b>tranzactii_card.csv</b>, extrasul PDF sau o poză de bon.</div>
+      </div>
+    </div>
+  </section>
+</main>
+<div id="toast" class="toast" role="status"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
