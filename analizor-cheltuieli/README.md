@@ -66,7 +66,7 @@ Soluție: Claude transformă întrebarea (RO sau EN) într-un **filtru JSON** (o
 - **Sfaturile personalizate cu AI** primesc doar totaluri agregate și se cachează.
 - **Prompt caching** pe system prompt-urile fixe și effort `low`.
 
-Costul real al sesiunii apare în header.
+Costul real al sesiunii apare în header. **Măsurat cu cheia reală:** încărcarea completă a datelor demo (2 apeluri de categorisire + 2 bonuri citite din poză) costă aproximativ 0,04 $, o întrebare aproximativ 0,005 $, iar sfaturile personalizate aproximativ 0,02 $. La un al doilea upload al acelorași fișiere, categoriile vin din cache, deci costul e zero.
 
 **3. Date murdare și surse care se suprapun → normalizare + deduplicare.**
 CSV-ul amestecă 4 formate de dată (`2026-03-04`, `05/03/2026`, `6.03.2026`, `3 mar. 2026`), sume cu separator de mii (`1.249,99`), BOM, rânduri de titlu și un subsol „Total inregistrari”. Plățile cu cardul apar și în extras, iar CSV-ul are și zile din februarie și aprilie.

@@ -217,7 +217,7 @@ QUERY_SCHEMA = {
         "luna": {"type": "string", "description": "AAAA-LL sau gol"},
         "data_de_la": {"type": "string", "description": "AAAA-LL-ZZ sau gol"},
         "data_pana_la": {"type": "string", "description": "AAAA-LL-ZZ sau gol"},
-        "text_cautat": {"type": "string", "description": "comerciant / cuvânt din descriere, sau gol"},
+        "text_cautat": {"type": "string", "description": "cuvinte din descriere separate prin |, sau gol"},
         "surse": {"type": "array", "items": {"type": "string", "enum": ["card_csv", "extras_pdf", "bon"]}},
         "moneda_originala": {"type": "string", "enum": ["", "RON", "EUR", "USD"]},
         "moneda_afisare": {"type": "string", "enum": ["", "RON", "EUR", "USD"]},
@@ -244,6 +244,9 @@ Reguli:
   „la ce magazine”/„top comercianți” => „pe_comercianti”; „în medie” => „medie”.
 - „în euro/dolari/lei” la afișare => moneda_afisare. „tranzacțiile făcute în euro” => moneda_originala.
 - „cash”, „numerar”, „bonuri” => surse [„bon”]; „pe card” => [„card_csv”]; „din extras” => [„extras_pdf”].
+- text_cautat: pentru un subset dintr-o categorie (ex. „livrări și cafenele”, „benzinării”), pune cuvintele-cheie
+  din descrierile comercianților separate prin |, ex. "glovo|bolt food|tazz|starbucks|cafe|restaurant" sau "omv|petrom|mol|rompetrol";
+  atunci lasă „categorii” gol. Pentru un singur comerciant, doar numele lui (ex. "lidl").
 - limita: 0 dacă nu se cere un top anume.
 - in_afara_domeniului = true dacă întrebarea nu are legătură cu tranzacțiile.
 - Echivalențe în engleză: "how much did I spend" = suma/cheltuieli, "income/earned" = venituri,

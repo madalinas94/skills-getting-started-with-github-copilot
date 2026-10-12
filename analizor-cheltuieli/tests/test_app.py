@@ -18,6 +18,8 @@ FILES = Path(__file__).resolve().parent.parent / "fisiere-test"
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
+    from backend import ai
+    monkeypatch.setattr(ai, "enabled", lambda: False)  # testele nu folosesc niciodată cheia din .env
     monkeypatch.setattr(main, "store", Store(tmp_path / "tx.json"))
     monkeypatch.setattr(cat_mod, "CACHE_FILE", tmp_path / "cache.json")
     main._q_cache.clear()

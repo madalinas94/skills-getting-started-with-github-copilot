@@ -193,7 +193,7 @@ class Store:
                 continue
             if d_to and t["date"] > d_to:
                 continue
-            if text and text not in t["description"].lower():
+            if text and not any(w.strip() and w.strip() in t["description"].lower() for w in text.split("|")):
                 continue
             if surse and t["source"] not in surse:
                 continue
@@ -239,9 +239,17 @@ def _answer(q: dict, op: str, tip: str, rows: list[dict], r: dict, cur: str, lan
     cats = [i18n.cat(c, lang) for c in (q.get("categorii") or [])]
     what = (L(" pe ", " on ") + ", ".join(cats)) if cats else ""
     if q.get("text_cautat"):
-        what += L(f" la „{q['text_cautat']}”", f" at “{q['text_cautat']}”")
+        # cu mai mulți termeni căutați, numim comercianții găsiți efectiv, nu toată lista de termeni
+        found = sorted({merchant_name(t["description"]) for t in rows})
+        terms = (", ".join(found[:5]) if "|" in q["text_cautat"] and found
+                 else ", ".join(w.strip() for w in q["text_cautat"].split("|") if w.strip()))
+        what += L(f" la „{terms}”", f" at “{terms}”")
     if q.get("moneda_originala"):
         what += L(f" (doar tranzacții în {q['moneda_originala']})", f" (only {q['moneda_originala']} transactions)")
+    src_names = {"bon": L("în numerar (bonuri)", "in cash (receipts)"), "card_csv": L("cu cardul", "by card"),
+                 "extras_pdf": L("din extrasul de cont", "from the bank statement")}
+    if q.get("surse"):
+        what += " " + ", ".join(src_names.get(x, x) for x in q["surse"])
     period = _period(q, lang)
     n = len(rows)
     if n == 0:
