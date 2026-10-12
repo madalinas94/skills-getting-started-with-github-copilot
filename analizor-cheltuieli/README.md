@@ -1,8 +1,8 @@
-# Finn · your money sidekick
+# Finn · Private Money Butler
 
-**Finn** e un robot-asistent pentru bani. Încarci exportul CSV de la card, extrasul de cont PDF și poze cu bonurile plătite cash. Finn le curăță, le categorisește cu AI și le combină fără dubluri. Apoi îți arată unde se duc banii, îți spune **povestea lunii** în slide-uri animate, îți dă atenționări și sfaturi de economisire, și răspunde la întrebări în limbaj natural (scrise sau vorbite).
+**Finn** e un majordom-robot pentru bani (papion, monoclu, mănuși albe), într-o interfață în stil *old money*: bleumarin de miez de noapte, fildeș și aur periat, tipografie serif și iconițe line-art. Încarci exportul CSV de la card, extrasul de cont PDF și poze cu bonurile plătite cash. Finn le curăță, le categorisește cu AI și le combină fără dubluri. Apoi îți arată unde se duc banii, îți spune **povestea lunii** în slide-uri animate, îți dă atenționări și sfaturi de economisire, și răspunde la întrebări în limbaj natural (scrise sau vorbite).
 
-🇷🇴 Română / 🇬🇧 English · 📱 merge pe telefon ca o aplicație (PWA) · 🌗 temă întunecată / luminoasă
+🇷🇴 Română / 🇬🇧 English · 📱 merge pe telefon ca o aplicație bancară (PWA) · 🌗 temă „midnight” / „ivory”
 
 **Stack:** Python + FastAPI (backend), HTML/CSS/JS fără framework și fără build (frontend), grafice SVG desenate de mână (fără biblioteci), Claude API (AI).
 
@@ -36,15 +36,15 @@ Deschide http://localhost:8000. Finn te salută. Apasă **„Arată-mi cu datele
 
 | | Ce conține |
 |---|---|
-| 🏠 **Acasă** | Finn cu rezumatul lunii și starea lui (zâmbește sau e îngrijorat, după scor), **scor financiar 0–100**, 5 KPI-uri animate, **donut pe categorii**, **personalitatea ta financiară**, **atenționări**, **calendar-heatmap** al cheltuielilor, **grafic zi cu zi** (bare + cumulat), **regula 50/30/20**, top sfaturi |
-| ▶ **Povestea lunii** | Slide-uri pe tot ecranul, ca un recap de tip *Wrapped*: cât ai cheltuit, categoria preferată, cea mai mare cheltuială, ziua cea mai scumpă, comerciantul preferat, abonamentele pe an, cât ai putea economisi și „personalitatea” lunii, la final cu confetti și buton de share. Navighezi cu tap, swipe sau săgeți; ții apăsat ca să pui pauză |
-| 📊 **Analize** | Tabel calitativ **categorii vs. buget recomandat** (cu status *În buget / Atenție / Peste buget*), cheltuieli pe zile ale săptămânii, plăți pe surse, top comercianți, abonamente (lunar și anual) |
+| 🏠 **Acasă** | Salut personalizat cu numele titularului (citit din extras), card **Consum** (cât din venit ai cheltuit, cu bare de consum și economii), **Venituri / Cheltuieli / Economii**, butoane rapide *Încarcă extrase*, *Adaugă manual* și *Vezi istoric*. Lângă ele: Finn cu rezumatul lunii și starea lui (zâmbește sau e îngrijorat, după scor), **scor financiar 0–100**, **personalitatea financiară**, **atenționări**, **calendar-heatmap**, top sfaturi |
+| ▶ **Povestea lunii** | Slide-uri pe tot ecranul, ca un recap de tip *Wrapped*: cât ai cheltuit, categoria preferată, cea mai mare cheltuială, ziua cea mai scumpă, comerciantul preferat, abonamentele pe an, cât ai putea economisi și „personalitatea” lunii, pe fundaluri de culoarea pietrelor prețioase, cu ramă aurie, praf de aur la final și buton de share. Navighezi cu tap, swipe sau săgeți; ții apăsat ca să pui pauză |
+| 📊 **Statistici** | **Distribuția cheltuielilor** (donut + listă cu iconițe în inele), grafic zi cu zi, regula 50/30/20, zile ale săptămânii, tabel calitativ **categorii vs. buget recomandat** (cu status *În buget / Atenție / Peste buget*), cheltuieli pe zile ale săptămânii, plăți pe surse, top comercianți, abonamente (lunar și anual) |
 | 🎛️ **Simulator** | *„Ce-ar fi dacă…”*: glisoare pe fiecare categorie și scenarii rapide (Ușor / Inteligent / Hardcore). Vezi pe loc economia pe lună, pe an și în 5 ani. Îți setezi un **obiectiv** (de exemplu o vacanță) și vezi în câte luni îl atingi, plus ce-ți poți permite cu economia de un an |
-| 💡 **Sfaturi** | 10+ tipuri de recomandări cu economie estimată și **pași bifabili** (progresul se ține minte), plus **sfaturi personalizate cu AI** la cerere |
-| 🧾 **Tranzacții** | Upload, adăugare manuală, filtre, tabel sortabil cu categorie editabilă (Finn ține minte corecția), export CSV |
+| 🎓 **Educație** | 10+ tipuri de recomandări cu economie estimată și **pași bifabili** (progresul se ține minte), plus **sfaturi personalizate cu AI** la cerere |
+| 🧾 **Cheltuieli** | Upload, adăugare manuală, filtre, tabel sortabil cu categorie editabilă (Finn ține minte corecția), export CSV |
 | 💬 **Chat Finn** | Întrebări scrise sau **prin voce** 🎙️, în română sau engleză. Răspunsul vine cu defalcare și link spre tranzacțiile folosite |
 
-Totul e interactiv: click pe o felie, o zi din calendar sau un comerciant te duce direct la tranzacțiile respective. Robotul urmărește cursorul cu privirea.
+Totul e interactiv: click pe o felie, o zi din calendar sau un comerciant te duce direct la tranzacțiile respective. Robotul urmărește cursorul cu privirea. Pe telefon ai bara de navigare jos (Acasă · Statistici · Finn · Cheltuieli · Educație), ca în aplicațiile bancare.
 
 **Cifre de control (martie 2026, toate sursele):**
 - Mâncare: 1.259,20 RON (1.185,70 pe card + 73,50 bon)
@@ -98,9 +98,10 @@ backend/local_query.py  interpretare întrebări fără AI (RO + EN)
 backend/i18n.py         traduceri pentru textele generate de server
 backend/main.py         API FastAPI (+ manifest și service worker pentru PWA)
 static/i18n.js          dicționarul RO / EN al interfeței
-static/finn.js          robotul Finn (SVG animat, ochi care urmăresc cursorul, stări) + confetti
+static/finn.js          Finn, majordomul (SVG animat, ochi care urmăresc cursorul, stări) + praf de aur
+static/icons.js         iconițe line-art pentru categorii, navigare și acțiuni
 static/charts.js        donut, gauge, grafic zilnic, coloane, calendar-heatmap (SVG propriu)
 static/story.js         „Povestea lunii”
 static/app.js           logica interfeței
-tests/                  28 de teste, inclusiv totalurile verificate de mână și RO/EN
+tests/                  29 de teste, inclusiv totalurile verificate de mână și RO/EN
 ```

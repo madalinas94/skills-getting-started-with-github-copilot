@@ -258,3 +258,23 @@ def parse_statement_pdf(raw: bytes) -> tuple[list[dict], list[str]]:
 
 def _looks_like_income(low: str) -> bool:
     return any(k in low for k in ("incasare", "încasare", "salariu", "dobanda", "dobândă", "transfer primit", "rambursare"))
+
+
+# ---------------------------------------------------------------- titularul contului
+
+_HOLDER = re.compile(r"Titular\s*:\s*([A-Za-zĂÂÎȘŞȚŢăâîșşțţ][A-Za-zĂÂÎȘŞȚŢăâîșşțţ.\- ]{1,60}?)\s*(?:[;|,\n]|$)", re.M)
+
+
+def extract_holder(raw: bytes, ext: str) -> str | None:
+    """Numele titularului din antetul extrasului („Titular: MATEI IONESCU”), pentru salutul personalizat."""
+    try:
+        if ext == ".pdf":
+            import pdfplumber
+            with pdfplumber.open(io.BytesIO(raw)) as pdf:
+                text = (pdf.pages[0].extract_text() or "") if pdf.pages else ""
+        else:
+            text = _decode(raw[:4000])
+    except Exception:  # noqa: BLE001 – numele e opțional, nu blocăm upload-ul
+        return None
+    m = _HOLDER.search(text)
+    return m.group(1).strip().title() if m else None

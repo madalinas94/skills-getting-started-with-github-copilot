@@ -17,34 +17,34 @@ const Story = (() => {
   function build(d) {
     const s = [];
     s.push({ bg: "g1", html: `<div class="st-finn">${Finn.svg({ wave: true })}</div>
-      <p class="st-kicker">${t("story.title")}</p><h2 class="st-huge">${d.month}</h2><p class="st-sub">${t("story.s1")} ✨</p>` });
+      <p class="st-kicker">${t("story.title")}</p><h2 class="st-huge">${d.month}</h2><p class="st-sub">${t("story.s1")}</p>` });
     s.push({ bg: "g2", html: `<p class="st-kicker">${t("story.spent")}</p>
       <h2 class="st-huge" data-count="${d.spent}" data-fmt="money">0</h2><p class="st-sub">${t("story.payments", { n: d.count })}</p>
-      <div class="st-emoji-rain">💸💳🧾</div>` });
+      ` });
     if (d.topCat) s.push({ bg: "g3", html: `<p class="st-kicker">${t("story.topCat")}</p>
       <div class="st-big-emoji">${d.topCat.icon}</div><h2 class="st-title">${d.topCat.name}</h2>
       <div class="st-ring" style="--p:${d.topCat.share};--c:${d.topCat.color}"><span data-count="${d.topCat.share}" data-fmt="pct">0</span></div>
       <p class="st-sub">${t("story.ofAll")} · ${d.topCat.value}</p>` });
     if (d.biggest) s.push({ bg: "g4", html: `<p class="st-kicker">${t("story.biggest")}</p>
-      <div class="st-big-emoji">🏆</div><h2 class="st-title">${d.biggest.name}</h2>
+      <div class="st-big-emoji">${icon("crown")}</div><h2 class="st-title">${d.biggest.name}</h2>
       <h3 class="st-num" data-count="${d.biggest.amount}" data-fmt="money">0</h3><p class="st-sub">${d.biggest.date}</p>` });
     if (d.busiest) s.push({ bg: "g5", html: `<p class="st-kicker">${t("story.busiest")}</p>
-      <div class="st-big-emoji">📅</div><h2 class="st-title">${d.busiest.weekday}</h2>
+      <div class="st-big-emoji">${icon("calendar")}</div><h2 class="st-title">${d.busiest.weekday}</h2>
       <p class="st-sub">${d.busiest.date}</p><h3 class="st-num" data-count="${d.busiest.amount}" data-fmt="money">0</h3>` });
     if (d.topMerchant) s.push({ bg: "g6", html: `<p class="st-kicker">${t("story.topMerchant")}</p>
-      <div class="st-big-emoji">❤️</div><h2 class="st-title">${d.topMerchant.name}</h2>
+      <div class="st-big-emoji">${icon("seal")}</div><h2 class="st-title">${d.topMerchant.name}</h2>
       <p class="st-sub">${t("story.visits", { n: d.topMerchant.visits, a: d.topMerchant.total })}</p>` });
     if (d.subsYear > 0) s.push({ bg: "g7", html: `<p class="st-kicker">${t("story.subs")}</p>
-      <div class="st-big-emoji">📺</div><h3 class="st-num" data-count="${d.subsYear}" data-fmt="money">0</h3>
+      <div class="st-big-emoji">${icon("fun")}</div><h3 class="st-num" data-count="${d.subsYear}" data-fmt="money">0</h3>
       <p class="st-sub">${t("story.subsYear")}</p>` });
     if (d.saveYear > 0) s.push({ bg: "g8", html: `<p class="st-kicker">${t("story.save")}</p>
-      <div class="st-big-emoji">🐷</div><h2 class="st-huge" data-count="${d.saveYear}" data-fmt="money">0</h2>
+      <div class="st-big-emoji">${icon("piggy")}</div><h2 class="st-huge" data-count="${d.saveYear}" data-fmt="money">0</h2>
       <p class="st-sub">${t("story.saveYear", { n: d.saveN })}</p>` });
     s.push({ bg: "g9", final: true, html: `<p class="st-kicker">${t("story.you")}</p>
       <div class="st-persona">${d.persona.emoji}</div><h2 class="st-title">${d.persona.title}</h2>
       <p class="st-sub">${d.persona.text}</p>
       <div class="st-score"><span>${t("story.score")}</span><b data-count="${d.score}">0</b><em>${d.scoreLabel}</em></div>
-      <div class="st-actions"><button class="btn grad" data-share>📤 ${t("story.share")}</button><button class="btn soft" data-close>${t("story.close")}</button></div>` });
+      <div class="st-actions"><button class="btn gold" data-share>${t("story.share")}</button><button class="btn ghost" data-close>${t("story.close")}</button></div>` });
     return s;
   }
 
@@ -57,9 +57,9 @@ const Story = (() => {
     root = document.createElement("div");
     root.className = "story";
     root.innerHTML = `<div class="st-bars">${slides.map(() => `<i><b></b></i>`).join("")}</div>
-      <button class="st-x" data-close aria-label="${t("story.close")}">✕</button>
+      <button class="st-x" data-close aria-label="${t("story.close")}">${icon("close")}</button>
       <div class="st-stage"></div>
-      <div class="st-hint">${t("story.tap")} ›</div>`;
+      <div class="st-hint">${t("story.tap")}</div>`;
     document.body.appendChild(root);
     document.body.classList.add("no-scroll");
     bind();

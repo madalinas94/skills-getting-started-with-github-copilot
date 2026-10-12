@@ -214,3 +214,9 @@ def test_english(client):
 def test_pwa_files(client):
     assert client.get("/manifest.webmanifest").json()["short_name"] == "Finn"
     assert "service" in client.get("/sw.js").text.lower()
+
+
+def test_owner_from_statement(client):
+    r = upload(client, "extras_cont_martie_2026.pdf")
+    assert r["owner"] == "Matei Ionescu"
+    assert client.get("/api/transactions").json()["owner"] == "Matei Ionescu"

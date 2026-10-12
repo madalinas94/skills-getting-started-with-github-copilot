@@ -27,13 +27,13 @@ const Charts = (() => {
   function donut(el, items, { center = "", sub = "", size = 220, onClick, onHover } = {}) {
     const total = items.reduce((a, i) => a + i.value, 0);
     if (!total) { el.innerHTML = `<div class="empty">Nicio cheltuială</div>`; return; }
-    const r = 80, cx = 100, cy = 100, w = 26;
+    const r = 78, cx = 100, cy = 100, w = 22, gap = items.length > 1 ? 0.025 : 0;
     let a0 = -Math.PI / 2;
     const arcs = items.map((it, i) => {
       const frac = it.value / total, a1 = a0 + frac * Math.PI * 2;
       const large = a1 - a0 > Math.PI ? 1 : 0;
       const p = (a, rr) => [cx + rr * Math.cos(a), cy + rr * Math.sin(a)];
-      const [x0, y0] = p(a0, r), [x1, y1] = p(Math.min(a1, a0 + Math.PI * 2 - 1e-4), r);
+      const [x0, y0] = p(a0 + gap / 2, r), [x1, y1] = p(Math.max(a0 + gap / 2 + 1e-3, Math.min(a1, a0 + Math.PI * 2 - 1e-4) - gap / 2), r);
       const d = frac >= 0.9999
         ? `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.01} ${cy - r}`
         : `M ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1}`;
@@ -59,10 +59,10 @@ const Charts = (() => {
   // ---------------------------------------------------------------- gauge scor
   function gauge(el, score, label) {
     const r = 80, cx = 100, cy = 100, len = Math.PI * r;
-    const color = score >= 80 ? "#34d399" : score >= 60 ? "#38bdf8" : score >= 40 ? "#fbbf24" : "#fb7185";
+    const color = score >= 80 ? "#7fae8f" : score >= 60 ? "#8fb0d6" : score >= 40 ? "#d4b46a" : "#c2626e";
     const id = "g" + uid++;
     el.innerHTML = `<svg viewBox="0 0 200 128">
-      <defs><linearGradient id="${id}" x1="0" x2="1"><stop offset="0" stop-color="#fb7185"/><stop offset=".5" stop-color="#fbbf24"/><stop offset="1" stop-color="#34d399"/></linearGradient></defs>
+      <defs><linearGradient id="${id}" x1="0" x2="1"><stop offset="0" stop-color="#8f2633"/><stop offset=".55" stop-color="#d4b46a"/><stop offset="1" stop-color="#5f8f75"/></linearGradient></defs>
       <path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="var(--glass-strong)" stroke-width="16" stroke-linecap="round"/>
       <path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="url(#${id})" stroke-width="16" stroke-linecap="round"
         stroke-dasharray="${len}" stroke-dashoffset="${len}" style="transition: stroke-dashoffset 1.2s cubic-bezier(.2,.8,.2,1)" data-g/>
@@ -104,15 +104,15 @@ const Charts = (() => {
     const area = `${line} L${x(days.length - 1)},${P.t + ih} L${x(0)},${P.t + ih} Z`;
     el.innerHTML = `<svg viewBox="0 0 ${W} ${H}">
       <defs>
-        <linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#6366f1"/></linearGradient>
-        <linearGradient id="${id}a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbbf24" stop-opacity=".28"/><stop offset="1" stop-color="#fbbf24" stop-opacity="0"/></linearGradient>
+        <linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e9cf8f"/><stop offset="1" stop-color="#9c7a45"/></linearGradient>
+        <linearGradient id="${id}a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="c-area-top"/><stop offset="1" class="c-area-bottom"/></linearGradient>
       </defs>
       <g class="axis">${grid}${labels}</g>
       <path d="${area}" fill="url(#${id}a)"/>
       ${bars}
-      <path d="${line}" fill="none" stroke="#fbbf24" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"
+      <path d="${line}" fill="none" class="c-line" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
         style="stroke-dasharray: 3000; stroke-dashoffset: 3000; animation: draw 1.4s .2s ease forwards"/>
-      ${cumPts.map((v, i) => `<circle cx="${x(i)}" cy="${yc(v)}" r="3.5" fill="#fbbf24" stroke="var(--bg2)" stroke-width="1.5"
+      ${cumPts.map((v, i) => `<circle cx="${x(i)}" cy="${yc(v)}" r="3" class="c-dot" stroke-width="1.5"
           data-tip="<b>Cumulat până pe ${days[i].full}</b>${fmt(v)}"/>`).join("")}
     </svg>`;
     bindTips(el);
@@ -129,8 +129,8 @@ const Charts = (() => {
     const imax = items.findIndex((i) => i.value === max);
     el.innerHTML = `<svg viewBox="0 0 ${W} ${H}">
       <defs>
-        <linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#6366f1"/></linearGradient>
-        <linearGradient id="${id}m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f472b6"/><stop offset="1" stop-color="#f97316"/></linearGradient>
+        <linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fa7c9"/><stop offset="1" stop-color="#3d5478"/></linearGradient>
+        <linearGradient id="${id}m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e9cf8f"/><stop offset="1" stop-color="#9c7a45"/></linearGradient>
       </defs>
       <g class="axis">${items.map((it, i) => {
         const x = P.l + (iw * (i + 0.5)) / items.length, h = (it.value / max) * ih, yy = P.t + ih - h;

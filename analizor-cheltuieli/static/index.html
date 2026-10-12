@@ -3,215 +3,191 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b0920">
+  <meta name="theme-color" content="#0b1322">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Finn">
-  <meta name="description" content="Finn – your money sidekick. Analizor de cheltuieli cu AI.">
-  <title>Finn · your money sidekick</title>
+  <meta name="description" content="Finn – your private money butler. Analizor de cheltuieli cu AI.">
+  <title>Finn · Private Money Butler</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Playfair+Display:wght@500;600&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-<div class="aurora" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-<div class="grain" aria-hidden="true"></div>
+<div class="backdrop" aria-hidden="true"></div>
 
 <!-- ============================ HEADER ============================ -->
 <header class="topbar">
   <div class="brand">
-    <span class="brand-bot" id="brandBot"></span>
-    <div><h1>Finn</h1><p data-i18n="tagline"></p></div>
+    <span class="crest" id="brandBot"></span>
+    <div class="wordmark"><h1>Finn</h1><p data-i18n="tagline"></p></div>
   </div>
   <nav class="tabs" role="tablist">
-    <button class="tab on" data-tab="home"><span class="ti">🏠</span><span data-i18n="tab.home"></span></button>
-    <button class="tab" data-tab="analytics"><span class="ti">📊</span><span data-i18n="tab.analytics"></span></button>
-    <button class="tab" data-tab="sim"><span class="ti">🎛️</span><span data-i18n="tab.sim"></span></button>
-    <button class="tab" data-tab="tips"><span class="ti">💡</span><span data-i18n="tab.tips"></span><b class="badge-dot" hidden></b></button>
-    <button class="tab" data-tab="tx"><span class="ti">🧾</span><span data-i18n="tab.tx"></span></button>
+    <button class="tab on" data-tab="home"><i data-icon="home"></i><span data-i18n="tab.home"></span></button>
+    <button class="tab" data-tab="analytics"><i data-icon="stats"></i><span data-i18n="tab.analytics"></span></button>
+    <button class="tab" data-tab="tx"><i data-icon="receipt"></i><span data-i18n="tab.tx"></span></button>
+    <button class="tab" data-tab="tips"><i data-icon="education"></i><span data-i18n="tab.tips"></span><b class="badge-dot" hidden></b></button>
+    <button class="tab" data-tab="sim"><i data-icon="sliders"></i><span data-i18n="tab.sim"></span></button>
   </nav>
   <div class="controls">
     <div class="seg" id="displayCur" role="radiogroup">
       <button data-v="RON" class="on">RON</button><button data-v="EUR">EUR</button><button data-v="USD">USD</button>
     </div>
-    <select id="monthSel"></select>
+    <select id="monthSel" aria-label="Period"></select>
     <div class="seg lang" id="langSeg" data-i18n-title="lang"><button data-v="ro">RO</button><button data-v="en">EN</button></div>
-    <button class="icon-btn" id="themeBtn" data-i18n-title="theme">☀️</button>
+    <button class="icon-btn" id="themeBtn" data-i18n-title="theme"></button>
     <span id="aiStatus" class="ai-pill"></span>
   </div>
+  <button class="seal-badge" id="sealBadge" data-goto="tips" data-i18n-title="seal"><i data-icon="seal"></i><b id="sealCount">0</b></button>
 </header>
 
 <main>
   <!-- ============================ ACASĂ ============================ -->
   <section class="view on" id="view-home">
-    <div class="hero card glass spot">
-      <button class="hero-bot story-ring" id="heroBot" aria-label="Story"></button>
-      <div class="hero-text">
-        <span class="eyebrow" id="heroHello"></span>
-        <p class="bubble" id="heroBubble"></p>
-        <div class="hero-actions">
-          <button class="btn grad shine" data-story><span>▶</span> <span data-i18n="hero.story"></span></button>
-          <label class="btn soft" for="fileInputHero">⬆ <span data-i18n="hero.upload"></span><input id="fileInputHero" type="file" multiple accept=".csv,.pdf,.jpg,.jpeg,.png,.webp" hidden></label>
-          <button class="btn soft" data-demo>✨ <span data-i18n="hero.demo"></span></button>
-          <button class="btn soft hide-m" data-open-chat>💬 <span data-i18n="hero.ask"></span></button>
+    <div class="home-grid">
+      <div class="home-main">
+        <div class="greet">
+          <span class="overline" id="todayLine"></span>
+          <h2 id="greetTitle"></h2>
+          <p data-i18n="home.sub"></p>
         </div>
-      </div>
-      <div class="hero-score" id="heroScore"></div>
-    </div>
 
-    <div id="homeEmpty" class="empty-state card glass" hidden>
-      <div class="drop big" data-drop>
-        <div class="drop-icon">📂</div>
-        <strong data-i18n="empty.drop"></strong>
-        <span data-i18n="empty.or"></span>
-      </div>
-      <div class="steps"><div><b>1</b><span data-i18n="step1"></span></div><div><b>2</b><span data-i18n="step2"></span></div><div><b>3</b><span data-i18n="step3"></span></div></div>
-    </div>
+        <div class="card panel consum">
+          <div class="consum-head"><span class="overline" data-i18n="consum.title"></span><b id="consumPct">–</b></div>
+          <div class="pill-bar spend"><span id="barSpend"></span></div>
+          <div class="pill-bar save"><span id="barSave"></span></div>
+          <div class="finn-note"><span class="note-bot" id="noteBot"></span><p id="consumText"></p></div>
+          <div class="figs">
+            <div><b id="figIncome">–</b><i class="chip plum" data-i18n="fig.income"></i></div>
+            <div><b id="figSpend">–</b><i class="chip claret" data-i18n="fig.spend"></i></div>
+            <div><b id="figSave">–</b><i class="chip gold" data-i18n="fig.save"></i></div>
+          </div>
+        </div>
 
-    <div id="homeData" class="stack-col">
-      <div class="kpis">
-        <div class="kpi card glass spot tilt" style="--g: var(--g-coral)"><i>💸</i><span data-i18n="kpi.spend"></span><strong id="kSpend">–</strong><em id="kSpendN"></em></div>
-        <div class="kpi card glass spot tilt" style="--g: var(--g-mint)"><i>💰</i><span data-i18n="kpi.income"></span><strong id="kIncome">–</strong><em id="kIncomeN"></em></div>
-        <div class="kpi card glass spot tilt" style="--g: var(--g-violet)"><i>⚖️</i><span data-i18n="kpi.net"></span><strong id="kNet">–</strong><em data-i18n="kpi.netNote"></em></div>
-        <div class="kpi card glass spot tilt" style="--g: var(--g-sky)"><i>🐷</i><span data-i18n="kpi.rate"></span><strong id="kRate">–</strong><em data-i18n="kpi.rateNote"></em></div>
-        <div class="kpi card glass spot tilt clickable" style="--g: var(--g-sun)" data-goto="tips"><i>🎯</i><span data-i18n="kpi.save"></span><strong id="kSave">–</strong><em id="kSaveY"></em></div>
+        <div class="act-grid">
+          <div class="act-col"><span class="overline" data-i18n="act.sources"></span>
+            <label class="act-tile navy" for="fileInputHero"><span class="act-n"><i data-icon="upload"></i></span><i data-icon="arrow" class="act-arrow"></i>
+              <input id="fileInputHero" type="file" multiple accept=".csv,.pdf,.jpg,.jpeg,.png,.webp" hidden></label>
+            <span class="act-label" data-i18n="act.upload"></span>
+          </div>
+          <div class="act-col"><span class="overline" data-i18n="act.expenses"></span>
+            <button class="act-tile claret" data-manual><i data-icon="plus" class="act-plus"></i></button>
+            <span class="act-label" data-i18n="act.manual"></span>
+          </div>
+        </div>
+        <button class="history-row" data-goto="tx"><i data-icon="history"></i><span data-i18n="act.history"></span></button>
+        <button class="demo-link" data-demo><i data-icon="sparkle"></i><span data-i18n="hero.demo"></span></button>
       </div>
 
-      <div class="bento">
-        <div class="card glass spot b-donut">
-          <div class="card-head"><h2 data-i18n="card.where"></h2><span class="hint" data-i18n="card.whereHint"></span></div>
-          <div class="donut-wrap"><div id="donut"></div><div id="donutLegend" class="legend"></div></div>
+      <div class="home-side">
+        <div class="card panel butler">
+          <button class="butler-bot story-ring" id="heroBot" aria-label="Story"></button>
+          <div class="butler-text">
+            <span class="overline" id="heroHello"></span>
+            <p class="bubble" id="heroBubble"></p>
+            <div class="hero-actions">
+              <button class="btn gold" data-story><i data-icon="story"></i><span data-i18n="hero.story"></span></button>
+              <button class="btn ghost hide-m" data-open-chat><i data-icon="chat"></i><span data-i18n="hero.ask"></span></button>
+            </div>
+          </div>
+          <div class="butler-score" id="heroScore"></div>
         </div>
-        <div class="card persona b-persona" id="persona"></div>
-        <div class="card glass spot b-alerts">
-          <div class="card-head"><h2 data-i18n="card.alerts"></h2><span class="hint" id="alertCount"></span></div>
-          <div id="alerts" class="alerts"></div>
+
+        <div id="homeEmpty" class="card panel empty-state" hidden>
+          <div class="drop big" data-drop>
+            <i data-icon="upload" class="drop-icon"></i>
+            <strong data-i18n="empty.drop"></strong>
+            <span data-i18n="empty.or"></span>
+          </div>
         </div>
-        <div class="card glass spot b-heat">
-          <div class="card-head"><h2 data-i18n="card.heatmap"></h2></div>
-          <div id="heatmap"></div>
-          <p class="hint" data-i18n="card.heatmapHint"></p>
+
+        <div id="homeData" class="stack-col">
+          <div class="side-2">
+            <div class="card persona" id="persona"></div>
+            <div class="card panel">
+              <div class="card-head"><h2 data-i18n="card.alerts"></h2><span class="hint" id="alertCount"></span></div>
+              <div id="alerts" class="alerts"></div>
+            </div>
+          </div>
+          <div class="side-2">
+            <div class="card panel">
+              <div class="card-head"><h2 data-i18n="card.heatmap"></h2><span class="hint" data-i18n="card.heatmapHint"></span></div>
+              <div id="heatmap"></div>
+            </div>
+            <div class="card panel">
+              <div class="card-head"><h2 data-i18n="card.topTips"></h2><button class="link-btn" data-goto="tips" data-i18n="card.seeAll"></button></div>
+              <div id="topTips" class="mini-tips"></div>
+            </div>
+          </div>
+          <button class="card sim-cta" data-goto="sim">
+            <span class="sim-cta-ico"><i data-icon="sliders"></i></span>
+            <span><b data-i18n="sim.title"></b><small data-i18n="sim.sub"></small></span><i data-icon="arrow" class="arrow"></i>
+          </button>
         </div>
-        <div class="card glass spot b-daily">
-          <div class="card-head"><h2 data-i18n="card.daily"></h2>
-            <div class="legend-inline"><span><i style="background:var(--violet)"></i><span data-i18n="card.perDay"></span></span><span><i class="line"></i><span data-i18n="card.cumulative"></span></span></div></div>
-          <div id="daily" class="chart"></div>
-        </div>
-        <div class="card glass spot b-rule">
-          <div class="card-head"><h2 data-i18n="card.rule"></h2><span class="hint" data-i18n="card.ruleHint"></span></div>
-          <div id="rule"></div>
-        </div>
-        <div class="card glass spot b-tips">
-          <div class="card-head"><h2 data-i18n="card.topTips"></h2><button class="link-btn" data-goto="tips" data-i18n="card.seeAll"></button></div>
-          <div id="topTips" class="mini-tips"></div>
-        </div>
-        <button class="card sim-cta b-sim" data-goto="sim">
-          <span class="sim-cta-ico">🎛️</span>
-          <span><b data-i18n="sim.title"></b><small data-i18n="sim.sub"></small></span><span class="arrow">→</span>
-        </button>
       </div>
     </div>
   </section>
 
-  <!-- ============================ ANALIZE ============================ -->
+  <!-- ============================ STATISTICI ============================ -->
   <section class="view" id="view-analytics">
-    <div class="card glass">
+    <div class="page-head"><span class="overline" id="statsPeriod"></span><h2 class="page-title" data-i18n="tab.analytics"></h2></div>
+    <div class="dist-grid">
+      <div class="card panel dist">
+        <div class="card-head"><h2 data-i18n="dist.title"></h2><span class="hint" data-i18n="card.whereHint"></span></div>
+        <div class="dist-chart"><div id="donut"></div></div>
+      </div>
+      <div class="card panel"><div id="distList" class="dist-list"></div></div>
+    </div>
+    <div class="card panel">
+      <div class="card-head"><h2 data-i18n="card.daily"></h2>
+        <div class="legend-inline"><span><i class="sw bar"></i><span data-i18n="card.perDay"></span></span><span><i class="sw line"></i><span data-i18n="card.cumulative"></span></span></div></div>
+      <div id="daily" class="chart"></div>
+    </div>
+    <div class="grid-2">
+      <div class="card panel">
+        <div class="card-head"><h2 data-i18n="card.rule"></h2><span class="hint" data-i18n="card.ruleHint"></span></div>
+        <div id="rule"></div>
+      </div>
+      <div class="card panel">
+        <div class="card-head"><h2 data-i18n="card.weekday"></h2><span class="hint" id="weekdayHint"></span></div>
+        <div id="weekday" class="chart"></div>
+      </div>
+    </div>
+    <div class="card panel">
       <div class="card-head"><h2 data-i18n="card.catBudget"></h2><span class="hint" data-i18n="card.catBudgetHint"></span></div>
       <div class="table-wrap"><table class="qtable" id="catTable"></table></div>
     </div>
     <div class="grid-2">
-      <div class="card glass spot">
-        <div class="card-head"><h2 data-i18n="card.weekday"></h2><span class="hint" id="weekdayHint"></span></div>
-        <div id="weekday" class="chart"></div>
-      </div>
-      <div class="card glass spot">
-        <div class="card-head"><h2 data-i18n="card.sources"></h2><span class="hint" data-i18n="card.sourcesHint"></span></div>
-        <div class="donut-wrap small"><div id="sourceDonut"></div><div id="sourceLegend" class="legend"></div></div>
-      </div>
-    </div>
-    <div class="grid-2">
-      <div class="card glass"><div class="card-head"><h2 data-i18n="card.merchants"></h2></div>
+      <div class="card panel"><div class="card-head"><h2 data-i18n="card.merchants"></h2></div>
         <div class="table-wrap"><table class="qtable" id="merchTable"></table></div></div>
-      <div class="card glass"><div class="card-head"><h2 data-i18n="card.subs"></h2><span class="hint" id="subsHint"></span></div>
-        <div class="table-wrap"><table class="qtable" id="subsTable"></table></div></div>
-    </div>
-  </section>
-
-  <!-- ============================ SIMULATOR ============================ -->
-  <section class="view" id="view-sim">
-    <div class="sim-head card glass">
-      <div class="sim-bot" id="simBot"></div>
-      <div><h2 class="display" data-i18n="sim.title"></h2><p class="muted" data-i18n="sim.sub"></p></div>
-    </div>
-    <div class="sim-grid">
-      <div class="card glass">
-        <div class="card-head"><h2 data-i18n="sim.presets"></h2><button class="link-btn" id="simReset" data-i18n="sim.reset"></button></div>
-        <div class="chips static" id="simPresets">
-          <button class="chip" data-preset="light" data-i18n="sim.p.light"></button>
-          <button class="chip" data-preset="smart" data-i18n="sim.p.smart"></button>
-          <button class="chip" data-preset="hard" data-i18n="sim.p.hard"></button>
+      <div class="stack-col">
+        <div class="card panel">
+          <div class="card-head"><h2 data-i18n="card.sources"></h2><span class="hint" data-i18n="card.sourcesHint"></span></div>
+          <div class="donut-wrap small"><div id="sourceDonut"></div><div id="sourceLegend" class="legend"></div></div>
         </div>
-        <div id="sliders" class="sliders"></div>
-      </div>
-      <div class="sim-side">
-        <div class="card sim-result">
-          <span class="eyebrow light" data-i18n="sim.save"></span>
-          <div class="sim-big"><strong id="simMonth">0</strong><span data-i18n="sim.perMonth"></span></div>
-          <div class="sim-row"><div><b id="simYear">0</b><small data-i18n="sim.perYear"></small></div><div><b id="sim5">0</b><small data-i18n="sim.in5"></small></div></div>
-          <div class="sim-bars" id="simBars"></div>
-        </div>
-        <div class="card glass">
-          <div class="card-head"><h2 data-i18n="sim.goal"></h2></div>
-          <div class="goal">
-            <div class="goal-ring" id="goalRing"></div>
-            <div class="goal-form">
-              <label><span data-i18n="sim.goalName"></span><input id="goalName"></label>
-              <label><span data-i18n="sim.goalAmount"></span><input id="goalAmount" inputmode="decimal"></label>
-            </div>
-          </div>
-        </div>
-        <div class="card glass">
-          <div class="card-head"><h2 data-i18n="sim.afford"></h2></div>
-          <div id="afford" class="afford"></div>
-        </div>
+        <div class="card panel"><div class="card-head"><h2 data-i18n="card.subs"></h2><span class="hint" id="subsHint"></span></div>
+          <div class="table-wrap"><table class="qtable" id="subsTable"></table></div></div>
       </div>
     </div>
   </section>
 
-  <!-- ============================ SFATURI ============================ -->
-  <section class="view" id="view-tips">
-    <div class="save-hero card glass">
-      <div class="save-bot" id="saveBot"></div>
-      <div>
-        <span class="eyebrow" data-i18n="tips.potential"></span>
-        <div class="save-num"><strong id="saveMonth">–</strong><span data-i18n="tips.perMonth"></span></div>
-        <p id="saveYear" class="muted"></p>
-      </div>
-      <div class="ai-tips-cta">
-        <button class="btn grad shine" id="aiTipsBtn">🤖 <span data-i18n="tips.ai"></span></button>
-        <small class="muted" data-i18n="tips.aiNote"></small>
-      </div>
-    </div>
-    <div id="aiTips" class="ai-tips" hidden></div>
-    <div id="recs" class="recs"></div>
-  </section>
-
-  <!-- ============================ TRANZACȚII ============================ -->
+  <!-- ============================ CHELTUIELI ============================ -->
   <section class="view" id="view-tx">
+    <div class="page-head"><span class="overline" data-i18n="act.history"></span><h2 class="page-title" data-i18n="tab.tx"></h2></div>
     <div class="grid-tx">
-      <div class="card glass">
+      <div class="card panel">
         <h2 data-i18n="tx.upload"></h2>
         <label class="drop" data-drop tabindex="0">
           <input id="fileInput" type="file" multiple accept=".csv,.pdf,.jpg,.jpeg,.png,.webp" hidden>
-          <div class="drop-icon">📂</div><strong data-i18n="tx.drop"></strong><span>CSV · PDF · JPG / PNG</span>
+          <i data-icon="upload" class="drop-icon"></i><strong data-i18n="tx.drop"></strong><span>CSV · PDF · JPG / PNG</span>
         </label>
         <div id="uploadReports" class="reports"></div>
-        <details class="manual">
+        <details class="manual" id="manualBox">
           <summary data-i18n="tx.manual"></summary>
           <form id="manualForm">
             <div class="row2">
@@ -224,12 +200,12 @@
               <label><span data-i18n="tx.type"></span><select name="direction"><option value="debit" data-i18n="tx.expense"></option><option value="credit" data-i18n="tx.incomeOne"></option></select></label>
             </div>
             <label><span data-i18n="tx.category"></span><select name="category" id="manualCat"><option value="" data-i18n="tx.auto"></option></select></label>
-            <button class="btn grad" type="submit" data-i18n="tx.add"></button>
+            <button class="btn gold" type="submit" data-i18n="tx.add"></button>
           </form>
         </details>
       </div>
 
-      <div class="card glass">
+      <div class="card panel">
         <div class="filters">
           <label><span data-i18n="f.currency"></span><select id="curFilter"><option value="" data-i18n="f.all"></option><option>RON</option><option>EUR</option><option>USD</option></select></label>
           <label><span data-i18n="f.source"></span><select id="srcFilter"><option value="" data-i18n="f.all"></option>
@@ -243,11 +219,11 @@
           <h2><span data-i18n="tx.title"></span> <span id="txCount" class="count"></span> <span id="txSum" class="count"></span></h2>
           <div class="actions">
             <label class="check"><input type="checkbox" id="showDup"> <span data-i18n="tx.dups"></span></label>
-            <button class="btn soft sm" id="exportBtn">⬇ <span data-i18n="tx.export"></span></button>
-            <button class="btn soft sm danger" id="resetBtn">🗑 <span data-i18n="tx.reset"></span></button>
+            <button class="btn ghost sm" id="exportBtn"><i data-icon="download"></i><span data-i18n="tx.export"></span></button>
+            <button class="btn ghost sm danger" id="resetBtn"><i data-icon="trash"></i><span data-i18n="tx.reset"></span></button>
           </div>
         </div>
-        <div id="highlightBar" class="highlight-bar" hidden><span id="highlightText"></span><button class="btn soft sm" id="clearHighlight" data-i18n="tx.showAll"></button></div>
+        <div id="highlightBar" class="highlight-bar" hidden><span id="highlightText"></span><button class="btn ghost sm" id="clearHighlight" data-i18n="tx.showAll"></button></div>
         <div class="table-wrap">
           <table id="txTable" class="qtable tx">
             <thead><tr>
@@ -262,47 +238,108 @@
       </div>
     </div>
   </section>
+
+  <!-- ============================ EDUCAȚIE ============================ -->
+  <section class="view" id="view-tips">
+    <div class="page-head"><span class="overline" data-i18n="edu.over"></span><h2 class="page-title" data-i18n="tab.tips"></h2></div>
+    <div class="save-hero card panel">
+      <div class="save-bot" id="saveBot"></div>
+      <div>
+        <span class="overline" data-i18n="tips.potential"></span>
+        <div class="save-num"><strong id="saveMonth">–</strong><span data-i18n="tips.perMonth"></span></div>
+        <p id="saveYear" class="muted"></p>
+      </div>
+      <div class="ai-tips-cta">
+        <button class="btn gold" id="aiTipsBtn"><i data-icon="feather"></i><span data-i18n="tips.ai"></span></button>
+        <button class="btn ghost" data-goto="sim"><i data-icon="sliders"></i><span data-i18n="edu.plan"></span></button>
+        <small class="muted" data-i18n="tips.aiNote"></small>
+      </div>
+    </div>
+    <div id="aiTips" class="ai-tips" hidden></div>
+    <div id="recs" class="recs"></div>
+  </section>
+
+  <!-- ============================ SIMULATOR ============================ -->
+  <section class="view" id="view-sim">
+    <div class="page-head"><span class="overline" data-i18n="sim.over"></span><h2 class="page-title" data-i18n="sim.title"></h2><p class="muted" data-i18n="sim.sub"></p></div>
+    <div class="sim-grid">
+      <div class="card panel">
+        <div class="card-head"><h2 data-i18n="sim.presets"></h2><button class="link-btn" id="simReset" data-i18n="sim.reset"></button></div>
+        <div class="chips static" id="simPresets">
+          <button class="chip" data-preset="light" data-i18n="sim.p.light"></button>
+          <button class="chip" data-preset="smart" data-i18n="sim.p.smart"></button>
+          <button class="chip" data-preset="hard" data-i18n="sim.p.hard"></button>
+        </div>
+        <div id="sliders" class="sliders"></div>
+      </div>
+      <div class="sim-side">
+        <div class="card sim-result">
+          <span class="overline" data-i18n="sim.save"></span>
+          <div class="sim-big"><strong id="simMonth">0</strong><span data-i18n="sim.perMonth"></span></div>
+          <div class="sim-row"><div><b id="simYear">0</b><small data-i18n="sim.perYear"></small></div><div><b id="sim5">0</b><small data-i18n="sim.in5"></small></div></div>
+          <div class="sim-bars" id="simBars"></div>
+        </div>
+        <div class="card panel">
+          <div class="card-head"><h2 data-i18n="sim.goal"></h2></div>
+          <div class="goal">
+            <div class="goal-ring" id="goalRing"></div>
+            <div class="goal-form">
+              <label><span data-i18n="sim.goalName"></span><input id="goalName"></label>
+              <label><span data-i18n="sim.goalAmount"></span><input id="goalAmount" inputmode="decimal"></label>
+            </div>
+          </div>
+        </div>
+        <div class="card panel">
+          <div class="card-head"><h2 data-i18n="sim.afford"></h2></div>
+          <div id="afford" class="afford"></div>
+        </div>
+      </div>
+    </div>
+  </section>
 </main>
 
 <!-- ============================ NAV MOBIL ============================ -->
 <nav class="bottom-nav" aria-label="Navigation">
-  <button data-tab="home" class="on"><span>🏠</span><small data-i18n="tab.home"></small></button>
-  <button data-tab="analytics"><span>📊</span><small data-i18n="tab.analytics"></small></button>
+  <button data-tab="home" class="on"><i data-icon="home"></i><small data-i18n="tab.home"></small></button>
+  <button data-tab="analytics"><i data-icon="stats"></i><small data-i18n="tab.analytics"></small></button>
   <button class="bn-finn" data-open-chat aria-label="Finn"><span id="navBot"></span></button>
-  <button data-tab="tips"><span>💡</span><small data-i18n="tab.tips"></small><b class="badge-dot" hidden></b></button>
-  <button data-tab="tx"><span>🧾</span><small data-i18n="tab.tx"></small></button>
+  <button data-tab="tx"><i data-icon="receipt"></i><small data-i18n="tab.tx"></small></button>
+  <button data-tab="tips"><i data-icon="education"></i><small data-i18n="tab.tips"></small><b class="badge-dot" hidden></b></button>
 </nav>
 
 <!-- ============================ CHAT FINN ============================ -->
 <button class="chat-fab" id="chatFab" data-open-chat aria-label="Finn"><span id="fabBot"></span></button>
 <div class="sheet-backdrop" id="sheetBackdrop"></div>
-<aside class="chat-drawer glass" id="chatDrawer" aria-hidden="true">
+<aside class="chat-drawer" id="chatDrawer" aria-hidden="true">
   <div class="sheet-grab"></div>
   <div class="chat-head">
     <span class="chat-avatar" id="chatBot"></span>
     <div><strong>Finn</strong><small data-i18n="chat.sub"></small></div>
-    <button class="icon-btn" id="chatClose" aria-label="Close">✕</button>
+    <button class="icon-btn" id="chatClose" aria-label="Close"><i data-icon="close"></i></button>
   </div>
   <div id="chatLog" class="chat-log" aria-live="polite"></div>
   <div id="suggestions" class="chips"></div>
   <form id="askForm" class="ask">
-    <button type="button" class="mic" id="micBtn" aria-label="Voice">🎙️</button>
+    <button type="button" class="mic" id="micBtn" aria-label="Voice"><i data-icon="mic"></i></button>
     <input id="question" autocomplete="off" data-i18n-ph="chat.ph">
-    <button class="btn grad" type="submit" id="askBtn" aria-label="Send">➤</button>
+    <button class="btn gold send" type="submit" id="askBtn" aria-label="Send"><i data-icon="send"></i></button>
   </form>
 </aside>
 
 <!-- ============================ SALUT ============================ -->
 <div class="welcome" id="welcome" hidden>
   <div class="welcome-card">
+    <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
     <div class="welcome-bot" id="welcomeBot"></div>
-    <h2 id="welcomeTitle" class="display"></h2>
+    <span class="overline" data-i18n="welcome.over"></span>
+    <h2 id="welcomeTitle"></h2>
+    <div class="rule-orn"><span></span><i>✦</i><span></span></div>
     <p id="welcomeText"></p>
     <div class="hero-actions center">
-      <button class="btn grad shine" id="welcomeGo"></button>
-      <button class="btn soft" id="welcomeAlt"></button>
+      <button class="btn gold" id="welcomeGo"></button>
+      <button class="btn ghost" id="welcomeAlt"></button>
     </div>
-    <div class="welcome-lang"><button data-lang="ro">🇷🇴 Română</button><button data-lang="en">🇬🇧 English</button></div>
+    <div class="welcome-lang"><button data-lang="ro">Română</button><span>·</span><button data-lang="en">English</button></div>
   </div>
 </div>
 
@@ -310,6 +347,7 @@
 <div id="toast" class="toast" role="status"></div>
 <div id="dropOverlay" class="drop-overlay" hidden><div data-i18n="dropAnywhere"></div></div>
 <script src="/static/i18n.js"></script>
+<script src="/static/icons.js"></script>
 <script src="/static/finn.js"></script>
 <script src="/static/charts.js"></script>
 <script src="/static/story.js"></script>

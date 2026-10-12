@@ -8,34 +8,42 @@ const Finn = (() => {
     const id = "f" + uid++;
     return `<svg class="finn mood-${mood} ${wave ? "wave" : ""} ${size}" viewBox="0 0 120 150" role="img" aria-label="Finn">
       <defs>
-        <radialGradient id="${id}o" cx="35%" cy="28%" r="80%">
-          <stop offset="0" stop-color="#a5f3fc"/><stop offset=".35" stop-color="#60a5fa"/>
-          <stop offset=".7" stop-color="#8b5cf6"/><stop offset="1" stop-color="#db2777"/>
+        <radialGradient id="${id}o" cx="35%" cy="28%" r="85%">
+          <stop offset="0" stop-color="#fffdf7"/><stop offset=".55" stop-color="#ece3cf"/><stop offset="1" stop-color="#c9b48a"/>
         </radialGradient>
-        <linearGradient id="${id}v" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f1535"/><stop offset="1" stop-color="#070a1f"/></linearGradient>
-        <radialGradient id="${id}j"><stop offset="0" stop-color="#fde68a"/><stop offset=".5" stop-color="#fb923c" stop-opacity=".8"/><stop offset="1" stop-color="#f43f5e" stop-opacity="0"/></radialGradient>
-        <filter id="${id}g" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f3dfa6"/><stop offset=".5" stop-color="#b8925a"/><stop offset="1" stop-color="#e9cf8f"/></linearGradient>
+        <linearGradient id="${id}v" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a2742"/><stop offset="1" stop-color="#0a1222"/></linearGradient>
+        <linearGradient id="${id}t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d2b4a"/><stop offset="1" stop-color="#101a30"/></linearGradient>
+        <radialGradient id="${id}j"><stop offset="0" stop-color="#f3dfa6" stop-opacity=".9"/><stop offset="1" stop-color="#b8925a" stop-opacity="0"/></radialGradient>
+        <filter id="${id}f" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
       </defs>
-      <ellipse class="f-shadow" cx="60" cy="143" rx="26" ry="4" fill="#000" opacity=".35"/>
+      <ellipse class="f-shadow" cx="60" cy="144" rx="24" ry="3.5" fill="#000" opacity=".35"/>
       <g class="f-body">
-        <ellipse class="f-jet" cx="60" cy="116" rx="11" ry="15" fill="url(#${id}j)"/>
-        <line x1="60" y1="20" x2="60" y2="9" stroke="#c4b5fd" stroke-width="3" stroke-linecap="round"/>
-        <circle class="f-antenna" cx="60" cy="8" r="5" fill="#fde047"/>
-        <g class="f-hand-l"><rect x="5" y="70" width="12" height="20" rx="6" fill="#7c3aed"/></g>
-        <g class="f-hand-r"><rect x="103" y="70" width="12" height="20" rx="6" fill="#7c3aed"/></g>
-        <circle cx="13" cy="60" r="7" fill="#6d28d9"/><circle cx="107" cy="60" r="7" fill="#6d28d9"/>
-        <circle cx="60" cy="62" r="45" fill="url(#${id}o)"/>
-        <ellipse cx="44" cy="35" rx="15" ry="8" fill="#fff" opacity=".35" transform="rotate(-25 44 35)"/>
-        <rect x="24" y="45" width="72" height="36" rx="18" fill="url(#${id}v)" stroke="#ffffff22" stroke-width="1.5"/>
-        <g class="f-brows"><path d="M38 51 Q44 47 51 47" stroke="#5eead4" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M82 51 Q76 47 69 47" stroke="#5eead4" stroke-width="2.5" fill="none" stroke-linecap="round"/></g>
-        <g class="f-eyes" filter="url(#${id}g)">
-          <ellipse class="f-eye" cx="46" cy="61" rx="6" ry="7.5" fill="#5eead4"/>
-          <ellipse class="f-eye" cx="74" cy="61" rx="6" ry="7.5" fill="#5eead4"/>
-          <path class="f-happy" d="M40 63 Q46 55 52 63 M68 63 Q74 55 80 63" stroke="#5eead4" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+        <ellipse class="f-jet" cx="60" cy="134" rx="16" ry="5" fill="url(#${id}j)"/>
+        <line x1="60" y1="17" x2="60" y2="8" stroke="url(#${id}g)" stroke-width="2" stroke-linecap="round"/>
+        <circle class="f-antenna" cx="60" cy="7" r="4" fill="url(#${id}g)"/>
+        <circle cx="16" cy="58" r="6" fill="url(#${id}g)"/><circle cx="104" cy="58" r="6" fill="url(#${id}g)"/>
+        <rect x="38" y="96" width="44" height="32" rx="13" fill="url(#${id}t)" stroke="url(#${id}g)" stroke-width="1"/>
+        <path d="M52 96 L60 110 L68 96 Z" fill="#f6f1e6"/>
+        <circle cx="60" cy="115" r="1.6" fill="url(#${id}g)"/><circle cx="60" cy="121" r="1.6" fill="url(#${id}g)"/>
+        <path d="M43 103 l6 0 l-3 4 z" fill="url(#${id}g)"/>
+        <g class="f-hand-l"><rect x="27" y="100" width="11" height="17" rx="5.5" fill="#f6f1e6" stroke="url(#${id}g)" stroke-width="1"/></g>
+        <g class="f-hand-r"><rect x="82" y="100" width="11" height="17" rx="5.5" fill="#f6f1e6" stroke="url(#${id}g)" stroke-width="1"/></g>
+        <circle cx="60" cy="56" r="42" fill="url(#${id}o)" stroke="url(#${id}g)" stroke-width="2"/>
+        <ellipse cx="45" cy="30" rx="13" ry="6" fill="#fff" opacity=".7" transform="rotate(-25 45 30)"/>
+        <rect x="25" y="40" width="70" height="32" rx="16" fill="url(#${id}v)" stroke="url(#${id}g)" stroke-width="1.2"/>
+        <g class="f-brows"><path d="M38 47 Q44 43 51 43" stroke="#f1cf7c" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M82 47 Q76 43 69 43" stroke="#f1cf7c" stroke-width="2.2" fill="none" stroke-linecap="round"/></g>
+        <g class="f-eyes" filter="url(#${id}f)">
+          <ellipse class="f-eye" cx="46" cy="56" rx="5" ry="6.5" fill="#f1cf7c"/>
+          <ellipse class="f-eye" cx="74" cy="56" rx="5" ry="6.5" fill="#f1cf7c"/>
+          <path class="f-happy" d="M40 58 Q46 50 52 58 M68 58 Q74 50 80 58" stroke="#f1cf7c" stroke-width="3" fill="none" stroke-linecap="round"/>
         </g>
-        <path class="f-mouth" d="M53 73 Q60 78 67 73" stroke="#5eead4" stroke-width="2.6" fill="none" stroke-linecap="round"/>
-        <circle class="f-blush" cx="33" cy="72" r="4" fill="#f472b6" opacity=".6"/><circle class="f-blush" cx="87" cy="72" r="4" fill="#f472b6" opacity=".6"/>
-        <circle cx="60" cy="99" r="6" fill="#fde047" opacity=".9"/><text x="60" y="101.6" text-anchor="middle" font-size="7" font-weight="900" fill="#78350f" font-family="sans-serif">F</text>
+        <circle cx="74" cy="56" r="10.5" fill="#ffffff10" stroke="url(#${id}g)" stroke-width="2"/>
+        <path d="M84 60 C 92 70, 86 84, 93 98" stroke="url(#${id}g)" stroke-width="1" fill="none"/>
+        <path class="f-mouth" d="M53 65 Q60 69 67 65" stroke="#f1cf7c" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+        <circle class="f-blush" cx="31" cy="72" r="4" fill="#d68c8c" opacity=".5"/><circle class="f-blush" cx="89" cy="72" r="4" fill="#d68c8c" opacity=".5"/>
+        <path d="M60 99 L48 93 L48 105 Z M60 99 L72 93 L72 105 Z" fill="#7a1f2b" stroke="#5a141e" stroke-width=".6"/>
+        <rect x="57" y="96" width="6" height="6" rx="1.5" fill="#8f2633"/>
       </g>
     </svg>`;
   }
@@ -77,8 +85,8 @@ const Finn = (() => {
   return { svg, setMood, talk, wave, track };
 })();
 
-// Confetti simplu pe canvas, pentru momentele de „bravo”.
-function confetti(n = 140) {
+// Praf de aur pe canvas, pentru momentele de „bravo”.
+function confetti(n = 110) {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const c = document.createElement("canvas");
   c.className = "confetti";
@@ -86,7 +94,8 @@ function confetti(n = 140) {
   document.body.appendChild(c);
   const ctx = c.getContext("2d");
   ctx.scale(devicePixelRatio, devicePixelRatio);
-  const colors = ["#8b5cf6", "#ec4899", "#f97316", "#fde047", "#34d399", "#38bdf8"];
+  // praf de aur, nu confetti colorat: mai potrivit pentru stilul sobru
+  const colors = ["#f3dfa6", "#d4b46a", "#b8925a", "#fff7e3", "#e9cf8f"];
   const parts = Array.from({ length: n }, () => ({
     x: innerWidth / 2 + (Math.random() - 0.5) * 120, y: innerHeight * 0.35, vx: (Math.random() - 0.5) * 14,
     vy: -Math.random() * 13 - 4, s: 5 + Math.random() * 6, r: Math.random() * 6, vr: (Math.random() - 0.5) * 0.3,
@@ -97,7 +106,9 @@ function confetti(n = 140) {
     ctx.clearRect(0, 0, innerWidth, innerHeight);
     parts.forEach((p) => {
       p.vy += 0.35; p.x += p.vx; p.y += p.vy; p.vx *= 0.99; p.r += p.vr;
-      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); ctx.restore();
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.globalAlpha = Math.max(0, 1 - frame / 170);
+      if (p.s > 8) { ctx.beginPath(); ctx.arc(0, 0, p.s / 4, 0, 6.3); ctx.fill(); } else ctx.fillRect(-p.s / 2, -p.s / 6, p.s, p.s / 3);
+      ctx.restore();
     });
     if (++frame < 160) requestAnimationFrame(loop); else c.remove();
   })();

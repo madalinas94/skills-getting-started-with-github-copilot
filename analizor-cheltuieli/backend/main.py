@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from . import ai, i18n, insights, local_query
 from .categorize import categorize, remember
-from .parsers import ParseError, detect_currency, parse_amount, parse_card_csv, parse_date, parse_statement_pdf
+from .parsers import ParseError, detect_currency, extract_holder, parse_amount, parse_card_csv, parse_date, parse_statement_pdf
 from .store import RATES, SOURCE_LABEL, Store
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -37,7 +37,7 @@ async def upload(files: list[UploadFile] = File(...)):
     for f in files:
         raw = await f.read()
         reports.append(_ingest(f.filename or "fisier", raw))
-    return {"reports": reports, "transactions": store.txs}
+    return {"reports": reports, "transactions": store.txs, "owner": store.owner}
 
 
 def _ingest(name: str, raw: bytes) -> dict:
@@ -86,6 +86,8 @@ def _ingest(name: str, raw: bytes) -> dict:
         rep["error"], rep["code"] = "Nu am găsit nicio tranzacție în fișier.", "no_tx"
         return rep
     rep["categorii"] = categorize(txs)
+    if ext in (".csv", ".txt", ".pdf") and not store.owner:
+        store.owner = extract_holder(raw, ext)
     store.add(txs, name, h)
     rep["added"] = len(txs)
     rep["warnings"] = warns
@@ -116,7 +118,7 @@ def _ai_document(raw: bytes, media_type: str, source: str) -> list[dict]:
 # ------------------------------------------------------------------ tranzacții
 @app.get("/api/transactions")
 def list_transactions():
-    return {"transactions": store.txs}
+    return {"transactions": store.txs, "owner": store.owner}
 
 
 class ManualTx(BaseModel):
@@ -264,7 +266,7 @@ def load_demo():
     for p in sorted((ROOT / "fisiere-test").iterdir()):
         if p.suffix.lower() in (".csv", ".pdf", *IMAGE_TYPES):
             reports.append(_ingest(p.name, p.read_bytes()))
-    return {"reports": reports, "transactions": store.txs}
+    return {"reports": reports, "transactions": store.txs, "owner": store.owner}
 
 
 # ------------------------------------------------------------------ status & UI

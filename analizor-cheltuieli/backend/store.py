@@ -35,6 +35,7 @@ class Store:
         self.lock = threading.Lock()
         self.txs: list[dict] = []
         self.files: dict[str, str] = {}  # hash -> nume fișier
+        self.owner: str | None = None  # titularul, din antetul extraselor
         self._load()
 
     # ------------------------------------------------------------ persistență
@@ -42,13 +43,14 @@ class Store:
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
             self.txs, self.files = data.get("txs", []), data.get("files", {})
+            self.owner = data.get("owner")
         except (FileNotFoundError, json.JSONDecodeError):
             pass
 
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(
-            json.dumps({"txs": self.txs, "files": self.files}, ensure_ascii=False, indent=1), encoding="utf-8"
+            json.dumps({"txs": self.txs, "files": self.files, "owner": self.owner}, ensure_ascii=False, indent=1), encoding="utf-8"
         )
 
     @staticmethod
@@ -91,7 +93,7 @@ class Store:
 
     def reset(self) -> None:
         with self.lock:
-            self.txs, self.files = [], {}
+            self.txs, self.files, self.owner = [], {}, None
             self._save()
 
     # ------------------------------------------------------------ deduplicare
