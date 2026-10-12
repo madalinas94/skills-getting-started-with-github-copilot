@@ -1,4 +1,4 @@
-// Penny (robotul) + grafice SVG desenate de mână: fără biblioteci externe, merg și offline.
+// Grafice SVG desenate de mână: fără biblioteci externe, merg și offline.
 const Charts = (() => {
   let uid = 0;
   const NS = "http://www.w3.org/2000/svg";
@@ -21,39 +21,6 @@ const Charts = (() => {
       el.addEventListener("mousemove", (e) => showTip(e, el.dataset.tip));
       el.addEventListener("mouseleave", hideTip);
     });
-  }
-
-  // ---------------------------------------------------------------- robotul Penny
-  function penny({ wave = false, happy = true } = {}) {
-    const id = "p" + uid++;
-    return `<svg class="penny ${wave ? "wave" : ""} ${happy ? "happy" : ""}" viewBox="0 0 120 140" aria-label="Penny, robotul">
-      <defs>
-        <linearGradient id="${id}h" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset=".6" stop-color="#ec4899"/><stop offset="1" stop-color="#f97316"/></linearGradient>
-        <linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#6366f1"/></linearGradient>
-        <radialGradient id="${id}c"><stop offset="0" stop-color="#fde68a"/><stop offset="1" stop-color="#f59e0b"/></radialGradient>
-      </defs>
-      <ellipse class="shadow" cx="60" cy="134" rx="30" ry="4" fill="#000" opacity=".35"/>
-      <g class="body">
-        <line x1="60" y1="20" x2="60" y2="8" stroke="#c4b5fd" stroke-width="3" stroke-linecap="round"/>
-        <circle class="antenna-ball" cx="60" cy="7" r="5.5" fill="url(#${id}c)"/>
-        <rect x="13" y="38" width="9" height="20" rx="4.5" fill="#7c3aed"/>
-        <rect x="98" y="38" width="9" height="20" rx="4.5" fill="#7c3aed"/>
-        <rect x="20" y="19" width="80" height="60" rx="24" fill="url(#${id}h)"/>
-        <rect x="29" y="30" width="62" height="38" rx="15" fill="#1b1440"/>
-        <ellipse class="eye" cx="47" cy="45" rx="6" ry="7" fill="#5eead4"/>
-        <ellipse class="eye" cx="73" cy="45" rx="6" ry="7" fill="#5eead4"/>
-        <circle cx="49" cy="42.5" r="2" fill="#fff"/><circle cx="75" cy="42.5" r="2" fill="#fff"/>
-        <path class="mouth" d="M49 56 Q60 64 71 56" stroke="#5eead4" stroke-width="3" fill="none" stroke-linecap="round"/>
-        <circle cx="36" cy="58" r="3.5" fill="#f472b6" opacity=".55"/><circle cx="84" cy="58" r="3.5" fill="#f472b6" opacity=".55"/>
-        <rect x="52" y="78" width="16" height="6" rx="3" fill="#6d28d9"/>
-        <rect x="32" y="83" width="56" height="40" rx="17" fill="url(#${id}b)"/>
-        <circle cx="60" cy="102" r="11" fill="url(#${id}c)" stroke="#fff7" stroke-width="2"/>
-        <text x="60" y="106" text-anchor="middle" font-size="10" font-weight="800" fill="#92400e" font-family="Plus Jakarta Sans, sans-serif">lei</text>
-        <rect x="20" y="88" width="11" height="26" rx="5.5" fill="#7c3aed" transform="rotate(12 26 90)"/>
-        <g class="arm-r"><rect x="89" y="70" width="11" height="26" rx="5.5" fill="#7c3aed" transform="rotate(-32 94 94)"/></g>
-        <rect x="40" y="121" width="13" height="9" rx="4" fill="#4c1d95"/><rect x="67" y="121" width="13" height="9" rx="4" fill="#4c1d95"/>
-      </g>
-    </svg>`;
   }
 
   // ---------------------------------------------------------------- donut
@@ -100,7 +67,7 @@ const Charts = (() => {
       <path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="url(#${id})" stroke-width="16" stroke-linecap="round"
         stroke-dasharray="${len}" stroke-dashoffset="${len}" style="transition: stroke-dashoffset 1.2s cubic-bezier(.2,.8,.2,1)" data-g/>
       <text x="100" y="92" class="gauge-label gauge-num">${score}</text>
-      <text x="100" y="116" class="gauge-label gauge-txt" style="fill:${color}">${label} · scor financiar</text>
+      <text x="100" y="116" class="gauge-label gauge-txt" style="fill:${color}">${label}</text>
     </svg>`;
     requestAnimationFrame(() => requestAnimationFrame(() => {
       el.querySelector("[data-g]").style.strokeDashoffset = len * (1 - score / 100);
@@ -177,6 +144,23 @@ const Charts = (() => {
     bindTips(el);
   }
 
+  // ---------------------------------------------------------------- calendar heatmap
+  // weeks: luni-prima zi; cells = [{date, day, value, n, inMonth}]
+  function heatmap(el, cells, { fmt, weekdays, onClick } = {}) {
+    const max = Math.max(...cells.map((c) => c.value || 0), 1);
+    const level = (v) => (v <= 0 ? 0 : Math.min(4, 1 + Math.floor((v / max) * 3.999)));
+    el.innerHTML = `<div class="heat">
+      ${weekdays.map((w) => `<span class="heat-wd">${w.slice(0, 2)}</span>`).join("")}
+      ${cells.map((c, i) => c.inMonth
+        ? `<button class="heat-cell l${level(c.value)}" data-i="${i}" style="animation-delay:${i * 12}ms"
+             data-tip="<b>${c.full}</b>${c.value ? fmt(c.value) + " · " + c.n : "—"}"><span>${c.day}</span></button>`
+        : `<span class="heat-cell blank"></span>`).join("")}
+    </div>
+    <div class="heat-legend"><span>0</span>${[0, 1, 2, 3, 4].map((l) => `<i class="heat-cell l${l}"></i>`).join("")}<span>${fmt(max)}</span></div>`;
+    bindTips(el);
+    if (onClick) el.querySelectorAll("button.heat-cell").forEach((b) => b.addEventListener("click", () => onClick(cells[+b.dataset.i])));
+  }
+
   function short(v) {
     if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
     if (v >= 1e4) return Math.round(v / 1e3) + "k";
@@ -189,5 +173,5 @@ const Charts = (() => {
   st.textContent = "@keyframes growY{from{transform:scaleY(0)}}@keyframes draw{to{stroke-dashoffset:0}}";
   document.head.appendChild(st);
 
-  return { penny, donut, gauge, daily, columns, bindTips, showTip, hideTip };
+  return { donut, gauge, daily, columns, heatmap, bindTips, showTip, hideTip };
 })();

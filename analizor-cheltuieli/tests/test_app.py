@@ -196,3 +196,21 @@ def test_insights_empty(client):
     assert ins["categories"] == [] and ins["recommendations"] == []
     upload(client, "extras_cont_martie_2026.pdf")  # doar extras: fără Mâncare
     assert client.get("/api/insights", params={"month": "2026-03"}).status_code == 200
+
+
+def test_english(client):
+    upload(client, "tranzactii_card.csv", "extras_cont_martie_2026.pdf")
+    r = client.post("/api/ask", json={"question": "How much did I spend on food in March?", "lang": "en"}).json()
+    assert r["total"] == 1185.70 and r["answer"].startswith("You spent") and "Food" in r["answer"]
+    ins = client.get("/api/insights", params={"month": "2026-03", "lang": "en"}).json()
+    assert ins["alerts"][0]["title"] == "You spent more than you earned"
+    assert ins["personality"]["title"].startswith("The ")
+    assert all(c["label"] in ("Housing", "Shopping", "Transport", "Food", "Travel", "Utilities",
+                              "Entertainment", "Health", "Other") for c in ins["categories"])
+    ro = client.get("/api/insights", params={"month": "2026-03", "lang": "ro"}).json()
+    assert ro["totals"] == ins["totals"]  # limba schimbă doar textele, nu cifrele
+
+
+def test_pwa_files(client):
+    assert client.get("/manifest.webmanifest").json()["short_name"] == "Finn"
+    assert "service" in client.get("/sw.js").text.lower()

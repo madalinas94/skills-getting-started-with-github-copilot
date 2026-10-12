@@ -10,15 +10,13 @@ from collections import defaultdict
 from datetime import date
 from pathlib import Path
 
+from . import i18n
 from .categorize import normalize_key
 
 DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "tranzactii.json"
 
 # Cursuri fixe din enunț: câți RON valorează o unitate din moneda respectivă.
 RATES = {"RON": 1.0, "EUR": 5.25, "USD": 4.40}
-
-LUNI_NUME = ["", "ianuarie", "februarie", "martie", "aprilie", "mai", "iunie", "iulie",
-             "august", "septembrie", "octombrie", "noiembrie", "decembrie"]
 
 SOURCE_LABEL = {"card_csv": "Card (CSV)", "extras_pdf": "Extras (PDF)", "bon": "Bon numerar"}
 
@@ -27,14 +25,8 @@ def convert(amount: float, frm: str, to: str) -> float:
     return amount * RATES[frm] / RATES[to]
 
 
-def fmt(v: float, cur: str) -> str:
-    s = f"{abs(v):,.2f}".replace(",", " ").replace(".", ",").replace(" ", ".")
-    return f"{'-' if v < 0 else ''}{s} {cur}"
-
-
-def month_label(ym: str) -> str:
-    y, m = ym.split("-")
-    return f"{LUNI_NUME[int(m)]} {y}"
+fmt = i18n.fmt
+month_label = i18n.month_label
 
 
 class Store:
@@ -138,7 +130,7 @@ class Store:
     def active(self) -> list[dict]:
         return [t for t in self.txs if not t.get("duplicate_of")]
 
-    def run_query(self, q: dict, display_currency: str = "RON") -> dict:
+    def run_query(self, q: dict, display_currency: str = "RON", lang: str = "ro") -> dict:
         cur = q.get("moneda_afisare") or display_currency or "RON"
         rows = self.filter(q)
         op = q.get("operatie", "suma")
@@ -164,7 +156,10 @@ class Store:
             result["top"] = top
         if op == "lista" and limit:
             result["ids"] = [t["id"] for t in sorted(rows, key=conv, reverse=True)[:limit]]
-        result["answer"] = _answer(q, op, tip, rows, result, cur)
+        if op == "pe_categorii":
+            for b in result["breakdown"]:
+                b["key"], b["label"] = b["label"], i18n.cat(b["label"], lang)
+        result["answer"] = _answer(q, op, tip, rows, result, cur, i18n.norm(lang))
         return result
 
     def filter(self, q: dict) -> list[dict]:
@@ -220,41 +215,59 @@ def merchant_name(desc: str) -> str:
 _merchant = merchant_name
 
 
-def _period(q: dict) -> str:
+def _period(q: dict, lang: str) -> str:
+    L = lambda ro, en: i18n.pick(lang, ro, en)  # noqa: E731
     if q.get("luna"):
-        return f" în {month_label(q['luna'])}"
+        return L(" în ", " in ") + month_label(q["luna"], lang)
     if q.get("data_de_la") or q.get("data_pana_la"):
-        return f" în perioada {q.get('data_de_la') or '…'} – {q.get('data_pana_la') or '…'}"
+        return L(" în perioada ", " between ") + f"{q.get('data_de_la') or '…'} – {q.get('data_pana_la') or '…'}"
     return ""
 
 
-def _answer(q: dict, op: str, tip: str, rows: list[dict], r: dict, cur: str) -> str:
-    cats = q.get("categorii") or []
-    what = f" pe {', '.join(cats)}" if cats else ""
+def _answer(q: dict, op: str, tip: str, rows: list[dict], r: dict, cur: str, lang: str = "ro") -> str:
+    L = lambda ro, en: i18n.pick(lang, ro, en)  # noqa: E731
+    f = lambda v: fmt(v, cur, lang)  # noqa: E731
+    cats = [i18n.cat(c, lang) for c in (q.get("categorii") or [])]
+    what = (L(" pe ", " on ") + ", ".join(cats)) if cats else ""
     if q.get("text_cautat"):
-        what += f" la „{q['text_cautat']}”"
+        what += L(f" la „{q['text_cautat']}”", f" at “{q['text_cautat']}”")
     if q.get("moneda_originala"):
-        what += f" (doar tranzacții în {q['moneda_originala']})"
-    period = _period(q)
-    verb = "ai încasat" if tip == "venituri" else ("ai avut tranzacții de" if tip == "toate" else "ai cheltuit")
+        what += L(f" (doar tranzacții în {q['moneda_originala']})", f" (only {q['moneda_originala']} transactions)")
+    period = _period(q, lang)
     n = len(rows)
     if n == 0:
-        return f"Nu am găsit nicio tranzacție{what}{period}."
-    plural = "tranzacție" if n == 1 else "tranzacții"
+        return L(f"Nu am găsit nicio tranzacție{what}{period}.", f"I found no transactions{what}{period}.")
+    plural = L("tranzacție" if n == 1 else "tranzacții", "transaction" if n == 1 else "transactions")
     foreign = {t["currency"] for t in rows} - {cur}
-    note = f" Sumele în {', '.join(sorted(foreign))} au fost convertite la cursul fix." if foreign else ""
+    note = L(f" Sumele în {', '.join(sorted(foreign))} au fost convertite la cursul fix.",
+             f" Amounts in {', '.join(sorted(foreign))} were converted at the fixed rate.") if foreign else ""
+    tot = f(r["total"])
 
     if op == "numar":
-        return f"Ai {n} {plural}{what}{period}, în valoare totală de {fmt(r['total'], cur)}.{note}"
+        return L(f"Ai {n} {plural}{what}{period}, în valoare totală de {tot}.{note}",
+                 f"You have {n} {plural}{what}{period}, worth {tot} in total.{note}")
     if op == "medie":
-        return f"În medie, {fmt(r['total'] / n, cur)} per tranzacție{what}{period} ({n} {plural}).{note}"
+        avg = f(r["total"] / n)
+        return L(f"În medie, {avg} per tranzacție{what}{period} ({n} {plural}).{note}",
+                 f"On average {avg} per transaction{what}{period} ({n} {plural}).{note}")
     if op == "maxim":
         t = r["top"][0]
-        return (f"Cea mai mare: {t['description']} pe {t['date']} – "
-                f"{fmt(convert(t['amount'], t['currency'], cur), cur)}{period}.{note}")
+        amt = f(convert(t["amount"], t["currency"], cur))
+        d = i18n.date_label(t["date"], lang)
+        return L(f"Cea mai mare: {t['description']} pe {d} – {amt}{period}.{note}",
+                 f"The biggest one: {t['description']} on {d} – {amt}{period}.{note}")
     if op in ("pe_categorii", "pe_comercianti"):
-        parts = "; ".join(f"{b['label']}: {fmt(b['value'], cur)}" for b in r["breakdown"][:10])
-        return f"Total {fmt(r['total'], cur)}{what}{period}. Defalcare – {parts}.{note}"
+        parts = "; ".join(f"{b['label']}: {f(b['value'])}" for b in r["breakdown"][:10])
+        return L(f"Total {tot}{what}{period}. Defalcare – {parts}.{note}",
+                 f"Total {tot}{what}{period}. Breakdown – {parts}.{note}")
     if op == "lista":
-        return f"Am găsit {n} {plural}{what}{period}, total {fmt(r['total'], cur)}. Le vezi evidențiate mai jos.{note}"
-    return f"{verb.capitalize()} {fmt(r['total'], cur)}{what}{period} ({n} {plural}).{note}"
+        return L(f"Am găsit {n} {plural}{what}{period}, total {tot}. Le vezi evidențiate mai jos.{note}",
+                 f"I found {n} {plural}{what}{period}, {tot} in total.{note}")
+    if tip == "venituri":
+        return L(f"Ai încasat {tot}{what}{period} ({n} {plural}).{note}",
+                 f"You received {tot}{what}{period} ({n} {plural}).{note}")
+    if tip == "toate":
+        return L(f"Ai avut tranzacții de {tot}{what}{period} ({n} {plural}).{note}",
+                 f"You had transactions worth {tot}{what}{period} ({n} {plural}).{note}")
+    return L(f"Ai cheltuit {tot}{what}{period} ({n} {plural}).{note}",
+             f"You spent {tot}{what}{period} ({n} {plural}).{note}")

@@ -232,7 +232,7 @@ QUERY_SCHEMA = {
     "additionalProperties": False,
 }
 
-_Q_SYSTEM = f"""Transformi întrebări în limba română despre cheltuieli personale într-un filtru JSON.
+_Q_SYSTEM = f"""Transformi întrebări în română SAU engleză despre cheltuieli personale într-un filtru JSON.
 NU calculezi nimic: un program aplică filtrul pe tranzacții și face calculele.
 Reguli:
 - Categorii posibile: {", ".join(CATEGORII)}. „mâncare”, „alimente”, „restaurante” = Mâncare;
@@ -245,13 +245,17 @@ Reguli:
 - „în euro/dolari/lei” la afișare => moneda_afisare. „tranzacțiile făcute în euro” => moneda_originala.
 - „cash”, „numerar”, „bonuri” => surse [„bon”]; „pe card” => [„card_csv”]; „din extras” => [„extras_pdf”].
 - limita: 0 dacă nu se cere un top anume.
-- in_afara_domeniului = true dacă întrebarea nu are legătură cu tranzacțiile."""
+- in_afara_domeniului = true dacă întrebarea nu are legătură cu tranzacțiile.
+- Echivalențe în engleză: "how much did I spend" = suma/cheltuieli, "income/earned" = venituri,
+  "food/groceries/restaurants" = Mâncare, "bills" = Utilități, "rent" = Locuință, "cash" = surse [„bon”].
+- Câmpul „interpretare” îl scrii în limba indicată în mesaj."""
 
 
 def parse_question(question: str, context: dict) -> dict:
     # Contextul variabil (lunile disponibile) vine după system prompt-ul cachat.
     content = (
         f"Luni disponibile în date: {', '.join(context.get('luni', [])) or 'necunoscut'}.\n"
+        f"Limba pentru „interpretare”: {'engleză' if context.get('lang') == 'en' else 'română'}.\n"
         f"Întrebare: {question}"
     )
     return _call_json(_Q_SYSTEM, content, QUERY_SCHEMA, max_tokens=3000)
@@ -259,9 +263,9 @@ def parse_question(question: str, context: dict) -> dict:
 
 # ------------------------------------------------------------- 4. sfaturi personalizate
 
-_TIPS_SYSTEM = """Ești Penny, un asistent financiar prietenos pentru utilizatori din România.
+_TIPS_SYSTEM = """Ești Finn, un asistent financiar prietenos pentru utilizatori din România.
 Primești DOAR totaluri agregate ale cheltuielilor unei luni (nu tranzacții individuale).
-Dai 3-4 sfaturi concrete, personalizate pe cifrele primite, în limba română, ton cald și direct.
+Dai 3-4 sfaturi concrete, personalizate pe cifrele primite, în limba cerută, ton cald și direct.
 Fiecare sfat: un titlu scurt (max 6 cuvinte), o explicație de 1-2 propoziții care citează
 cifrele reale, și o estimare realistă a economiei lunare în moneda primită (0 dacă nu se aplică).
 Nu inventa cheltuieli care nu apar în date. Nu recomanda produse financiare anume."""
@@ -290,5 +294,6 @@ _TIPS_SCHEMA = {
 }
 
 
-def personal_tips(summary: dict) -> dict:
-    return _call_json(_TIPS_SYSTEM, json.dumps(summary, ensure_ascii=False), _TIPS_SCHEMA, max_tokens=4000)
+def personal_tips(summary: dict, lang: str = "ro") -> dict:
+    limba = "Răspunde în engleză." if lang == "en" else "Răspunde în română."
+    return _call_json(_TIPS_SYSTEM, f"{limba}\n{json.dumps(summary, ensure_ascii=False)}", _TIPS_SCHEMA, max_tokens=4000)

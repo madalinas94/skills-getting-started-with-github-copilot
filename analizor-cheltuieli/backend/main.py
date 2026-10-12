@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import ai, insights, local_query
+from . import ai, i18n, insights, local_query
 from .categorize import categorize, remember
 from .parsers import ParseError, detect_currency, parse_amount, parse_card_csv, parse_date, parse_statement_pdf
 from .store import RATES, SOURCE_LABEL, Store
@@ -41,16 +41,18 @@ async def upload(files: list[UploadFile] = File(...)):
 
 
 def _ingest(name: str, raw: bytes) -> dict:
-    rep = {"file": name, "added": 0, "warnings": [], "error": None, "source": None, "categorii": None}
+    # `code` permite interfeței să afișeze mesajul în limba aleasă (ro/en)
+    rep = {"file": name, "added": 0, "warnings": [], "error": None, "code": None, "source": None, "categorii": None}
     if not raw:
-        rep["error"] = "Fișier gol."
+        rep["error"], rep["code"] = "Fișier gol.", "empty"
         return rep
     if len(raw) > MAX_FILE:
-        rep["error"] = "Fișier prea mare (max 15 MB)."
+        rep["error"], rep["code"] = "Fișier prea mare (max 15 MB).", "too_big"
         return rep
     h = store.file_hash(raw)
     if (prev := store.seen_file(h)):
         rep["error"] = f"Fișierul a fost deja încărcat (ca „{prev}”) – l-am ignorat ca să nu dublez sumele."
+        rep["code"] = "duplicate"
         return rep
 
     ext = Path(name).suffix.lower()
@@ -70,15 +72,18 @@ def _ingest(name: str, raw: bytes) -> dict:
             rep["source"] = "bon"
             txs, warns = _ai_document(raw, IMAGE_TYPES[ext], "bon"), []
         else:
+            rep["code"] = "format"
             raise ParseError("Format necunoscut. Acceptat: .csv, .pdf, .jpg, .png, .webp.")
     except (ParseError, ai.AIUnavailable) as e:
         rep["error"] = str(e)
-        if isinstance(e, ai.AIUnavailable) and ext in IMAGE_TYPES:
-            rep["error"] += " Poți adăuga bonul manual din formularul „Adaugă manual”."
+        if isinstance(e, ai.AIUnavailable):
+            rep["code"] = "no_ai_image" if ext in IMAGE_TYPES else "no_ai"
+            if ext in IMAGE_TYPES:
+                rep["error"] += " Poți adăuga bonul manual din formularul „Adaugă manual”."
         return rep
 
     if not txs:
-        rep["error"] = "Nu am găsit nicio tranzacție în fișier."
+        rep["error"], rep["code"] = "Nu am găsit nicio tranzacție în fișier.", "no_tx"
         return rep
     rep["categorii"] = categorize(txs)
     store.add(txs, name, h)
@@ -181,6 +186,7 @@ def reset():
 class Ask(BaseModel):
     question: str
     display_currency: str = "RON"
+    lang: str = "ro"
 
 
 @app.post("/api/ask")
@@ -189,17 +195,19 @@ def ask(body: Ask):
     if not question:
         raise HTTPException(400, "Scrie o întrebare.")
     if not store.txs:
-        return {"answer": "Încarcă mai întâi un fișier cu tranzacții.", "query": None, "ids": []}
+        return {"answer": i18n.pick(body.lang, "Încarcă mai întâi un fișier cu tranzacții.",
+                                    "Upload a transactions file first."), "query": None, "ids": []}
 
     months = store.months()
-    key = hashlib.sha1(f"{question.lower()}|{','.join(months)}".encode()).hexdigest()
+    lang = i18n.norm(body.lang)
+    key = hashlib.sha1(f"{question.lower()}|{','.join(months)}|{lang}".encode()).hexdigest()
     started = time.time()
     mode, warning = "AI", None
     if key in _q_cache:
         q, mode = _q_cache[key], "cache"
     else:
         try:
-            q = ai.parse_question(question, {"luni": months})
+            q = ai.parse_question(question, {"luni": months, "lang": lang})
         except ai.AIUnavailable as e:
             q, mode, warning = local_query.parse(question, months), "local", str(e)
         _q_cache[key] = q
@@ -207,18 +215,20 @@ def ask(body: Ask):
             _q_cache.popitem(last=False)
 
     if q.get("in_afara_domeniului"):
-        return {"answer": "Pot răspunde doar la întrebări despre tranzacțiile încărcate.", "query": q, "ids": [], "mode": mode}
+        return {"answer": i18n.pick(lang, "Pot răspunde doar la întrebări despre tranzacțiile încărcate.",
+                                    "I can only answer questions about your uploaded transactions."),
+                "query": q, "ids": [], "mode": mode}
 
     cur = body.display_currency if body.display_currency in RATES else "RON"
-    res = store.run_query(q, cur)
+    res = store.run_query(q, cur, lang)
     return {**res, "query": q, "mode": mode, "warning": warning, "ms": int((time.time() - started) * 1000)}
 
 
 # ------------------------------------------------------------------ analize & sfaturi
 @app.get("/api/insights")
-def get_insights(month: str = "", currency: str = "RON"):
+def get_insights(month: str = "", currency: str = "RON", lang: str = "ro"):
     cur = currency if currency in RATES else "RON"
-    return insights.build(store.active(), month, cur)
+    return insights.build(store.active(), month, cur, lang)
 
 
 _tips_cache: dict[str, dict] = {}
@@ -227,19 +237,22 @@ _tips_cache: dict[str, dict] = {}
 class TipsReq(BaseModel):
     month: str = ""
     currency: str = "RON"
+    lang: str = "ro"
 
 
 @app.post("/api/ai-tips")
 def ai_tips(body: TipsReq):
     cur = body.currency if body.currency in RATES else "RON"
-    summary = insights.summary_for_ai(insights.build(store.active(), body.month, cur))
-    key = hashlib.sha1(repr(summary).encode()).hexdigest()
+    lang = i18n.norm(body.lang)
+    summary = insights.summary_for_ai(insights.build(store.active(), body.month, cur, lang))
+    key = hashlib.sha1(f"{summary!r}|{lang}".encode()).hexdigest()
     if key in _tips_cache:  # aceleași cifre -> același răspuns, fără cost
         return {**_tips_cache[key], "mode": "cache"}
     try:
-        res = ai.personal_tips(summary)
+        res = ai.personal_tips(summary, lang)
     except ai.AIUnavailable as e:
-        raise HTTPException(503, f"Sfaturile personalizate au nevoie de AI: {e}")
+        raise HTTPException(503, i18n.pick(lang, f"Sfaturile personalizate au nevoie de AI: {e}",
+                                           f"Personal tips need the AI: {e}"))
     _tips_cache[key] = res
     return {**res, "mode": "AI"}
 
@@ -264,6 +277,18 @@ def status():
 
 
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
+
+
+# PWA: service worker-ul trebuie servit din rădăcină ca să controleze toată aplicația
+@app.get("/sw.js")
+def service_worker():
+    return FileResponse(ROOT / "static" / "sw.js", media_type="application/javascript",
+                        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"})
+
+
+@app.get("/manifest.webmanifest")
+def manifest():
+    return FileResponse(ROOT / "static" / "manifest.webmanifest", media_type="application/manifest+json")
 
 
 @app.get("/")

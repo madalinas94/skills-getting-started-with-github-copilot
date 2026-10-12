@@ -1,10 +1,10 @@
-# Penny · Analizor de cheltuieli
+# Finn · your money sidekick
 
-**Penny** e robotul-asistent al aplicației (*your money buddy*). Te salută când deschizi aplicația, îți rezumă luna, îți dă atenționări și te învață cum să economisești.
+**Finn** e un robot-asistent pentru bani. Încarci exportul CSV de la card, extrasul de cont PDF și poze cu bonurile plătite cash. Finn le curăță, le categorisește cu AI și le combină fără dubluri. Apoi îți arată unde se duc banii, îți spune **povestea lunii** în slide-uri animate, îți dă atenționări și sfaturi de economisire, și răspunde la întrebări în limbaj natural (scrise sau vorbite).
 
-Încarci exportul CSV de la card, extrasul de cont PDF și poze cu bonurile cash. Aplicația le pune într-un singur tabel curat (dată, descriere, sumă, monedă, categorie, sursă), arată un grafic pe categorii pentru luna aleasă și răspunde la întrebări în limbaj natural, de exemplu „Cât am cheltuit pe mâncare în martie?”.
+🇷🇴 Română / 🇬🇧 English · 📱 merge pe telefon ca o aplicație (PWA) · 🌗 temă întunecată / luminoasă
 
-**Stack:** Python + FastAPI (backend), HTML/CSS/JS simplu (frontend, fără build), Claude API (AI).
+**Stack:** Python + FastAPI (backend), HTML/CSS/JS fără framework și fără build (frontend), grafice SVG desenate de mână (fără biblioteci), Claude API (AI).
 
 ## Cum se pornește
 
@@ -15,41 +15,36 @@ cp .env.example .env          # apoi pune cheia în ANTHROPIC_API_KEY=...
 uvicorn backend.main:app --reload
 ```
 
-Deschide http://localhost:8000. Penny te salută; apasă **„Arată-mi cu datele demo”** (încarcă dintr-un click fișierele din `fisiere-test/`) sau trage oriunde în pagină propriile fișiere.
+Deschide http://localhost:8000. Finn te salută. Apasă **„Arată-mi cu datele demo”** (încarcă dintr-un click fișierele din `fisiere-test/`) sau trage oriunde în pagină propriile fișiere.
 
-- Testele merg fără cheie și fără cost: `python -m pytest -q`
-- Fără cheie aplicația merge în continuare, dar în **mod local**. Categoriile se aleg prin reguli, întrebările sunt interpretate local, iar bonurile se introduc din formularul „Adaugă manual”.
-- Modelul se schimbă din `.env` cu `CLAUDE_MODEL=...`. Implicit e `claude-opus-5-5`, cu effort `low`.
+- **Pe telefon:** pornește cu `uvicorn backend.main:app --host 0.0.0.0` și deschide `http://<IP-ul-calculatorului>:8000` din aceeași rețea Wi-Fi. Interfața are bară de navigare jos, chat tip bottom-sheet și tabel transformat în carduri. Ca s-o instalezi ca aplicație („Add to Home Screen”), browserul cere HTTPS, deci e nevoie de un tunel HTTPS (de exemplu ngrok sau cloudflared). Pe `localhost`, instalarea merge direct.
+- **Testele** merg fără cheie și fără cost: `python -m pytest -q` (28 de teste).
+- **Fără cheie**, aplicația merge în continuare în **mod local**: categorii prin reguli, întrebări interpretate local (RO și EN), bonuri introduse manual.
+- **Modelul** se schimbă din `.env` cu `CLAUDE_MODEL=...`. Implicit e `claude-opus-5-5`, cu effort `low`.
 
 ## Ce face
 
 | Nivel | Implementare |
 |---|---|
-| 1 | Upload CSV → tabel curat. AI-ul alege categoria din lista fixă (un singur apel pentru tot fișierul). Întrebări în limbaj natural cu răspuns calculat exact |
-| 2 | Extras PDF + bonuri foto (citite de Claude din imagine). Grafic pe categorii pentru luna aleasă (click pe o categorie filtrează tabelul) |
+| 1 | Upload CSV → tabel curat (dată, descriere, sumă, monedă, categorie, sursă). AI-ul alege categoria din lista fixă, cu un singur apel pentru tot fișierul. Întrebări în limbaj natural cu răspuns calculat exact |
+| 2 | Extras PDF + bonuri foto (citite de Claude din imagine). Grafice pe categorii pentru luna aleasă |
 | 3 | Toate cele trei surse combinate, cu **deduplicare**: plățile cu cardul apar și în CSV, și în extras (Kaufland 312,80, eMAG 1.249,99, Enel 214,37). Sunt numărate o singură dată |
 
-Monede: afișare în RON / EUR / USD (butoanele de sus) și filtru „Moneda tranzacției”. Fiecare tranzacție își păstrează moneda originală, care apare în coloana „Original”. Conversia folosește cursul fix 1 EUR = 5,25 RON și 1 USD = 4,40 RON.
+**Monede:** afișare în RON / EUR / USD și filtru pe moneda originală. Fiecare tranzacție își păstrează moneda; conversia folosește cursul fix 1 EUR = 5,25 RON și 1 USD = 4,40 RON.
 
-Ecranele aplicației (4 taburi + chat):
+### Ecranele
 
-| Tab | Ce conține |
+| | Ce conține |
 |---|---|
-| 🏠 **Acasă** | Penny cu rezumatul lunii, **scor financiar 0–100** (gauge), 5 KPI-uri (cheltuieli, încasări, sold, rată de economisire, economie posibilă), **donut pe categorii**, **atenționări** colorate pe severitate, **grafic zi cu zi** (bare + total cumulat), **regula 50/30/20** (ideal vs. tu), top sfaturi |
-| 📊 **Analize** | Tabel calitativ **categorii vs. buget recomandat** (folosire buget + status *În buget / Atenție / Peste buget*), cheltuieli **pe zile ale săptămânii**, donut **pe surse de plată**, **top comercianți**, **abonamente** cu cost lunar și anual |
-| 💡 **Sfaturi** | Potențialul total de economisire (pe lună și pe an), **10+ tipuri de recomandări** cu economie estimată și **tips bifabile** (progresul se ține minte), plus **sfaturi personalizate cu AI** la cerere |
-| 🧾 **Tranzacții** | Upload, adăugare manuală, filtre (monedă, sursă, categorie, tip, căutare), tabel sortabil cu categorie editabilă, export CSV |
-| 💬 **Chat Penny** | Buton flotant (sau tasta `/`): întrebări în limbaj natural, cu răspuns, defalcare și link spre tranzacțiile folosite |
+| 🏠 **Acasă** | Finn cu rezumatul lunii și starea lui (zâmbește sau e îngrijorat, după scor), **scor financiar 0–100**, 5 KPI-uri animate, **donut pe categorii**, **personalitatea ta financiară**, **atenționări**, **calendar-heatmap** al cheltuielilor, **grafic zi cu zi** (bare + cumulat), **regula 50/30/20**, top sfaturi |
+| ▶ **Povestea lunii** | Slide-uri pe tot ecranul, ca un recap de tip *Wrapped*: cât ai cheltuit, categoria preferată, cea mai mare cheltuială, ziua cea mai scumpă, comerciantul preferat, abonamentele pe an, cât ai putea economisi și „personalitatea” lunii, la final cu confetti și buton de share. Navighezi cu tap, swipe sau săgeți; ții apăsat ca să pui pauză |
+| 📊 **Analize** | Tabel calitativ **categorii vs. buget recomandat** (cu status *În buget / Atenție / Peste buget*), cheltuieli pe zile ale săptămânii, plăți pe surse, top comercianți, abonamente (lunar și anual) |
+| 🎛️ **Simulator** | *„Ce-ar fi dacă…”*: glisoare pe fiecare categorie și scenarii rapide (Ușor / Inteligent / Hardcore). Vezi pe loc economia pe lună, pe an și în 5 ani. Îți setezi un **obiectiv** (de exemplu o vacanță) și vezi în câte luni îl atingi, plus ce-ți poți permite cu economia de un an |
+| 💡 **Sfaturi** | 10+ tipuri de recomandări cu economie estimată și **pași bifabili** (progresul se ține minte), plus **sfaturi personalizate cu AI** la cerere |
+| 🧾 **Tranzacții** | Upload, adăugare manuală, filtre, tabel sortabil cu categorie editabilă (Finn ține minte corecția), export CSV |
+| 💬 **Chat Finn** | Întrebări scrise sau **prin voce** 🎙️, în română sau engleză. Răspunsul vine cu defalcare și link spre tranzacțiile folosite |
 
-Totul e interactiv: click pe o felie din donut, pe o zi din grafic sau pe un comerciant te duce direct la tranzacțiile respective. Are temă întunecată și luminoasă și funcționează pe telefon.
-
-Funcții extra:
-- corectezi categoria din tabel, iar corecția e reținută pentru viitor
-- „Vezi tranzacțiile” arată exact rândurile folosite la un răspuns
-- export CSV
-- respinge un fișier deja încărcat, ca sumele să nu se dubleze
-- contor de cost AI în header
-- funcționează și fără AI
+Totul e interactiv: click pe o felie, o zi din calendar sau un comerciant te duce direct la tranzacțiile respective. Robotul urmărește cursorul cu privirea.
 
 **Cifre de control (martie 2026, toate sursele):**
 - Mâncare: 1.259,20 RON (1.185,70 pe card + 73,50 bon)
@@ -59,43 +54,53 @@ Funcții extra:
 ## 3 decizii tehnice (problemă → soluție)
 
 **1. Cifrele trebuie să fie corecte → AI-ul nu face niciodată calcule.**
-Problemă: un LLM care adună 30 de sume poate greși, iar pentru 12 puncte cifrele trebuie să fie exacte.
-Soluție: Claude transformă întrebarea într-un **filtru JSON** (operație, categorii, lună, tip, monedă, sursă), validat prin *structured outputs* pe o schemă fixă. Python aplică filtrul și calculează suma. Răspunsul e deci reproductibil, iar butonul „Vezi tranzacțiile” arată exact ce rânduri au intrat în calcul.
+Problemă: un LLM care adună 30 de sume poate greși, iar trainerul verifică cifrele.
+Soluție: Claude transformă întrebarea (RO sau EN) într-un **filtru JSON** (operație, categorii, lună, tip, monedă, sursă), validat prin *structured outputs*. Python aplică filtrul și calculează. Răspunsul e reproductibil, iar „Vezi tranzacțiile” arată exact rândurile folosite.
 
 **2. Cost-effective → AI doar unde e nevoie, cu batch și cache.**
-Problemă: dacă trimiți fiecare tranzacție sau tot tabelul la fiecare întrebare, costul crește odată cu datele.
-Soluție, pe niveluri:
-- **CSV și PDF se parsează determinist în cod**, cu cost zero. Pentru PDF, debitul/creditul se deduce din variația soldului. Claude primește PDF-ul doar dacă textul nu poate fi extras (de exemplu un PDF scanat).
-- **Categorii:** un singur apel batch per upload, care conține doar comercianții *unici și necunoscuți* (normalizați: „MEGA IMAGE 0123” și „MEGA IMAGE 0456” sunt același comerciant). Rezultatul se salvează pe disc, deci la al doilea upload costul e zero (verificat în teste).
-- **Întrebări:** Claude primește doar întrebarea și lista lunilor disponibile, nu tranzacțiile. Costul rămâne constant oricât de multe date ai. Întrebările repetate vin din cache.
-- **Încasările** sunt marcate „Venituri” direct prin regulă, fără AI.
-- System prompt-urile sunt fixe și marcate pentru *prompt caching*, iar effort-ul e `low`.
+- **CSV-ul și PDF-ul se parsează determinist**, cu cost zero. Debitul sau creditul din PDF se deduce din variația soldului. Claude primește PDF-ul doar dacă textul nu se poate extrage (de exemplu un PDF scanat).
+- **Categorii:** un singur apel batch per upload, doar pentru comercianții *unici și necunoscuți*. Rezultatul se salvează pe disc, iar la un nou upload costul e zero.
+- **Întrebări:** Claude primește doar întrebarea, nu tranzacțiile, deci costul nu crește cu datele. Întrebările repetate vin din cache.
+- **Recomandările, scorul, personalitatea, atenționările și povestea lunii** se calculează local, gratuit și instant.
+- **Sfaturile personalizate cu AI** primesc doar totaluri agregate și se cachează.
+- **Prompt caching** pe system prompt-urile fixe și effort `low`.
 
-Costul real al unei sesiuni apare în header.
-
-**Bonus · Recomandările sunt calculate local, AI-ul doar le personalizează.**
-Atenționările, scorul, regula 50/30/20 și cele 10+ tipuri de recomandări se calculează în Python (`backend/insights.py`) cu reguli transparente. Sunt gratuite, instantanee și reproductibile. Butonul „Sfaturi personalizate cu AI” trimite către Claude **doar totaluri agregate** (pe categorii, top comercianți), niciodată tranzacții individuale. E mai ieftin și protejează datele. Răspunsul se cachează pentru aceleași cifre.
+Costul real al sesiunii apare în header.
 
 **3. Date murdare și surse care se suprapun → normalizare + deduplicare.**
-Problemă: CSV-ul amestecă 4 formate de dată (`2026-03-04`, `05/03/2026`, `6.03.2026`, `3 mar. 2026`), sume cu separator de mii (`1.249,99`), BOM, rânduri de titlu și un subsol „Total inregistrari”. Pe lângă asta, plățile cu cardul apar și în extras, iar CSV-ul conține și zile din februarie și aprilie.
+CSV-ul amestecă 4 formate de dată (`2026-03-04`, `05/03/2026`, `6.03.2026`, `3 mar. 2026`), sume cu separator de mii (`1.249,99`), BOM, rânduri de titlu și un subsol „Total inregistrari”. Plățile cu cardul apar și în extras, iar CSV-ul are și zile din februarie și aprilie.
 Soluție:
 - parser tolerant, cu antetul detectat automat
-- separatorul zecimal ales după poziție
 - rândurile fără dată validă sunt ignorate
-- tranzacțiile din extras care au aceeași sumă, aceeași monedă și o dată la cel mult ±3 zile de o tranzacție din CSV (plus același comerciant, aceeași zi sau „Plata card”) sunt marcate ca duplicat și excluse din totaluri. Ele rămân vizibile tăiat, cu bifa „arată duplicatele”
-- filtrul pe lună se aplică pe data reală, așa că 27 februarie și 1 aprilie nu intră în martie
-- încasările (credit) nu sunt niciodată socotite cheltuieli
+- deduplicare card ↔ extras după sumă, monedă și dată (±3 zile)
+- filtrul pe lună se aplică pe data reală
+- încasările nu sunt niciodată socotite cheltuieli
+- același fișier încărcat de două ori e respins
+
+### Alte alegeri
+
+- **Bilingv fără dublarea logicii:** categoriile rămân stocate cu ID-ul din enunț, iar doar afișarea se traduce. Serverul generează textele (recomandări, răspunsuri) în limba cerută, iar cifrele sunt identice (verificat în teste).
+- **Mobil ca o aplicație:**
+  - PWA: manifest, service worker, merge offline
+  - bară de navigare jos, chat tip bottom-sheet
+  - safe-area pentru iPhone
+  - pe ecrane mici, efectele grele (blur) sunt simplificate ca scroll-ul să fie fluid
 
 ## Structură
 
 ```
 backend/parsers.py      CSV + PDF → tranzacții (fără AI)
 backend/categorize.py   cache → AI batch → reguli de rezervă
-backend/ai.py           toate apelurile Claude (categorii, bonuri, întrebări)
-backend/store.py        stocare, deduplicare, conversie valutară, calcule
-backend/local_query.py  interpretare întrebări fără AI (rezervă)
-backend/insights.py     scor, atenționări, recomandări, regula 50/30/20, tabele
-backend/main.py         API FastAPI
-static/                 interfața (Penny + grafice SVG proprii, fără biblioteci)
-tests/                  26 de teste, inclusiv totalurile verificate de mână
+backend/ai.py           toate apelurile Claude (categorii, bonuri, întrebări, sfaturi)
+backend/store.py        stocare, deduplicare, conversie valutară, calcule, răspunsuri RO/EN
+backend/insights.py     scor, atenționări, recomandări, personalitate, regula 50/30/20
+backend/local_query.py  interpretare întrebări fără AI (RO + EN)
+backend/i18n.py         traduceri pentru textele generate de server
+backend/main.py         API FastAPI (+ manifest și service worker pentru PWA)
+static/i18n.js          dicționarul RO / EN al interfeței
+static/finn.js          robotul Finn (SVG animat, ochi care urmăresc cursorul, stări) + confetti
+static/charts.js        donut, gauge, grafic zilnic, coloane, calendar-heatmap (SVG propriu)
+static/story.js         „Povestea lunii”
+static/app.js           logica interfeței
+tests/                  28 de teste, inclusiv totalurile verificate de mână și RO/EN
 ```
