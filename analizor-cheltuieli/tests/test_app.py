@@ -168,3 +168,31 @@ def test_ai_path_with_mocked_claude(client, monkeypatch):
     n = len(calls)
     upload(client, "tranzactii_card.csv")
     assert len(calls) == n
+
+
+def test_insights(client):
+    upload(client, "tranzactii_card.csv", "extras_cont_martie_2026.pdf")
+    add_receipts(client)
+    ins = client.get("/api/insights", params={"month": "2026-03", "currency": "RON"}).json()
+    assert ins["totals"]["income"] == 6700.42
+    assert ins["totals"]["net"] < 0
+    assert ins["alerts"][0]["level"] == "danger"  # a cheltuit mai mult decât a încasat
+    ids = {r["id"] for r in ins["recommendations"]}
+    assert {"food", "subs", "fees", "shopping", "transport", "save"} <= ids
+    assert ins["potential_saving"] > 0 and 0 < ins["score"] <= 100
+    assert sum(r["total"] for r in ins["categories"]) == pytest.approx(ins["totals"]["expenses"], abs=0.05)
+    eur = client.get("/api/insights", params={"month": "2026-03", "currency": "EUR"}).json()
+    assert eur["totals"]["expenses"] == pytest.approx(ins["totals"]["expenses"] / 5.25, abs=0.01)
+
+
+def test_demo_endpoint(client):
+    r = client.post("/api/demo").json()
+    names = {x["file"] for x in r["reports"]}
+    assert "tranzactii_card.csv" in names and "extras_cont_martie_2026.pdf" in names
+
+
+def test_insights_empty(client):
+    ins = client.get("/api/insights").json()
+    assert ins["categories"] == [] and ins["recommendations"] == []
+    upload(client, "extras_cont_martie_2026.pdf")  # doar extras: fără Mâncare
+    assert client.get("/api/insights", params={"month": "2026-03"}).status_code == 200

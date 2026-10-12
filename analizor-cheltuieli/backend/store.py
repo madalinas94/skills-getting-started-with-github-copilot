@@ -205,10 +205,19 @@ def _token_overlap(a: str, b: str) -> bool:
     return bool(ta & tb)
 
 
-def _merchant(desc: str) -> str:
-    k = normalize_key(desc)
-    k = re.sub(r"\b(BUCURESTI|BUC|SRL|SA|ROMANIA|RO)\b", "", k)
-    return " ".join(k.split()[:2]).title() or desc
+_STOP = {"BUCURESTI", "BUC", "SRL", "SA", "SCS", "ROMANIA", "RO", "COM", "HELP", "AFI", "COTROCENI",
+         "BANEASA", "AMSTERDAM", "STOCKHOLM", "MUNTENIA", "DISCOUNT", "PLATA", "CARD", "O"}
+
+
+def merchant_name(desc: str) -> str:
+    """„LIDL DISCOUNT 4410 BUCURESTI” -> „Lidl”, „UBER *TRIP HELP.UBER.COM” -> „Uber Trip”."""
+    words = [w.strip(".") for w in re.split(r"[\s*/]+", normalize_key(desc))]
+    words = [w for w in words if len(w) > 1 and w not in _STOP]
+    name = " ".join(words[:2]).title()
+    return re.sub(r"\.(Eu|Ro|Com)\b", "", name) or desc
+
+
+_merchant = merchant_name
 
 
 def _period(q: dict) -> str:

@@ -1,4 +1,6 @@
-# Analizor de cheltuieli
+# Penny · Analizor de cheltuieli
+
+**Penny** e robotul-asistent al aplicației (*your money buddy*). Te salută când deschizi aplicația, îți rezumă luna, îți dă atenționări și te învață cum să economisești.
 
 Încarci exportul CSV de la card, extrasul de cont PDF și poze cu bonurile cash. Aplicația le pune într-un singur tabel curat (dată, descriere, sumă, monedă, categorie, sursă), arată un grafic pe categorii pentru luna aleasă și răspunde la întrebări în limbaj natural, de exemplu „Cât am cheltuit pe mâncare în martie?”.
 
@@ -13,7 +15,7 @@ cp .env.example .env          # apoi pune cheia în ANTHROPIC_API_KEY=...
 uvicorn backend.main:app --reload
 ```
 
-Deschide http://localhost:8000 și trage în pagină fișierele din `fisiere-test/`.
+Deschide http://localhost:8000. Penny te salută; apasă **„Arată-mi cu datele demo”** (încarcă dintr-un click fișierele din `fisiere-test/`) sau trage oriunde în pagină propriile fișiere.
 
 - Testele merg fără cheie și fără cost: `python -m pytest -q`
 - Fără cheie aplicația merge în continuare, dar în **mod local**. Categoriile se aleg prin reguli, întrebările sunt interpretate local, iar bonurile se introduc din formularul „Adaugă manual”.
@@ -28,6 +30,18 @@ Deschide http://localhost:8000 și trage în pagină fișierele din `fisiere-tes
 | 3 | Toate cele trei surse combinate, cu **deduplicare**: plățile cu cardul apar și în CSV, și în extras (Kaufland 312,80, eMAG 1.249,99, Enel 214,37). Sunt numărate o singură dată |
 
 Monede: afișare în RON / EUR / USD (butoanele de sus) și filtru „Moneda tranzacției”. Fiecare tranzacție își păstrează moneda originală, care apare în coloana „Original”. Conversia folosește cursul fix 1 EUR = 5,25 RON și 1 USD = 4,40 RON.
+
+Ecranele aplicației (4 taburi + chat):
+
+| Tab | Ce conține |
+|---|---|
+| 🏠 **Acasă** | Penny cu rezumatul lunii, **scor financiar 0–100** (gauge), 5 KPI-uri (cheltuieli, încasări, sold, rată de economisire, economie posibilă), **donut pe categorii**, **atenționări** colorate pe severitate, **grafic zi cu zi** (bare + total cumulat), **regula 50/30/20** (ideal vs. tu), top sfaturi |
+| 📊 **Analize** | Tabel calitativ **categorii vs. buget recomandat** (folosire buget + status *În buget / Atenție / Peste buget*), cheltuieli **pe zile ale săptămânii**, donut **pe surse de plată**, **top comercianți**, **abonamente** cu cost lunar și anual |
+| 💡 **Sfaturi** | Potențialul total de economisire (pe lună și pe an), **10+ tipuri de recomandări** cu economie estimată și **tips bifabile** (progresul se ține minte), plus **sfaturi personalizate cu AI** la cerere |
+| 🧾 **Tranzacții** | Upload, adăugare manuală, filtre (monedă, sursă, categorie, tip, căutare), tabel sortabil cu categorie editabilă, export CSV |
+| 💬 **Chat Penny** | Buton flotant (sau tasta `/`): întrebări în limbaj natural, cu răspuns, defalcare și link spre tranzacțiile folosite |
+
+Totul e interactiv: click pe o felie din donut, pe o zi din grafic sau pe un comerciant te duce direct la tranzacțiile respective. Are temă întunecată și luminoasă și funcționează pe telefon.
 
 Funcții extra:
 - corectezi categoria din tabel, iar corecția e reținută pentru viitor
@@ -59,6 +73,9 @@ Soluție, pe niveluri:
 
 Costul real al unei sesiuni apare în header.
 
+**Bonus · Recomandările sunt calculate local, AI-ul doar le personalizează.**
+Atenționările, scorul, regula 50/30/20 și cele 10+ tipuri de recomandări se calculează în Python (`backend/insights.py`) cu reguli transparente. Sunt gratuite, instantanee și reproductibile. Butonul „Sfaturi personalizate cu AI” trimite către Claude **doar totaluri agregate** (pe categorii, top comercianți), niciodată tranzacții individuale. E mai ieftin și protejează datele. Răspunsul se cachează pentru aceleași cifre.
+
 **3. Date murdare și surse care se suprapun → normalizare + deduplicare.**
 Problemă: CSV-ul amestecă 4 formate de dată (`2026-03-04`, `05/03/2026`, `6.03.2026`, `3 mar. 2026`), sume cu separator de mii (`1.249,99`), BOM, rânduri de titlu și un subsol „Total inregistrari”. Pe lângă asta, plățile cu cardul apar și în extras, iar CSV-ul conține și zile din februarie și aprilie.
 Soluție:
@@ -77,7 +94,8 @@ backend/categorize.py   cache → AI batch → reguli de rezervă
 backend/ai.py           toate apelurile Claude (categorii, bonuri, întrebări)
 backend/store.py        stocare, deduplicare, conversie valutară, calcule
 backend/local_query.py  interpretare întrebări fără AI (rezervă)
+backend/insights.py     scor, atenționări, recomandări, regula 50/30/20, tabele
 backend/main.py         API FastAPI
-static/                 interfața
-tests/                  23 de teste, inclusiv totalurile verificate de mână
+static/                 interfața (Penny + grafice SVG proprii, fără biblioteci)
+tests/                  26 de teste, inclusiv totalurile verificate de mână
 ```

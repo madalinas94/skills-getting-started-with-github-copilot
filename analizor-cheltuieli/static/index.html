@@ -1,128 +1,256 @@
 <!doctype html>
-<html lang="ro">
+<html lang="ro" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Analizor de cheltuieli</title>
+  <title>Penny · Analizor de cheltuieli</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
+<div class="bg-blobs" aria-hidden="true"><i></i><i></i><i></i></div>
+
+<!-- ============================ HEADER ============================ -->
 <header class="topbar">
   <div class="brand">
-    <span class="logo" aria-hidden="true">Σ</span>
+    <span class="brand-bot" id="brandBot"></span>
     <div>
-      <h1>Analizor de cheltuieli</h1>
-      <p class="sub">Card · extras de cont · bonuri cash — într-un singur loc</p>
+      <h1>Penny</h1>
+      <p>your money buddy · analizor de cheltuieli</p>
     </div>
   </div>
-  <div class="top-right">
-    <span id="aiStatus" class="pill">…</span>
-    <span id="aiCost" class="pill muted" title="Cost estimat al apelurilor către Claude în această sesiune"></span>
+  <nav class="tabs" role="tablist">
+    <button class="tab on" data-tab="home" role="tab">🏠 <span>Acasă</span></button>
+    <button class="tab" data-tab="analytics" role="tab">📊 <span>Analize</span></button>
+    <button class="tab" data-tab="tips" role="tab">💡 <span>Sfaturi</span><b id="tipsBadge" class="badge-dot" hidden></b></button>
+    <button class="tab" data-tab="tx" role="tab">🧾 <span>Tranzacții</span></button>
+  </nav>
+  <div class="controls">
+    <div class="seg" id="displayCur" role="radiogroup" aria-label="Moneda de afișare">
+      <button data-v="RON" class="on">RON</button><button data-v="EUR">EUR</button><button data-v="USD">USD</button>
+    </div>
+    <select id="monthSel" aria-label="Luna"></select>
+    <button class="icon-btn" id="themeBtn" title="Schimbă tema">🌙</button>
+    <span id="aiStatus" class="ai-pill" title="">…</span>
   </div>
 </header>
 
-<main class="layout">
-  <!-- ======================= coloana stângă ======================= -->
-  <aside class="side">
-    <section class="card">
-      <h2>1. Încarcă fișiere</h2>
-      <label id="drop" class="drop" tabindex="0">
-        <input id="fileInput" type="file" multiple accept=".csv,.pdf,.jpg,.jpeg,.png,.webp">
-        <strong>Trage fișierele aici</strong>
-        <span>sau apasă pentru a alege · CSV, PDF, JPG/PNG</span>
-      </label>
-      <div id="uploadReports" class="reports"></div>
-      <details class="manual">
-        <summary>Adaugă manual o tranzacție (ex. bon)</summary>
-        <form id="manualForm">
-          <div class="row2">
-            <label>Data<input name="date" placeholder="14.03.2026" required></label>
-            <label>Sumă<input name="amount" placeholder="73,50" required></label>
-          </div>
-          <label>Descriere<input name="description" placeholder="Magazin alimentar" required></label>
-          <div class="row2">
-            <label>Monedă<select name="currency"><option>RON</option><option>EUR</option><option>USD</option></select></label>
-            <label>Tip<select name="direction"><option value="debit">Cheltuială</option><option value="credit">Încasare</option></select></label>
-          </div>
-          <label>Categorie<select name="category" id="manualCat"><option value="">Alege AI-ul / automat</option></select></label>
-          <button class="btn primary" type="submit">Adaugă</button>
-        </form>
-      </details>
-    </section>
-
-    <section class="card chat">
-      <h2>2. Întreabă</h2>
-      <div id="suggestions" class="chips"></div>
-      <div id="chatLog" class="chat-log" aria-live="polite"></div>
-      <form id="askForm" class="ask">
-        <input id="question" autocomplete="off" placeholder="Cât am cheltuit pe mâncare în martie?">
-        <button class="btn primary" type="submit" id="askBtn">Întreabă</button>
-      </form>
-    </section>
-  </aside>
-
-  <!-- ======================= coloana principală ======================= -->
-  <section class="content">
-    <div class="toolbar card">
-      <div class="field">
-        <span class="lbl">Afișează în</span>
-        <div class="seg" id="displayCur" role="radiogroup">
-          <button data-v="RON" class="on">RON</button><button data-v="EUR">EUR</button><button data-v="USD">USD</button>
+<main>
+  <!-- ============================ ACASĂ ============================ -->
+  <section class="view on" id="view-home">
+    <div class="hero glass">
+      <div class="hero-bot" id="heroBot"></div>
+      <div class="hero-text">
+        <span class="eyebrow" id="heroHello">Hi! 👋</span>
+        <p class="bubble" id="heroBubble"></p>
+        <div class="hero-actions">
+          <label class="btn grad" for="fileInputHero">⬆ Încarcă fișiere<input id="fileInputHero" type="file" multiple accept=".csv,.pdf,.jpg,.jpeg,.png,.webp" hidden></label>
+          <button class="btn soft" id="demoBtn">✨ Încarcă datele demo</button>
+          <button class="btn soft" data-open-chat>💬 Întreabă-l pe Penny</button>
         </div>
       </div>
-      <label class="field"><span class="lbl">Lună</span><select id="monthSel"></select></label>
-      <label class="field"><span class="lbl">Moneda tranzacției</span>
-        <select id="curFilter"><option value="">Toate</option><option>RON</option><option>EUR</option><option>USD</option></select>
-      </label>
-      <label class="field"><span class="lbl">Sursă</span>
-        <select id="srcFilter"><option value="">Toate</option><option value="card_csv">Card (CSV)</option><option value="extras_pdf">Extras (PDF)</option><option value="bon">Bon numerar</option></select>
-      </label>
-      <label class="field"><span class="lbl">Categorie</span><select id="catFilter"><option value="">Toate</option></select></label>
-      <label class="field grow"><span class="lbl">Caută</span><input id="search" placeholder="ex. lidl"></label>
+      <div class="hero-score" id="heroScore"></div>
     </div>
 
-    <div class="kpis">
-      <div class="kpi card"><span>Cheltuieli</span><strong id="kSpend">–</strong><em id="kSpendN"></em></div>
-      <div class="kpi card"><span>Încasări</span><strong id="kIncome" class="pos">–</strong><em id="kIncomeN"></em></div>
-      <div class="kpi card"><span>Sold net</span><strong id="kNet">–</strong><em>încasări − cheltuieli</em></div>
-      <div class="kpi card"><span>Duplicate excluse</span><strong id="kDup">0</strong><em>card ↔ extras</em></div>
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <h2 id="chartTitle">Cheltuieli pe categorii</h2>
-        <span class="hint">Click pe o categorie ca să filtrezi tabelul</span>
+    <div id="homeEmpty" class="empty-state glass" hidden>
+      <div class="drop big" data-drop>
+        <div class="drop-icon">📂</div>
+        <strong>Trage aici CSV-ul cardului, extrasul PDF sau pozele bonurilor</strong>
+        <span>sau apasă „Încarcă fișiere” · poți pune mai multe deodată</span>
       </div>
-      <div id="chart" class="bars"></div>
+      <div class="steps">
+        <div><b>1</b>Încarci fișierele</div><div><b>2</b>Penny le curăță și le categorisește</div><div><b>3</b>Primești analize și sfaturi</div>
+      </div>
     </div>
 
-    <div class="card">
-      <div class="card-head">
-        <h2>Tranzacții <span id="txCount" class="count"></span></h2>
-        <div class="actions">
-          <label class="check"><input type="checkbox" id="showDup"> arată duplicatele</label>
-          <button class="btn ghost" id="exportBtn">Export CSV</button>
-          <button class="btn ghost danger" id="resetBtn">Șterge tot</button>
+    <div id="homeData">
+      <div class="kpis">
+        <div class="kpi glass" style="--g: var(--g-coral)"><i>💸</i><span>Cheltuieli</span><strong id="kSpend">–</strong><em id="kSpendN"></em></div>
+        <div class="kpi glass" style="--g: var(--g-mint)"><i>💰</i><span>Încasări</span><strong id="kIncome">–</strong><em id="kIncomeN"></em></div>
+        <div class="kpi glass" style="--g: var(--g-violet)"><i>⚖️</i><span>Sold net</span><strong id="kNet">–</strong><em>încasări − cheltuieli</em></div>
+        <div class="kpi glass" style="--g: var(--g-sky)"><i>🐷</i><span>Rată economisire</span><strong id="kRate">–</strong><em>ținta: ≥ 20%</em></div>
+        <div class="kpi glass clickable" style="--g: var(--g-sun)" data-goto="tips"><i>🎯</i><span>Poți economisi</span><strong id="kSave">–</strong><em id="kSaveY"></em></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card glass">
+          <div class="card-head"><h2>Unde se duc banii</h2><span class="hint">click pe o felie → tranzacții</span></div>
+          <div class="donut-wrap"><div id="donut"></div><div id="donutLegend" class="legend"></div></div>
+        </div>
+        <div class="card glass">
+          <div class="card-head"><h2>Atenționări</h2><span class="hint" id="alertCount"></span></div>
+          <div id="alerts" class="alerts"></div>
         </div>
       </div>
-      <div id="highlightBar" class="highlight-bar" hidden>
-        <span id="highlightText"></span><button class="btn ghost" id="clearHighlight">Arată toate</button>
+
+      <div class="card glass">
+        <div class="card-head"><h2>Cheltuieli zi cu zi</h2>
+          <div class="legend-inline"><span><i style="background:var(--violet)"></i>pe zi</span><span><i class="line"></i>cumulat</span></div></div>
+        <div id="daily" class="chart"></div>
       </div>
-      <div class="table-wrap">
-        <table id="txTable">
-          <thead><tr>
-            <th data-sort="date">Data</th><th data-sort="description">Descriere</th>
-            <th data-sort="conv" class="num">Sumă</th><th class="num">Original</th>
-            <th data-sort="category">Categorie</th><th data-sort="source">Sursă</th><th></th>
-          </tr></thead>
-          <tbody></tbody>
-        </table>
-        <div id="empty" class="empty">Nicio tranzacție încă. Încarcă <b>tranzactii_card.csv</b>, extrasul PDF sau o poză de bon.</div>
+
+      <div class="grid-2">
+        <div class="card glass">
+          <div class="card-head"><h2>Regula 50 / 30 / 20</h2><span class="hint">nevoi · dorințe · economii, din venit</span></div>
+          <div id="rule"></div>
+        </div>
+        <div class="card glass">
+          <div class="card-head"><h2>Top sfaturi</h2><button class="link-btn" data-goto="tips">Vezi toate →</button></div>
+          <div id="topTips" class="mini-tips"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ ANALIZE ============================ -->
+  <section class="view" id="view-analytics">
+    <div class="card glass">
+      <div class="card-head"><h2>Categorii vs. buget recomandat</h2><span class="hint">buget = procent orientativ din venitul lunii</span></div>
+      <div class="table-wrap"><table class="qtable" id="catTable"></table></div>
+    </div>
+    <div class="grid-2">
+      <div class="card glass">
+        <div class="card-head"><h2>Pe zile ale săptămânii</h2><span class="hint" id="weekdayHint"></span></div>
+        <div id="weekday" class="chart"></div>
+      </div>
+      <div class="card glass">
+        <div class="card-head"><h2>Cum plătești</h2><span class="hint">după sursă</span></div>
+        <div class="donut-wrap small"><div id="sourceDonut"></div><div id="sourceLegend" class="legend"></div></div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card glass">
+        <div class="card-head"><h2>Top comercianți</h2></div>
+        <div class="table-wrap"><table class="qtable" id="merchTable"></table></div>
+      </div>
+      <div class="card glass">
+        <div class="card-head"><h2>Abonamente & plăți recurente</h2><span class="hint" id="subsHint"></span></div>
+        <div class="table-wrap"><table class="qtable" id="subsTable"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ SFATURI ============================ -->
+  <section class="view" id="view-tips">
+    <div class="save-hero glass">
+      <div class="save-bot" id="saveBot"></div>
+      <div>
+        <span class="eyebrow">Potențial de economisire</span>
+        <div class="save-num"><strong id="saveMonth">–</strong><span>/ lună</span></div>
+        <p id="saveYear" class="muted"></p>
+      </div>
+      <div class="ai-tips-cta">
+        <button class="btn grad" id="aiTipsBtn">🤖 Sfaturi personalizate cu AI</button>
+        <small class="muted">Penny primește doar totaluri, nu tranzacțiile tale.</small>
+      </div>
+    </div>
+    <div id="aiTips" class="ai-tips" hidden></div>
+    <div id="recs" class="recs"></div>
+  </section>
+
+  <!-- ============================ TRANZACȚII ============================ -->
+  <section class="view" id="view-tx">
+    <div class="grid-tx">
+      <div class="card glass">
+        <h2>Încarcă fișiere</h2>
+        <label class="drop" data-drop tabindex="0">
+          <input id="fileInput" type="file" multiple accept=".csv,.pdf,.jpg,.jpeg,.png,.webp" hidden>
+          <div class="drop-icon">📂</div>
+          <strong>Trage fișierele aici</strong>
+          <span>CSV · PDF · JPG / PNG</span>
+        </label>
+        <div id="uploadReports" class="reports"></div>
+        <details class="manual">
+          <summary>➕ Adaugă manual (ex. un bon)</summary>
+          <form id="manualForm">
+            <div class="row2">
+              <label>Data<input name="date" placeholder="14.03.2026" required></label>
+              <label>Sumă<input name="amount" placeholder="73,50" required></label>
+            </div>
+            <label>Descriere<input name="description" placeholder="Magazin alimentar" required></label>
+            <div class="row2">
+              <label>Monedă<select name="currency"><option>RON</option><option>EUR</option><option>USD</option></select></label>
+              <label>Tip<select name="direction"><option value="debit">Cheltuială</option><option value="credit">Încasare</option></select></label>
+            </div>
+            <label>Categorie<select name="category" id="manualCat"><option value="">Automat</option></select></label>
+            <button class="btn grad" type="submit">Adaugă</button>
+          </form>
+        </details>
+      </div>
+
+      <div class="card glass">
+        <div class="filters">
+          <label><span>Moneda tranzacției</span>
+            <select id="curFilter"><option value="">Toate</option><option>RON</option><option>EUR</option><option>USD</option></select></label>
+          <label><span>Sursă</span>
+            <select id="srcFilter"><option value="">Toate</option><option value="card_csv">Card (CSV)</option><option value="extras_pdf">Extras (PDF)</option><option value="bon">Bon numerar</option></select></label>
+          <label><span>Categorie</span><select id="catFilter"><option value="">Toate</option></select></label>
+          <label><span>Tip</span>
+            <select id="dirFilter"><option value="">Toate</option><option value="debit">Cheltuieli</option><option value="credit">Încasări</option></select></label>
+          <label class="grow"><span>Caută</span><input id="search" placeholder="ex. lidl"></label>
+        </div>
+        <div class="card-head">
+          <h2>Tranzacții <span id="txCount" class="count"></span> <span id="txSum" class="count"></span></h2>
+          <div class="actions">
+            <label class="check"><input type="checkbox" id="showDup"> duplicate</label>
+            <button class="btn soft sm" id="exportBtn">⬇ Export CSV</button>
+            <button class="btn soft sm danger" id="resetBtn">🗑 Șterge tot</button>
+          </div>
+        </div>
+        <div id="highlightBar" class="highlight-bar" hidden>
+          <span id="highlightText"></span><button class="btn soft sm" id="clearHighlight">✕ Arată toate</button>
+        </div>
+        <div class="table-wrap">
+          <table id="txTable" class="qtable tx">
+            <thead><tr>
+              <th data-sort="date">Data</th><th data-sort="description">Descriere</th>
+              <th data-sort="category">Categorie</th><th data-sort="source">Sursă</th>
+              <th data-sort="conv" class="num">Sumă</th><th></th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+          <div id="txEmpty" class="empty">Nicio tranzacție. Încarcă fișiere sau apasă „Încarcă datele demo”.</div>
+        </div>
       </div>
     </div>
   </section>
 </main>
+
+<!-- ============================ CHAT PENNY ============================ -->
+<button class="chat-fab" id="chatFab" aria-label="Vorbește cu Penny" data-open-chat><span id="fabBot"></span></button>
+<aside class="chat-drawer glass" id="chatDrawer" aria-hidden="true">
+  <div class="chat-head">
+    <span class="chat-avatar" id="chatBot"></span>
+    <div><strong>Penny</strong><small id="chatSub">întreabă-mă orice despre cheltuieli</small></div>
+    <button class="icon-btn" id="chatClose" aria-label="Închide">✕</button>
+  </div>
+  <div id="chatLog" class="chat-log" aria-live="polite"></div>
+  <div id="suggestions" class="chips"></div>
+  <form id="askForm" class="ask">
+    <input id="question" autocomplete="off" placeholder="Cât am cheltuit pe mâncare în martie?">
+    <button class="btn grad" type="submit" id="askBtn" aria-label="Trimite">➤</button>
+  </form>
+</aside>
+
+<!-- ============================ SALUT ============================ -->
+<div class="welcome" id="welcome" hidden>
+  <div class="welcome-card glass">
+    <div class="welcome-bot" id="welcomeBot"></div>
+    <h2 id="welcomeTitle">Hi! I'm Penny 👋</h2>
+    <p id="welcomeText"></p>
+    <div class="hero-actions center">
+      <button class="btn grad" id="welcomeGo">Hai să începem 🚀</button>
+      <button class="btn soft" id="welcomeDemo">✨ Arată-mi cu datele demo</button>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip" class="tooltip" role="tooltip"></div>
 <div id="toast" class="toast" role="status"></div>
+<div id="dropOverlay" class="drop-overlay" hidden><div>📂 Dă drumul fișierelor oriunde</div></div>
+<script src="/static/charts.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

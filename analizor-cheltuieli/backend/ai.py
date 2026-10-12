@@ -255,3 +255,40 @@ def parse_question(question: str, context: dict) -> dict:
         f"Întrebare: {question}"
     )
     return _call_json(_Q_SYSTEM, content, QUERY_SCHEMA, max_tokens=3000)
+
+
+# ------------------------------------------------------------- 4. sfaturi personalizate
+
+_TIPS_SYSTEM = """Ești Penny, un asistent financiar prietenos pentru utilizatori din România.
+Primești DOAR totaluri agregate ale cheltuielilor unei luni (nu tranzacții individuale).
+Dai 3-4 sfaturi concrete, personalizate pe cifrele primite, în limba română, ton cald și direct.
+Fiecare sfat: un titlu scurt (max 6 cuvinte), o explicație de 1-2 propoziții care citează
+cifrele reale, și o estimare realistă a economiei lunare în moneda primită (0 dacă nu se aplică).
+Nu inventa cheltuieli care nu apar în date. Nu recomanda produse financiare anume."""
+
+_TIPS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "salut": {"type": "string", "description": "o propoziție scurtă, caldă, care rezumă luna"},
+        "sfaturi": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "titlu": {"type": "string"},
+                    "detaliu": {"type": "string"},
+                    "economie_lunara": {"type": "number"},
+                    "emoji": {"type": "string"},
+                },
+                "required": ["titlu", "detaliu", "economie_lunara", "emoji"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["salut", "sfaturi"],
+    "additionalProperties": False,
+}
+
+
+def personal_tips(summary: dict) -> dict:
+    return _call_json(_TIPS_SYSTEM, json.dumps(summary, ensure_ascii=False), _TIPS_SCHEMA, max_tokens=4000)

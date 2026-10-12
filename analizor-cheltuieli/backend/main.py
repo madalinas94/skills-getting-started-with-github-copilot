@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import ai, local_query
+from . import ai, insights, local_query
 from .categorize import categorize, remember
 from .parsers import ParseError, detect_currency, parse_amount, parse_card_csv, parse_date, parse_statement_pdf
 from .store import RATES, SOURCE_LABEL, Store
@@ -173,6 +173,7 @@ def delete(tx_id: str):
 def reset():
     store.reset()
     _q_cache.clear()
+    _tips_cache.clear()
     return {"ok": True}
 
 
@@ -211,6 +212,46 @@ def ask(body: Ask):
     cur = body.display_currency if body.display_currency in RATES else "RON"
     res = store.run_query(q, cur)
     return {**res, "query": q, "mode": mode, "warning": warning, "ms": int((time.time() - started) * 1000)}
+
+
+# ------------------------------------------------------------------ analize & sfaturi
+@app.get("/api/insights")
+def get_insights(month: str = "", currency: str = "RON"):
+    cur = currency if currency in RATES else "RON"
+    return insights.build(store.active(), month, cur)
+
+
+_tips_cache: dict[str, dict] = {}
+
+
+class TipsReq(BaseModel):
+    month: str = ""
+    currency: str = "RON"
+
+
+@app.post("/api/ai-tips")
+def ai_tips(body: TipsReq):
+    cur = body.currency if body.currency in RATES else "RON"
+    summary = insights.summary_for_ai(insights.build(store.active(), body.month, cur))
+    key = hashlib.sha1(repr(summary).encode()).hexdigest()
+    if key in _tips_cache:  # aceleași cifre -> același răspuns, fără cost
+        return {**_tips_cache[key], "mode": "cache"}
+    try:
+        res = ai.personal_tips(summary)
+    except ai.AIUnavailable as e:
+        raise HTTPException(503, f"Sfaturile personalizate au nevoie de AI: {e}")
+    _tips_cache[key] = res
+    return {**res, "mode": "AI"}
+
+
+@app.post("/api/demo")
+def load_demo():
+    """Încarcă fișierele din fisiere-test/ cu un click (pentru prezentare)."""
+    reports = []
+    for p in sorted((ROOT / "fisiere-test").iterdir()):
+        if p.suffix.lower() in (".csv", ".pdf", *IMAGE_TYPES):
+            reports.append(_ingest(p.name, p.read_bytes()))
+    return {"reports": reports, "transactions": store.txs}
 
 
 # ------------------------------------------------------------------ status & UI
