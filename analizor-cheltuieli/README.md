@@ -41,6 +41,7 @@ Deschide http://localhost:8000. Finn te salută. Apasă **„Arată-mi cu datele
 | 📊 **Statistici** | **Distribuția cheltuielilor** (donut + listă cu iconițe în inele), grafic zi cu zi, regula 50/30/20, zile ale săptămânii, tabel calitativ **categorii vs. buget recomandat** (cu status *În buget / Atenție / Peste buget*), cheltuieli pe zile ale săptămânii, plăți pe surse, top comercianți, abonamente (lunar și anual) |
 | 🎛️ **Simulator** | *„Ce-ar fi dacă…”*: glisoare pe fiecare categorie și scenarii rapide (Ușor / Inteligent / Hardcore). Vezi pe loc economia pe lună, pe an și în 5 ani. Îți setezi un **obiectiv** (de exemplu o vacanță) și vezi în câte luni îl atingi, plus ce-ți poți permite cu economia de un an |
 | 🎓 **Educație** | 10+ tipuri de recomandări cu economie estimată și **pași bifabili** (progresul se ține minte), plus **sfaturi personalizate cu AI** la cerere |
+| 🎯 **Bugete** | Ca la aplicațiile bancare: buget lunar pe categorie (setat de tine sau **sugerat de Finn din venit**), sumar **Depășite / Respectate / Nesetate** (cu filtru), pe fiecare categorie status *Deficit / Respectat / La limită*, barele Cheltuieli vs. Buget și un sfat concret (de exemplu „Încearcă să recuperezi deficitul cheltuind mai puțin. Luna viitoare țintește cel mult 614 RON pe Mâncare”), plus editorul „Editează bugete” |
 | 🧾 **Cheltuieli** | Upload, adăugare manuală, filtre, tabel sortabil cu categorie editabilă (Finn ține minte corecția), export CSV |
 | 💬 **Chat Finn** | Întrebări scrise sau **prin voce** 🎙️, în română sau engleză. Răspunsul vine cu defalcare și link spre tranzacțiile folosite |
 
@@ -103,5 +104,5 @@ static/icons.js         iconițe line-art pentru categorii, navigare și acțiun
 static/charts.js        donut, gauge, grafic zilnic, coloane, calendar-heatmap (SVG propriu)
 static/story.js         „Povestea lunii”
 static/app.js           logica interfeței
-tests/                  29 de teste, inclusiv totalurile verificate de mână și RO/EN
+tests/                  30 de teste, inclusiv totalurile verificate de mână și RO/EN
 ```

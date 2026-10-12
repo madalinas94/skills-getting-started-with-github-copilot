@@ -27,6 +27,7 @@ const state = {
   cur: store.get("finn-cur", "RON"), month: "", tab: "home", curFilter: "", srcFilter: "", catFilter: "", dirFilter: "", search: "",
   showDup: false, sort: { key: "date", asc: false }, highlight: null, lastHeadline: "",
   sim: store.get("finn-sim", {}), goal: store.get("finn-goal", null), goalWasNear: false,
+  budFilter: "", budSort: "deficit",
 };
 
 // ---------------------------------------------------------------- utilitare
@@ -132,6 +133,7 @@ function setLang(lang, rerender = true) {
   LANG = lang;
   store.set("finn-lang", lang);
   applyI18n();
+  $$(".tab").forEach((b) => (b.title = b.querySelector("[data-i18n]")?.textContent || ""));
   $$("#langSeg button, .welcome-lang button").forEach((b) => b.classList.toggle("on", (b.dataset.v || b.dataset.lang) === lang));
   $("#suggestions").innerHTML = t("chat.suggestions").map((s) => `<button class="chip" type="button">${esc(s)}</button>`).join("");
   const catOpts = (state.categories.length ? state.categories : Object.keys(CAT)).map((c) => `<option value="${c}">${catName(c)}</option>`).join("");
@@ -210,6 +212,7 @@ function render() {
   renderHero();
   if (has) { renderPersona(); renderAlerts(); renderHeatmap(); renderTopTips(); }
   renderStats();
+  renderBudgets();
   renderSim();
   renderTips();
   renderTable();
@@ -438,6 +441,83 @@ function renderRule() {
       <div>${t("rule.wants")}<b>${fmt0(r.wants)}</b>${verdict(r.wants_pct, 30, true)}</div>
       <div>${t("rule.savings")}<b>${fmt0(r.savings)}</b>${verdict(r.savings_pct, 20, false)}</div>
     </div>`;
+}
+
+// ---------------------------------------------------------------- BUGETE
+function renderBudgets() {
+  const b = state.insights?.budgets;
+  if (!b) return;
+  const { over, ok, unset } = b.counts;
+  [["#bmOver", over], ["#bmOk", ok], ["#bmUnset", unset], ["#bsOver", over], ["#bsOk", ok], ["#bsUnset", unset]].forEach(([s, v]) => ($(s).textContent = v));
+  $$(".badge-over").forEach((x) => (x.hidden = !over));
+  $$(".bud-stat").forEach((x) => x.classList.toggle("on", x.dataset.bfilter === state.budFilter));
+  $("#budPeriod").textContent = monthLabel(state.month);
+
+  const info = [t("bud.info1", { p: monthLabel(state.month) })];
+  if (!b.has_any) info.push(t("bud.infoNone"));
+  else {
+    info.push(t("bud.info2", { n: b.items.filter((x) => x.status !== "unset").length, t: fmt0(b.total_budget / b.months) }));
+    if (!state.month) info.push(t("bud.infoAll", { m: b.months }));
+    const now = new Date(), ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    if (state.month === ym) info.push(t("bud.info3", { d: new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate() }));
+  }
+  $("#budInfo").innerHTML = info.map((x) => `<li>${esc(x)}</li>`).join("");
+
+  let items = [...b.items];
+  if (state.budFilter) items = items.filter((x) => (state.budFilter === "ok" ? ["ok", "near"].includes(x.status) : x.status === state.budFilter));
+  if (state.budSort === "name") items.sort((a, c) => a.label.localeCompare(c.label, locale()));
+  const chip = { over: ["alarm", "bud.deficit"], near: ["warn", "bud.near"], ok: ["check", "bud.surplus"], unset: ["close", "bud.none"] };
+  $("#budgetList").innerHTML = items.length ? items.map((x, i) => {
+    const max = Math.max(x.spent, x.budget, 1);
+    const amount = x.status === "unset" ? fmt(x.spent) : fmt(x.diff);
+    const bars = x.status === "unset" ? "" : `<div class="bud-bars">
+        <div class="bbar spend ${x.status === "over" ? "over" : ""}"><span style="width:${(x.spent / max) * 100}%">${t("bud.spent")}</span></div><span class="bbar-val">${fmt0(x.spent).replace(/ \S+$/, "")}</span>
+        <div class="bbar budget"><span style="width:${(x.budget / max) * 100}%">${t("bud.budget")}</span></div><span class="bbar-val">${fmt0(x.budget).replace(/ \S+$/, "")}</span>
+      </div>`;
+    const act = x.status === "unset" ? t("bud.set") : t("bud.edit");
+    return `<article class="bud-item" style="--c:${catColor(x.category)};animation-delay:${i * 0.05}s">
+      <span class="ring">${catIcon(x.category)}</span>
+      <div>
+        <h3>${esc(x.label)}</h3>
+        <div class="bud-line"><span class="bud-chip ${x.status}">${icon(chip[x.status][0])}${t(chip[x.status][1])}</span><span class="bud-amt">${amount}</span>
+          ${x.usage !== null ? `<small class="muted">${x.usage}% ${t("bud.ofBudget")}</small>` : ""}</div>
+        ${bars}
+      </div>
+      <div class="bud-advice ${x.status}"><span>${esc(x.text)}</span><span class="adv-ico">${icon(x.status === "over" ? "alarm" : x.status === "unset" ? "info" : "check")}</span>
+        <button class="adv-act" data-edit-budgets="${esc(x.category)}">${act} ${icon("arrow")}</button></div>
+    </article>`;
+  }).join("") : `<div class="empty">${t("bud.emptyFilter")}</div>`;
+}
+
+async function openBudgetEditor(focusCat) {
+  let data;
+  try { data = await api(`/api/budgets?month=${state.month}&currency=${state.cur}`); } catch (e) { return toast(e.message); }
+  const spent = Object.fromEntries((state.insights?.budgets?.items || []).map((x) => [x.category, x.spent]));
+  const cats = (state.insights?.budgets?.items || []).map((x) => x.category).sort((a, c) => (spent[c] || 0) - (spent[a] || 0));
+  $("#budgetInputs").innerHTML = cats.map((c) => `<label class="bud-in" style="--c:${catColor(c)}">
+      <span class="ring">${catIcon(c)}</span>
+      <span><b>${esc(catName(c))}</b><small>${t("bud.spent")}: ${fmt0(spent[c] || 0)}</small></span>
+      <span class="money"><input name="${esc(c)}" inputmode="decimal" placeholder="—" value="${data.budgets[c] ? Math.round(data.budgets[c]) : ""}"><em>${state.cur}</em></span>
+    </label>`).join("");
+  $("#budgetModal")._suggested = data.suggested;
+  $("#budgetModal").hidden = false;
+  const f = focusCat && $(`#budgetInputs input[name="${CSS.escape(focusCat)}"]`);
+  if (f) setTimeout(() => { f.scrollIntoView({ block: "center" }); f.focus(); }, 200);
+}
+const closeBudgetEditor = () => { $("#budgetModal").hidden = true; };
+
+async function saveBudgets() {
+  const budgets = {};
+  $$("#budgetInputs input").forEach((i) => {
+    const v = parseFloat(String(i.value).replace(/\s/g, "").replace(",", "."));
+    if (v > 0) budgets[i.name] = v;
+  });
+  try {
+    await api("/api/budgets", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ budgets, currency: state.cur }) });
+    closeBudgetEditor();
+    await refresh();
+    toast(t("bud.saved"));
+  } catch (e) { toast(e.message); }
 }
 
 // ---------------------------------------------------------------- SIMULATOR
@@ -772,6 +852,7 @@ function setTab(tab) {
   if (tab === "analytics" && state.insights) renderStats();
   if (tab === "home" && state.txs.length && state.insights) { renderHeatmap(); renderConsum(); }
   if (tab === "sim") updateSim();
+  if (tab === "budgets") renderBudgets();
 }
 
 let installEvt = null;
@@ -799,7 +880,25 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("#heroBot")) state.txs.length ? openStory() : Finn.wave($("#heroBot"));
   if (e.target.closest("[data-demo]")) uploadFiles(null, true);
   if (e.target.closest("[data-manual]")) openManual();
+  const eb = e.target.closest("[data-edit-budgets]");
+  if (eb) openBudgetEditor(eb.dataset.editBudgets);
+  const bf = e.target.closest("[data-bfilter]");
+  if (bf) { state.budFilter = state.budFilter === bf.dataset.bfilter ? "" : bf.dataset.bfilter; renderBudgets(); }
+  if (e.target.closest("[data-close-modal]") || e.target.id === "budgetModal") closeBudgetEditor();
 });
+$("#budSort").addEventListener("click", () => {
+  state.budSort = state.budSort === "deficit" ? "name" : "deficit";
+  toast(t(state.budSort === "name" ? "bud.sortName" : "bud.sortDeficit"));
+  renderBudgets();
+});
+$("#budSuggest").addEventListener("click", () => {
+  const s = $("#budgetModal")._suggested || {};
+  $$("#budgetInputs input").forEach((i) => { if (s[i.name]) i.value = Math.round(s[i.name]); });
+  toast(t("bud.suggested"));
+});
+$("#budClear").addEventListener("click", () => $$("#budgetInputs input").forEach((i) => (i.value = "")));
+$("#budSave").addEventListener("click", saveBudgets);
+$("#budgetForm").addEventListener("submit", (e) => { e.preventDefault(); saveBudgets(); });
 $("#chatClose").addEventListener("click", () => openChat(false));
 $("#sheetBackdrop").addEventListener("click", () => openChat(false));
 $("#themeBtn").addEventListener("click", () => applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
@@ -915,7 +1014,7 @@ $("#welcomeAlt").addEventListener("click", () => { if (state.txs.length) openSto
 $("#welcome").addEventListener("click", (e) => { if (e.target.id === "welcome") closeWelcome(); });
 addEventListener("keydown", (e) => {
   if (Story.isOpen()) return;
-  if (e.key === "Escape") { closeWelcome(); openChat(false); }
+  if (e.key === "Escape") { closeWelcome(); openChat(false); closeBudgetEditor(); }
   if (e.key === "/" && !e.target.matches("input, select, textarea")) { e.preventDefault(); openChat(true); }
 });
 

@@ -1,5 +1,5 @@
 // Service worker Finn: interfața merge și offline (datele vin mereu proaspete de la server).
-const CACHE = "finn-v5";
+const CACHE = "finn-v6";
 const SHELL = ["/", "/static/styles.css", "/static/i18n.js", "/static/icons.js", "/static/finn.js", "/static/charts.js", "/static/story.js",
   "/static/app.js", "/static/icons/icon.svg", "/static/icons/icon-192.png", "/manifest.webmanifest"];
 

@@ -30,6 +30,7 @@
   <nav class="tabs" role="tablist">
     <button class="tab on" data-tab="home"><i data-icon="home"></i><span data-i18n="tab.home"></span></button>
     <button class="tab" data-tab="analytics"><i data-icon="stats"></i><span data-i18n="tab.analytics"></span></button>
+    <button class="tab" data-tab="budgets"><i data-icon="target"></i><span data-i18n="tab.budgets"></span><b class="badge-over" hidden></b></button>
     <button class="tab" data-tab="tx"><i data-icon="receipt"></i><span data-i18n="tab.tx"></span></button>
     <button class="tab" data-tab="tips"><i data-icon="education"></i><span data-i18n="tab.tips"></span><b class="badge-dot" hidden></b></button>
     <button class="tab" data-tab="sim"><i data-icon="sliders"></i><span data-i18n="tab.sim"></span></button>
@@ -81,6 +82,14 @@
           </div>
         </div>
         <button class="history-row" data-goto="tx"><i data-icon="history"></i><span data-i18n="act.history"></span></button>
+        <button class="card panel budget-mini" data-goto="budgets">
+          <span class="bm-head"><span class="overline" data-i18n="bud.title"></span><i data-icon="arrow"></i></span>
+          <span class="bm-stats">
+            <span class="bm over"><i data-icon="alarm"></i><b id="bmOver">0</b><small data-i18n="bud.over"></small></span>
+            <span class="bm ok"><i data-icon="check"></i><b id="bmOk">0</b><small data-i18n="bud.ok"></small></span>
+            <span class="bm unset"><i data-icon="close"></i><b id="bmUnset">0</b><small data-i18n="bud.unset"></small></span>
+          </span>
+        </button>
         <button class="demo-link" data-demo><i data-icon="sparkle"></i><span data-i18n="hero.demo"></span></button>
       </div>
 
@@ -176,6 +185,22 @@
     </div>
   </section>
 
+  <!-- ============================ BUGETE ============================ -->
+  <section class="view" id="view-budgets">
+    <div class="page-head row">
+      <div><span class="overline" id="budPeriod"></span><h2 class="page-title" data-i18n="bud.page"></h2></div>
+      <button class="icon-btn lg" id="budSort" data-i18n-title="bud.sort"><i data-icon="filter"></i></button>
+    </div>
+    <div class="bud-summary">
+      <button class="bud-stat over" data-bfilter="over"><span class="bs-ico"><i data-icon="alarm"></i></span><b id="bsOver">0</b><small data-i18n="bud.over"></small></button>
+      <button class="bud-stat ok" data-bfilter="ok"><span class="bs-ico"><i data-icon="check"></i></span><b id="bsOk">0</b><small data-i18n="bud.ok"></small></button>
+      <button class="bud-stat unset" data-bfilter="unset"><span class="bs-ico"><i data-icon="close"></i></span><b id="bsUnset">0</b><small data-i18n="bud.unset"></small></button>
+    </div>
+    <div class="bud-info"><span class="bi-ico"><i data-icon="info"></i></span><ul id="budInfo"></ul></div>
+    <div class="card panel bud-list-card"><div id="budgetList" class="bud-list"></div></div>
+    <button class="btn ghost wide" data-edit-budgets><i data-icon="sliders"></i><span data-i18n="bud.editAll"></span></button>
+  </section>
+
   <!-- ============================ CHELTUIELI ============================ -->
   <section class="view" id="view-tx">
     <div class="page-head"><span class="overline" data-i18n="act.history"></span><h2 class="page-title" data-i18n="tab.tx"></h2></div>
@@ -251,6 +276,7 @@
       </div>
       <div class="ai-tips-cta">
         <button class="btn gold" id="aiTipsBtn"><i data-icon="feather"></i><span data-i18n="tips.ai"></span></button>
+        <button class="btn ghost" data-goto="budgets"><i data-icon="target"></i><span data-i18n="tab.budgets"></span></button>
         <button class="btn ghost" data-goto="sim"><i data-icon="sliders"></i><span data-i18n="edu.plan"></span></button>
         <small class="muted" data-i18n="tips.aiNote"></small>
       </div>
@@ -325,6 +351,23 @@
     <button class="btn gold send" type="submit" id="askBtn" aria-label="Send"><i data-icon="send"></i></button>
   </form>
 </aside>
+
+<!-- ============================ EDITOR BUGETE ============================ -->
+<div class="modal" id="budgetModal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div><span class="overline" data-i18n="bud.monthly"></span><h2 data-i18n="bud.editAll"></h2></div>
+      <button class="icon-btn" data-close-modal aria-label="Close"><i data-icon="close"></i></button>
+    </div>
+    <p class="muted modal-sub" data-i18n="bud.editSub"></p>
+    <form id="budgetForm"><div id="budgetInputs" class="bud-inputs"></div></form>
+    <div class="modal-foot">
+      <button class="btn ghost" id="budSuggest"><i data-icon="sparkle"></i><span data-i18n="bud.suggest"></span></button>
+      <button class="btn ghost" id="budClear"><i data-icon="trash"></i><span data-i18n="bud.clear"></span></button>
+      <button class="btn gold" id="budSave"><span data-i18n="bud.save"></span></button>
+    </div>
+  </div>
+</div>
 
 <!-- ============================ SALUT ============================ -->
 <div class="welcome" id="welcome" hidden>

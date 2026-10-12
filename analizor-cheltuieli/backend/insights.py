@@ -38,7 +38,7 @@ def _match(t: dict, pattern: str) -> bool:
     return re.search(pattern, t["description"].lower()) is not None
 
 
-def build(txs: list[dict], month: str, cur: str, lang: str = "ro") -> dict:
+def build(txs: list[dict], month: str, cur: str, lang: str = "ro", budgets: dict[str, float] | None = None) -> dict:
     """txs = tranzacții active (fără duplicate). month = 'AAAA-LL' sau '' pentru toate."""
     lang = i18n.norm(lang)
     L = lambda ro, en: i18n.pick(lang, ro, en)  # noqa: E731
@@ -342,8 +342,65 @@ def build(txs: list[dict], month: str, cur: str, lang: str = "ro") -> dict:
         "potential_saving": c(potential), "potential_saving_year": c(potential * 12),
         "categories": cat_table, "merchants": merchants[:12], "subscriptions": subs_table,
         "personality": _personality(exp, by_cat, E, I, eating_sum, len(subs), L),
+        "budgets": _budgets(by_cat, budgets or {}, rows, month, I, c, f, L, lang),
         "headline": _headline(period, E, I, potential, recs, f, L),
     }
+
+
+def suggest_budgets(txs: list[dict], month: str) -> dict[str, float]:
+    """Buget recomandat (RON): procentul orientativ din venit; fără venit, cheltuiala lunii minus 10%."""
+    rows = [t for t in txs if not month or t["date"].startswith(month)]
+    months = max(len({t["date"][:7] for t in rows}), 1)
+    income = sum(_ron(t) for t in rows if t["direction"] == "credit") / months
+    spent: dict[str, float] = defaultdict(float)
+    for t in rows:
+        if t["direction"] == "debit" and t["category"] != "Venituri":
+            spent[t["category"]] += _ron(t) / months
+    out = {}
+    for cat_name, share in BUDGET_SHARE.items():
+        v = income * share / 100 if income else spent.get(cat_name, 0) * 0.9
+        if v > 0:
+            out[cat_name] = max(50.0, round(v / 50) * 50)  # rotunjit la 50 RON, ca un buget real
+    return out
+
+
+def _budgets(by_cat, budgets, rows, month, I, c, f, L, lang) -> dict:
+    """Bugete vs. cheltuieli: depășite (deficit), respectate (surplus), nesetate."""
+    months = 1 if month else max(len({t["date"][:7] for t in rows}), 1)
+    items = []
+    for cat_name in BUDGET_SHARE:  # toate categoriile de cheltuieli, în ordinea fixă
+        spent = sum(_ron(t) for t in by_cat.get(cat_name, []))
+        budget = budgets.get(cat_name, 0) * months
+        name = i18n.cat(cat_name, lang)
+        if not budget:
+            status, diff = "unset", 0.0
+            text = (L(f"Ai cheltuit {f(spent)} pe {name} fără un buget. Setează unul ca să-ți urmăresc limita.",
+                      f"You spent {f(spent)} on {name} without a budget. Set one and I'll keep watch.")
+                    if spent else L("Nicio cheltuială și niciun buget setat.", "No spending and no budget set."))
+        elif spent > budget:
+            status, diff = "over", spent - budget
+            nxt = budget - diff
+            text = L("Încearcă să recuperezi deficitul cheltuind mai puțin. ", "Try to recover the deficit by spending less. ") + (
+                L(f"Luna viitoare țintește cel mult {f(nxt)} pe {name}.", f"Next month, aim for at most {f(nxt)} on {name}.") if nxt > 0
+                else L(f"Deficitul depășește un buget întreg: amână cheltuielile neesențiale pe {name}.",
+                       f"The deficit exceeds a whole budget: postpone non-essential {name} spending."))
+        else:
+            diff = budget - spent
+            status = "near" if spent >= 0.85 * budget else "ok"
+            text = (L(f"Ești aproape de limită: mai ai doar {f(diff)} din buget.", f"Close to the limit: only {f(diff)} left in the budget.")
+                    if status == "near" else
+                    L(f"Bravo! Ai rămas sub buget cu {f(diff)}.", f"Well done! You stayed {f(diff)} under budget."))
+        items.append({
+            "category": cat_name, "label": name, "status": status, "spent": c(spent), "budget": c(budget), "diff": c(diff),
+            "usage": round(spent / budget * 100) if budget else None, "text": text,
+        })
+    order = {"over": 0, "near": 1, "ok": 2, "unset": 3}
+    items.sort(key=lambda b: (order[b["status"]], -b["diff"] if b["status"] == "over" else -b["spent"]))
+    counts = {"over": sum(b["status"] == "over" for b in items),
+              "ok": sum(b["status"] in ("ok", "near") for b in items),
+              "unset": sum(b["status"] == "unset" for b in items)}
+    return {"items": items, "counts": counts, "months": months,
+            "total_budget": c(sum(budgets.values()) * months), "has_any": bool(budgets)}
 
 
 def _personality(exp, by_cat, E, I, eating_sum, n_subs, L) -> dict:

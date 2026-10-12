@@ -230,7 +230,28 @@ def ask(body: Ask):
 @app.get("/api/insights")
 def get_insights(month: str = "", currency: str = "RON", lang: str = "ro"):
     cur = currency if currency in RATES else "RON"
-    return insights.build(store.active(), month, cur, lang)
+    return insights.build(store.active(), month, cur, lang, store.budgets)
+
+
+# ------------------------------------------------------------------ bugete
+@app.get("/api/budgets")
+def get_budgets(month: str = "", currency: str = "RON"):
+    cur = currency if currency in RATES else "RON"
+    to = lambda d: {k: round(v / RATES[cur], 2) for k, v in d.items()}  # noqa: E731
+    return {"currency": cur, "budgets": to(store.budgets), "suggested": to(insights.suggest_budgets(store.active(), month))}
+
+
+class BudgetsReq(BaseModel):
+    budgets: dict[str, float]
+    currency: str = "RON"
+
+
+@app.put("/api/budgets")
+def put_budgets(body: BudgetsReq):
+    cur = body.currency if body.currency in RATES else "RON"
+    clean = {k: v * RATES[cur] for k, v in body.budgets.items() if k in insights.BUDGET_SHARE and v and v > 0}
+    store.set_budgets(clean)
+    return {"ok": True, "budgets": store.budgets}
 
 
 _tips_cache: dict[str, dict] = {}

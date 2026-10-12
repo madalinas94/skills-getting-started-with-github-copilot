@@ -220,3 +220,24 @@ def test_owner_from_statement(client):
     r = upload(client, "extras_cont_martie_2026.pdf")
     assert r["owner"] == "Matei Ionescu"
     assert client.get("/api/transactions").json()["owner"] == "Matei Ionescu"
+
+
+def test_budgets(client):
+    upload(client, "tranzactii_card.csv", "extras_cont_martie_2026.pdf")
+    sug = client.get("/api/budgets", params={"month": "2026-03"}).json()["suggested"]
+    assert sug["Locuință"] == 2000.0  # 30% din 6.700,42, rotunjit la 50
+    ins = client.get("/api/insights", params={"month": "2026-03"}).json()["budgets"]
+    assert ins["counts"]["unset"] == 9 and not ins["has_any"]
+
+    client.put("/api/budgets", json={"budgets": {"Mâncare": 1000, "Utilități": 400, "Shopping": 0}})
+    b = client.get("/api/insights", params={"month": "2026-03"}).json()["budgets"]
+    by = {x["category"]: x for x in b["items"]}
+    assert by["Mâncare"]["status"] == "over" and by["Mâncare"]["diff"] == 185.70
+    assert by["Utilități"]["status"] == "ok" and by["Utilități"]["diff"] == round(400 - 269.37, 2)
+    assert by["Shopping"]["status"] == "unset"
+    assert b["counts"] == {"over": 1, "ok": 1, "unset": 7}
+    assert b["items"][0]["category"] == "Mâncare"  # depășirile apar primele
+
+    # bugetele se pot trimite și în EUR; se stochează în RON
+    client.put("/api/budgets", json={"budgets": {"Mâncare": 200}, "currency": "EUR"})
+    assert client.get("/api/budgets").json()["budgets"]["Mâncare"] == 1050.0

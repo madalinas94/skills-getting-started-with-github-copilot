@@ -36,6 +36,7 @@ class Store:
         self.txs: list[dict] = []
         self.files: dict[str, str] = {}  # hash -> nume fișier
         self.owner: str | None = None  # titularul, din antetul extraselor
+        self.budgets: dict[str, float] = {}  # buget lunar pe categorie, în RON
         self._load()
 
     # ------------------------------------------------------------ persistență
@@ -44,13 +45,14 @@ class Store:
             data = json.loads(self.path.read_text(encoding="utf-8"))
             self.txs, self.files = data.get("txs", []), data.get("files", {})
             self.owner = data.get("owner")
+            self.budgets = data.get("budgets", {})
         except (FileNotFoundError, json.JSONDecodeError):
             pass
 
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(
-            json.dumps({"txs": self.txs, "files": self.files, "owner": self.owner}, ensure_ascii=False, indent=1), encoding="utf-8"
+            json.dumps({"txs": self.txs, "files": self.files, "owner": self.owner, "budgets": self.budgets}, ensure_ascii=False, indent=1), encoding="utf-8"
         )
 
     @staticmethod
@@ -90,6 +92,11 @@ class Store:
             self._mark_duplicates()
             self._save()
             return len(self.txs) < n
+
+    def set_budgets(self, budgets: dict[str, float]) -> None:
+        with self.lock:
+            self.budgets = {k: round(v, 2) for k, v in budgets.items() if v and v > 0}
+            self._save()
 
     def reset(self) -> None:
         with self.lock:
