@@ -6,6 +6,12 @@
   <meta name="theme-color" content="#070b14">
   <title>Testify Hardware — Calcul lunar</title>
   <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Testify">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="/static/styles.css">
@@ -63,6 +69,9 @@
           <h1 id="page-title"></h1>
         </div>
         <div class="topbar-actions">
+          <button class="btn btn-primary quick-add" id="quick-add" type="button" aria-label="Adăugare rapidă">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Adaugă</span>
+          </button>
           <div class="month-picker glass" id="month-picker">
             <button type="button" class="icon-btn" id="month-prev" aria-label="Luna anterioară">
               <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
@@ -89,6 +98,25 @@
       </header>
       <div id="modal-body"></div>
     </div>
+  </div>
+
+  <!-- Asistentul Testi -->
+  <div id="assistant" class="assistant hidden">
+    <section id="assistant-panel" class="assistant-panel hidden" aria-label="Asistentul Testi">
+      <header class="assistant-head">
+        <div id="assistant-avatar" class="assistant-avatar"></div>
+        <div style="flex:1">
+          <strong>Testi</strong>
+          <small><span class="live-dot"></span>Asistentul tău financiar</small>
+        </div>
+        <button class="icon-btn" type="button" id="assistant-close" aria-label="Închide asistentul">
+          <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </header>
+      <div id="assistant-messages" class="assistant-messages" aria-live="polite"></div>
+      <footer id="assistant-actions" class="assistant-actions"></footer>
+    </section>
+    <button id="assistant-fab" class="assistant-fab" type="button" aria-label="Deschide asistentul Testi"></button>
   </div>
 
   <div id="toasts" class="toasts" aria-live="polite"></div>

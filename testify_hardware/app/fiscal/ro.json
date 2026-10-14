@@ -1,0 +1,42 @@
+{
+  "country": "RO",
+  "version": "2026.1",
+  "published": "2026-01-01",
+  "source": "Codul fiscal (Legea 227/2015) cu modificările ulterioare, inclusiv Legea 141/2025",
+  "rules": [
+    {
+      "effective_from": "2025-01-01",
+      "title": "Cotele fiscale pentru 2025",
+      "rates": {
+        "cas_rate": 25,
+        "cass_rate": 10,
+        "income_tax_rate": 10,
+        "cam_rate": 2.25,
+        "profit_tax_rate": 16,
+        "micro_tax_rate": 1,
+        "dividend_tax_rate": 10
+      },
+      "changes": [
+        "Impozitul pe dividende a crescut de la 8% la 10%."
+      ]
+    },
+    {
+      "effective_from": "2026-01-01",
+      "title": "Modificări fiscale de la 1 ianuarie 2026",
+      "rates": {
+        "cas_rate": 25,
+        "cass_rate": 10,
+        "income_tax_rate": 10,
+        "cam_rate": 2.25,
+        "profit_tax_rate": 16,
+        "micro_tax_rate": 1,
+        "dividend_tax_rate": 16
+      },
+      "changes": [
+        "Impozitul pe dividende crește de la 10% la 16%. Din profitul pe care îl scoateți din firmă vă rămâne mai puțin.",
+        "Microîntreprinderile au o singură cotă de 1%, iar plafonul scade la 100.000 euro venituri pe an.",
+        "Impozitul pe profit rămâne 16%, iar contribuțiile pe salarii (CAS 25%, CASS 10%, impozit 10%, CAM 2,25%) nu se schimbă."
+      ]
+    }
+  ]
+}

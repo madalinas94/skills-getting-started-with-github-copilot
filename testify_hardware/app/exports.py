@@ -70,7 +70,7 @@ def _write_table(sheet, headers: list[str], rows: list[list], money_cols: set[in
 
 def excel_report(conn: sqlite3.Connection, ym: str) -> bytes:
     settings = get_settings(conn)
-    summary = month_summary(conn, ym, settings)
+    summary = month_summary(conn, ym)
     start, end = month_bounds(ym)
     book = Workbook()
 
@@ -104,7 +104,7 @@ def excel_report(conn: sqlite3.Connection, ym: str) -> bytes:
                  ["Data", "Categorie", "Descriere", "Sumă"],
                  [list(row) for row in expenses], {4})
 
-    pay = payroll(conn, ym, settings)
+    pay = payroll(conn, ym)
     rows = [[line["name"], line["role"], line["gross"], line["cas"], line["cass"],
              line["income_tax"], line["net"], line["cam"], line["employer_cost"]]
             for line in pay["lines"]]
@@ -138,8 +138,8 @@ def lei(value: float) -> str:
 def pdf_report(conn: sqlite3.Connection, ym: str) -> bytes:
     regular, bold = _register_fonts()
     settings = get_settings(conn)
-    summary = month_summary(conn, ym, settings)
-    pay = payroll(conn, ym, settings)
+    summary = month_summary(conn, ym)
+    pay = payroll(conn, ym)
 
     title = ParagraphStyle("title", fontName=bold, fontSize=20, leading=24,
                            textColor=colors.HexColor("#0f172a"))

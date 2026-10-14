@@ -3,6 +3,7 @@
 Pornire: uvicorn app.main:app --host 0.0.0.0 --port 8000 (din folderul testify_hardware)
 """
 
+import asyncio
 import re
 from contextlib import asynccontextmanager
 from datetime import date
@@ -13,7 +14,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
-from . import auth, calc, demo, exports
+from . import auth, calc, demo, exports, fiscal
 from .db import DEFAULT_SETTINGS, get_conn, get_settings, init_db, set_setting
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -21,11 +22,25 @@ DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 MONTH_PATTERN = r"^\d{4}-(0[1-9]|1[0-2])$"
 
 
+def run_fiscal_check() -> dict:
+    with get_conn() as conn:
+        return fiscal.check_for_updates(conn)
+
+
+async def fiscal_watcher() -> None:
+    """Verifică periodic, în fundal, dacă au apărut reguli fiscale noi."""
+    while True:
+        await asyncio.to_thread(run_fiscal_check)
+        await asyncio.sleep(fiscal.CHECK_INTERVAL_HOURS * 3600)
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
+    watcher = asyncio.create_task(fiscal_watcher()) if fiscal.feed_url() else None
     yield
+    if watcher:
+        watcher.cancel()
 
 
 app = FastAPI(title="Testify Hardware", description="Aplicația internă pentru calculul lunar",
@@ -71,10 +86,12 @@ def start_session(response: Response, conn) -> None:
 @app.get("/api/auth/status")
 def auth_status(testify_session: str | None = Cookie(default=None)):
     with get_conn() as conn:
+        settings = get_settings(conn)
         return {
             "setup_done": auth.is_setup_done(conn),
             "logged_in": auth.is_valid_session(conn, testify_session),
-            "company": get_settings(conn).get("company_name"),
+            "company": settings.get("company_name"),
+            "owner_name": settings.get("owner_name", ""),
         }
 
 
@@ -345,7 +362,7 @@ class SalaryIn(BaseModel):
 
 
 def employee_details(conn, employee) -> dict:
-    settings = get_settings(conn)
+    settings = fiscal.settings_for_month(conn, calc.current_month())
     history = [dict(row) for row in conn.execute(
         "SELECT * FROM salary_history WHERE employee_id = ? ORDER BY effective_from DESC, id DESC",
         (employee["id"],),
@@ -421,21 +438,15 @@ def add_salary(employee_id: int, body: SalaryIn):
 @api.get("/salary-preview")
 def salary_preview(gross: float = Query(gt=0)):
     with get_conn() as conn:
-        return calc.salary_breakdown(gross, get_settings(conn))
+        return calc.salary_breakdown(gross, fiscal.settings_for_month(conn, calc.current_month()))
 
 
 # ---------- Setări ----------
 
 class SettingsIn(BaseModel):
     company_name: str = Field(min_length=1, max_length=120)
+    owner_name: str = Field(default="", max_length=60)
     tax_regime: str = Field(pattern="^(profit|micro)$")
-    profit_tax_rate: float = Field(ge=0, le=100)
-    micro_tax_rate: float = Field(ge=0, le=100)
-    cas_rate: float = Field(ge=0, le=100)
-    cass_rate: float = Field(ge=0, le=100)
-    income_tax_rate: float = Field(ge=0, le=100)
-    cam_rate: float = Field(ge=0, le=100)
-    dividend_tax_rate: float = Field(ge=0, le=100)
 
 
 @api.get("/settings")
@@ -450,6 +461,26 @@ def write_settings(body: SettingsIn):
     with get_conn() as conn:
         for key, value in body.model_dump().items():
             set_setting(conn, key, str(value))
+    return {"ok": True}
+
+
+# ---------- Legislație fiscală ----------
+
+@api.get("/fiscal")
+def fiscal_overview():
+    with get_conn() as conn:
+        return fiscal.overview(conn)
+
+
+@api.post("/fiscal/check")
+async def fiscal_check():
+    return await asyncio.to_thread(run_fiscal_check)
+
+
+@api.post("/fiscal/seen")
+def fiscal_seen():
+    with get_conn() as conn:
+        fiscal.mark_seen(conn)
     return {"ok": True}
 
 

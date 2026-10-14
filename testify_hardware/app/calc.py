@@ -5,6 +5,7 @@ import sqlite3
 from datetime import date
 
 from .db import get_settings
+from .fiscal import RATE_KEYS, settings_for_month
 
 MONTH_NAMES = [
     "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
@@ -77,8 +78,8 @@ def gross_for_month(conn: sqlite3.Connection, employee: sqlite3.Row, ym: str):
     return row["gross"] if row else None
 
 
-def payroll(conn: sqlite3.Connection, ym: str, settings: dict | None = None) -> dict:
-    settings = settings or get_settings(conn)
+def payroll(conn: sqlite3.Connection, ym: str) -> dict:
+    settings = settings_for_month(conn, ym)
     lines = []
     for employee in conn.execute("SELECT * FROM employees ORDER BY name").fetchall():
         gross = gross_for_month(conn, employee, ym)
@@ -93,14 +94,13 @@ def payroll(conn: sqlite3.Connection, ym: str, settings: dict | None = None) -> 
     return {"month": ym, "lines": lines, "totals": totals}
 
 
-def month_summary(conn: sqlite3.Connection, ym: str, settings: dict | None = None,
-                  until_day: int | None = None) -> dict:
+def month_summary(conn: sqlite3.Connection, ym: str, until_day: int | None = None) -> dict:
     """Totalurile unei luni: venituri, cheltuieli, salarii, taxe, profit.
 
     Cu until_day se iau doar vânzările și cheltuielile până în acea zi, ca luna
     în curs să fie comparată cu aceeași perioadă din luna trecută.
     """
-    settings = settings or get_settings(conn)
+    settings = settings_for_month(conn, ym)
     start, end = month_bounds(ym)
     if until_day is not None:
         end = min(end, f"{ym}-{until_day:02d}")
@@ -120,7 +120,7 @@ def month_summary(conn: sqlite3.Connection, ym: str, settings: dict | None = Non
     expenses_by_category = {row["category"]: r2(row["total"]) for row in expense_rows}
     operating_expenses = sum(expenses_by_category.values())
 
-    pay = payroll(conn, ym, settings)["totals"]
+    pay = payroll(conn, ym)["totals"]
     profit_before_tax = revenue - operating_expenses - pay["employer_cost"]
     regime = settings.get("tax_regime", "profit")
     if regime == "micro":
@@ -150,6 +150,8 @@ def month_summary(conn: sqlite3.Connection, ym: str, settings: dict | None = Non
             "total": r2(total_taxes),
         },
         "tax_regime": regime,
+        "rates": {key: settings[key] for key in RATE_KEYS},
+        "fiscal_rule": settings["fiscal_rule"],
         "company_tax_label": company_tax_label(regime),
         "total_costs": r2(total_costs),
         "profit_before_tax": r2(profit_before_tax),
@@ -269,15 +271,15 @@ def dashboard(conn: sqlite3.Connection, ym: str) -> dict:
     settings = get_settings(conn)
     categories = {row["name"]: row["color"]
                   for row in conn.execute("SELECT name, color FROM categories")}
-    current = month_summary(conn, ym, settings)
+    current = month_summary(conn, ym)
     in_progress = ym == current_month()
     until_day = date.today().day if in_progress else None
-    previous = month_summary(conn, shift_month(ym, -1), settings, until_day)
+    previous = month_summary(conn, shift_month(ym, -1), until_day)
 
     trend = []
     for offset in range(-11, 1):
         month = shift_month(ym, offset)
-        summary = month_summary(conn, month, settings)
+        summary = month_summary(conn, month)
         trend.append({
             "month": month,
             "label": month_label(month, short=True),
@@ -303,6 +305,7 @@ def dashboard(conn: sqlite3.Connection, ym: str) -> dict:
 
     return {
         "company": settings.get("company_name", "Testify Hardware"),
+        "owner_name": settings.get("owner_name", ""),
         "in_progress": in_progress,
         "compared_until_day": until_day,
         "current": current,

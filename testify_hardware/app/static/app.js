@@ -81,6 +81,7 @@ const ICONS = {
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
   box: '<path d="M21 16V8a2 2 0 00-1-1.7l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.7l7 4a2 2 0 002 0l7-4a2 2 0 001-1.7z"/><path d="M3.3 7L12 12l8.7-5M12 22V12"/>',
   raise: '<path d="M12 20V10M18 20V4M6 20v-4"/>',
+  refresh: '<path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0114.8-3.4L23 10M1 14l4.7 4.4A9 9 0 0020.5 15"/>',
 };
 const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ""}</svg>`;
 
@@ -129,6 +130,7 @@ async function boot() {
   try {
     const status = await api("/api/auth/status");
     if (status.company) $("#brand-name").textContent = status.company;
+    state.ownerName = status.owner_name;
     if (status.logged_in) return showApp();
     authMode = status.setup_done ? "login" : "setup";
     showAuth();
@@ -180,6 +182,9 @@ $("#auth-form").addEventListener("submit", async (e) => {
 
 $("#logout-btn").addEventListener("click", async () => {
   await api("/api/auth/logout", { method: "POST" }).catch(() => {});
+  $("#assistant").classList.add("hidden");
+  robot.close();
+  try { sessionStorage.removeItem("testi-greeted"); } catch { /* stocare indisponibilă */ }
   authMode = "login";
   showAuth();
 });
@@ -206,6 +211,7 @@ function showApp() {
   $("#app").classList.remove("hidden");
   buildNav();
   route();
+  robot.init();
 }
 
 function route() {
@@ -1000,9 +1006,11 @@ async function renderEmployees(view) {
 const rateTxt = (v) => String(Number(v)).replace(".", ",");
 
 async function renderTaxes(view) {
-  const [d, sample, settings] = await Promise.all([
-    api(`/api/dashboard?month=${state.month}`), api("/api/salary-preview?gross=100"), api("/api/settings"),
+  const [d, sample] = await Promise.all([
+    api(`/api/dashboard?month=${state.month}`), api("/api/salary-preview?gross=100"),
   ]);
+  // Cotele valabile în luna afișată, din regulile fiscale.
+  const settings = { ...d.current.rates, tax_regime: d.current.tax_regime };
   const t = d.current.taxes;
   const salaryTaxes = t.total - t.company_tax;
   const share = d.current.revenue ? (t.total / d.current.revenue) * 100 : 0;
@@ -1133,32 +1141,50 @@ async function renderReports(view) {
 /* ================= Setări ================= */
 
 async function renderSettings(view) {
-  const [s] = await Promise.all([api("/api/settings"), loadCategories()]);
-  const rateField = (name, label, hint) => `
-    <label class="field"><span>${label}</span><input type="number" name="${name}" min="0" max="100" step="0.01" required value="${esc(s[name])}"><small>${hint}</small></label>`;
+  const [s, f] = await Promise.all([api("/api/settings"), api("/api/fiscal"), loadCategories()]);
+  const statusText = f.last_check
+    ? `Ultima verificare: ${new Date(f.last_check).toLocaleString("ro-RO", { dateStyle: "medium", timeStyle: "short" })} · ${f.last_status === "ok" ? "la zi" : "nu am putut verifica online, folosesc ultimele reguli salvate"}`
+    : "Încă nu s-a făcut nicio verificare online.";
 
   view.innerHTML = `
-    <section class="grid cols-2-even">
-      <article class="card glass">
-        <div class="card-head"><div><h2>Firma și cotele de taxe</h2><p>Dacă se schimbă legislația, actualizați cotele aici.</p></div></div>
-        <form id="settings-form">
-          <div class="form-grid">
-            <label class="field" style="grid-column:1/-1"><span>Numele firmei</span><input name="company_name" required maxlength="120" value="${esc(s.company_name)}"></label>
-            <label class="field" style="grid-column:1/-1"><span>Regim de impozitare</span><select name="tax_regime">
-              <option value="profit" ${s.tax_regime === "profit" ? "selected" : ""}>Impozit pe profit</option>
-              <option value="micro" ${s.tax_regime === "micro" ? "selected" : ""}>Microîntreprindere</option>
-            </select></label>
-            ${rateField("profit_tax_rate", "Impozit pe profit (%)", "din profit")}
-            ${rateField("micro_tax_rate", "Impozit micro (%)", "din venituri")}
-            ${rateField("cas_rate", "CAS (%)", "pensie, din brut")}
-            ${rateField("cass_rate", "CASS (%)", "sănătate, din brut")}
-            ${rateField("income_tax_rate", "Impozit pe venit (%)", "după CAS și CASS")}
-            ${rateField("cam_rate", "CAM (%)", "plătit de firmă")}
-            ${rateField("dividend_tax_rate", "Impozit dividende (%)", "pentru „cât îmi rămâne”")}
+    <section class="grid cols-2-even" style="align-items:start">
+      <div class="grid">
+        <article class="card glass">
+          <div class="card-head"><div><h2>Firma</h2><p>Datele folosite în aplicație și în rapoarte.</p></div></div>
+          <form id="settings-form">
+            <div class="form-grid">
+              <label class="field"><span>Numele firmei</span><input name="company_name" required maxlength="120" value="${esc(s.company_name)}"></label>
+              <label class="field"><span>Numele dumneavoastră</span><input name="owner_name" maxlength="60" value="${esc(s.owner_name)}"><small>Așa vă salută asistentul.</small></label>
+              <label class="field" style="grid-column:1/-1"><span>Regim de impozitare</span><select name="tax_regime">
+                <option value="profit" ${s.tax_regime === "profit" ? "selected" : ""}>Impozit pe profit (16% din profit)</option>
+                <option value="micro" ${s.tax_regime === "micro" ? "selected" : ""}>Microîntreprindere (% din venituri)</option>
+              </select></label>
+            </div>
+            <div class="form-actions"><button class="btn btn-primary" type="submit">${icon("check")}Salvează</button></div>
+          </form>
+        </article>
+
+        <article class="card glass fiscal-card">
+          <div class="card-head">
+            <div><h2>Legislație fiscală <span class="live-dot"></span></h2><p>Cotele se actualizează automat. Nu trebuie să faceți nimic.</p></div>
+            <button class="btn btn-sm" id="fiscal-check" type="button">${icon("refresh")}Verifică acum</button>
           </div>
-          <div class="form-actions"><button class="btn btn-primary" type="submit">${icon("check")}Salvează setările</button></div>
-        </form>
-      </article>
+          <p class="muted" style="font-size:13px;margin:0 0 14px" id="fiscal-status">${esc(statusText)}</p>
+          <div class="rates-grid">
+            ${Object.entries(f.labels).map(([key, label]) => `
+              <div class="rate"><span>${esc(label)}</span><strong>${rateTxt(f.current.rates[key])}%</strong></div>`).join("")}
+          </div>
+          <p class="muted" style="font-size:12px;margin:12px 0 18px">În vigoare din ${formatDate(f.current.effective_from)} · Sursa: ${esc(f.current.source)}${f.version ? ` · versiunea ${esc(f.version)}` : ""}</p>
+          <h3 style="font-size:14px;margin:0 0 10px">Istoricul modificărilor</h3>
+          <ul class="law-timeline">
+            ${f.history.map((r) => `
+              <li class="${r.effective_from > todayISO() ? "future" : ""}">
+                <b>${formatDate(r.effective_from)}</b> — ${esc(r.title)}${r.effective_from > todayISO() ? ' <span class="tag order">urmează</span>' : ""}
+                ${r.changes.length ? `<ul>${r.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
+              </li>`).join("")}
+          </ul>
+        </article>
+      </div>
 
       <div class="grid">
         <article class="card glass">
@@ -1184,13 +1210,24 @@ async function renderSettings(view) {
   $("#settings-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const d = formData(e.target);
-    const body = { company_name: d.company_name, tax_regime: d.tax_regime };
-    ["profit_tax_rate", "micro_tax_rate", "cas_rate", "cass_rate", "income_tax_rate", "cam_rate", "dividend_tax_rate"].forEach((k) => { body[k] = Number(d[k]); });
+    const body = { company_name: d.company_name, owner_name: d.owner_name, tax_regime: d.tax_regime };
     try {
       await api("/api/settings", { method: "PUT", body });
       $("#brand-name").textContent = body.company_name;
+      state.ownerName = body.owner_name;
       toast("Setările au fost salvate.");
     } catch (err) { toast(err.message, "err"); }
+  });
+  $("#fiscal-check").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.classList.add("spinning");
+    try {
+      const result = await api("/api/fiscal/check", { method: "POST" });
+      toast(result.message, result.ok ? "ok" : "err");
+      if (result.changed.length) { robot.refresh(); }
+      render();
+    } catch (err) { toast(err.message, "err"); btn.disabled = false; btn.classList.remove("spinning"); }
   });
   $("#password-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1206,6 +1243,179 @@ async function renderSettings(view) {
       catch (err) { toast(err.message, "err"); }
     }
   });
+}
+
+/* ================= Asistentul Testi ================= */
+
+function robotSVG(className = "") {
+  return `<svg class="robot ${className}" viewBox="0 0 120 120" aria-hidden="true">
+    <defs>
+      <linearGradient id="rb-body" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1e293b"/><stop offset="1" stop-color="#0b1222"/></linearGradient>
+      <linearGradient id="rb-edge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#3b82f6"/></linearGradient>
+      <radialGradient id="rb-eye"><stop offset="0" stop-color="#ecfeff"/><stop offset=".45" stop-color="#22d3ee"/><stop offset="1" stop-color="#0891b2" stop-opacity="0"/></radialGradient>
+    </defs>
+    <g class="rb-antenna"><line x1="60" y1="14" x2="60" y2="26" stroke="url(#rb-edge)" stroke-width="3"/><circle class="rb-light" cx="60" cy="11" r="5" fill="#fbbf24"/></g>
+    <rect x="24" y="26" width="72" height="54" rx="20" fill="url(#rb-body)" stroke="url(#rb-edge)" stroke-width="3"/>
+    <rect x="33" y="37" width="54" height="30" rx="13" fill="#020617"/>
+    <g class="rb-eyes"><circle cx="48" cy="52" r="7" fill="url(#rb-eye)"/><circle cx="72" cy="52" r="7" fill="url(#rb-eye)"/></g>
+    <path class="rb-mouth" d="M52 61 q8 5 16 0" stroke="#22d3ee" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <rect x="18" y="45" width="6" height="16" rx="3" fill="#22d3ee"/><rect x="96" y="45" width="6" height="16" rx="3" fill="#22d3ee"/>
+    <rect x="40" y="82" width="40" height="26" rx="10" fill="url(#rb-body)" stroke="url(#rb-edge)" stroke-width="3"/>
+    <circle cx="60" cy="95" r="4" fill="#fbbf24"/>
+    <g class="rb-arm"><path d="M80 88 q16 -4 20 -20" stroke="url(#rb-edge)" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="100" cy="66" r="5" fill="#22d3ee"/></g>
+    <path d="M40 90 q-12 4 -14 16" stroke="url(#rb-edge)" stroke-width="5" fill="none" stroke-linecap="round"/>
+  </svg>`;
+}
+
+const robot = {
+  messages: [],
+  actions: [],
+  playing: 0,
+
+  init() {
+    $("#assistant").classList.remove("hidden");
+    $("#assistant-fab").innerHTML = `${robotSVG("mini")}<span class="fab-dot hidden" id="assistant-dot"></span>`;
+    $("#assistant-avatar").innerHTML = robotSVG("waving");
+    $("#assistant-fab").onclick = () => this.toggle();
+    $("#assistant-close").onclick = () => this.close();
+    let greeted = false;
+    try { greeted = sessionStorage.getItem("testi-greeted") === "1"; } catch { /* stocare indisponibilă */ }
+    this.refresh(!greeted);
+    try { sessionStorage.setItem("testi-greeted", "1"); } catch { /* stocare indisponibilă */ }
+  },
+
+  toggle() { $("#assistant-panel").classList.contains("hidden") ? this.open() : this.close(); },
+  close() { $("#assistant-panel").classList.add("hidden"); $("#assistant-fab").classList.remove("open"); },
+  open() {
+    $("#assistant-panel").classList.remove("hidden");
+    $("#assistant-fab").classList.add("open");
+    $("#assistant-dot").classList.add("hidden");
+    this.play();
+  },
+
+  async refresh(autoOpen = false) {
+    try {
+      await this.compose();
+      const hasNews = this.fiscalNews;
+      if (autoOpen || hasNews) this.open();
+      else $("#assistant-dot").classList.toggle("hidden", !hasNews);
+    } catch { /* asistentul nu trebuie să blocheze aplicația */ }
+  },
+
+  async compose() {
+    const lastMonth = shiftMonth(currentMonth(), -1);
+    const [past, now, fiscalInfo] = await Promise.all([
+      api(`/api/dashboard?month=${lastMonth}`), api(`/api/dashboard?month=${currentMonth()}`), api("/api/fiscal"),
+    ]);
+    const name = past.owner_name || state.ownerName || "";
+    const p = past.current;
+    const msgs = [];
+    msgs.push({ html: `<b>${esc(greeting())}${name ? `, ${esc(name)}` : ""}!</b> Eu sunt <b>Testi</b>, asistentul tău financiar. Am pregătit cifrele firmei pentru tine.` });
+    if (p.revenue) {
+      msgs.push({ html: `În <b>${esc(p.label)}</b> ai încasat <b>${lei(p.revenue)}</b>, iar profitul net a fost <b class="${p.profit >= 0 ? "pos" : "neg"}">${lei(p.profit)}</b>. ${p.owner_income > 0 ? `Ție îți rămân <b class="gold">${lei(p.owner_income)}</b> după impozitul pe dividende.` : "Luna a fost pe pierdere, deci nu se plătește impozit pe profit."}` });
+    }
+    if (now.current.revenue) {
+      const ch = now.changes.revenue;
+      msgs.push({ html: `Luna aceasta, până azi: <b>${lei(now.current.revenue)}</b> încasări${ch !== null ? `, <b class="${ch >= 0 ? "pos" : "neg"}">${ch >= 0 ? "+" : "−"}${pct(Math.abs(ch))}</b> față de aceeași perioadă a lunii trecute` : ""}.` });
+    }
+    const warn = past.insights.find((n) => n.tone === "warn" || n.tone === "bad");
+    if (warn) msgs.push({ html: `${icon("alert")} ${esc(warn.text)}`, tone: "warn" });
+
+    this.fiscalNews = fiscalInfo.unseen.length > 0;
+    if (this.fiscalNews) {
+      fiscalInfo.unseen.forEach((rule) => {
+        const future = rule.effective_from > todayISO();
+        msgs.push({
+          tone: "law",
+          html: `<b>${icon("taxes")} Noutate în Codul fiscal</b> — ${esc(rule.title)} (${future ? "se aplică de la" : "în vigoare din"} ${formatDate(rule.effective_from)}).
+            <ul>${rule.changes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>
+            Am actualizat deja calculele. Nu trebuie să faci nimic.`,
+        });
+      });
+    } else {
+      const r = fiscalInfo.current.rates;
+      const checked = fiscalInfo.last_check && fiscalInfo.last_status === "ok"
+        ? ` (verificat ${new Date(fiscalInfo.last_check).toLocaleString("ro-RO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })})` : "";
+      msgs.push({ tone: "law", html: `${icon("check")} Regulile fiscale sunt la zi${esc(checked)}: impozit pe profit ${rateTxt(r.profit_tax_rate)}%, dividende ${rateTxt(r.dividend_tax_rate)}%. Te anunț eu dacă se schimbă ceva.` });
+    }
+    this.messages = msgs;
+    this.actions = [
+      ...(this.fiscalNews ? [{ label: "Am înțeles", primary: true, run: async () => { await api("/api/fiscal/seen", { method: "POST" }); this.fiscalNews = false; toast("Mulțumesc! Am notat că ai văzut noutățile."); this.close(); } }] : []),
+      { label: "Adaugă o vânzare", run: () => { this.close(); quickAdd("sale"); } },
+      { label: "Vezi taxele", run: () => { this.close(); location.hash = "#taxe"; } },
+    ];
+    this.rendered = false;
+  },
+
+  async play() {
+    if (this.rendered) return;
+    this.rendered = true;
+    const run = ++this.playing;
+    const box = $("#assistant-messages");
+    const actions = $("#assistant-actions");
+    box.innerHTML = "";
+    actions.innerHTML = "";
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    for (const msg of this.messages) {
+      const typing = document.createElement("div");
+      typing.className = "bubble typing";
+      typing.innerHTML = "<i></i><i></i><i></i>";
+      box.append(typing);
+      box.scrollTop = box.scrollHeight;
+      await new Promise((r) => setTimeout(r, reduce ? 0 : 650));
+      if (run !== this.playing) return;
+      typing.className = `bubble ${msg.tone || ""}`;
+      typing.innerHTML = msg.html;
+      box.scrollTop = box.scrollHeight;
+      await new Promise((r) => setTimeout(r, reduce ? 0 : 250));
+    }
+    this.actions.forEach((a) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = `btn btn-sm ${a.primary ? "btn-primary" : ""}`;
+      b.textContent = a.label;
+      b.onclick = a.run;
+      actions.append(b);
+    });
+  },
+};
+
+/* ================= Adăugare rapidă (mai ales pe telefon) ================= */
+
+async function quickAdd(kind = "sale") {
+  await loadCategories();
+  const body = (k) => `
+    <div class="segmented" style="margin-bottom:16px">
+      <button type="button" data-kind="sale" class="${k === "sale" ? "active" : ""}">Vânzare</button>
+      <button type="button" data-kind="expense" class="${k === "expense" ? "active" : ""}">Cheltuială</button>
+    </div>
+    <form id="quick-form">${k === "sale" ? saleFormHTML({}, "order") : expenseFormHTML()}
+      <div class="form-actions"><button class="btn btn-primary btn-block" type="submit">${icon("plus")}Salvează</button></div>
+    </form>`;
+  const mount = (root, k) => {
+    $$("[data-kind]", root).forEach((b) => b.addEventListener("click", () => { root.innerHTML = body(b.dataset.kind); mount(root, b.dataset.kind); }));
+    const form = $("#quick-form", root);
+    if (k === "sale") wireSaleForm(form);
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        const payload = k === "sale" ? salePayload(form, "order") : expensePayload(form);
+        await api(k === "sale" ? "/api/sales" : "/api/expenses", { method: "POST", body: payload });
+        closeModal();
+        toast(`${k === "sale" ? "Vânzare" : "Cheltuială"} salvată: ${lei(payload.amount, true)}`);
+        setMonthFromDate(payload.date);
+        render();
+      } catch (err) { toast(err.message, "err"); }
+    });
+  };
+  openModal("Adăugare rapidă", body(kind), (root) => mount(root, kind));
+}
+$("#quick-add").addEventListener("click", () => quickAdd("sale"));
+
+/* ================= Aplicație instalabilă (PWA) ================= */
+
+if ("serviceWorker" in navigator && window.isSecureContext) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("/static/sw.js").catch(() => {}));
 }
 
 window.closeModal = closeModal;

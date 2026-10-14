@@ -58,21 +58,25 @@ CREATE TABLE IF NOT EXISTS expenses (
     amount      REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS fiscal_rules (
+    effective_from TEXT PRIMARY KEY,
+    title          TEXT NOT NULL DEFAULT '',
+    rates          TEXT NOT NULL,
+    changes        TEXT NOT NULL DEFAULT '[]',
+    source         TEXT NOT NULL DEFAULT '',
+    seen           INTEGER NOT NULL DEFAULT 0,
+    received_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(date);
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
 """
 
-# Cotele sunt în procente și pot fi modificate din pagina Setări.
+# Setările firmei. Cotele de taxe nu stau aici, ci în regulile fiscale (vezi fiscal.py).
 DEFAULT_SETTINGS = {
     "company_name": "Testify Hardware",
+    "owner_name": "Robert",
     "tax_regime": "profit",      # "profit" (impozit pe profit) sau "micro" (microîntreprindere)
-    "profit_tax_rate": "16",     # impozit pe profit (% din profit)
-    "micro_tax_rate": "1",       # impozit microîntreprindere (% din venituri)
-    "cas_rate": "25",            # pensie, reținută din brut
-    "cass_rate": "10",           # sănătate, reținută din brut
-    "income_tax_rate": "10",     # impozit pe venit salarii
-    "cam_rate": "2.25",          # contribuția asiguratorie pentru muncă, plătită de firmă
-    "dividend_tax_rate": "16",   # impozit pe dividende, pentru „cât îmi rămâne mie”
 }
 
 DEFAULT_CATEGORIES = [
@@ -135,6 +139,9 @@ def init_db() -> None:
                 "INSERT OR IGNORE INTO categories(name, color) VALUES (?, ?)", DEFAULT_CATEGORIES
             )
             set_setting(conn, "categories_version", CATEGORIES_VERSION)
+
+        from .fiscal import install_bundled_rules
+        install_bundled_rules(conn)
 
 
 def get_settings(conn: sqlite3.Connection) -> dict:

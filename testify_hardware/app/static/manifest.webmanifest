@@ -1,0 +1,21 @@
+{
+  "name": "Testify Hardware — Calcul lunar",
+  "short_name": "Testify",
+  "description": "Aplicația internă pentru calculul lunar al firmei Testify Hardware",
+  "start_url": "/static/index.html#dashboard",
+  "scope": "/static/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070b14",
+  "theme_color": "#070b14",
+  "lang": "ro",
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Adaugă vânzare", "url": "/static/index.html#vanzari" },
+    { "name": "Taxe", "url": "/static/index.html#taxe" }
+  ]
+}

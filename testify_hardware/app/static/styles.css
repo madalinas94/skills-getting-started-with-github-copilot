@@ -379,3 +379,88 @@ td.actions { width: 1%; white-space: nowrap; text-align: right; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ================= Asistentul Testi ================= */
+.assistant { position: fixed; right: 22px; bottom: 22px; z-index: 45; display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
+.assistant-fab {
+  width: 68px; height: 68px; border-radius: 22px; border: 1px solid rgba(34, 211, 238, .45); cursor: pointer; position: relative;
+  background: radial-gradient(circle at 30% 20%, #1e3a5f, #0b1222 70%); padding: 6px;
+  box-shadow: 0 14px 40px -10px rgba(34, 211, 238, .55), inset 0 0 20px rgba(34, 211, 238, .15);
+  animation: float 4s ease-in-out infinite; transition: transform .2s;
+}
+.assistant-fab:hover { transform: scale(1.06); }
+.assistant-fab.open { animation: none; }
+.assistant-fab .robot { width: 100%; height: 100%; }
+.fab-dot { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; border-radius: 50%; background: var(--gold); border: 3px solid var(--bg); box-shadow: 0 0 12px var(--gold); animation: blink 1.4s infinite; }
+@keyframes float { 50% { transform: translateY(-6px); } }
+
+.assistant-panel {
+  width: min(390px, calc(100vw - 32px)); max-height: min(620px, calc(100vh - 140px)); display: flex; flex-direction: column;
+  border-radius: 22px; overflow: hidden; border: 1px solid rgba(34, 211, 238, .3);
+  background: linear-gradient(180deg, rgba(15, 25, 48, .97), rgba(8, 13, 26, .97));
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .8), 0 0 0 1px rgba(34, 211, 238, .08), 0 0 60px -20px rgba(34, 211, 238, .4);
+  animation: pop .45s cubic-bezier(.2, 1.2, .3, 1); transform-origin: bottom right;
+}
+@keyframes pop { from { opacity: 0; transform: scale(.85) translateY(20px); } }
+.assistant-head { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border);
+  background: radial-gradient(120% 140% at 0% 0%, rgba(34, 211, 238, .18), transparent 60%); }
+.assistant-head strong { display: block; font-size: 16px; }
+.assistant-head small { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+.assistant-avatar { width: 64px; height: 64px; flex-shrink: 0; filter: drop-shadow(0 0 16px rgba(34, 211, 238, .45)); }
+.assistant-avatar .robot { width: 100%; height: 100%; }
+.assistant-messages { padding: 16px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1; }
+.assistant-actions { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 16px 16px; border-top: 1px solid var(--border); }
+.assistant-actions:empty { display: none; }
+
+.bubble { align-self: flex-start; max-width: 100%; padding: 11px 14px; border-radius: 4px 16px 16px 16px; font-size: 14px; line-height: 1.5;
+  background: rgba(30, 41, 70, .7); border: 1px solid var(--border); animation: rise .35s both; }
+.bubble svg { width: 15px; height: 15px; vertical-align: -2px; }
+.bubble b.pos { color: var(--green); } .bubble b.neg { color: var(--red); } .bubble b.gold { color: var(--gold); }
+.bubble ul { margin: 6px 0; padding-left: 18px; color: var(--text); }
+.bubble ul li { margin: 3px 0; }
+.bubble.warn { border-color: rgba(251, 191, 36, .35); background: rgba(251, 191, 36, .08); }
+.bubble.warn svg { color: var(--gold); }
+.bubble.law { border-color: rgba(34, 211, 238, .35); background: linear-gradient(135deg, rgba(34, 211, 238, .1), rgba(59, 130, 246, .08)); }
+.bubble.law svg { color: var(--cyan); }
+.bubble.typing { display: inline-flex; gap: 5px; padding: 14px 16px; }
+.bubble.typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); animation: dots 1s infinite; }
+.bubble.typing i:nth-child(2) { animation-delay: .15s; } .bubble.typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes dots { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-4px); } }
+
+/* Animațiile robotului */
+.robot .rb-eyes { transform-origin: 60px 52px; animation: eyes 4.5s infinite; }
+@keyframes eyes { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+.robot .rb-light { animation: glow 1.8s ease-in-out infinite; }
+@keyframes glow { 50% { fill: #fde68a; filter: drop-shadow(0 0 6px #fbbf24); } }
+.robot.waving .rb-arm { transform-origin: 80px 88px; animation: wave 1.2s ease-in-out 3; }
+@keyframes wave { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-18deg); } 75% { transform: rotate(14deg); } }
+.robot .rb-antenna { transform-origin: 60px 26px; animation: sway 3s ease-in-out infinite; }
+@keyframes sway { 50% { transform: rotate(6deg); } }
+
+.live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); animation: blink 2s infinite; vertical-align: middle; }
+
+/* Legislație fiscală */
+.fiscal-card { border-color: rgba(34, 211, 238, .28); }
+.rates-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.rate { padding: 10px 12px; border-radius: 12px; background: rgba(7, 11, 20, .45); border: 1px solid var(--border); }
+.rate span { display: block; font-size: 11px; color: var(--muted); }
+.rate strong { font-size: 17px; font-variant-numeric: tabular-nums; }
+.law-timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.law-timeline > li { position: relative; padding: 10px 12px 10px 16px; border-radius: 12px; background: rgba(7, 11, 20, .45); border-left: 3px solid var(--cyan); font-size: 13px; }
+.law-timeline > li.future { border-left-color: var(--gold); }
+.law-timeline ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
+.btn.spinning svg { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 860px) {
+  .assistant { right: 14px; bottom: calc(86px + env(safe-area-inset-bottom)); }
+  .assistant-fab { width: 56px; height: 56px; border-radius: 18px; }
+  .assistant-panel { max-height: calc(100vh - 190px); }
+  .quick-add span { display: none; }
+  .quick-add { padding: 10px; }
+  .topbar-actions { flex-wrap: nowrap; }
+}
+@media (max-width: 520px) {
+  .month-picker { width: auto; flex: 1; }
+}
+@media (max-width: 860px) { .toasts { bottom: calc(160px + env(safe-area-inset-bottom)); } }
