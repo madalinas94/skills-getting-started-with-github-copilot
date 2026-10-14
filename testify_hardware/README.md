@@ -100,7 +100,8 @@ Cotele de taxe nu sunt scrise în cod. Ele stau în fișierul `app/fiscal/ro.jso
 fiecare set de cote are **data de la care se aplică**:
 
 - Aplicația descarcă singură versiunea publicată a acestui fișier, la pornire și apoi la fiecare
-  6 ore. Adresa implicită este fișierul din acest repository, de pe ramura `main`; se poate
+  6 ore. Adresa implicită este fișierul `app/fiscal/ro.json` din repository-ul
+  `madalinas94/testify-hardware`, de pe ramura `main`; se poate
   schimba cu variabila de mediu `TESTIFY_FISCAL_FEED` (un șir gol oprește actualizarea).
 - Când apare o regulă nouă, aplicația o salvează, recalculează lunile la care se aplică, iar
   Testi îl anunță pe proprietar ce s-a schimbat. O regulă poate fi publicată înainte să intre în

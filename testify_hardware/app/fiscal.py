@@ -17,8 +17,7 @@ from .db import get_settings, set_setting
 
 BUNDLED_RULES = Path(__file__).resolve().parent / "fiscal" / "ro.json"
 DEFAULT_FEED_URL = (
-    "https://raw.githubusercontent.com/madalinas94/skills-getting-started-with-github-copilot/"
-    "main/testify_hardware/app/fiscal/ro.json"
+    "https://raw.githubusercontent.com/madalinas94/testify-hardware/main/app/fiscal/ro.json"
 )
 CHECK_INTERVAL_HOURS = 6
 RATE_KEYS = [
