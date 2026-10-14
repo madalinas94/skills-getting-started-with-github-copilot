@@ -77,11 +77,25 @@ DEFAULT_CATEGORIES = [
     ("Marfă / furnizori", "#38bdf8"),
     ("Chirie", "#a78bfa"),
     ("Utilități", "#34d399"),
+    ("Internet și telefonie", "#2dd4bf"),
     ("Transport", "#fbbf24"),
+    ("Combustibil și auto", "#facc15"),
     ("Contabilitate", "#f472b6"),
     ("Marketing", "#fb923c"),
+    ("Software și abonamente", "#818cf8"),
+    ("Echipamente IT și mobilier", "#60a5fa"),
+    ("Comisioane bancare și POS", "#c084fc"),
+    ("Asigurări", "#4ade80"),
+    ("Mentenanță și reparații", "#f97316"),
+    ("Ambalaje și consumabile", "#e879f9"),
+    ("Taxe locale și autorizații", "#fda4af"),
+    ("Medicina muncii și SSM", "#5eead4"),
+    ("Training și cursuri", "#93c5fd"),
+    ("Protocol și deplasări", "#fcd34d"),
     ("Altele", "#94a3b8"),
 ]
+# Crește când se adaugă categorii implicite noi, ca să ajungă și în bazele existente.
+CATEGORIES_VERSION = "2"
 
 
 def db_path() -> Path:
@@ -114,10 +128,11 @@ def init_db() -> None:
             conn.execute(
                 "INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)", (key, value)
             )
-        if conn.execute("SELECT COUNT(*) FROM categories").fetchone()[0] == 0:
+        if get_settings(conn).get("categories_version") != CATEGORIES_VERSION:
             conn.executemany(
-                "INSERT INTO categories(name, color) VALUES (?, ?)", DEFAULT_CATEGORIES
+                "INSERT OR IGNORE INTO categories(name, color) VALUES (?, ?)", DEFAULT_CATEGORIES
             )
+            set_setting(conn, "categories_version", CATEGORIES_VERSION)
 
 
 def get_settings(conn: sqlite3.Connection) -> dict:

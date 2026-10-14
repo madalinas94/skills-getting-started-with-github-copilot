@@ -10,7 +10,7 @@ plătește firma și cât îi rămâne lui.
 | --- | --- |
 | **Dashboard** | Venituri, costuri, profit și „cât îți rămâne ție” pe lună, cu comparație față de luna trecută; evoluția pe 12 luni; graficul „Unde se duc banii”; observații automate; top produse |
 | **Vânzări** | Se adaugă fie fiecare comandă (produs, cantitate, preț), fie doar totalul pe zi/lună |
-| **Cheltuieli** | Cheltuieli pe categorii editabile (marfă, chirie, utilități, transport…) |
+| **Cheltuieli** | 19 categorii implicite, editabile: marfă, chirie, utilități, internet și telefonie, transport, combustibil, contabilitate, marketing, software, echipamente, comisioane bancare/POS, asigurări, reparații, ambalaje, taxe locale, SSM, training, protocol, altele |
 | **Angajați** | Adăugare angajați, salariu brut cu istoric de măriri, calcul automat al netului și al costului pentru firmă, stat de plată lunar |
 | **Taxe** | CAS, CASS, impozit pe venit, CAM și impozit micro, explicate pe înțeles |
 | **Rapoarte** | Export Excel și PDF pentru contabilă, plus comparația pe ultimele 12 luni |

@@ -422,7 +422,7 @@ async function renderDashboard(view) {
             <div class="donut-center"><span>Total ieșiri</span><strong class="num">${lei(d.flow.reduce((s, f) => s + f.amount, 0))}</strong></div>
           </div>
           <ul class="legend">
-            ${d.flow.map((f) => `<li><span class="sw" style="background:${esc(f.color)}"></span><span>${esc(f.name)}</span><span class="val"><b>${pct(f.share)}</b> · ${lei(f.amount)}</span></li>`).join("")}
+            ${d.flow.map((f) => `<li${f.details ? ` title="${esc(f.details.map((x) => `${x.name}: ${lei(x.amount)}`).join("\n"))}"` : ""}><span class="sw" style="background:${esc(f.color)}"></span><span>${esc(f.name)}</span><span class="val"><b>${pct(f.share)}</b> · ${lei(f.amount)}</span></li>`).join("")}
           </ul>
         </div>` : emptyState("Nu există încă ieșiri de bani în această lună.")}
       </article>
@@ -719,7 +719,7 @@ async function renderExpenses(view) {
   const maxCat = Math.max(...cats.map((c) => c[1]), 1);
 
   view.innerHTML = `
-    <section class="grid cols-2">
+    <section class="grid cols-2" style="align-items:start">
       <article class="card glass">
         <div class="card-head"><div><h2>Adaugă o cheltuială</h2><p>Facturi, chirie, utilități, transport…</p></div>
           <button class="btn btn-sm" id="manage-cats" type="button">${icon("settings")}Categorii</button></div>

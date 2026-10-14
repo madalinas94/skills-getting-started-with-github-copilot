@@ -105,15 +105,49 @@ def load_demo_data(conn: sqlite3.Connection, today: date | None = None) -> None:
                     (date(year, month, day).isoformat(), category, description, round(amount, 2)),
                 )
 
+        winter = month in (11, 12, 1, 2)
+        busy = month in (11, 12)
+
+        # Cheltuieli fixe, în fiecare lună
         expense(3, "Chirie", "Chirie spațiu comercial și depozit", 6500)
         expense(5, "Contabilitate", "Servicii contabilitate", 1200)
-        expense(8, "Marfă / furnizori", "Factură distribuitor accesorii", revenue * 0.29)
-        expense(20, "Marfă / furnizori", "Factură distribuitor periferice", revenue * 0.23)
-        winter = month in (11, 12, 1, 2)
-        expense(12, "Utilități", "Curent, apă, internet", rng.uniform(1100, 1500) if winter
-                else rng.uniform(750, 1000))
+        expense(6, "Internet și telefonie", "Abonament internet fibră și telefoane mobile", 460)
+        expense(7, "Software și abonamente", "Program facturare, Microsoft 365, hosting site",
+                rng.uniform(620, 700))
+        expense(9, "Asigurări", "Asigurare marfă, spațiu și auto", 380)
+        expense(11, "Medicina muncii și SSM", "Contract SSM și medicina muncii", 180)
+
+        # Cheltuieli variabile, legate de activitate
+        expense(8, "Marfă / furnizori", "Factură distribuitor accesorii", revenue * 0.27)
+        expense(20, "Marfă / furnizori", "Factură distribuitor periferice", revenue * 0.22)
+        expense(12, "Utilități", "Curent, apă, gaz", rng.uniform(1000, 1400) if winter
+                else rng.uniform(650, 900))
         transport = rng.uniform(1400, 2200) * (1.6 if offset == 0 else 1)
-        expense(15, "Transport", "Curierat și combustibil", transport)
-        marketing = rng.uniform(1800, 2800) * (1.8 if month in (11, 12) else 1)
-        expense(10, "Marketing", "Reclame online și promovare", marketing)
-        expense(25, "Altele", "Consumabile birou", rng.uniform(250, 700))
+        expense(15, "Transport", "Curierat livrări clienți", transport)
+        expense(16, "Combustibil și auto", "Combustibil și întreținere mașină firmă",
+                rng.uniform(1100, 1700))
+        expense(10, "Marketing", "Reclame online și promovare",
+                rng.uniform(1800, 2800) * (1.8 if busy else 1))
+        expense(28, "Comisioane bancare și POS", "Comisioane POS și transferuri bancare",
+                revenue * 0.006 + 85)
+        expense(18, "Ambalaje și consumabile", "Cutii, folie, etichete pentru colete",
+                revenue * 0.007)
+        expense(22, "Protocol și deplasări", "Întâlniri furnizori și deplasări",
+                rng.uniform(250, 800))
+        expense(25, "Altele", "Cheltuieli diverse", rng.uniform(150, 450))
+
+        # Cheltuieli ocazionale
+        if rng.random() < 0.3:
+            expense(14, "Echipamente IT și mobilier", "Laptop, imprimantă sau mobilier birou",
+                    rng.uniform(1800, 5500))
+        if rng.random() < 0.45:
+            expense(19, "Mentenanță și reparații", "Reparații spațiu și service echipamente",
+                    rng.uniform(300, 1400))
+        if rng.random() < 0.25:
+            expense(21, "Training și cursuri", "Curs vânzări / marketing online",
+                    rng.uniform(700, 1900))
+        if month in (3, 9):
+            expense(26, "Taxe locale și autorizații", "Impozit clădire și auto (semestrial)", 1850)
+        if month == 1:
+            expense(13, "Taxe locale și autorizații", "Taxă firmă și autorizație funcționare", 650)
+            expense(17, "Medicina muncii și SSM", "Control medical anual angajați", 900)

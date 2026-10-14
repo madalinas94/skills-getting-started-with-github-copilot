@@ -281,7 +281,8 @@ def delete_expense(expense_id: int):
 @api.get("/categories")
 def list_categories():
     with get_conn() as conn:
-        return [dict(row) for row in conn.execute("SELECT * FROM categories ORDER BY id")]
+        return [dict(row) for row in conn.execute(
+            "SELECT * FROM categories ORDER BY name = 'Altele', id")]
 
 
 @api.post("/categories", status_code=201)

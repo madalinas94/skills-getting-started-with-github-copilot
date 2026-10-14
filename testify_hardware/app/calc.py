@@ -12,6 +12,7 @@ MONTH_NAMES = [
 ]
 SALARY_CATEGORY = "Salarii nete"
 TAX_CATEGORY = "Taxe și contribuții"
+FLOW_MAX_ITEMS = 9
 
 
 def r2(value: float) -> float:
@@ -170,6 +171,15 @@ def money_flow(summary: dict, categories: dict) -> list[dict]:
         flow.append({"name": TAX_CATEGORY, "amount": summary["taxes"]["total"],
                      "color": "#f87171"})
     flow.sort(key=lambda item: item["amount"], reverse=True)
+    # Cu multe categorii, graficul rămâne lizibil: cele mici se adună într-o felie.
+    if len(flow) > FLOW_MAX_ITEMS:
+        rest = flow[FLOW_MAX_ITEMS - 1:]
+        flow = flow[:FLOW_MAX_ITEMS - 1] + [{
+            "name": f"Alte {len(rest)} categorii",
+            "amount": r2(sum(item["amount"] for item in rest)),
+            "color": "#64748b",
+            "details": [{"name": item["name"], "amount": item["amount"]} for item in rest],
+        }]
     total = sum(item["amount"] for item in flow) or 1
     for item in flow:
         item["share"] = r2(item["amount"] / total * 100)

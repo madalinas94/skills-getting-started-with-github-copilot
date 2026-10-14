@@ -125,3 +125,21 @@ def test_demo_data_dashboard_and_exports(client):
     assert excel.status_code == 200 and excel.content[:2] == b"PK"
     pdf = client.get(f"/api/export/pdf?month={month}")
     assert pdf.status_code == 200 and pdf.content[:4] == b"%PDF"
+
+
+def test_default_categories_cover_common_expenses(client):
+    names = [c["name"] for c in client.get("/api/categories").json()]
+    assert len(names) == 19
+    assert {"Software și abonamente", "Comisioane bancare și POS", "Asigurări"} <= set(names)
+    assert names[-1] == "Altele"
+
+
+def test_small_categories_are_grouped_in_money_flow(client):
+    for index, category in enumerate(c["name"] for c in client.get("/api/categories").json()):
+        client.post("/api/expenses", json={"date": "2026-03-05", "category": category,
+                                           "amount": 100 + index})
+    flow = client.get("/api/dashboard?month=2026-03").json()["flow"]
+    assert len(flow) == calc.FLOW_MAX_ITEMS
+    grouped = flow[-1]
+    assert grouped["name"] == "Alte 11 categorii"
+    assert grouped["amount"] == sum(item["amount"] for item in grouped["details"])
