@@ -65,7 +65,15 @@ CREATE TABLE IF NOT EXISTS clients (
     payment_terms INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS suppliers (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL UNIQUE,
+    payment_terms INTEGER NOT NULL DEFAULT 30,
+    contact       TEXT NOT NULL DEFAULT ''
+);
+
 -- Recepții de marfă (NIR): cresc stocul; costul intră în profit abia când marfa se vinde.
+-- Marfa se plătește la termen: până la scadență, suma apare la datorii către furnizori.
 CREATE TABLE IF NOT EXISTS purchases (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     date       TEXT NOT NULL,
@@ -73,7 +81,9 @@ CREATE TABLE IF NOT EXISTS purchases (
     supplier   TEXT NOT NULL DEFAULT '',
     product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     quantity   INTEGER NOT NULL,
-    unit_cost  REAL NOT NULL
+    unit_cost  REAL NOT NULL,
+    due_date   TEXT,
+    paid       INTEGER NOT NULL DEFAULT 1
 );
 
 -- O vânzare e fie o factură pe un produs (product_id, quantity, unit_price, unit_cost),
@@ -135,7 +145,12 @@ MIGRATIONS = [
     ("sales", "paid", "INTEGER NOT NULL DEFAULT 1"),
     ("expenses", "supplier", "TEXT NOT NULL DEFAULT ''"),
     ("expenses", "vat_kind", "TEXT NOT NULL DEFAULT 'standard'"),
+    ("purchases", "due_date", "TEXT"),
+    ("purchases", "paid", "INTEGER NOT NULL DEFAULT 1"),
 ]
+
+# Termenul de plată implicit la furnizori (clientul plătește la 15–30 de zile).
+DEFAULT_SUPPLIER_TERMS = 30
 
 # Setările firmei. Cotele de taxe nu stau aici, ci în regulile fiscale (vezi fiscal.py).
 DEFAULT_SETTINGS = {

@@ -13,6 +13,7 @@ schimbă Codul fiscal.
 | **Vânzări** | Facturi pe produse din stoc (preț și cost se completează singure, numărul facturii e automat) sau doar totalul pe zi/lună; client, scadență și status încasat/neîncasat |
 | **Stoc** | Produse cu cod, furnizor, preț, cost, stoc minim; stocul scade la vânzare și crește la recepția de marfă (NIR); alerte de stoc minim, „se termină în ~X zile”, fișa de inventar lunară |
 | **Clienți** | Clienți B2B/B2C/marketplace cu termen de plată, vânzări pe client, facturi de încasat și restanțe |
+| **Furnizori** | Furnizori cu termen de plată (implicit 30 de zile), marfă cumpărată, plăți de făcut în ordinea scadenței, restanțe și ce e scadent în 7 zile |
 | **Cheltuieli** | 19 categorii implicite, editabile: marfă, chirie, utilități, internet și telefonie, transport, combustibil, contabilitate, marketing, software, echipamente, comisioane bancare/POS, asigurări, reparații, ambalaje, taxe locale, SSM, training, protocol, altele |
 | **Angajați** | Adăugare angajați, salariu brut cu istoric de măriri, calcul automat al netului și al costului pentru firmă, stat de plată lunar |
 | **Taxe** | Decontul de TVA (colectată − deductibilă = de plată), CAS, CASS, impozit pe venit, CAM și impozitul pe profit, explicate pe înțeles, cu cotele valabile în luna aleasă |
@@ -108,6 +109,10 @@ funcționează la fel.
 - **Îți rămâne ție** = profit net − impozitul pe dividende (16% din 2026).
 - **Creanțe:** o factură către un client cu termen de plată rămâne „de încasat” până o marcați
   încasată; după scadență apare ca restantă.
+- **Datorii la furnizori:** fiecare recepție de marfă primește scadența după termenul
+  furnizorului (clientul plătește la 15–30 de zile) și rămâne „de plătit” până o marcați plătită.
+- **Alerte de stoc:** fiecare produs are un stoc minim (implicit 5 bucăți pentru produsele noi);
+  sub el, alerta apare în aplicație: la Testi, pe dashboard, la emiterea facturii și în pagina Stoc.
 - La luna în curs, comparația se face cu aceeași perioadă din luna trecută.
 
 Calculul e o estimare lunară, pentru imaginea de ansamblu: nu ține cont de deducerea personală,

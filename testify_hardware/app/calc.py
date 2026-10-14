@@ -7,7 +7,7 @@ contribuții și impozite se rotunjesc la leu, ca în statele de plată.
 
 import calendar
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from . import inventory
@@ -295,6 +295,43 @@ def receivables(conn: sqlite3.Connection, day: str | None = None) -> dict:
             "invoices": invoices}
 
 
+def payables(conn: sqlite3.Connection, day: str | None = None, soon_days: int = 7) -> dict:
+    """Ce are firma de plătit furnizorilor de marfă (cu TVA): restanțe și scadențe apropiate."""
+    day = day or date.today().isoformat()
+    soon = (date.fromisoformat(day) + timedelta(days=soon_days)).isoformat()
+    settings = settings_for_month(conn, day[:7])
+    vat = rate(settings, "vat_standard_rate") if settings.get("vat_payer", "1") == "1" else 0
+    rows = conn.execute(
+        "SELECT pu.*, p.name AS product_name FROM purchases pu JOIN products p ON p.id = pu.product_id "
+        "WHERE pu.paid = 0 ORDER BY pu.due_date, pu.id").fetchall()
+    by_supplier: dict[str, dict] = {}
+    documents = []
+    total = overdue = due_soon = 0.0
+    for row in rows:
+        net = row["quantity"] * row["unit_cost"]
+        amount = r2(net + rnd(net * vat, 2))
+        late = bool(row["due_date"] and row["due_date"] < day)
+        near = bool(row["due_date"] and day <= row["due_date"] <= soon)
+        name = row["supplier"] or "Fără furnizor"
+        documents.append({"id": row["id"], "doc_number": row["doc_number"], "date": row["date"],
+                          "due_date": row["due_date"], "supplier": name, "product": row["product_name"],
+                          "amount": amount, "overdue": late, "due_soon": near})
+        entry = by_supplier.setdefault(name, {"supplier": name, "amount": 0.0, "overdue": 0.0,
+                                              "due_soon": 0.0, "documents": 0, "next_due": row["due_date"]})
+        entry["amount"] = r2(entry["amount"] + amount)
+        entry["documents"] += 1
+        total += amount
+        if late:
+            entry["overdue"] = r2(entry["overdue"] + amount)
+            overdue += amount
+        if near:
+            entry["due_soon"] = r2(entry["due_soon"] + amount)
+            due_soon += amount
+    suppliers = sorted(by_supplier.values(), key=lambda item: item["amount"], reverse=True)
+    return {"total": r2(total), "overdue": r2(overdue), "due_soon": r2(due_soon), "soon_days": soon_days,
+            "suppliers": suppliers, "documents": documents, "count": len(rows)}
+
+
 def insights(current: dict, previous: dict, trend: list[dict], flow: list[dict],
              until_day: int | None = None) -> list[dict]:
     """Observații scurte, în limbaj simplu, pentru antreprenor."""
@@ -433,6 +470,7 @@ def dashboard(conn: sqlite3.Connection, ym: str) -> dict:
         "top_clients": top_clients,
         "low_stock": low_stock,
         "receivables": receivables(conn),
+        "payables": payables(conn),
         "insights": insights(current, previous, trend, flow, until_day),
         "year": {
             "revenue": r2(sum(m["revenue"] for m in year_to_date)),

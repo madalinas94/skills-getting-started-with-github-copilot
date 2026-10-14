@@ -538,3 +538,4 @@ button.tag:hover { filter: brightness(1.25); }
 }
 .prod-cell { min-width: 230px; }
 .prod-cell small { white-space: nowrap; }
+.due-list li.later { border-left-color: var(--border-strong); }

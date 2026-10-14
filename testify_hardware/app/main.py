@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 from . import auth, calc, demo, exports, fiscal, importer, inventory
-from .db import DEFAULT_SETTINGS, get_conn, get_settings, init_db, set_setting
+from .db import DEFAULT_SETTINGS, DEFAULT_SUPPLIER_TERMS, get_conn, get_settings, init_db, set_setting
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -439,7 +439,7 @@ class ProductIn(BaseModel):
     supplier: str = Field(default="", max_length=120)
     sale_price: float = Field(ge=0)
     cost: float = Field(ge=0)
-    min_stock: int = Field(default=0, ge=0)
+    min_stock: int = Field(default=5, ge=0)  # pragul de alertă propus de client
     opening_stock: int = Field(default=0, ge=0)
     active: bool = True
 
@@ -451,6 +451,7 @@ class PurchaseIn(BaseModel):
     unit_cost: float | None = Field(default=None, gt=0)
     supplier: str = Field(default="", max_length=120)
     doc_number: str = Field(default="", max_length=40)
+    paid: bool | None = None
 
     @field_validator("date")
     @classmethod
@@ -469,6 +470,7 @@ def create_product(body: ProductIn):
     with get_conn() as conn:
         if conn.execute("SELECT 1 FROM products WHERE code = ?", (body.code,)).fetchone():
             raise HTTPException(status_code=400, detail="Există deja un produs cu acest cod.")
+        supplier_terms(conn, body.supplier)
         cursor = conn.execute(
             "INSERT INTO products(code, name, category, supplier, sale_price, cost, min_stock, "
             "opening_stock, opening_date, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -532,10 +534,14 @@ def create_purchase(body: PurchaseIn):
             raise HTTPException(status_code=404, detail="Produsul nu există.")
         cost = body.unit_cost or product["cost"]
         doc = body.doc_number or f"NIR-{date.today():%y%m%d}-{body.product_id}"
+        supplier = body.supplier or product["supplier"]
+        terms = supplier_terms(conn, supplier)
+        due = (date.fromisoformat(body.date) + timedelta(days=terms)).isoformat()
+        paid = body.paid if body.paid is not None else terms == 0
         cursor = conn.execute(
-            "INSERT INTO purchases(date, doc_number, supplier, product_id, quantity, unit_cost) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (body.date, doc, body.supplier or product["supplier"], product["id"], body.quantity, cost),
+            "INSERT INTO purchases(date, doc_number, supplier, product_id, quantity, unit_cost, due_date, paid) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (body.date, doc, supplier, product["id"], body.quantity, cost, due, int(paid)),
         )
         if cost != product["cost"]:  # costul de achiziție se actualizează la ultimul preț
             conn.execute("UPDATE products SET cost = ? WHERE id = ?", (cost, product["id"]))
@@ -548,6 +554,85 @@ def delete_purchase(purchase_id: int):
         if conn.execute("DELETE FROM purchases WHERE id = ?", (purchase_id,)).rowcount == 0:
             raise HTTPException(status_code=404, detail="Recepția nu există.")
     return {"ok": True}
+
+
+@api.patch("/purchases/{purchase_id}/paid")
+def set_purchase_paid(purchase_id: int, body: PaidIn):
+    with get_conn() as conn:
+        if conn.execute("UPDATE purchases SET paid = ? WHERE id = ?",
+                        (int(body.paid), purchase_id)).rowcount == 0:
+            raise HTTPException(status_code=404, detail="Recepția nu există.")
+    return {"ok": True}
+
+
+# ---------- Furnizori și plăți ----------
+
+def supplier_terms(conn, name: str) -> int:
+    """Termenul de plată al furnizorului; un furnizor nou primește termenul implicit."""
+    if not name:
+        return 0
+    row = conn.execute("SELECT payment_terms FROM suppliers WHERE name = ?", (name,)).fetchone()
+    if row:
+        return row["payment_terms"]
+    conn.execute("INSERT INTO suppliers(name, payment_terms) VALUES (?, ?)", (name, DEFAULT_SUPPLIER_TERMS))
+    return DEFAULT_SUPPLIER_TERMS
+
+
+class SupplierIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    payment_terms: int = Field(default=DEFAULT_SUPPLIER_TERMS, ge=0, le=365)
+    contact: str = Field(default="", max_length=200)
+
+
+@api.get("/suppliers")
+def list_suppliers(month: str = Query(default_factory=calc.current_month, pattern=MONTH_PATTERN)):
+    start, end = calc.month_bounds(month)
+    with get_conn() as conn:
+        due = {item["supplier"]: item for item in calc.payables(conn)["suppliers"]}
+        rows = conn.execute(
+            "SELECT s.*, "
+            "COALESCE((SELECT SUM(quantity * unit_cost) FROM purchases pu WHERE pu.supplier = s.name "
+            "AND pu.date BETWEEN ? AND ?), 0) AS month_purchases, "
+            "COALESCE((SELECT SUM(quantity * unit_cost) FROM purchases pu WHERE pu.supplier = s.name), 0) "
+            "AS total_purchases, "
+            "(SELECT COUNT(*) FROM products p WHERE p.supplier = s.name) AS products "
+            "FROM suppliers s ORDER BY total_purchases DESC, s.name", (start, end)).fetchall()
+        return [{**dict(row), "payable": due.get(row["name"], {}).get("amount", 0),
+                 "overdue": due.get(row["name"], {}).get("overdue", 0),
+                 "due_soon": due.get(row["name"], {}).get("due_soon", 0)} for row in rows]
+
+
+@api.post("/suppliers", status_code=201)
+def create_supplier(body: SupplierIn):
+    with get_conn() as conn:
+        if conn.execute("SELECT 1 FROM suppliers WHERE name = ?", (body.name,)).fetchone():
+            raise HTTPException(status_code=400, detail="Furnizorul există deja.")
+        cursor = conn.execute("INSERT INTO suppliers(name, payment_terms, contact) VALUES (?, ?, ?)",
+                              (body.name, body.payment_terms, body.contact))
+    return {"id": cursor.lastrowid}
+
+
+@api.put("/suppliers/{supplier_id}")
+def update_supplier(supplier_id: int, body: SupplierIn):
+    with get_conn() as conn:
+        old = conn.execute("SELECT * FROM suppliers WHERE id = ?", (supplier_id,)).fetchone()
+        if not old:
+            raise HTTPException(status_code=404, detail="Furnizorul nu există.")
+        conn.execute("UPDATE suppliers SET name = ?, payment_terms = ?, contact = ? WHERE id = ?",
+                     (body.name, body.payment_terms, body.contact, supplier_id))
+        if old["name"] != body.name:  # redenumirea se vede peste tot
+            for table in ("purchases", "products", "expenses"):
+                conn.execute(f"UPDATE {table} SET supplier = ? WHERE supplier = ?", (body.name, old["name"]))
+        if old["payment_terms"] != body.payment_terms:  # recepțiile neplătite primesc noul termen
+            conn.execute("UPDATE purchases SET due_date = date(date, ?) WHERE supplier = ? AND paid = 0",
+                         (f"+{body.payment_terms} days", body.name))
+    return {"ok": True}
+
+
+@api.get("/payables")
+def get_payables():
+    with get_conn() as conn:
+        return calc.payables(conn)
 
 
 @api.get("/inventory")

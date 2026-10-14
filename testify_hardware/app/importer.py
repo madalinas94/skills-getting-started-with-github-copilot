@@ -15,6 +15,7 @@ from datetime import date, datetime, timedelta
 from openpyxl import load_workbook
 
 from .calc import month_bounds
+from .db import DEFAULT_SUPPLIER_TERMS
 
 CATEGORY_MAP = {
     "chirie": "Chirie",
@@ -28,7 +29,8 @@ CATEGORY_MAP = {
     "banca": "Comisioane bancare și POS",
     "echipamente_it": "Echipamente IT și mobilier",
 }
-DATA_TABLES = ("sales", "expenses", "purchases", "salary_history", "employees", "products", "clients")
+DATA_TABLES = ("sales", "expenses", "purchases", "salary_history", "employees", "products", "clients",
+               "suppliers")
 
 
 def norm(text) -> str:
@@ -173,6 +175,19 @@ class Importer:
         self.add("clients")
         return self.conn.execute("SELECT * FROM clients WHERE name = ?", (name,)).fetchone()
 
+    def supplier_terms(self, name: str) -> int:
+        """Termenul de plată al furnizorului; furnizorii noi primesc termenul implicit."""
+        name = (name or "").strip()
+        if not name:
+            return 0
+        row = self.conn.execute("SELECT payment_terms FROM suppliers WHERE name = ?", (name,)).fetchone()
+        if row:
+            return row["payment_terms"]
+        self.conn.execute("INSERT INTO suppliers(name, payment_terms) VALUES (?, ?)",
+                          (name, DEFAULT_SUPPLIER_TERMS))
+        self.add("suppliers")
+        return DEFAULT_SUPPLIER_TERMS
+
     def category(self, raw: str) -> str:
         key = norm(raw)
         if key in CATEGORY_MAP:
@@ -212,6 +227,7 @@ class Importer:
                       str(row.get("furnizor") or ""), to_float(row.get(table.col("pret_vanzare"))),
                       to_float(row.get(table.col("cost_achizitie"))),
                       int(to_float(row.get("stoc_minim"))))
+            self.supplier_terms(values[2])
             exists = self.conn.execute("SELECT 1 FROM products WHERE code = ?", (code,)).fetchone()
             self.conn.execute(
                 "INSERT INTO products(code, name, category, supplier, sale_price, cost, min_stock) "
@@ -265,12 +281,14 @@ class Importer:
                     (pid, start, end)).fetchone()
                 if quantity and not has_nir:
                     self.conn.execute(
-                        "INSERT INTO purchases(date, doc_number, supplier, product_id, quantity, unit_cost) "
-                        "VALUES (?, ?, ?, ?, ?, ?)",
-                        (end, f"INV-{row_day[:7]}", "Intrări din inventar", pid, quantity, cost))
+                        "INSERT INTO purchases(date, doc_number, supplier, product_id, quantity, unit_cost, "
+                        "due_date, paid) VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
+                        (end, f"INV-{row_day[:7]}", "Intrări din inventar", pid, quantity, cost, end))
                     self.add("purchases")
 
     def purchases(self, table: Table) -> None:
+        dates = [to_date(row.get("data")) for row in table.rows if row.get("data")]
+        reference = self.reference or (month_bounds(max(dates)[:7])[1] if dates else None)
         for row in table.rows:
             code = str(row.get("cod_produs") or "").strip()
             day = to_date(row.get("data"))
@@ -286,10 +304,13 @@ class Importer:
             if self.conn.execute("SELECT 1 FROM purchases WHERE doc_number = ? AND product_id = ?",
                                  (doc, pid)).fetchone():
                 continue
+            due = (date.fromisoformat(day) + timedelta(days=self.supplier_terms(supplier))).isoformat()
+            # Ca la clienți: ce are scadența după data de referință e încă de plătit.
+            paid = 1 if reference is None or due <= reference else 0
             self.conn.execute(
-                "INSERT INTO purchases(date, doc_number, supplier, product_id, quantity, unit_cost) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (day, doc, supplier, pid, int(to_float(row.get("cantitate"))), cost))
+                "INSERT INTO purchases(date, doc_number, supplier, product_id, quantity, unit_cost, "
+                "due_date, paid) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (day, doc, supplier, pid, int(to_float(row.get("cantitate"))), cost, due, paid))
             self.add("purchases")
 
     def sales(self, table: Table) -> None:

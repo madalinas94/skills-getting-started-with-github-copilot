@@ -149,3 +149,33 @@ def test_bad_import_changes_nothing(client):
     files = [("files", ("note.txt", b"nu e tabel"))]
     assert client.post("/api/import", files=files, data={"replace": "true"}).status_code == 400
     assert client.get("/api/summary?month=2026-09").json()["sales_count"] == 114
+
+
+def test_supplier_payables_follow_payment_terms(client):
+    client.post("/api/demo")
+    pay = client.get("/api/payables").json()
+    # Recepțiile din septembrie cu scadența după 30.09 (termen 30 de zile) sunt încă de plătit.
+    assert pay["count"] == 31
+    techsource = next(s for s in client.get("/api/suppliers").json() if s["name"] == "TechSource Import SRL")
+    assert techsource["payment_terms"] == 30 and techsource["payable"] > 0
+
+    hub = next(p for p in client.get("/api/products").json() if p["code"] == "P101")
+    purchase = client.post("/api/purchases", json={"date": "2026-10-14", "product_id": hub["id"],
+                                                   "quantity": 10}).json()
+    nir = next(x for x in client.get("/api/purchases?month=2026-10").json() if x["id"] == purchase["id"])
+    assert nir["paid"] == 0 and nir["due_date"] == "2026-11-13"
+    after = client.get("/api/payables").json()
+    assert after["total"] == pytest.approx(pay["total"] + round(10 * 85 * 1.21, 2))
+
+    client.patch(f"/api/purchases/{purchase['id']}/paid", json={"paid": True})
+    assert client.get("/api/payables").json()["total"] == pytest.approx(pay["total"])
+
+
+def test_changing_supplier_terms_moves_unpaid_due_dates(client):
+    client.post("/api/demo")
+    conex = next(s for s in client.get("/api/suppliers").json() if s["name"] == "Conex Distributie SRL")
+    client.put(f"/api/suppliers/{conex['id']}", json={"name": conex["name"], "payment_terms": 15})
+    unpaid = [d for d in client.get("/api/payables").json()["documents"] if d["supplier"] == conex["name"]]
+    assert unpaid
+    from datetime import date, timedelta
+    assert all(d["due_date"] == (date.fromisoformat(d["date"]) + timedelta(days=15)).isoformat() for d in unpaid)

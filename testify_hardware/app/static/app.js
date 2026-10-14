@@ -200,6 +200,7 @@ const ROUTES = {
   vanzari: { label: "Vânzări", icon: "sales", eyebrow: "Facturi și încasări", title: "Vânzări", render: renderSales },
   stoc: { label: "Stoc", icon: "box", eyebrow: "Produse și inventar", title: "Produse și stoc", render: renderStock },
   clienti: { label: "Clienți", icon: "users", eyebrow: "Cine vă datorează bani", title: "Clienți și încasări", render: renderClients },
+  furnizori: { label: "Furnizori", icon: "truck", eyebrow: "Cui datorați bani", title: "Furnizori și plăți", render: renderSuppliers },
   cheltuieli: { label: "Cheltuieli", icon: "expenses", eyebrow: "Bani care ies", title: "Cheltuieli", render: renderExpenses },
   angajati: { label: "Angajați", icon: "team", eyebrow: "Echipa și salariile", title: "Angajați", render: renderEmployees },
   taxe: { label: "Taxe", icon: "taxes", eyebrow: "Ce plătiți statului", title: "Taxe și contribuții", render: renderTaxes },
@@ -397,7 +398,7 @@ async function renderDashboard(view) {
     { label: "De încasat de la clienți", value: lei(r.total), note: r.overdue ? `${lei(r.overdue)} trecut de scadență` : "nimic restant", tone: r.overdue ? "warn" : "ok", href: "#clienti", icon: "wallet" },
     { label: "Valoarea stocului", value: lei(c.stock_value), note: d.low_stock.length ? `${d.low_stock.length} produse sub stocul minim` : "toate produsele pe stoc", tone: d.low_stock.length ? "warn" : "ok", href: "#stoc", icon: "box" },
     { label: c.vat_payer ? "TVA de plată" : "Taxe pe salarii", value: lei(c.vat_payer ? c.vat.payable : c.taxes.total - c.taxes.company_tax), note: c.vat_payer ? `colectată ${lei(c.vat.collected)} − deductibilă ${lei(c.vat.deductible)}` : "CAS, CASS, impozit, CAM", tone: "info", href: "#taxe", icon: "taxes" },
-    { label: "Achiziții de marfă", value: lei(c.purchases), note: `cost marfă vândută ${lei(c.cogs)}`, tone: "info", href: "#stoc", icon: "truck" },
+    { label: "De plătit furnizorilor", value: lei(d.payables.total), note: d.payables.due_soon ? `${lei(d.payables.due_soon)} scadent în 7 zile` : "nimic scadent săptămâna asta", tone: d.payables.overdue || d.payables.due_soon ? "warn" : "ok", href: "#furnizori", icon: "truck" },
   ];
 
   view.innerHTML = `
@@ -474,7 +475,8 @@ async function renderDashboard(view) {
           ${r.clients.filter((x) => x.overdue).slice(0, 3).map((x) => `
             <li class="insight bad"><span class="ic">${icon("wallet")}</span>
               <span><b>${esc(x.client)}</b> are ${lei(x.overdue)} trecuți de scadență.</span></li>`).join("")}
-          ${!d.low_stock.length && !r.overdue ? `<li class="insight good"><span class="ic">${icon("check")}</span><span>Nicio alertă. Stocul și încasările sunt în regulă.</span></li>` : ""}
+          ${d.payables.due_soon ? `<li class="insight warn"><span class="ic">${icon("truck")}</span><span>În următoarele 7 zile aveți de plătit <b>${lei(d.payables.due_soon)}</b> furnizorilor.</span></li>` : ""}
+          ${!d.low_stock.length && !r.overdue && !d.payables.due_soon ? `<li class="insight good"><span class="ic">${icon("check")}</span><span>Nicio alertă. Stocul și încasările sunt în regulă.</span></li>` : ""}
         </ul>
       </article>
 
@@ -796,7 +798,7 @@ function productFormHTML(p = {}) {
       <label class="field" style="grid-column:span 2"><span>Furnizor</span><input name="supplier" maxlength="120" value="${esc(p.supplier || "")}"></label>
       <label class="field"><span>Preț vânzare fără TVA</span><input type="number" name="sale_price" min="0" step="0.01" required value="${esc(p.sale_price ?? "")}"></label>
       <label class="field"><span>Cost achiziție</span><input type="number" name="cost" min="0" step="0.01" required value="${esc(p.cost ?? "")}"></label>
-      <label class="field"><span>Stoc minim</span><input type="number" name="min_stock" min="0" step="1" value="${esc(p.min_stock ?? 0)}"><small>Sub el primiți alertă.</small></label>
+      <label class="field"><span>Stoc minim</span><input type="number" name="min_stock" min="0" step="1" value="${esc(p.min_stock ?? 5)}"><small>Sub el primiți alertă.</small></label>
       ${p.id ? "" : `<label class="field"><span>Stoc actual</span><input type="number" name="opening_stock" min="0" step="1" value="0"></label>`}
     </div>`;
 }
@@ -893,12 +895,13 @@ async function renderStock(view) {
     <section class="card glass ${stockTab === "nir" ? "" : "hidden"}" data-panel="nir">
       <div class="card-head"><div><h2>Recepții de marfă — ${esc(monthLabel(state.month))}</h2><p>${purchases.length} documente · ${lei(received, true)} fără TVA</p></div></div>
       ${purchases.length ? `<div class="table-wrap"><table>
-        <thead><tr><th>Data</th><th>NIR</th><th>Furnizor</th><th>Produs</th><th class="r">Cant.</th><th class="r">Cost / buc.</th><th class="r">Valoare</th><th></th></tr></thead>
+        <thead><tr><th>Data</th><th>NIR</th><th>Furnizor</th><th>Produs</th><th class="r">Cant.</th><th class="r">Cost / buc.</th><th class="r">Valoare</th><th>Plată</th><th></th></tr></thead>
         <tbody id="nir-rows">${purchases.map((x) => `
           <tr data-search="${esc(`${x.doc_number} ${x.supplier} ${x.product_name}`.toLowerCase())}">
             <td>${formatDate(x.date)}</td><td class="mono">${esc(x.doc_number)}</td><td>${esc(x.supplier)}</td>
             <td>${esc(x.product_code)} · ${esc(x.product_name)}</td><td class="r">${x.quantity}</td>
             <td class="r">${lei(x.unit_cost, true)}</td><td class="r"><b>${lei(x.value, true)}</b></td>
+            <td>${x.paid ? `<span class="tag paid">${icon("check")}Plătit</span>` : `<span class="tag ${x.due_date < todayISO() ? "late" : "unpaid"}">Scadent ${formatDate(x.due_date).slice(0, 5)}</span>`}</td>
             <td class="actions"><button class="icon-btn danger" data-del-nir="${x.id}" title="Șterge">${icon("trash")}</button></td>
           </tr>`).join("")}</tbody>
       </table></div>` : emptyState("Nicio recepție de marfă în această lună.")}
@@ -1052,6 +1055,84 @@ async function renderClients(view) {
       try {
         await api(`/api/sales/${collect.dataset.collect}/paid`, { method: "PATCH", body: { paid: true } });
         toast("Factura a fost marcată încasată."); render();
+      } catch (err) { toast(err.message, "err"); }
+    }
+  });
+}
+
+/* ================= Furnizori ================= */
+
+function supplierFormHTML(s = {}) {
+  return `
+    <div class="form-grid">
+      <label class="field" style="grid-column:1/-1"><span>Nume furnizor</span><input name="name" required maxlength="120" value="${esc(s.name || "")}"></label>
+      <label class="field"><span>Termen de plată (zile)</span><input type="number" name="payment_terms" min="0" max="365" value="${esc(s.payment_terms ?? 30)}"><small>De obicei 15–30 de zile.</small></label>
+      <label class="field"><span>Contact (opțional)</span><input name="contact" maxlength="200" value="${esc(s.contact || "")}" placeholder="telefon, email"></label>
+    </div>`;
+}
+
+async function renderSuppliers(view) {
+  const [suppliers, pay] = await Promise.all([api(`/api/suppliers?month=${state.month}`), api("/api/payables")]);
+  const monthTotal = suppliers.reduce((s, x) => s + x.month_purchases, 0);
+  const today = todayISO();
+
+  view.innerHTML = `
+    <section class="stat-strip">
+      <div class="stat"><span>De plătit furnizorilor (cu TVA)</span><strong>${lei(pay.total)}</strong></div>
+      <div class="stat"><span>Scadent în următoarele ${pay.soon_days} zile</span><strong style="color:${pay.due_soon ? "var(--gold)" : "inherit"}">${lei(pay.due_soon)}</strong></div>
+      <div class="stat"><span>Trecut de scadență</span><strong style="color:${pay.overdue ? "var(--red)" : "var(--green)"}">${lei(pay.overdue)}</strong></div>
+      <div class="stat"><span>Marfă cumpărată în ${esc(monthLabel(state.month))}</span><strong>${lei(monthTotal)}</strong></div>
+    </section>
+
+    <section class="grid cols-2 mt" style="align-items:start">
+      <article class="card glass">
+        <div class="card-head"><div><h2>Furnizori</h2><p>Termenul de plată se aplică automat la fiecare recepție de marfă.</p></div>
+          <button class="btn btn-primary" id="add-supplier" type="button">${icon("plus")}Furnizor nou</button></div>
+        <div class="table-wrap"><table class="compact">
+          <thead><tr><th>Furnizor</th><th>Termen</th><th class="r">Luna</th><th class="r">Total cumpărat</th><th class="r">De plătit</th><th></th></tr></thead>
+          <tbody>${suppliers.map((s) => `<tr>
+            <td><b>${esc(s.name)}</b><br><small class="muted">${s.products} produse${s.contact ? ` · ${esc(s.contact)}` : ""}</small></td>
+            <td>${s.payment_terms ? `${s.payment_terms} zile` : "pe loc"}</td>
+            <td class="r">${lei(s.month_purchases)}</td>
+            <td class="r">${lei(s.total_purchases)}</td>
+            <td class="r">${s.payable ? `<b style="color:${s.overdue ? "var(--red)" : "var(--gold)"}">${lei(s.payable)}</b>` : '<span class="muted">—</span>'}</td>
+            <td class="actions"><button class="icon-btn" data-edit-supplier="${s.id}" title="Editează">${icon("edit")}</button></td>
+          </tr>`).join("")}</tbody>
+        </table></div>
+      </article>
+
+      <article class="card glass">
+        <div class="card-head"><div><h2>Plăți de făcut</h2><p>În ordinea scadenței</p></div></div>
+        ${pay.documents.length ? `<ul class="due-list">${pay.documents.map((d) => `
+          <li class="${d.overdue ? "late" : d.due_soon ? "" : "later"}">
+            <div><b>${esc(d.supplier)}</b><small>${esc(d.doc_number)} · ${esc(d.product)} · scadent ${formatDate(d.due_date)}${d.overdue ? " · restant" : d.due_soon ? " · săptămâna asta" : ""}</small></div>
+            <strong>${lei(d.amount, true)}</strong>
+            <button class="btn btn-sm" data-pay="${d.id}" type="button">${icon("check")}Plătit</button>
+          </li>`).join("")}</ul>` : emptyState("Nu aveți nimic de plătit furnizorilor.")}
+      </article>
+    </section>`;
+
+  const openForm = (s) => openModal(s ? `Editează ${s.name}` : "Furnizor nou", `<form id="supplier-form">${supplierFormHTML(s)}
+    <div class="form-actions"><button class="btn btn-ghost" type="button" onclick="closeModal()">Renunță</button>
+    <button class="btn btn-primary" type="submit">${icon("check")}Salvează</button></div></form>`, (body) => {
+    $("#supplier-form", body).addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const d = formData(e.target);
+      try {
+        await api(s ? `/api/suppliers/${s.id}` : "/api/suppliers", { method: s ? "PUT" : "POST",
+          body: { ...d, payment_terms: Number(d.payment_terms) || 0 } });
+        closeModal(); toast("Furnizorul a fost salvat."); render();
+      } catch (err) { toast(err.message, "err"); }
+    });
+  });
+  $("#add-supplier").addEventListener("click", () => openForm());
+  view.addEventListener("click", async (e) => {
+    const edit = e.target.closest("[data-edit-supplier]"), payBtn = e.target.closest("[data-pay]");
+    if (edit) openForm(suppliers.find((s) => s.id === Number(edit.dataset.editSupplier)));
+    if (payBtn) {
+      try {
+        await api(`/api/purchases/${payBtn.dataset.pay}/paid`, { method: "PATCH", body: { paid: true } });
+        toast("Plata a fost înregistrată."); render();
       } catch (err) { toast(err.message, "err"); }
     }
   });
@@ -1792,6 +1873,10 @@ const robot = {
     }
     if (now.low_stock.length) {
       msgs.push({ tone: "warn", html: `${icon("box")} Stoc pe terminate: ${now.low_stock.slice(0, 3).map((x) => `<b>${esc(x.name)}</b> (${x.stock} buc.)`).join(", ")}${now.low_stock.length > 3 ? ` și încă ${now.low_stock.length - 3}` : ""}. Fă o comandă la furnizori.` });
+    }
+    const pay = now.payables;
+    if (pay.due_soon || pay.overdue) {
+      msgs.push({ tone: "warn", html: `${icon("truck")} Plăți către furnizori: <b>${lei(pay.due_soon)}</b> scadente în 7 zile${pay.overdue ? ` și <b>${lei(pay.overdue)}</b> deja restante` : ""}. Ai de încasat ${lei(now.receivables.total)}, deci ${now.receivables.total >= pay.total ? "acoperi plățile din încasări." : "încasările nu acoperă toate plățile, ai grijă la cont."}` });
     }
     if (p.vat) msgs.push({ html: `${icon("taxes")} Pentru ${esc(p.label)} ai de plătit <b>${lei(p.vat.payable)}</b> TVA, până pe 25 a lunii următoare.` });
     const warn = past.insights.find((n) => n.tone === "warn" || n.tone === "bad");
