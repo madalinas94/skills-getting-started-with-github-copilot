@@ -5,6 +5,19 @@ Aplicație web care rulează pe calculatorul de la birou și înlocuiește fiși
 plătește firma și cât îi rămâne lui. Cotele de taxe se actualizează automat când se
 schimbă Codul fiscal.
 
+## Cum o deschideți (pe scurt)
+
+1. **Instalați Python** (gratuit) de pe <https://www.python.org/downloads/>. Pe Windows, la
+   instalare bifați **„Add python.exe to PATH”**.
+2. **Descărcați aplicația:** pe această pagină, butonul verde **Code → Download ZIP**, apoi
+   dezarhivați folderul (sau `git clone` dacă folosiți Git).
+3. **Porniți-o:** pe Windows, dublu-click pe **`start.bat`**; pe Mac/Linux, rulați `./start.sh`
+   în terminal. Prima pornire durează un minut (instalează ce îi trebuie).
+4. Aplicația se deschide în browser la <http://localhost:8000>. La prima intrare alegeți parola,
+   notați codul de recuperare și bifați „Încarcă datele firmei” ca să vedeți datele din T3 2026.
+5. **Opțional, Testi cu AI:** Setări → Testi cu inteligență artificială → lipiți cheia API
+   Anthropic primită separat (cheia nu se pune niciodată în acest repository).
+
 ## Ce știe să facă
 
 | Pagină | Ce conține |
