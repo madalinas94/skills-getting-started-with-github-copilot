@@ -428,6 +428,8 @@ def salary_preview(gross: float = Query(gt=0)):
 
 class SettingsIn(BaseModel):
     company_name: str = Field(min_length=1, max_length=120)
+    tax_regime: str = Field(pattern="^(profit|micro)$")
+    profit_tax_rate: float = Field(ge=0, le=100)
     micro_tax_rate: float = Field(ge=0, le=100)
     cas_rate: float = Field(ge=0, le=100)
     cass_rate: float = Field(ge=0, le=100)

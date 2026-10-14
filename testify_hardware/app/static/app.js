@@ -439,7 +439,7 @@ async function renderDashboard(view) {
       <article class="card glass">
         <div class="card-head"><div><h2>Taxe luna aceasta</h2><p>Total: <b style="color:var(--text)">${lei(c.taxes.total)}</b></p></div>
           <a class="btn btn-sm" href="#taxe">Detalii</a></div>
-        <div class="bars">${taxBars(c.taxes)}</div>
+        <div class="bars">${taxBars(c.taxes, c.company_tax_label)}</div>
       </article>
 
       <article class="card glass">
@@ -488,11 +488,11 @@ async function renderDashboard(view) {
   });
 }
 
-function taxBars(t) {
+function taxBars(t, companyLabel) {
   const items = [
     ["CAS — pensii", t.cas, "#a78bfa"], ["CASS — sănătate", t.cass, "#34d399"],
     ["Impozit pe salarii", t.income_tax, "#22d3ee"], ["CAM — contribuția firmei", t.cam, "#fb923c"],
-    ["Impozit microîntreprindere", t.micro_tax, "#fbbf24"],
+    [companyLabel, t.company_tax, "#fbbf24"],
   ];
   const max = Math.max(...items.map((i) => i[1]), 1);
   return items.map(([name, value, color]) => `
@@ -1004,7 +1004,7 @@ async function renderTaxes(view) {
     api(`/api/dashboard?month=${state.month}`), api("/api/salary-preview?gross=100"), api("/api/settings"),
   ]);
   const t = d.current.taxes;
-  const salaryTaxes = t.total - t.micro_tax;
+  const salaryTaxes = t.total - t.company_tax;
   const share = d.current.revenue ? (t.total / d.current.revenue) * 100 : 0;
   const yearTaxes = d.trend.filter((m) => m.month.slice(0, 4) === state.month.slice(0, 4)).reduce((s, m) => s + m.taxes, 0);
 
@@ -1013,7 +1013,9 @@ async function renderTaxes(view) {
     ["CASS", "#34d399", "Contribuția la sănătate", `${rateTxt(settings.cass_rate)}% din salariul brut, reținut din salariul angajatului.`, t.cass],
     ["IV", "#22d3ee", "Impozit pe venit", `${rateTxt(settings.income_tax_rate)}% din ce rămâne după CAS și CASS.`, t.income_tax],
     ["CAM", "#fb923c", "Contribuția asiguratorie pentru muncă", `${rateTxt(settings.cam_rate)}% din brut, plătit de firmă peste salariu.`, t.cam],
-    ["μ", "#fbbf24", "Impozit microîntreprindere", `${rateTxt(settings.micro_tax_rate)}% din veniturile lunii (${lei(d.current.revenue)}).`, t.micro_tax],
+    settings.tax_regime === "micro"
+      ? ["μ", "#fbbf24", "Impozit microîntreprindere", `${rateTxt(settings.micro_tax_rate)}% din veniturile lunii (${lei(d.current.revenue)}).`, t.company_tax]
+      : ["IP", "#fbbf24", "Impozit pe profit", `${rateTxt(settings.profit_tax_rate)}% din profitul lunii înainte de impozit (${lei(d.current.profit_before_tax)}). Dacă luna e pe pierdere, nu se plătește.`, t.company_tax],
   ];
 
   view.innerHTML = `
@@ -1057,7 +1059,7 @@ async function renderTaxes(view) {
       labels: d.trend.map((m) => m.label),
       datasets: [
         { label: "Taxe din salarii", data: d.trend.map((m) => m.salary_taxes), backgroundColor: "#a78bfa", borderRadius: 6, stack: "t", maxBarThickness: 20 },
-        { label: "Impozit micro", data: d.trend.map((m) => m.micro_tax), backgroundColor: "#fbbf24", borderRadius: 6, stack: "t", maxBarThickness: 20 },
+        { label: d.current.company_tax_label, data: d.trend.map((m) => m.company_tax), backgroundColor: "#fbbf24", borderRadius: 6, stack: "t", maxBarThickness: 20 },
       ],
     },
     options: {
@@ -1077,7 +1079,7 @@ async function renderReports(view) {
   const rows = [
     ["Venituri din vânzări", c.revenue, "var(--cyan)"], ["Cheltuieli operaționale", -c.operating_expenses],
     ["Salarii brute", -c.payroll.gross], ["CAM (plătit de firmă)", -c.taxes.cam],
-    ["Impozit microîntreprindere", -c.taxes.micro_tax], ["Profit net", c.profit, c.profit >= 0 ? "var(--green)" : "var(--red)"],
+    ["Profit înainte de impozit", c.profit_before_tax], [c.company_tax_label, -c.taxes.company_tax], ["Profit net", c.profit, c.profit >= 0 ? "var(--green)" : "var(--red)"],
     ["Impozit pe dividende (estimat)", -c.dividend_tax], ["Rămâne proprietarului", c.owner_income, "var(--gold)"],
   ];
   const year = d.trend;
@@ -1095,7 +1097,7 @@ async function renderReports(view) {
       </button>
     </section>
 
-    <section class="grid cols-2-even mt">
+    <section class="grid cols-2-even mt" style="align-items:start">
       <article class="card glass">
         <div class="card-head"><div><h2>Calculul lunii — ${esc(c.label)}</h2><p>De la venituri la ce vă rămâne</p></div></div>
         <div class="table-wrap"><table><tbody>
@@ -1105,10 +1107,10 @@ async function renderReports(view) {
       </article>
       <article class="card glass">
         <div class="card-head"><div><h2>Ultimele 12 luni</h2><p>Comparație lună de lună</p></div></div>
-        <div class="table-wrap"><table>
+        <div class="table-wrap"><table class="compact">
           <thead><tr><th>Luna</th><th class="r">Venituri</th><th class="r">Costuri</th><th class="r">Profit</th><th class="r">Marjă</th></tr></thead>
           <tbody>${year.slice().reverse().map((m) => `<tr${m.month === state.month ? ' style="background:rgba(34,211,238,.07)"' : ""}>
-            <td>${esc(monthLabel(m.month))}</td><td class="r">${lei(m.revenue)}</td><td class="r">${lei(m.costs)}</td>
+            <td style="white-space:nowrap">${esc(m.label)}</td><td class="r">${lei(m.revenue)}</td><td class="r">${lei(m.costs)}</td>
             <td class="r" style="color:${m.profit >= 0 ? "var(--green)" : "var(--red)"};font-weight:700">${lei(m.profit)}</td>
             <td class="r">${m.revenue ? pct((m.profit / m.revenue) * 100) : "—"}</td></tr>`).join("")}</tbody>
           <tfoot><tr><td>Total</td><td class="r">${lei(sum("revenue"))}</td><td class="r">${lei(sum("costs"))}</td><td class="r">${lei(sum("profit"))}</td>
@@ -1142,6 +1144,11 @@ async function renderSettings(view) {
         <form id="settings-form">
           <div class="form-grid">
             <label class="field" style="grid-column:1/-1"><span>Numele firmei</span><input name="company_name" required maxlength="120" value="${esc(s.company_name)}"></label>
+            <label class="field" style="grid-column:1/-1"><span>Regim de impozitare</span><select name="tax_regime">
+              <option value="profit" ${s.tax_regime === "profit" ? "selected" : ""}>Impozit pe profit</option>
+              <option value="micro" ${s.tax_regime === "micro" ? "selected" : ""}>Microîntreprindere</option>
+            </select></label>
+            ${rateField("profit_tax_rate", "Impozit pe profit (%)", "din profit")}
             ${rateField("micro_tax_rate", "Impozit micro (%)", "din venituri")}
             ${rateField("cas_rate", "CAS (%)", "pensie, din brut")}
             ${rateField("cass_rate", "CASS (%)", "sănătate, din brut")}
@@ -1177,8 +1184,8 @@ async function renderSettings(view) {
   $("#settings-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const d = formData(e.target);
-    const body = { company_name: d.company_name };
-    ["micro_tax_rate", "cas_rate", "cass_rate", "income_tax_rate", "cam_rate", "dividend_tax_rate"].forEach((k) => { body[k] = Number(d[k]); });
+    const body = { company_name: d.company_name, tax_regime: d.tax_regime };
+    ["profit_tax_rate", "micro_tax_rate", "cas_rate", "cass_rate", "income_tax_rate", "cam_rate", "dividend_tax_rate"].forEach((k) => { body[k] = Number(d[k]); });
     try {
       await api("/api/settings", { method: "PUT", body });
       $("#brand-name").textContent = body.company_name;

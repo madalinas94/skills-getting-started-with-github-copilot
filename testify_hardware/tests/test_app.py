@@ -61,12 +61,20 @@ def test_monthly_summary_combines_sales_expenses_salaries_and_taxes(client):
     assert summary["revenue"] == 10000
     assert summary["operating_expenses"] == 2000
     assert summary["payroll"]["gross"] == 5000
-    assert summary["taxes"]["micro_tax"] == 100
-    # 2000 cheltuieli + 5112,5 cost salariu + 100 impozit micro
-    assert summary["total_costs"] == 7212.5
-    assert summary["profit"] == 2787.5
-    assert summary["dividend_tax"] == 446.0
-    assert summary["owner_income"] == 2341.5
+    # 10000 − 2000 cheltuieli − 5112,5 cost salariu = 2887,5 profit înainte de impozit
+    assert summary["profit_before_tax"] == 2887.5
+    assert summary["taxes"]["company_tax"] == 462.0
+    assert summary["profit"] == 2425.5
+    assert summary["dividend_tax"] == 388.08
+    assert summary["owner_income"] == 2037.42
+
+
+def test_no_profit_tax_in_a_loss_month(client):
+    client.post("/api/sales", json={"date": "2026-03-10", "description": "x", "amount": 1000})
+    client.post("/api/expenses", json={"date": "2026-03-05", "category": "Chirie", "amount": 3000})
+    summary = client.get("/api/summary?month=2026-03").json()
+    assert summary["taxes"]["company_tax"] == 0
+    assert summary["profit"] == -2000
 
 
 def test_salary_change_applies_from_its_date(client):
@@ -106,10 +114,13 @@ def test_category_in_use_cannot_be_deleted(client):
 
 def test_settings_change_tax_rates(client):
     settings = client.get("/api/settings").json()
+    settings["tax_regime"] = "micro"
     settings["micro_tax_rate"] = 3
     assert client.put("/api/settings", json=settings).status_code == 200
     client.post("/api/sales", json={"date": "2026-03-10", "description": "x", "amount": 1000})
-    assert client.get("/api/summary?month=2026-03").json()["taxes"]["micro_tax"] == 30
+    summary = client.get("/api/summary?month=2026-03").json()
+    assert summary["taxes"]["company_tax"] == 30
+    assert summary["company_tax_label"] == "Impozit microîntreprindere"
 
 
 def test_demo_data_dashboard_and_exports(client):

@@ -65,6 +65,8 @@ CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
 # Cotele sunt în procente și pot fi modificate din pagina Setări.
 DEFAULT_SETTINGS = {
     "company_name": "Testify Hardware",
+    "tax_regime": "profit",      # "profit" (impozit pe profit) sau "micro" (microîntreprindere)
+    "profit_tax_rate": "16",     # impozit pe profit (% din profit)
     "micro_tax_rate": "1",       # impozit microîntreprindere (% din venituri)
     "cas_rate": "25",            # pensie, reținută din brut
     "cass_rate": "10",           # sănătate, reținută din brut

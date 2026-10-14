@@ -121,10 +121,15 @@ def month_summary(conn: sqlite3.Connection, ym: str, settings: dict | None = Non
     operating_expenses = sum(expenses_by_category.values())
 
     pay = payroll(conn, ym, settings)["totals"]
-    micro_tax = revenue * rate(settings, "micro_tax_rate")
+    profit_before_tax = revenue - operating_expenses - pay["employer_cost"]
+    regime = settings.get("tax_regime", "profit")
+    if regime == "micro":
+        company_tax = revenue * rate(settings, "micro_tax_rate")
+    else:
+        company_tax = max(profit_before_tax, 0) * rate(settings, "profit_tax_rate")
     salary_taxes = pay["cas"] + pay["cass"] + pay["income_tax"] + pay["cam"]
-    total_taxes = salary_taxes + micro_tax
-    total_costs = operating_expenses + pay["employer_cost"] + micro_tax
+    total_taxes = salary_taxes + company_tax
+    total_costs = operating_expenses + pay["employer_cost"] + company_tax
     profit = revenue - total_costs
     dividend_tax = max(profit, 0) * rate(settings, "dividend_tax_rate")
 
@@ -141,15 +146,22 @@ def month_summary(conn: sqlite3.Connection, ym: str, settings: dict | None = Non
             "cass": pay["cass"],
             "income_tax": pay["income_tax"],
             "cam": pay["cam"],
-            "micro_tax": r2(micro_tax),
+            "company_tax": r2(company_tax),
             "total": r2(total_taxes),
         },
+        "tax_regime": regime,
+        "company_tax_label": company_tax_label(regime),
         "total_costs": r2(total_costs),
+        "profit_before_tax": r2(profit_before_tax),
         "profit": r2(profit),
         "margin": r2(profit / revenue * 100) if revenue else 0.0,
         "dividend_tax": r2(dividend_tax),
         "owner_income": r2(max(profit, 0) - dividend_tax),
     }
+
+
+def company_tax_label(regime: str) -> str:
+    return "Impozit microîntreprindere" if regime == "micro" else "Impozit pe profit"
 
 
 def pct_change(current: float, previous: float):
@@ -273,8 +285,8 @@ def dashboard(conn: sqlite3.Connection, ym: str) -> dict:
             "costs": summary["total_costs"],
             "profit": summary["profit"],
             "taxes": summary["taxes"]["total"],
-            "salary_taxes": r2(summary["taxes"]["total"] - summary["taxes"]["micro_tax"]),
-            "micro_tax": summary["taxes"]["micro_tax"],
+            "salary_taxes": r2(summary["taxes"]["total"] - summary["taxes"]["company_tax"]),
+            "company_tax": summary["taxes"]["company_tax"],
         })
 
     start, end = month_bounds(ym)

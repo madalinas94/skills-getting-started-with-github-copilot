@@ -31,7 +31,8 @@ def summary_rows(summary: dict) -> list[tuple[str, float]]:
         ("Cheltuieli operaționale", summary["operating_expenses"]),
         ("Salarii brute", summary["payroll"]["gross"]),
         ("CAM (plătit de firmă)", taxes["cam"]),
-        ("Impozit microîntreprindere", taxes["micro_tax"]),
+        ("Profit înainte de impozit", summary["profit_before_tax"]),
+        (summary["company_tax_label"], taxes["company_tax"]),
         ("Total costuri", summary["total_costs"]),
         ("Profit net", summary["profit"]),
         ("Impozit pe dividende (estimat)", summary["dividend_tax"]),
@@ -46,7 +47,7 @@ def tax_rows(summary: dict) -> list[tuple[str, float]]:
         ("CASS — sănătate (din salarii)", taxes["cass"]),
         ("Impozit pe venit (din salarii)", taxes["income_tax"]),
         ("CAM — contribuție firmă", taxes["cam"]),
-        ("Impozit microîntreprindere", taxes["micro_tax"]),
+        (summary["company_tax_label"], taxes["company_tax"]),
         ("Total taxe", taxes["total"]),
     ]
 

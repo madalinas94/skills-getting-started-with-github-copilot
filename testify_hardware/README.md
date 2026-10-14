@@ -12,12 +12,12 @@ plătește firma și cât îi rămâne lui.
 | **Vânzări** | Se adaugă fie fiecare comandă (produs, cantitate, preț), fie doar totalul pe zi/lună |
 | **Cheltuieli** | 19 categorii implicite, editabile: marfă, chirie, utilități, internet și telefonie, transport, combustibil, contabilitate, marketing, software, echipamente, comisioane bancare/POS, asigurări, reparații, ambalaje, taxe locale, SSM, training, protocol, altele |
 | **Angajați** | Adăugare angajați, salariu brut cu istoric de măriri, calcul automat al netului și al costului pentru firmă, stat de plată lunar |
-| **Taxe** | CAS, CASS, impozit pe venit, CAM și impozit micro, explicate pe înțeles |
+| **Taxe** | CAS, CASS, impozit pe venit, CAM și impozitul pe profit, explicate pe înțeles |
 | **Rapoarte** | Export Excel și PDF pentru contabilă, plus comparația pe ultimele 12 luni |
 | **Setări** | Numele firmei, cotele de taxe (modificabile dacă se schimbă legea), parola, date demo |
 
 Cerințele clientului, pe scurt: un singur utilizator (proprietarul) protejat cu parolă,
-firmă neplătitoare de TVA, salarii stabilite la brut, doar vânzare de accesorii, rulare pe
+firmă neplătitoare de TVA, plătitoare de impozit pe profit (nu e microîntreprindere), salarii stabilite la brut, doar vânzare de accesorii, rulare pe
 calculatorul de la birou, separat de site-ul firmei, cu acces opțional de pe telefon.
 
 ## Pornire
@@ -40,13 +40,16 @@ Datele se salvează în `data/testify.db`. Pentru o copie de siguranță, copia�
 
 - **Salariu:** CAS 25% și CASS 10% din brut; impozit pe venit 10% din (brut − CAS − CASS);
   firma plătește în plus CAM 2,25%. Costul pentru firmă = brut + CAM.
-- **Impozit microîntreprindere:** 1% din veniturile lunii.
-- **Profit net** = venituri − cheltuieli − costul salariilor − impozit micro.
+- **Profit înainte de impozit** = venituri − cheltuieli − costul salariilor.
+- **Impozit pe profit:** 16% din profitul înainte de impozit. Într-o lună pe pierdere nu se
+  plătește. (Din Setări se poate trece pe regimul de microîntreprindere: 1% din venituri.)
+- **Profit net** = profit înainte de impozit − impozit pe profit.
 - **Îți rămâne ție** = profit net − impozitul pe dividende (16%).
 - La luna în curs, comparația se face cu aceeași perioadă din luna trecută.
 
-Toate cotele se pot modifica din **Setări**. Calculul nu ține cont de deducerea personală
-și nici de alte facilități fiscale.
+Toate cotele se pot modifica din **Setări**. Calculul e o estimare lunară, pentru imaginea de
+ansamblu: nu ține cont de deducerea personală, de facilitățile fiscale sau de recuperarea
+pierderilor din lunile anterioare la impozitul pe profit (care legal se declară trimestrial).
 
 ## Tehnic
 

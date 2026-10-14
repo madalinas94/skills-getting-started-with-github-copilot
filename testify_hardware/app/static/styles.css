@@ -255,6 +255,9 @@ th { text-align: left; font-size: 12px; font-weight: 600; color: var(--faint); t
 td { padding: 12px 22px; border-bottom: 1px solid rgba(148, 163, 184, .07); vertical-align: middle; }
 tbody tr { transition: background .15s; }
 tbody tr:hover { background: rgba(148, 163, 184, .05); }
+table.compact th, table.compact td { padding-left: 12px; padding-right: 12px; }
+table.compact th:first-child, table.compact td:first-child { padding-left: 22px; }
+table.compact th:last-child, table.compact td:last-child { padding-right: 22px; }
 tfoot td { font-weight: 700; border-bottom: none; background: rgba(34, 211, 238, .06); }
 td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 td.actions { width: 1%; white-space: nowrap; text-align: right; }
