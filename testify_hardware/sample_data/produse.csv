@@ -1,0 +1,15 @@
+cod_produs,produs,categorie,furnizor,pret_vanzare_fara_tva,cost_achizitie_unitar,marja_bruta_pct,stoc_minim
+P101,Hub USB-C 7in1,Accesorii,Conex Distributie SRL,169.00,85.00,49.7,5
+P102,Incarcator GaN 65W,Accesorii,Conex Distributie SRL,149.00,75.00,49.7,25
+P103,Mousepad XL,Accesorii,Conex Distributie SRL,49.90,19.00,61.9,25
+P104,Suport laptop aluminiu,Accesorii,Conex Distributie SRL,99.00,48.00,51.5,5
+P105,Boxa bluetooth Mini,Audio,SoundLine Trading SRL,129.90,70.00,46.1,30
+P106,Casti over-ear H5,Audio,SoundLine Trading SRL,219.50,120.00,45.3,10
+P107,Cablu HDMI 2.1 3m,Cabluri,Conex Distributie SRL,54.90,22.00,59.9,15
+P108,Cablu USB-C 2m,Cabluri,Conex Distributie SRL,29.99,9.00,70.0,20
+P109,Monitor 27 inch QHD,Monitoare,TechSource Import SRL,1199.00,780.00,34.9,5
+P110,Mouse wireless M200,Periferice,TechSource Import SRL,79.99,45.00,43.7,15
+P111,Tastatura mecanica K7,Periferice,TechSource Import SRL,289.00,160.00,44.6,25
+P112,Webcam FullHD C920,Periferice,TechSource Import SRL,349.00,190.00,45.6,20
+P113,SSD extern 1TB,Stocare,DataStore Distributie SRL,449.00,290.00,35.4,10
+P114,Stick USB 64GB,Stocare,DataStore Distributie SRL,39.90,18.00,54.9,10

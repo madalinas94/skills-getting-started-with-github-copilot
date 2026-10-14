@@ -24,6 +24,7 @@ CHECK_INTERVAL_HOURS = 6
 RATE_KEYS = [
     "cas_rate", "cass_rate", "income_tax_rate", "cam_rate",
     "profit_tax_rate", "micro_tax_rate", "dividend_tax_rate",
+    "vat_standard_rate", "vat_reduced_rate",
 ]
 RATE_LABELS = {
     "cas_rate": "CAS (pensie)",
@@ -33,6 +34,8 @@ RATE_LABELS = {
     "profit_tax_rate": "Impozit pe profit",
     "micro_tax_rate": "Impozit microîntreprindere",
     "dividend_tax_rate": "Impozit pe dividende",
+    "vat_standard_rate": "TVA standard",
+    "vat_reduced_rate": "TVA redus",
 }
 
 
@@ -89,10 +92,20 @@ def apply_feed(conn: sqlite3.Connection, feed: dict, mark_seen: bool = False) ->
     return changed
 
 
+def version_key(version: str | None) -> tuple:
+    try:
+        return tuple(int(part) for part in str(version).split("."))
+    except ValueError:
+        return (0,)
+
+
 def install_bundled_rules(conn: sqlite3.Connection) -> None:
-    """La prima pornire încarcă regulile livrate cu aplicația."""
-    if conn.execute("SELECT COUNT(*) FROM fiscal_rules").fetchone()[0] == 0:
-        apply_feed(conn, json.loads(BUNDLED_RULES.read_text(encoding="utf-8")), mark_seen=True)
+    """Încarcă regulile livrate cu aplicația, dacă sunt mai noi decât cele salvate."""
+    bundled = json.loads(BUNDLED_RULES.read_text(encoding="utf-8"))
+    empty = conn.execute("SELECT COUNT(*) FROM fiscal_rules").fetchone()[0] == 0
+    stored = get_settings(conn).get("fiscal_version")
+    if empty or version_key(bundled.get("version")) > version_key(stored):
+        apply_feed(conn, bundled, mark_seen=True)
 
 
 def fetch_feed(url: str, timeout: float = 8) -> dict:
@@ -108,7 +121,11 @@ def check_for_updates(conn: sqlite3.Connection, url: str | None = None) -> dict:
     if not url:
         return {"ok": False, "changed": [], "message": "Actualizarea automată este dezactivată."}
     try:
-        changed = apply_feed(conn, fetch_feed(url))
+        feed = fetch_feed(url)
+        # O versiune publicată mai veche decât cea instalată nu are voie să o înlocuiască.
+        stored = get_settings(conn).get("fiscal_version")
+        older = stored and version_key(feed.get("version")) < version_key(stored)
+        changed = [] if older else apply_feed(conn, feed)
         set_setting(conn, "fiscal_last_check", now)
         set_setting(conn, "fiscal_last_status", "ok")
         message = (f"Am găsit {len(changed)} actualizări." if changed

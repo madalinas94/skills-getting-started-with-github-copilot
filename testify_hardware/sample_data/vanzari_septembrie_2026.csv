@@ -1,0 +1,115 @@
+﻿data,nr_factura,produs,categorie,cantitate,pret_unitar_fara_tva,cost_achizitie_unitar,client
+2026-09-01,NB-1001,Cablu USB-C 2m,Cabluri,7,29.99,9.00,Alfa Office SRL
+2026-09-01,NB-1002,Webcam FullHD C920,Periferice,2,349.00,190.00,Online - eMag
+2026-09-01,NB-1003,Boxa bluetooth Mini,Audio,1,129.90,70.00,Persoana fizica
+2026-09-01,NB-1004,Cablu HDMI 2.1 3m,Cabluri,12,54.90,22.00,Alfa Office SRL
+2026-09-01,NB-1005,Cablu HDMI 2.1 3m,Cabluri,2,54.90,22.00,Persoana fizica
+2026-09-02,NB-1006,Casti over-ear H5,Audio,1,219.50,120.00,Online - site propriu
+2026-09-02,NB-1007,SSD extern 1TB,Stocare,1,449.00,290.00,Persoana fizica
+2026-09-02,NB-1008,Boxa bluetooth Mini,Audio,1,129.90,70.00,Persoana fizica
+2026-09-03,NB-1009,Cablu USB-C 2m,Cabluri,1,29.99,9.00,Online - site propriu
+2026-09-03,NB-1010,Mousepad XL,Accesorii,1,49.90,19.00,Persoana fizica
+2026-09-03,NB-1011,SSD extern 1TB,Stocare,1,449.00,290.00,Persoana fizica
+2026-09-03,NB-1012,Cablu HDMI 2.1 3m,Cabluri,2,54.90,22.00,Persoana fizica
+2026-09-03,NB-1013,Boxa bluetooth Mini,Audio,3,129.90,70.00,Online - eMag
+2026-09-03,NB-1014,Mousepad XL,Accesorii,19,49.90,19.00,Gamma Logistic SRL
+2026-09-04,NB-1015,Incarcator GaN 65W,Accesorii,12,149.00,75.00,Beta Studio SRL
+2026-09-04,NB-1016,Cablu HDMI 2.1 3m,Cabluri,2,54.90,22.00,Online - site propriu
+2026-09-04,NB-1017,Incarcator GaN 65W,Accesorii,2,149.00,75.00,Online - eMag
+2026-09-04,NB-1018,Cablu HDMI 2.1 3m,Cabluri,10,54.90,22.00,Delta Design SRL
+2026-09-04,NB-1019,Tastatura mecanica K7,Periferice,18,289.00,160.00,Delta Design SRL
+2026-09-04,NB-1020,Boxa bluetooth Mini,Audio,2,129.90,70.00,Persoana fizica
+2026-09-05,NB-1021,Incarcator GaN 65W,Accesorii,2,149.00,75.00,Online - site propriu
+2026-09-05,NB-1022,SSD extern 1TB,Stocare,1,449.00,290.00,Persoana fizica
+2026-09-05,NB-1023,Hub USB-C 7in1,Accesorii,6,169.00,85.00,Alfa Office SRL
+2026-09-05,NB-1024,Suport laptop aluminiu,Accesorii,2,99.00,48.00,Online - site propriu
+2026-09-05,NB-1025,Stick USB 64GB,Stocare,3,39.90,18.00,Online - eMag
+2026-09-07,NB-1026,Stick USB 64GB,Stocare,16,39.90,18.00,Delta Design SRL
+2026-09-07,NB-1027,Cablu USB-C 2m,Cabluri,1,29.99,9.00,Online - eMag
+2026-09-07,NB-1028,Casti over-ear H5,Audio,3,219.50,120.00,Persoana fizica
+2026-09-07,NB-1029,Casti over-ear H5,Audio,7,219.50,120.00,Delta Design SRL
+2026-09-07,NB-1030,Cablu USB-C 2m,Cabluri,13,29.99,9.00,Omega Consult SRL
+2026-09-07,NB-1031,Cablu USB-C 2m,Cabluri,1,29.99,9.00,Online - site propriu
+2026-09-08,NB-1032,Incarcator GaN 65W,Accesorii,1,149.00,75.00,Online - eMag
+2026-09-08,NB-1033,Cablu USB-C 2m,Cabluri,12,29.99,9.00,Beta Studio SRL
+2026-09-08,NB-1034,Stick USB 64GB,Stocare,23,39.90,18.00,Delta Design SRL
+2026-09-08,NB-1035,Cablu USB-C 2m,Cabluri,9,29.99,9.00,Alfa Office SRL
+2026-09-08,NB-1036,Monitor 27 inch QHD,Monitoare,2,1199.00,780.00,Online - site propriu
+2026-09-08,NB-1037,Incarcator GaN 65W,Accesorii,2,149.00,75.00,Online - site propriu
+2026-09-09,NB-1038,Mouse wireless M200,Periferice,2,79.99,45.00,Online - site propriu
+2026-09-09,NB-1039,Monitor 27 inch QHD,Monitoare,4,1199.00,780.00,Delta Design SRL
+2026-09-09,NB-1040,Mouse wireless M200,Periferice,1,79.99,45.00,Persoana fizica
+2026-09-10,NB-1041,Casti over-ear H5,Audio,15,219.50,120.00,Alfa Office SRL
+2026-09-10,NB-1042,SSD extern 1TB,Stocare,23,449.00,290.00,Alfa Office SRL
+2026-09-10,NB-1043,Cablu USB-C 2m,Cabluri,2,29.99,9.00,Online - eMag
+2026-09-11,NB-1044,Cablu HDMI 2.1 3m,Cabluri,2,54.90,22.00,Online - site propriu
+2026-09-11,NB-1045,Cablu USB-C 2m,Cabluri,2,29.99,9.00,Online - eMag
+2026-09-11,NB-1046,Incarcator GaN 65W,Accesorii,20,149.00,75.00,Alfa Office SRL
+2026-09-12,NB-1047,Mouse wireless M200,Periferice,9,79.99,45.00,Alfa Office SRL
+2026-09-12,NB-1048,Cablu HDMI 2.1 3m,Cabluri,1,54.90,22.00,Online - site propriu
+2026-09-12,NB-1049,Mouse wireless M200,Periferice,2,79.99,45.00,Persoana fizica
+2026-09-12,NB-1050,Boxa bluetooth Mini,Audio,16,129.90,70.00,Omega Consult SRL
+2026-09-12,NB-1051,Cablu USB-C 2m,Cabluri,2,29.99,9.00,Persoana fizica
+2026-09-12,NB-1052,Hub USB-C 7in1,Accesorii,3,169.00,85.00,Persoana fizica
+2026-09-14,NB-1053,Mousepad XL,Accesorii,16,49.90,19.00,Beta Studio SRL
+2026-09-14,NB-1054,Tastatura mecanica K7,Periferice,21,289.00,160.00,Omega Consult SRL
+2026-09-14,NB-1055,Incarcator GaN 65W,Accesorii,1,149.00,75.00,Online - site propriu
+2026-09-14,NB-1056,Tastatura mecanica K7,Periferice,12,289.00,160.00,Delta Design SRL
+2026-09-14,NB-1057,Casti over-ear H5,Audio,3,219.50,120.00,Online - eMag
+2026-09-15,NB-1058,Boxa bluetooth Mini,Audio,1,129.90,70.00,Online - eMag
+2026-09-15,NB-1059,Casti over-ear H5,Audio,2,219.50,120.00,Online - eMag
+2026-09-15,NB-1060,Tastatura mecanica K7,Periferice,1,289.00,160.00,Online - eMag
+2026-09-16,NB-1061,Casti over-ear H5,Audio,11,219.50,120.00,Delta Design SRL
+2026-09-16,NB-1062,Incarcator GaN 65W,Accesorii,24,149.00,75.00,Omega Consult SRL
+2026-09-16,NB-1063,Webcam FullHD C920,Periferice,25,349.00,190.00,Gamma Logistic SRL
+2026-09-17,NB-1064,Webcam FullHD C920,Periferice,3,349.00,190.00,Online - eMag
+2026-09-17,NB-1065,Tastatura mecanica K7,Periferice,18,289.00,160.00,Beta Studio SRL
+2026-09-17,NB-1066,Tastatura mecanica K7,Periferice,3,289.00,160.00,Persoana fizica
+2026-09-18,NB-1067,Mouse wireless M200,Periferice,10,79.99,45.00,Alfa Office SRL
+2026-09-18,NB-1068,Cablu USB-C 2m,Cabluri,1,29.99,9.00,Persoana fizica
+2026-09-18,NB-1069,SSD extern 1TB,Stocare,1,449.00,290.00,Online - site propriu
+2026-09-18,NB-1070,SSD extern 1TB,Stocare,3,449.00,290.00,Online - eMag
+2026-09-18,NB-1071,Incarcator GaN 65W,Accesorii,9,149.00,75.00,Omega Consult SRL
+2026-09-18,NB-1072,Boxa bluetooth Mini,Audio,21,129.90,70.00,Alfa Office SRL
+2026-09-19,NB-1073,Monitor 27 inch QHD,Monitoare,1,1199.00,780.00,Persoana fizica
+2026-09-19,NB-1074,Boxa bluetooth Mini,Audio,21,129.90,70.00,Gamma Logistic SRL
+2026-09-19,NB-1075,Casti over-ear H5,Audio,1,219.50,120.00,Online - eMag
+2026-09-19,NB-1076,Mousepad XL,Accesorii,6,49.90,19.00,Beta Studio SRL
+2026-09-21,NB-1077,Mouse wireless M200,Periferice,2,79.99,45.00,Online - site propriu
+2026-09-21,NB-1078,Webcam FullHD C920,Periferice,1,349.00,190.00,Online - site propriu
+2026-09-21,NB-1079,Mousepad XL,Accesorii,5,49.90,19.00,Omega Consult SRL
+2026-09-21,NB-1080,Webcam FullHD C920,Periferice,24,349.00,190.00,Beta Studio SRL
+2026-09-21,NB-1081,Boxa bluetooth Mini,Audio,1,129.90,70.00,Persoana fizica
+2026-09-22,NB-1082,Mouse wireless M200,Periferice,2,79.99,45.00,Persoana fizica
+2026-09-22,NB-1083,Boxa bluetooth Mini,Audio,21,129.90,70.00,Omega Consult SRL
+2026-09-22,NB-1084,Mousepad XL,Accesorii,22,49.90,19.00,Alfa Office SRL
+2026-09-22,NB-1085,Boxa bluetooth Mini,Audio,6,129.90,70.00,Gamma Logistic SRL
+2026-09-23,NB-1086,Mousepad XL,Accesorii,7,49.90,19.00,Alfa Office SRL
+2026-09-23,NB-1087,Mouse wireless M200,Periferice,24,79.99,45.00,Omega Consult SRL
+2026-09-23,NB-1088,Mousepad XL,Accesorii,19,49.90,19.00,Gamma Logistic SRL
+2026-09-24,NB-1089,Mousepad XL,Accesorii,2,49.90,19.00,Online - site propriu
+2026-09-24,NB-1090,Hub USB-C 7in1,Accesorii,2,169.00,85.00,Persoana fizica
+2026-09-24,NB-1091,Cablu USB-C 2m,Cabluri,19,29.99,9.00,Delta Design SRL
+2026-09-24,NB-1092,Incarcator GaN 65W,Accesorii,18,149.00,75.00,Beta Studio SRL
+2026-09-24,NB-1093,Cablu HDMI 2.1 3m,Cabluri,8,54.90,22.00,Gamma Logistic SRL
+2026-09-24,NB-1094,Tastatura mecanica K7,Periferice,9,289.00,160.00,Gamma Logistic SRL
+2026-09-25,NB-1095,Cablu USB-C 2m,Cabluri,3,29.99,9.00,Persoana fizica
+2026-09-25,NB-1096,Cablu HDMI 2.1 3m,Cabluri,10,54.90,22.00,Delta Design SRL
+2026-09-25,NB-1097,Stick USB 64GB,Stocare,3,39.90,18.00,Persoana fizica
+2026-09-25,NB-1098,Monitor 27 inch QHD,Monitoare,1,1199.00,780.00,Online - eMag
+2026-09-25,NB-1099,Monitor 27 inch QHD,Monitoare,4,1199.00,780.00,Gamma Logistic SRL
+2026-09-26,NB-1100,Boxa bluetooth Mini,Audio,19,129.90,70.00,Delta Design SRL
+2026-09-26,NB-1101,Suport laptop aluminiu,Accesorii,21,99.00,48.00,Gamma Logistic SRL
+2026-09-26,NB-1102,SSD extern 1TB,Stocare,8,449.00,290.00,Alfa Office SRL
+2026-09-26,NB-1103,Tastatura mecanica K7,Periferice,7,289.00,160.00,Alfa Office SRL
+2026-09-26,NB-1104,Hub USB-C 7in1,Accesorii,13,169.00,85.00,Beta Studio SRL
+2026-09-28,NB-1105,Webcam FullHD C920,Periferice,17,349.00,190.00,Gamma Logistic SRL
+2026-09-28,NB-1106,Cablu USB-C 2m,Cabluri,2,29.99,9.00,Online - site propriu
+2026-09-28,NB-1107,Mouse wireless M200,Periferice,1,79.99,45.00,Persoana fizica
+2026-09-28,NB-1108,Boxa bluetooth Mini,Audio,2,129.90,70.00,Persoana fizica
+2026-09-29,NB-1109,Hub USB-C 7in1,Accesorii,1,169.00,85.00,Online - site propriu
+2026-09-29,NB-1110,Tastatura mecanica K7,Periferice,12,289.00,160.00,Omega Consult SRL
+2026-09-29,NB-1111,Cablu HDMI 2.1 3m,Cabluri,19,54.90,22.00,Alfa Office SRL
+2026-09-30,NB-1112,Incarcator GaN 65W,Accesorii,1,149.00,75.00,Online - eMag
+2026-09-30,NB-1113,SSD extern 1TB,Stocare,12,449.00,290.00,Omega Consult SRL
+2026-09-30,NB-1114,Cablu HDMI 2.1 3m,Cabluri,1,54.90,22.00,Online - eMag

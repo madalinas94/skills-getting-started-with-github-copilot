@@ -1,7 +1,7 @@
 {
   "country": "RO",
-  "version": "2026.1",
-  "published": "2026-01-01",
+  "version": "2026.2",
+  "published": "2026-10-14",
   "source": "Codul fiscal (Legea 227/2015) cu modificările ulterioare, inclusiv Legea 141/2025",
   "rules": [
     {
@@ -14,10 +14,31 @@
         "cam_rate": 2.25,
         "profit_tax_rate": 16,
         "micro_tax_rate": 1,
-        "dividend_tax_rate": 10
+        "dividend_tax_rate": 10,
+        "vat_standard_rate": 19,
+        "vat_reduced_rate": 9
       },
       "changes": [
         "Impozitul pe dividende a crescut de la 8% la 10%."
+      ]
+    },
+    {
+      "effective_from": "2025-08-01",
+      "title": "Modificări TVA de la 1 august 2025",
+      "rates": {
+        "cas_rate": 25,
+        "cass_rate": 10,
+        "income_tax_rate": 10,
+        "cam_rate": 2.25,
+        "profit_tax_rate": 16,
+        "micro_tax_rate": 1,
+        "dividend_tax_rate": 10,
+        "vat_standard_rate": 21,
+        "vat_reduced_rate": 11
+      },
+      "changes": [
+        "Cota standard de TVA crește de la 19% la 21%.",
+        "Cotele reduse de 5% și 9% se unifică la 11% (de exemplu apă și canalizare)."
       ]
     },
     {
@@ -30,7 +51,9 @@
         "cam_rate": 2.25,
         "profit_tax_rate": 16,
         "micro_tax_rate": 1,
-        "dividend_tax_rate": 16
+        "dividend_tax_rate": 16,
+        "vat_standard_rate": 21,
+        "vat_reduced_rate": 11
       },
       "changes": [
         "Impozitul pe dividende crește de la 10% la 16%. Din profitul pe care îl scoateți din firmă vă rămâne mai puțin.",

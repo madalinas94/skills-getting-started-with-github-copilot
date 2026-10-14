@@ -33,8 +33,9 @@ def test_salary_breakdown_from_gross():
     assert result["cass"] == 500
     assert result["income_tax"] == 325
     assert result["net"] == 2925
-    assert result["cam"] == 112.5
-    assert result["employer_cost"] == 5112.5
+    # Contribuțiile se rotunjesc la leu, cu 0,5 în sus (112,5 → 113), ca în statul de plată.
+    assert result["cam"] == 113
+    assert result["employer_cost"] == 5113
 
 
 def test_api_requires_login(monkeypatch):
@@ -55,26 +56,37 @@ def test_setup_only_once(client):
     assert response.status_code == 400
 
 
-def test_monthly_summary_combines_sales_expenses_salaries_and_taxes(client):
-    client.post("/api/sales", json={"date": "2026-03-10", "description": "Comandă mouse",
-                                    "product": "Mouse", "quantity": 2, "amount": 6000})
+def add_product(client, **overrides):
+    body = {"code": "T1", "name": "Mouse test", "sale_price": 100, "cost": 60,
+            "min_stock": 5, "opening_stock": 20, **overrides}
+    return client.post("/api/products", json=body).json()["id"]
+
+
+def test_monthly_summary_follows_the_accountant_model(client):
+    product = add_product(client)
+    client.post("/api/sales", json={"date": "2026-03-10", "product_id": product, "quantity": 20,
+                                    "unit_price": 300})
     client.post("/api/sales", json={"date": "2026-03-11", "description": "Total zi",
-                                    "amount": 4000})
+                                    "amount": 4000, "cost_total": 1000})
     client.post("/api/expenses", json={"date": "2026-03-05", "category": "Chirie",
-                                       "amount": 2000})
+                                       "amount": 1000})
     client.post("/api/employees", json={"name": "Ana Pop", "role": "Vânzări",
                                         "hire_date": "2026-01-01", "gross": 5000})
 
     summary = client.get("/api/summary?month=2026-03").json()
     assert summary["revenue"] == 10000
-    assert summary["operating_expenses"] == 2000
-    assert summary["payroll"]["gross"] == 5000
-    # 10000 − 2000 cheltuieli − 5112,5 cost salariu = 2887,5 profit înainte de impozit
-    assert summary["profit_before_tax"] == 2887.5
-    assert summary["taxes"]["company_tax"] == 462.0
-    assert summary["profit"] == 2425.5
-    assert summary["dividend_tax"] == 388.08
-    assert summary["owner_income"] == 2037.42
+    # costul mărfii vândute: 20 × 60 din stoc + 1000 la vânzarea totală
+    assert summary["cogs"] == 2200
+    assert summary["gross_margin"] == 7800
+    assert summary["opex_total"] == 6113          # 1000 cheltuieli + 5000 brut + 113 CAM
+    assert summary["profit_before_tax"] == 1687
+    assert summary["taxes"]["company_tax"] == 270  # 16% din 1687 = 269,92 → 270
+    assert summary["profit"] == 1417
+    assert summary["dividend_tax"] == 226.72
+    assert summary["owner_income"] == 1190.28
+    # TVA: 21% din vânzări − 21% din chirie
+    assert summary["vat"] == {"collected": 2100, "deductible_purchases": 0, "deductible_expenses": 210,
+                              "deductible": 210, "payable": 1890}
 
 
 def test_no_profit_tax_in_a_loss_month(client):
@@ -195,10 +207,11 @@ def test_invalid_or_unreachable_feed_keeps_existing_rules(client):
 
 def test_demo_data_dashboard_and_exports(client):
     assert client.post("/api/demo").status_code == 200
-    month = calc.shift_month(date.today().strftime("%Y-%m"), -1)
+    month = "2026-09"
     dashboard = client.get(f"/api/dashboard?month={month}").json()
     assert dashboard["current"]["revenue"] > 0
-    assert len(dashboard["trend"]) == 12
+    # Evoluția pornește de la prima lună cu date (iulie 2026).
+    assert [m["month"] for m in dashboard["trend"]] == ["2026-07", "2026-08", "2026-09"]
     assert dashboard["flow"] and dashboard["insights"]
     assert len(client.get("/api/employees").json()) == 6
 

@@ -1,0 +1,13 @@
+﻿data,categorie,descriere,furnizor,suma_fara_tva
+2026-09-01,Chirie,Chirie spatiu birou + depozit,Imobiliare Centru SRL,6500.00
+2026-09-05,Utilitati,Energie electrica august,Enel Energie (fictiv),1340.75
+2026-09-05,Utilitati,Apa si canalizare august,Apa Nova (fictiv),210.40
+2026-09-07,Utilitati,Gaz august,Engie (fictiv),185.20
+2026-09-08,Utilitati,Internet fibra + telefonie,Digi (fictiv),149.00
+2026-09-10,Contabilitate,Servicii contabilitate septembrie,Cifra Exacta SRL,900.00
+2026-09-12,Software,"Abonamente SaaS (facturare, email, cloud)",Diversi,420.00
+2026-09-15,Marketing,Reclame online septembrie,Meta / Google (fictiv),2300.00
+2026-09-18,Transport,Curierat livrari,FAN Courier (fictiv),1120.50
+2026-09-20,Consumabile,"Ambalaje, banda, etichete",Pack Pro SRL,365.80
+2026-09-25,Mentenanta,Revizie aer conditionat,Clima Service SRL,450.00
+2026-09-28,Banca,Comisioane bancare,Banca fictiva,62.30

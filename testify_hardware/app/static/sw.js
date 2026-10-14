@@ -1,6 +1,6 @@
 // Service worker: interfața se deschide instant și funcționează și cu semnal slab.
 // Datele (/api) vin mereu de la server, ca cifrele să fie la zi.
-const CACHE = "testify-v1";
+const CACHE = "testify-v2";
 const SHELL = [
   "/static/index.html", "/static/styles.css", "/static/app.js", "/static/logo.svg",
   "/static/vendor/chart.umd.min.js", "/static/manifest.webmanifest",

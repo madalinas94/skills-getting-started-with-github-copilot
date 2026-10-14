@@ -4,3 +4,4 @@ openpyxl
 reportlab
 httpx
 pytest
+python-multipart

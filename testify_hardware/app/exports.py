@@ -17,6 +17,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 from .calc import month_bounds, month_summary, payroll
 from .db import get_settings
+from .inventory import inventory_month
 
 FONTS_DIR = Path(__file__).resolve().parent / "fonts"
 MONEY = '#,##0.00 "lei"'
@@ -25,30 +26,54 @@ ACCENT = "0EA5E9"
 
 
 def summary_rows(summary: dict) -> list[tuple[str, float]]:
+    """Contul de profit și pierdere, în aceeași ordine ca raportul contabilului."""
     taxes = summary["taxes"]
-    return [
+    rows = [
         ("Venituri din vânzări", summary["revenue"]),
-        ("Cheltuieli operaționale", summary["operating_expenses"]),
-        ("Salarii brute", summary["payroll"]["gross"]),
-        ("CAM (plătit de firmă)", taxes["cam"]),
+        ("Costul mărfii vândute", summary["cogs"]),
+        ("Marja brută", summary["gross_margin"]),
+    ]
+    rows += [(f"   {name}", amount) for name, amount in summary["expenses_by_category"].items()]
+    rows += [
+        ("   Salarii brute", summary["payroll"]["gross"]),
+        ("   CAM (contribuție angajator)", taxes["cam"]),
+        ("Total cheltuieli operaționale", summary["opex_total"]),
         ("Profit înainte de impozit", summary["profit_before_tax"]),
         (summary["company_tax_label"], taxes["company_tax"]),
-        ("Total costuri", summary["total_costs"]),
         ("Profit net", summary["profit"]),
         ("Impozit pe dividende (estimat)", summary["dividend_tax"]),
         ("Rămâne proprietarului", summary["owner_income"]),
     ]
+    return rows
 
 
 def tax_rows(summary: dict) -> list[tuple[str, float]]:
     taxes = summary["taxes"]
-    return [
+    rows = [
         ("CAS — pensie (din salarii)", taxes["cas"]),
         ("CASS — sănătate (din salarii)", taxes["cass"]),
         ("Impozit pe venit (din salarii)", taxes["income_tax"]),
         ("CAM — contribuție firmă", taxes["cam"]),
         (summary["company_tax_label"], taxes["company_tax"]),
-        ("Total taxe", taxes["total"]),
+        ("Total taxe (fără TVA)", taxes["total"]),
+    ]
+    if summary["vat"]:
+        vat = summary["vat"]
+        rows += [
+            ("TVA colectată", vat["collected"]),
+            ("TVA deductibilă — achiziții marfă", vat["deductible_purchases"]),
+            ("TVA deductibilă — cheltuieli", vat["deductible_expenses"]),
+            ("TVA de plată / (de recuperat)", vat["payable"]),
+        ]
+    return rows
+
+
+def control_rows(summary: dict) -> list[tuple[str, float]]:
+    return [
+        ("Achiziții marfă (fără TVA)", summary["purchases"]),
+        ("Valoare stoc la final de lună", summary["stock_value"]),
+        ("Salarii nete de plată", summary["payroll"]["net"]),
+        ("Număr facturi emise", summary["sales_count"]),
     ]
 
 
@@ -84,25 +109,49 @@ def excel_report(conn: sqlite3.Connection, ym: str) -> bytes:
     sheet.append([])
     _write_table(sheet, ["Taxe și contribuții", "Valoare"],
                  [list(row) for row in tax_rows(summary)], {2})
+    sheet.append([])
+    _write_table(sheet, ["Indicatori de control", "Valoare"],
+                 [list(row) for row in control_rows(summary)], {2})
     sheet.freeze_panes = None
-    sheet.column_dimensions["A"].width = 38
+    sheet.column_dimensions["A"].width = 40
     sheet.column_dimensions["B"].width = 20
 
     sales = conn.execute(
-        "SELECT date, description, product, quantity, amount FROM sales "
-        "WHERE date BETWEEN ? AND ? ORDER BY date, id", (start, end)
+        "SELECT s.date, s.invoice_number, COALESCE(s.product, s.description), s.quantity, "
+        "s.unit_price, s.amount, COALESCE(s.quantity, 1) * COALESCE(s.unit_cost, 0), "
+        "c.name, s.due_date, CASE WHEN s.paid THEN 'Încasat' ELSE 'Neîncasat' END "
+        "FROM sales s LEFT JOIN clients c ON c.id = s.client_id "
+        "WHERE s.date BETWEEN ? AND ? ORDER BY s.date, s.id", (start, end)
     ).fetchall()
     _write_table(book.create_sheet("Vânzări"),
-                 ["Data", "Descriere", "Produs", "Cantitate", "Sumă"],
-                 [list(row) for row in sales], {5})
+                 ["Data", "Nr. factură", "Produs / descriere", "Cantitate", "Preț unitar",
+                  "Valoare fără TVA", "Cost marfă vândută", "Client", "Scadență", "Status"],
+                 [list(row) for row in sales], {5, 6, 7})
+
+    purchases = conn.execute(
+        "SELECT pu.date, pu.doc_number, pu.supplier, p.code, p.name, pu.quantity, pu.unit_cost, "
+        "pu.quantity * pu.unit_cost FROM purchases pu JOIN products p ON p.id = pu.product_id "
+        "WHERE pu.date BETWEEN ? AND ? ORDER BY pu.date, pu.id", (start, end)
+    ).fetchall()
+    _write_table(book.create_sheet("Achiziții"),
+                 ["Data", "Nr. NIR", "Furnizor", "Cod", "Produs", "Cantitate", "Cost unitar",
+                  "Valoare fără TVA"], [list(row) for row in purchases], {7, 8})
 
     expenses = conn.execute(
-        "SELECT date, category, description, amount FROM expenses "
-        "WHERE date BETWEEN ? AND ? ORDER BY date, id", (start, end)
+        "SELECT date, category, description, supplier, amount, "
+        "CASE vat_kind WHEN 'standard' THEN 'standard' WHEN 'reduced' THEN 'redusă' ELSE 'fără TVA' END "
+        "FROM expenses WHERE date BETWEEN ? AND ? ORDER BY date, id", (start, end)
     ).fetchall()
     _write_table(book.create_sheet("Cheltuieli"),
-                 ["Data", "Categorie", "Descriere", "Sumă"],
-                 [list(row) for row in expenses], {4})
+                 ["Data", "Categorie", "Descriere", "Furnizor", "Sumă fără TVA", "Cotă TVA"],
+                 [list(row) for row in expenses], {5})
+
+    stock = inventory_month(conn, ym)
+    _write_table(book.create_sheet("Stocuri"),
+                 ["Cod", "Produs", "Stoc inițial", "Intrări", "Ieșiri", "Stoc final", "Cost unitar",
+                  "Valoare stoc final"],
+                 [[line["code"], line["name"], line["initial"], line["entries"], line["exits"],
+                   line["final"], line["cost"], line["value"]] for line in stock["lines"]], {7, 8})
 
     pay = payroll(conn, ym)
     rows = [[line["name"], line["role"], line["gross"], line["cas"], line["cass"],
@@ -180,11 +229,11 @@ def pdf_report(conn: sqlite3.Connection, ym: str) -> bytes:
         table(["Taxă", "Valoare"],
               [[name, lei(value)] for name, value in tax_rows(summary)],
               [110 * mm, 60 * mm], total_row=True),
-        Paragraph("Cheltuieli pe categorii", heading),
-        table(["Categorie", "Valoare"],
-              [[name, lei(value)] for name, value in summary["expenses_by_category"].items()]
-              + [["Total", lei(summary["operating_expenses"])]],
-              [110 * mm, 60 * mm], total_row=True),
+        Paragraph("Indicatori de control", heading),
+        table(["Indicator", "Valoare"],
+              [[name, str(value) if isinstance(value, int) else lei(value)]
+               for name, value in control_rows(summary)],
+              [110 * mm, 60 * mm]),
         Paragraph("Salarii", heading),
         table(["Angajat", "Brut", "Rețineri", "Net", "Cost firmă"],
               [[line["name"], lei(line["gross"]),

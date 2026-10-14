@@ -81,6 +81,8 @@ const ICONS = {
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
   box: '<path d="M21 16V8a2 2 0 00-1-1.7l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.7l7 4a2 2 0 002 0l7-4a2 2 0 001-1.7z"/><path d="M3.3 7L12 12l8.7-5M12 22V12"/>',
   raise: '<path d="M12 20V10M18 20V4M6 20v-4"/>',
+  truck: '<path d="M1 3h15v13H1zM16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
+  users: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1"/><path d="M19 4.5a3 3 0 010 5.5M5 4.5a3 3 0 000 5.5"/>',
   refresh: '<path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0114.8-3.4L23 10M1 14l4.7 4.4A9 9 0 0020.5 15"/>',
 };
 const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ""}</svg>`;
@@ -92,6 +94,8 @@ const state = {
   route: "dashboard",
   charts: [],
   categories: [],
+  products: [],
+  clients: [],
 };
 
 async function api(path, options = {}) {
@@ -193,7 +197,9 @@ $("#logout-btn").addEventListener("click", async () => {
 
 const ROUTES = {
   dashboard: { label: "Dashboard", icon: "dashboard", eyebrow: "Imagine de ansamblu", title: "Cum merge firma", render: renderDashboard },
-  vanzari: { label: "Vânzări", icon: "sales", eyebrow: "Bani care intră", title: "Vânzări", render: renderSales },
+  vanzari: { label: "Vânzări", icon: "sales", eyebrow: "Facturi și încasări", title: "Vânzări", render: renderSales },
+  stoc: { label: "Stoc", icon: "box", eyebrow: "Produse și inventar", title: "Produse și stoc", render: renderStock },
+  clienti: { label: "Clienți", icon: "users", eyebrow: "Cine vă datorează bani", title: "Clienți și încasări", render: renderClients },
   cheltuieli: { label: "Cheltuieli", icon: "expenses", eyebrow: "Bani care ies", title: "Cheltuieli", render: renderExpenses },
   angajati: { label: "Angajați", icon: "team", eyebrow: "Echipa și salariile", title: "Angajați", render: renderEmployees },
   taxe: { label: "Taxe", icon: "taxes", eyebrow: "Ce plătiți statului", title: "Taxe și contribuții", render: renderTaxes },
@@ -216,7 +222,9 @@ function showApp() {
 
 function route() {
   const key = location.hash.slice(1);
+  const changed = state.route !== (ROUTES[key] ? key : "dashboard");
   state.route = ROUTES[key] ? key : "dashboard";
+  if (changed) robot.close();  // panoul asistentului nu rămâne peste pagina nouă
   render();
 }
 window.addEventListener("hashchange", route);
@@ -377,17 +385,24 @@ async function renderDashboard(view) {
   const c = d.current;
   const trend = d.trend;
   const cmp = d.in_progress ? `vs. 1–${d.compared_until_day} luna trecută` : "vs. luna trecută";
+  const r = d.receivables;
 
   const kpis = [
-    { key: "revenue", label: "Venituri", icon: "coins", accent: "#22d3ee", value: c.revenue, spark: trend.map((t) => t.revenue), sub: `${c.sales_count} înregistrări` },
-    { key: "total_costs", label: "Costuri totale", icon: "wallet", accent: "#f87171", value: c.total_costs, spark: trend.map((t) => t.costs), invert: true, sub: "marfă, salarii, taxe…" },
-    { key: "profit", label: "Profit net", icon: "profit", accent: c.profit >= 0 ? "#34d399" : "#f87171", value: c.profit, spark: trend.map((t) => t.profit), sub: `marjă ${pct(c.margin)}` },
+    { key: "revenue", label: "Venituri", icon: "coins", accent: "#22d3ee", value: c.revenue, spark: trend.map((t) => t.revenue), sub: `${c.sales_count} facturi · fără TVA` },
+    { key: "gross_margin", label: "Marjă brută", icon: "box", accent: "#a78bfa", value: c.gross_margin, spark: trend.map((t) => t.gross_margin), sub: `${pct(c.gross_margin_pct)} din vânzări` },
+    { key: "profit", label: "Profit net", icon: "profit", accent: c.profit >= 0 ? "#34d399" : "#f87171", value: c.profit, spark: trend.map((t) => t.profit), sub: `marjă netă ${pct(c.margin)}` },
     { key: "owner_income", label: "Îți rămâne ție", icon: "star", accent: "#fbbf24", value: c.owner_income, spark: trend.map((t) => Math.max(t.profit, 0)), sub: "după impozitul pe dividende" },
+  ];
+  const minis = [
+    { label: "De încasat de la clienți", value: lei(r.total), note: r.overdue ? `${lei(r.overdue)} trecut de scadență` : "nimic restant", tone: r.overdue ? "warn" : "ok", href: "#clienti", icon: "wallet" },
+    { label: "Valoarea stocului", value: lei(c.stock_value), note: d.low_stock.length ? `${d.low_stock.length} produse sub stocul minim` : "toate produsele pe stoc", tone: d.low_stock.length ? "warn" : "ok", href: "#stoc", icon: "box" },
+    { label: c.vat_payer ? "TVA de plată" : "Taxe pe salarii", value: lei(c.vat_payer ? c.vat.payable : c.taxes.total - c.taxes.company_tax), note: c.vat_payer ? `colectată ${lei(c.vat.collected)} − deductibilă ${lei(c.vat.deductible)}` : "CAS, CASS, impozit, CAM", tone: "info", href: "#taxe", icon: "taxes" },
+    { label: "Achiziții de marfă", value: lei(c.purchases), note: `cost marfă vândută ${lei(c.cogs)}`, tone: "info", href: "#stoc", icon: "truck" },
   ];
 
   view.innerHTML = `
     <div class="hero">
-      <h2>${greeting()}! Iată cum arată <span>${esc(d.company)}</span> în ${esc(c.label)}.</h2>
+      <h2>${greeting()}${d.owner_name ? `, ${esc(d.owner_name)}` : ""}! Iată cum arată <span>${esc(d.company)}</span> în ${esc(c.label)}.</h2>
       ${d.in_progress
         ? `<span class="badge"><span class="dot"></span>Lună în curs — date până azi</span>`
         : `<span class="chip up">${icon("check")}Lună încheiată</span>`}
@@ -408,11 +423,19 @@ async function renderDashboard(view) {
         </article>`).join("")}
     </section>
 
+    <section class="mini-kpis mt">
+      ${minis.map((m) => `
+        <a class="mini glass ${m.tone}" href="${m.href}">
+          <span class="mini-ic">${icon(m.icon)}</span>
+          <span class="mini-body"><span>${esc(m.label)}</span><strong>${m.value}</strong><small>${esc(m.note)}</small></span>
+        </a>`).join("")}
+    </section>
+
     <section class="grid cols-2 mt">
       <article class="card glass fill">
         <div class="card-head">
-          <div><h2>Evoluție pe 12 luni</h2><p>Venituri, costuri și profit</p></div>
-          <div class="stat-strip" style="grid-template-columns:repeat(3,auto);gap:18px">
+          <div><h2>Evoluție lunară</h2><p>Venituri, marjă brută și profit net</p></div>
+          <div class="stat-strip" style="grid-template-columns:repeat(2,auto);gap:18px">
             <div><span class="muted" style="font-size:12px">Venituri ${c.month.slice(0, 4)}</span><br><strong class="num">${lei(d.year.revenue)}</strong></div>
             <div><span class="muted" style="font-size:12px">Profit ${c.month.slice(0, 4)}</span><br><strong class="num" style="color:var(--green)">${lei(d.year.profit)}</strong></div>
           </div>
@@ -421,16 +444,16 @@ async function renderDashboard(view) {
       </article>
 
       <article class="card glass">
-        <div class="card-head"><div><h2>Unde se duc banii</h2><p>Toate ieșirile din ${esc(c.label)}</p></div></div>
+        <div class="card-head"><div><h2>Unde se duc banii</h2><p>Toate costurile din ${esc(c.label)}</p></div></div>
         ${d.flow.length ? `
         <div class="donut-wrap">
           <div class="donut"><canvas id="flow-chart"></canvas>
-            <div class="donut-center"><span>Total ieșiri</span><strong class="num">${lei(d.flow.reduce((s, f) => s + f.amount, 0))}</strong></div>
+            <div class="donut-center"><span>Total costuri</span><strong class="num">${lei(d.flow.reduce((s, f) => s + f.amount, 0))}</strong></div>
           </div>
           <ul class="legend">
             ${d.flow.map((f) => `<li${f.details ? ` title="${esc(f.details.map((x) => `${x.name}: ${lei(x.amount)}`).join("\n"))}"` : ""}><span class="sw" style="background:${esc(f.color)}"></span><span>${esc(f.name)}</span><span class="val"><b>${pct(f.share)}</b> · ${lei(f.amount)}</span></li>`).join("")}
           </ul>
-        </div>` : emptyState("Nu există încă ieșiri de bani în această lună.")}
+        </div>` : emptyState("Nu există încă costuri în această lună.")}
       </article>
     </section>
 
@@ -443,18 +466,40 @@ async function renderDashboard(view) {
       </article>
 
       <article class="card glass">
-        <div class="card-head"><div><h2>Taxe luna aceasta</h2><p>Total: <b style="color:var(--text)">${lei(c.taxes.total)}</b></p></div>
-          <a class="btn btn-sm" href="#taxe">Detalii</a></div>
-        <div class="bars">${taxBars(c.taxes, c.company_tax_label)}</div>
+        <div class="card-head"><div><h2>Alerte</h2><p>Stoc și încasări</p></div></div>
+        <ul class="insights">
+          ${d.low_stock.slice(0, 4).map((p) => `
+            <li class="insight ${p.status === "out" ? "bad" : "warn"}"><span class="ic">${icon("box")}</span>
+              <span><b>${esc(p.name)}</b>: ${p.status === "out" ? "stoc epuizat" : `mai sunt ${p.stock} buc. (minim ${p.min_stock})`}. Comandă de la ${esc(p.supplier || "furnizor")}.</span></li>`).join("")}
+          ${r.clients.filter((x) => x.overdue).slice(0, 3).map((x) => `
+            <li class="insight bad"><span class="ic">${icon("wallet")}</span>
+              <span><b>${esc(x.client)}</b> are ${lei(x.overdue)} trecuți de scadență.</span></li>`).join("")}
+          ${!d.low_stock.length && !r.overdue ? `<li class="insight good"><span class="ic">${icon("check")}</span><span>Nicio alertă. Stocul și încasările sunt în regulă.</span></li>` : ""}
+        </ul>
       </article>
 
       <article class="card glass">
-        <div class="card-head"><div><h2>Top produse</h2><p>După valoarea vânzărilor</p></div></div>
+        <div class="card-head"><div><h2>Top clienți</h2><p>Vânzări în ${esc(c.label)}</p></div><a class="btn btn-sm" href="#clienti">Toți</a></div>
+        ${d.top_clients.length ? `<div class="bars">${d.top_clients.map((x, i) => `
+          <div class="bar-row"><header><span>${i + 1}. ${esc(x.client)} <span class="tag">${esc(x.type)}</span></span><span>${lei(x.amount)}</span></header>
+          <div class="bar"><i data-w="${(x.amount / d.top_clients[0].amount) * 100}%" style="background:linear-gradient(90deg,#a78bfa,#22d3ee)"></i></div></div>`).join("")}</div>`
+          : emptyState("Alegeți clientul la vânzări ca să vedeți topul.")}
+      </article>
+    </section>
+
+    <section class="grid cols-2-even mt">
+      <article class="card glass">
+        <div class="card-head"><div><h2>Produsele care aduc cel mai mult profit</h2><p>Vânzări minus costul mărfii, în ${esc(c.label)}</p></div></div>
         ${d.top_products.length ? `<div class="bars">${d.top_products.map((p, i) => `
-          <div class="bar-row"><header><span>${i + 1}. ${esc(p.product)}</span><span>${lei(p.amount)}</span></header>
-          <div class="bar"><i data-w="${(p.amount / d.top_products[0].amount) * 100}%" style="background:linear-gradient(90deg,#3b82f6,#22d3ee)"></i></div>
-          <small class="muted" style="font-size:12px">${numberFmt.format(p.quantity)} buc.</small></div>`).join("")}</div>`
-          : emptyState("Completați produsul la vânzări ca să vedeți topul.")}
+          <div class="bar-row"><header><span>${i + 1}. ${esc(p.product)}</span><span><b style="color:var(--green)">${lei(p.profit)}</b> din ${lei(p.amount)}</span></header>
+          <div class="bar"><i data-w="${(p.profit / d.top_products[0].profit) * 100}%" style="background:linear-gradient(90deg,#3b82f6,#22d3ee)"></i></div>
+          <small class="muted" style="font-size:12px">${numberFmt.format(p.quantity)} buc. vândute</small></div>`).join("")}</div>`
+          : emptyState("Adăugați vânzări pe produse ca să vedeți topul.")}
+      </article>
+      <article class="card glass">
+        <div class="card-head"><div><h2>Taxe luna aceasta</h2><p>Total fără TVA: <b style="color:var(--text)">${lei(c.taxes.total)}</b></p></div>
+          <a class="btn btn-sm" href="#taxe">Detalii</a></div>
+        <div class="bars">${taxBars(c.taxes, c.company_tax_label)}</div>
       </article>
     </section>`;
 
@@ -465,12 +510,12 @@ async function renderDashboard(view) {
     data: {
       labels: trend.map((t) => t.label),
       datasets: [
-        { type: "line", label: "Profit", data: trend.map((t) => t.profit), borderColor: "#fbbf24", backgroundColor: "#fbbf24",
-          borderWidth: 3, tension: 0.4, pointRadius: 3, pointHoverRadius: 6, order: 0 },
-        { type: "bar", label: "Venituri", data: trend.map((t) => t.revenue), borderRadius: 8, maxBarThickness: 22, order: 1,
+        { type: "line", label: "Profit net", data: trend.map((t) => t.profit), borderColor: "#fbbf24", backgroundColor: "#fbbf24",
+          borderWidth: 3, tension: 0.4, pointRadius: 4, pointHoverRadius: 7, order: 0 },
+        { type: "bar", label: "Venituri", data: trend.map((t) => t.revenue), borderRadius: 8, maxBarThickness: 34, order: 1,
           backgroundColor: (ctx) => ctx.chart.chartArea ? gradient(ctx.chart.ctx, ctx.chart.chartArea, "#22d3ee", "rgba(59,130,246,0.25)") : "#22d3ee" },
-        { type: "bar", label: "Costuri", data: trend.map((t) => t.costs), borderRadius: 8, maxBarThickness: 22, order: 2,
-          backgroundColor: (ctx) => ctx.chart.chartArea ? gradient(ctx.chart.ctx, ctx.chart.chartArea, "rgba(248,113,113,0.85)", "rgba(248,113,113,0.12)") : "#f87171" },
+        { type: "bar", label: "Marjă brută", data: trend.map((t) => t.gross_margin), borderRadius: 8, maxBarThickness: 34, order: 2,
+          backgroundColor: (ctx) => ctx.chart.chartArea ? gradient(ctx.chart.ctx, ctx.chart.chartArea, "rgba(167,139,250,0.9)", "rgba(167,139,250,0.15)") : "#a78bfa" },
       ],
     },
     options: {
@@ -480,7 +525,7 @@ async function renderDashboard(view) {
         legend: { position: "bottom", labels: { usePointStyle: true, pointStyle: "rectRounded", padding: 18 } },
         tooltip: { callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${lei(ctx.parsed.y)}` } },
       },
-      scales: { x: { grid: { display: false } }, y: { ticks: { callback: moneyTick } } },
+      scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: moneyTick } } },
     },
   });
 
@@ -536,21 +581,11 @@ function emptyState(text) {
 
 let saleMode = "order";
 
-function saleFormHTML(sale = {}, mode = "order") {
-  const isOrder = mode === "order";
-  const unit = sale.quantity && sale.amount ? (sale.amount / sale.quantity).toFixed(2) : "";
-  return `
-    <div class="form-grid">
-      <label class="field"><span>Data</span><input type="date" name="date" required value="${esc(sale.date || defaultDate())}"></label>
-      ${isOrder ? `
-        <label class="field" style="grid-column:span 2"><span>Produs</span><input name="product" list="products-list" required maxlength="200" placeholder="ex. Mouse wireless Logitech" value="${esc(sale.product || "")}"></label>
-        <label class="field"><span>Cantitate</span><input type="number" name="quantity" min="1" step="1" required value="${esc(sale.quantity || 1)}"></label>
-        <label class="field"><span>Preț / bucată</span><input type="number" name="unit" min="0.01" step="0.01" placeholder="0,00" value="${esc(unit)}"></label>
-      ` : `
-        <label class="field" style="grid-column:span 2"><span>Descriere</span><input name="description" required maxlength="200" placeholder="ex. Vânzări magazin — total zi" value="${esc(sale.description || "")}"></label>
-      `}
-      <label class="field"><span>Total (lei)</span><input type="number" name="amount" min="0.01" step="0.01" required placeholder="0,00" value="${esc(sale.amount ?? "")}"></label>
-    </div>`;
+// Produsele și clienții, pentru listele din formulare.
+async function loadCatalog() {
+  const [products, clients] = await Promise.all([api("/api/products"), api("/api/clients")]);
+  state.products = products;
+  state.clients = clients;
 }
 
 // Data propusă e mereu azi; după salvare, aplicația trece la luna înregistrării.
@@ -558,89 +593,139 @@ function defaultDate() {
   return todayISO();
 }
 
+function clientOptions(selected) {
+  const fallback = state.clients.find((c) => c.name === "Persoana fizica")?.id;
+  const value = selected ?? fallback;
+  return `<option value="">— fără client —</option>` + state.clients.map((c) =>
+    `<option value="${c.id}" ${c.id === value ? "selected" : ""}>${esc(c.name)}${c.payment_terms ? ` · plată la ${c.payment_terms} zile` : ""}</option>`).join("");
+}
+
+function productOptions(selected) {
+  return `<option value="">Alegeți produsul…</option>` + state.products.filter((p) => p.active || p.id === selected).map((p) =>
+    `<option value="${p.id}" ${p.id === selected ? "selected" : ""}>${esc(p.code)} · ${esc(p.name)} — ${p.stock} buc.</option>`).join("");
+}
+
+function saleFormHTML(sale = {}, mode = "order") {
+  const isOrder = mode === "order";
+  return `
+    <div class="form-grid">
+      <label class="field"><span>Data</span><input type="date" name="date" required value="${esc(sale.date || defaultDate())}"></label>
+      <label class="field" style="grid-column:span 2"><span>Client</span><select name="client_id">${clientOptions(sale.client_id)}</select></label>
+      ${isOrder ? `
+        <label class="field" style="grid-column:1/-1"><span>Produs</span><select name="product_id" required>${productOptions(sale.product_id)}</select></label>
+        <label class="field"><span>Cantitate</span><input type="number" name="quantity" min="1" step="1" required value="${esc(sale.quantity || 1)}"></label>
+        <label class="field"><span>Preț / buc. fără TVA</span><input type="number" name="unit_price" min="0.01" step="0.01" placeholder="din fișa produsului" value="${esc(sale.unit_price ?? "")}"></label>
+        <div class="sale-calc" style="grid-column:1/-1"></div>
+      ` : `
+        <label class="field" style="grid-column:span 2"><span>Descriere</span><input name="description" required maxlength="200" placeholder="ex. Vânzări magazin — total zi" value="${esc(sale.description || "")}"></label>
+        <label class="field"><span>Sumă fără TVA (lei)</span><input type="number" name="amount" min="0.01" step="0.01" required placeholder="0,00" value="${esc(sale.amount ?? "")}"></label>
+        <label class="field"><span>Costul mărfii (opțional)</span><input type="number" name="cost_total" min="0" step="0.01" placeholder="0,00" value="${esc(sale.unit_cost ?? "")}"><small>Pentru o marjă corectă.</small></label>
+      `}
+    </div>`;
+}
+
+// La comandă: prețul vine din fișa produsului, iar dedesubt se văd totalul, stocul și profitul.
 function wireSaleForm(form) {
-  const qty = $("[name=quantity]", form), unit = $("[name=unit]", form), amount = $("[name=amount]", form);
-  if (!qty) return;
-  const recalc = () => {
-    const q = Number(qty.value), u = Number(unit.value);
-    if (q > 0 && u > 0) amount.value = (q * u).toFixed(2);
+  const select = $("[name=product_id]", form);
+  if (!select) return;
+  const qty = $("[name=quantity]", form), price = $("[name=unit_price]", form), out = $(".sale-calc", form);
+  const update = (fromProduct) => {
+    const p = state.products.find((x) => x.id === Number(select.value));
+    if (!p) { out.innerHTML = ""; return; }
+    if (fromProduct || !price.value) price.value = p.sale_price ? p.sale_price.toFixed(2) : "";
+    const q = Number(qty.value) || 0, u = Number(price.value) || 0;
+    const total = q * u, profit = total - q * p.cost;
+    const after = p.stock - q;
+    out.innerHTML = `
+      <span>Total: <b>${lei(total, true)}</b></span>
+      <span>Profit din vânzare: <b style="color:${profit >= 0 ? "var(--green)" : "var(--red)"}">${lei(profit, true)}</b></span>
+      <span class="${after < 0 ? "neg" : after <= p.min_stock ? "warn" : ""}">Stoc după vânzare: <b>${after} buc.</b>${after < 0 ? " — stoc insuficient!" : after <= p.min_stock ? " — sub minim" : ""}</span>`;
   };
-  qty.addEventListener("input", recalc);
-  unit.addEventListener("input", recalc);
-  amount.addEventListener("input", () => {
-    const q = Number(qty.value), a = Number(amount.value);
-    if (q > 0 && a > 0) unit.value = (a / q).toFixed(2);
-  });
+  select.addEventListener("change", () => update(true));
+  qty.addEventListener("input", () => update(false));
+  price.addEventListener("input", () => update(false));
+  update(false);
 }
 
 function salePayload(form, mode) {
   const d = formData(form);
-  const payload = { date: d.date, amount: Number(d.amount) };
+  const payload = { date: d.date, client_id: d.client_id ? Number(d.client_id) : null };
   if (mode === "order") {
-    payload.product = d.product;
+    payload.product_id = Number(d.product_id);
     payload.quantity = Number(d.quantity) || 1;
-    payload.description = `Comandă ${d.product}${payload.quantity > 1 ? ` ×${payload.quantity}` : ""}`;
+    if (d.unit_price) payload.unit_price = Number(d.unit_price);
   } else {
     payload.description = d.description;
-    payload.product = null;
-    payload.quantity = null;
+    payload.amount = Number(d.amount);
+    payload.cost_total = d.cost_total ? Number(d.cost_total) : null;
   }
   return payload;
 }
 
+function paidChip(s) {
+  if (s.paid) return `<button class="tag paid" data-paid="${s.id}" data-value="0" title="Marchează ca neîncasată">${icon("check")}Încasat</button>`;
+  const late = s.due_date && s.due_date < todayISO();
+  return `<button class="tag ${late ? "late" : "unpaid"}" data-paid="${s.id}" data-value="1" title="Marchează ca încasată">${late ? "Restantă" : "Neîncasat"} · ${formatDate(s.due_date).slice(0, 5)}</button>`;
+}
+
+async function saveSale(payload, id) {
+  const result = await api(id ? `/api/sales/${id}` : "/api/sales", { method: id ? "PUT" : "POST", body: payload });
+  if (result.warning) toast(result.warning, "err");
+  return result;
+}
+
 async function renderSales(view) {
-  const sales = await api(`/api/sales?month=${state.month}`);
+  const [sales] = await Promise.all([api(`/api/sales?month=${state.month}`), loadCatalog()]);
   const total = sales.reduce((s, x) => s + x.amount, 0);
-  const orders = sales.filter((s) => s.product);
-  const byDay = {};
-  sales.forEach((s) => { byDay[s.date] = (byDay[s.date] || 0) + s.amount; });
-  const bestDay = Object.entries(byDay).sort((a, b) => b[1] - a[1])[0];
-  const products = [...new Set(sales.map((s) => s.product).filter(Boolean))];
+  const margin = sales.reduce((s, x) => s + x.amount - (x.quantity || 1) * (x.unit_cost || 0), 0);
+  const unpaid = sales.filter((s) => !s.paid).reduce((s, x) => s + x.amount, 0);
+  const invoices = sales.filter((s) => s.invoice_number).length;
 
   view.innerHTML = `
     <section class="card glass">
       <div class="card-head">
-        <div><h2>Adaugă o vânzare</h2><p>Introduceți fiecare comandă sau doar totalul pe zi/lună — cum vă e mai comod.</p></div>
+        <div><h2>Factură nouă</h2><p>Alegeți produsul din stoc, sau introduceți doar totalul pe zi/lună.</p></div>
         <div class="segmented" id="sale-mode">
-          <button type="button" data-mode="order" class="${saleMode === "order" ? "active" : ""}">Comandă</button>
+          <button type="button" data-mode="order" class="${saleMode === "order" ? "active" : ""}">Produs din stoc</button>
           <button type="button" data-mode="total" class="${saleMode === "total" ? "active" : ""}">Total zi / lună</button>
         </div>
       </div>
       <form id="sale-form">
         <div id="sale-fields">${saleFormHTML({}, saleMode)}</div>
-        <div class="form-actions"><button class="btn btn-primary" type="submit">${icon("plus")}Adaugă vânzarea</button></div>
+        <div class="form-actions"><button class="btn btn-primary" type="submit">${icon("plus")}Emite factura</button></div>
       </form>
-      <datalist id="products-list">${products.map((p) => `<option value="${esc(p)}">`).join("")}</datalist>
     </section>
 
     <section class="stat-strip mt">
-      <div class="stat"><span>Total vânzări</span><strong>${lei(total)}</strong></div>
-      <div class="stat"><span>Înregistrări</span><strong>${sales.length}</strong></div>
-      <div class="stat"><span>Valoare medie comandă</span><strong>${lei(orders.length ? orders.reduce((s, o) => s + o.amount, 0) / orders.length : 0)}</strong></div>
-      <div class="stat"><span>Cea mai bună zi</span><strong>${bestDay ? `${formatDate(bestDay[0]).slice(0, 5)} · ${lei(bestDay[1])}` : "—"}</strong></div>
+      <div class="stat"><span>Vânzări fără TVA</span><strong>${lei(total)}</strong></div>
+      <div class="stat"><span>Facturi emise</span><strong>${invoices}</strong></div>
+      <div class="stat"><span>Marjă brută</span><strong style="color:var(--green)">${lei(margin)} <small class="muted">${total ? pct((margin / total) * 100) : ""}</small></strong></div>
+      <div class="stat"><span>Neîncasat din luna aceasta</span><strong style="color:${unpaid ? "var(--gold)" : "inherit"}">${lei(unpaid)}</strong></div>
     </section>
 
     <section class="card glass mt">
       <div class="card-head">
-        <div><h2>Vânzări — ${esc(monthLabel(state.month))}</h2><p>${sales.length} înregistrări</p></div>
-        <div class="toolbar"><label class="field search">${icon("search")}<input id="sale-search" placeholder="Caută produs sau descriere…"></label></div>
+        <div><h2>Vânzări — ${esc(monthLabel(state.month))}</h2><p>Apăsați pe status ca să marcați o factură încasată.</p></div>
+        <div class="toolbar"><label class="field search">${icon("search")}<input id="sale-search" placeholder="Caută factură, client sau produs…"></label></div>
       </div>
       ${sales.length ? `<div class="table-wrap"><table>
-        <thead><tr><th>Data</th><th>Descriere</th><th>Tip</th><th class="r">Cant.</th><th class="r">Sumă</th><th></th></tr></thead>
+        <thead><tr><th>Data</th><th>Factură</th><th>Client</th><th>Produs / descriere</th><th class="r">Cant.</th><th class="r">Valoare</th><th>Status</th><th></th></tr></thead>
         <tbody id="sale-rows">${sales.map((s) => `
-          <tr data-search="${esc(`${s.description} ${s.product || ""}`.toLowerCase())}">
+          <tr data-search="${esc(`${s.invoice_number || ""} ${s.client_name || ""} ${s.description} ${s.product || ""}`.toLowerCase())}">
             <td>${formatDate(s.date)}</td>
-            <td>${esc(s.description)}</td>
-            <td>${s.product ? '<span class="tag order">Comandă</span>' : '<span class="tag total">Total</span>'}</td>
+            <td class="mono">${esc(s.invoice_number || "—")}</td>
+            <td>${esc(s.client_name || "—")}</td>
+            <td>${esc(s.product || s.description)}${s.product_id ? "" : ' <span class="tag total">Total</span>'}</td>
             <td class="r">${s.quantity ?? "—"}</td>
             <td class="r"><b>${lei(s.amount, true)}</b></td>
+            <td>${paidChip(s)}</td>
             <td class="actions">
               <button class="icon-btn" data-edit="${s.id}" title="Editează">${icon("edit")}</button>
               <button class="icon-btn danger" data-del="${s.id}" title="Șterge">${icon("trash")}</button>
             </td>
           </tr>`).join("")}</tbody>
-        <tfoot><tr><td colspan="4">Total lună</td><td class="r">${lei(total, true)}</td><td></td></tr></tfoot>
-      </table></div>` : emptyState("Nu există vânzări în această lună. Adăugați prima vânzare mai sus.")}
+        <tfoot><tr><td colspan="5">Total lună</td><td class="r">${lei(total, true)}</td><td colspan="2"></td></tr></tfoot>
+      </table></div>` : emptyState("Nu există vânzări în această lună. Emiteți prima factură mai sus.")}
     </section>`;
 
   const form = $("#sale-form");
@@ -655,8 +740,8 @@ async function renderSales(view) {
     e.preventDefault();
     try {
       const payload = salePayload(form, saleMode);
-      await api("/api/sales", { method: "POST", body: payload });
-      toast(`Vânzare adăugată: ${lei(payload.amount, true)}`);
+      const result = await saveSale(payload);
+      toast(`Factura ${result.invoice_number} a fost emisă.`);
       setMonthFromDate(payload.date);
       render();
     } catch (err) { toast(err.message, "err"); }
@@ -665,11 +750,18 @@ async function renderSales(view) {
   paginate(view, "#sale-rows", "#sale-search");
 
   view.addEventListener("click", async (e) => {
-    const edit = e.target.closest("[data-edit]"), del = e.target.closest("[data-del]");
+    const edit = e.target.closest("[data-edit]"), del = e.target.closest("[data-del]"), paid = e.target.closest("[data-paid]");
+    if (paid) {
+      try {
+        await api(`/api/sales/${paid.dataset.paid}/paid`, { method: "PATCH", body: { paid: paid.dataset.value === "1" } });
+        toast(paid.dataset.value === "1" ? "Factura a fost marcată încasată." : "Factura a fost marcată neîncasată.");
+        render();
+      } catch (err) { toast(err.message, "err"); }
+    }
     if (edit) {
       const sale = sales.find((s) => s.id === Number(edit.dataset.edit));
-      const mode = sale.product ? "order" : "total";
-      openModal("Editează vânzarea", `<form id="edit-sale">${saleFormHTML(sale, mode)}
+      const mode = sale.product_id ? "order" : "total";
+      openModal(`Editează ${sale.invoice_number || "vânzarea"}`, `<form id="edit-sale">${saleFormHTML(sale, mode)}
         <div class="form-actions"><button class="btn btn-ghost" type="button" onclick="closeModal()">Renunță</button>
         <button class="btn btn-primary" type="submit">${icon("check")}Salvează</button></div></form>`, (body) => {
         const f = $("#edit-sale", body);
@@ -677,16 +769,290 @@ async function renderSales(view) {
         f.addEventListener("submit", async (ev) => {
           ev.preventDefault();
           try {
-            const payload = salePayload(f, mode);
-            await api(`/api/sales/${sale.id}`, { method: "PUT", body: payload });
+            const payload = { ...salePayload(f, mode), paid: Boolean(sale.paid), invoice_number: sale.invoice_number };
+            await saveSale(payload, sale.id);
             closeModal(); toast("Vânzarea a fost actualizată."); setMonthFromDate(payload.date); render();
           } catch (err) { toast(err.message, "err"); }
         });
       });
     }
-    if (del && await confirmBox("Ștergeți vânzarea?", "Vânzarea va fi ștearsă definitiv.")) {
+    if (del && await confirmBox("Ștergeți vânzarea?", "Vânzarea va fi ștearsă definitiv, iar marfa revine în stoc.")) {
       try { await api(`/api/sales/${del.dataset.del}`, { method: "DELETE" }); toast("Vânzarea a fost ștearsă."); render(); }
       catch (err) { toast(err.message, "err"); }
+    }
+  });
+}
+
+/* ================= Stoc ================= */
+
+let stockTab = "products";
+
+function productFormHTML(p = {}) {
+  return `
+    <div class="form-grid">
+      <label class="field"><span>Cod</span><input name="code" required maxlength="40" value="${esc(p.code || "")}" placeholder="ex. P115"></label>
+      <label class="field" style="grid-column:span 2"><span>Denumire</span><input name="name" required maxlength="200" value="${esc(p.name || "")}"></label>
+      <label class="field"><span>Categorie</span><input name="category" maxlength="100" value="${esc(p.category || "")}" placeholder="ex. Periferice"></label>
+      <label class="field" style="grid-column:span 2"><span>Furnizor</span><input name="supplier" maxlength="120" value="${esc(p.supplier || "")}"></label>
+      <label class="field"><span>Preț vânzare fără TVA</span><input type="number" name="sale_price" min="0" step="0.01" required value="${esc(p.sale_price ?? "")}"></label>
+      <label class="field"><span>Cost achiziție</span><input type="number" name="cost" min="0" step="0.01" required value="${esc(p.cost ?? "")}"></label>
+      <label class="field"><span>Stoc minim</span><input type="number" name="min_stock" min="0" step="1" value="${esc(p.min_stock ?? 0)}"><small>Sub el primiți alertă.</small></label>
+      ${p.id ? "" : `<label class="field"><span>Stoc actual</span><input type="number" name="opening_stock" min="0" step="1" value="0"></label>`}
+    </div>`;
+}
+
+function productPayload(form) {
+  const d = formData(form);
+  return { code: d.code, name: d.name, category: d.category, supplier: d.supplier,
+    sale_price: Number(d.sale_price), cost: Number(d.cost), min_stock: Number(d.min_stock) || 0,
+    opening_stock: Number(d.opening_stock) || 0, active: true };
+}
+
+function openReceive(productId) {
+  const p = state.products.find((x) => x.id === productId);
+  openModal("Recepție marfă (NIR)", `<form id="nir-form">
+    <div class="form-grid">
+      <label class="field" style="grid-column:1/-1"><span>Produs</span><select name="product_id" required>${productOptions(productId)}</select></label>
+      <label class="field"><span>Data</span><input type="date" name="date" required value="${todayISO()}"></label>
+      <label class="field"><span>Cantitate primită</span><input type="number" name="quantity" min="1" step="1" required value="${p ? Math.max(p.min_stock * 2 - p.stock, 1) : 1}"></label>
+      <label class="field"><span>Cost / buc. fără TVA</span><input type="number" name="unit_cost" min="0.01" step="0.01" value="${p ? p.cost : ""}"></label>
+      <label class="field" style="grid-column:span 2"><span>Furnizor</span><input name="supplier" maxlength="120" value="${esc(p?.supplier || "")}"></label>
+      <label class="field"><span>Nr. NIR (opțional)</span><input name="doc_number" maxlength="40" placeholder="automat"></label>
+    </div>
+    <p class="muted" style="font-size:13px">Stocul crește imediat. Costul mărfii intră în profit abia când marfa se vinde.</p>
+    <div class="form-actions"><button class="btn btn-ghost" type="button" onclick="closeModal()">Renunță</button>
+    <button class="btn btn-primary" type="submit">${icon("check")}Adaugă în stoc</button></div></form>`, (body) => {
+    $("#nir-form", body).addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const d = formData(e.target);
+      try {
+        await api("/api/purchases", { method: "POST", body: { date: d.date, product_id: Number(d.product_id),
+          quantity: Number(d.quantity), unit_cost: d.unit_cost ? Number(d.unit_cost) : null, supplier: d.supplier, doc_number: d.doc_number } });
+        closeModal(); toast("Marfa a fost adăugată în stoc."); setMonthFromDate(d.date); render();
+      } catch (err) { toast(err.message, "err"); }
+    });
+  });
+}
+
+const STATUS_LABEL = { ok: "În stoc", low: "Sub minim", out: "Epuizat" };
+
+async function renderStock(view) {
+  const [inv, purchases] = await Promise.all([
+    api(`/api/inventory?month=${state.month}`), api(`/api/purchases?month=${state.month}`), loadCatalog(),
+  ]);
+  const products = state.products;
+  const value = products.reduce((s, p) => s + p.stock_value, 0);
+  const alerts = products.filter((p) => p.status !== "ok" && p.active);
+  const received = purchases.reduce((s, x) => s + x.value, 0);
+
+  view.innerHTML = `
+    <section class="stat-strip">
+      <div class="stat"><span>Valoarea stocului azi</span><strong>${lei(value)}</strong></div>
+      <div class="stat"><span>Produse</span><strong>${products.filter((p) => p.active).length}</strong></div>
+      <div class="stat"><span>Sub stocul minim</span><strong style="color:${alerts.length ? "var(--gold)" : "var(--green)"}">${alerts.length}</strong></div>
+      <div class="stat"><span>Marfă primită în ${esc(monthLabel(state.month))}</span><strong>${lei(received)}</strong></div>
+    </section>
+
+    <div class="card-head mt" style="margin-bottom:14px">
+      <div class="segmented" id="stock-tabs">
+        <button type="button" data-tab="products" class="${stockTab === "products" ? "active" : ""}">Produse</button>
+        <button type="button" data-tab="nir" class="${stockTab === "nir" ? "active" : ""}">Recepții (NIR)</button>
+        <button type="button" data-tab="inventory" class="${stockTab === "inventory" ? "active" : ""}">Fișă de inventar</button>
+      </div>
+      <div class="toolbar">
+        <button class="btn" id="new-product" type="button">${icon("plus")}Produs nou</button>
+        <button class="btn btn-primary" id="receive" type="button">${icon("truck")}Recepție marfă</button>
+      </div>
+    </div>
+
+    <section class="card glass ${stockTab === "products" ? "" : "hidden"}" data-panel="products">
+      <div class="card-head"><div><h2>Produse și stoc actual</h2><p>Stocul scade automat la fiecare vânzare și crește la recepții.</p></div>
+        <div class="toolbar"><label class="field search">${icon("search")}<input id="prod-search" placeholder="Caută cod, produs, furnizor…"></label></div></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Cod</th><th>Produs</th><th>Stoc</th><th class="r">Preț</th><th class="r">Cost</th><th class="r">Marjă</th><th class="r">Valoare stoc</th><th>Se termină în</th><th></th></tr></thead>
+        <tbody id="prod-rows">${products.map((p) => `
+          <tr data-search="${esc(`${p.code} ${p.name} ${p.category} ${p.supplier}`.toLowerCase())}" class="${p.active ? "" : "inactive"}">
+            <td class="mono">${esc(p.code)}</td>
+            <td class="prod-cell"><b>${esc(p.name)}</b><br><small class="muted">${esc(p.category)} · ${esc(p.supplier || "—")}</small></td>
+            <td style="min-width:150px"><div class="stock-cell"><span class="tag st-${p.status}">${STATUS_LABEL[p.status]}</span><b>${p.stock}</b><small class="muted">/ min ${p.min_stock}</small></div>
+              <div class="bar"><i data-w="${Math.min(100, (p.stock / Math.max(p.min_stock * 3, 1)) * 100)}%" style="background:${p.status === "ok" ? "var(--green)" : p.status === "low" ? "var(--gold)" : "var(--red)"}"></i></div></td>
+            <td class="r">${lei(p.sale_price, true)}</td>
+            <td class="r">${lei(p.cost, true)}</td>
+            <td class="r">${pct(p.margin_pct)}</td>
+            <td class="r"><b>${lei(p.stock_value)}</b></td>
+            <td>${p.days_left === null ? '<span class="muted">—</span>' : `<span class="${p.days_left <= 7 ? "neg" : p.days_left <= 14 ? "warn" : ""}">~${p.days_left} zile</span>`}</td>
+            <td class="actions">
+              <button class="icon-btn" data-receive="${p.id}" title="Recepție marfă">${icon("truck")}</button>
+              <button class="icon-btn" data-edit-product="${p.id}" title="Editează">${icon("edit")}</button>
+            </td>
+          </tr>`).join("")}</tbody>
+        <tfoot><tr><td colspan="6">Total stoc</td><td class="r">${lei(value)}</td><td colspan="2"></td></tr></tfoot>
+      </table></div>
+    </section>
+
+    <section class="card glass ${stockTab === "nir" ? "" : "hidden"}" data-panel="nir">
+      <div class="card-head"><div><h2>Recepții de marfă — ${esc(monthLabel(state.month))}</h2><p>${purchases.length} documente · ${lei(received, true)} fără TVA</p></div></div>
+      ${purchases.length ? `<div class="table-wrap"><table>
+        <thead><tr><th>Data</th><th>NIR</th><th>Furnizor</th><th>Produs</th><th class="r">Cant.</th><th class="r">Cost / buc.</th><th class="r">Valoare</th><th></th></tr></thead>
+        <tbody id="nir-rows">${purchases.map((x) => `
+          <tr data-search="${esc(`${x.doc_number} ${x.supplier} ${x.product_name}`.toLowerCase())}">
+            <td>${formatDate(x.date)}</td><td class="mono">${esc(x.doc_number)}</td><td>${esc(x.supplier)}</td>
+            <td>${esc(x.product_code)} · ${esc(x.product_name)}</td><td class="r">${x.quantity}</td>
+            <td class="r">${lei(x.unit_cost, true)}</td><td class="r"><b>${lei(x.value, true)}</b></td>
+            <td class="actions"><button class="icon-btn danger" data-del-nir="${x.id}" title="Șterge">${icon("trash")}</button></td>
+          </tr>`).join("")}</tbody>
+      </table></div>` : emptyState("Nicio recepție de marfă în această lună.")}
+    </section>
+
+    <section class="card glass ${stockTab === "inventory" ? "" : "hidden"}" data-panel="inventory">
+      <div class="card-head"><div><h2>Fișă de inventar — ${esc(monthLabel(state.month))}</h2><p>Stoc inițial + intrări − ieșiri = stoc final, la fel ca în raportul contabil.</p></div></div>
+      <div class="table-wrap"><table class="compact">
+        <thead><tr><th>Cod</th><th>Produs</th><th class="r">Inițial</th><th class="r">Intrări</th><th class="r">Ieșiri</th><th class="r">Final</th><th class="r">Cost</th><th class="r">Valoare</th><th>Control</th></tr></thead>
+        <tbody>${inv.lines.map((l) => `<tr>
+          <td class="mono">${esc(l.code)}</td><td>${esc(l.name)}</td><td class="r">${l.initial}</td>
+          <td class="r" style="color:var(--green)">+${l.entries}</td><td class="r" style="color:var(--red)">−${l.exits}</td>
+          <td class="r"><b>${l.final}</b></td><td class="r">${lei(l.cost)}</td><td class="r">${lei(l.value)}</td>
+          <td>${l.initial + l.entries - l.exits === l.final ? `<span class="tag paid">${icon("check")}OK</span>` : '<span class="tag late">Diferență</span>'}</td></tr>`).join("")}</tbody>
+        <tfoot><tr><td colspan="3">Total</td><td class="r">+${inv.totals.entries}</td><td class="r">−${inv.totals.exits}</td><td></td><td></td><td class="r">${lei(inv.totals.value)}</td><td></td></tr></tfoot>
+      </table></div>
+    </section>`;
+
+  animateBars(view);
+  paginate(view, "#prod-rows", "#prod-search", 50);
+  $$("#stock-tabs button").forEach((b) => b.addEventListener("click", () => {
+    stockTab = b.dataset.tab;
+    $$("#stock-tabs button").forEach((x) => x.classList.toggle("active", x === b));
+    $$("[data-panel]", view).forEach((p) => p.classList.toggle("hidden", p.dataset.panel !== stockTab));
+  }));
+  $("#receive").addEventListener("click", () => openReceive(alerts[0]?.id));
+  $("#new-product").addEventListener("click", () => {
+    openModal("Produs nou", `<form id="product-form">${productFormHTML()}
+      <div class="form-actions"><button class="btn btn-ghost" type="button" onclick="closeModal()">Renunță</button>
+      <button class="btn btn-primary" type="submit">${icon("check")}Adaugă produsul</button></div></form>`, (body) => {
+      $("#product-form", body).addEventListener("submit", async (e) => {
+        e.preventDefault();
+        try { await api("/api/products", { method: "POST", body: productPayload(e.target) }); closeModal(); toast("Produsul a fost adăugat."); render(); }
+        catch (err) { toast(err.message, "err"); }
+      });
+    });
+  });
+  view.addEventListener("click", async (e) => {
+    const receive = e.target.closest("[data-receive]"), edit = e.target.closest("[data-edit-product]"), delNir = e.target.closest("[data-del-nir]");
+    if (receive) openReceive(Number(receive.dataset.receive));
+    if (edit) {
+      const p = products.find((x) => x.id === Number(edit.dataset.editProduct));
+      openModal(`Editează ${p.name}`, `<form id="product-form">${productFormHTML(p)}
+        <label class="check" style="margin-top:12px"><input type="checkbox" name="active" ${p.active ? "checked" : ""}><span>Produs activ (apare la vânzări)</span></label>
+        <div class="form-actions"><button class="btn btn-danger" type="button" id="del-product">${icon("trash")}Șterge</button>
+        <button class="btn btn-ghost" type="button" onclick="closeModal()">Renunță</button>
+        <button class="btn btn-primary" type="submit">${icon("check")}Salvează</button></div></form>`, (body) => {
+        $("#product-form", body).addEventListener("submit", async (ev) => {
+          ev.preventDefault();
+          try {
+            await api(`/api/products/${p.id}`, { method: "PUT", body: { ...productPayload(ev.target), active: $("[name=active]", ev.target).checked } });
+            closeModal(); toast("Produsul a fost salvat."); render();
+          } catch (err) { toast(err.message, "err"); }
+        });
+        $("#del-product", body).addEventListener("click", async () => {
+          try { await api(`/api/products/${p.id}`, { method: "DELETE" }); closeModal(); toast("Produsul a fost șters."); render(); }
+          catch (err) { toast(err.message, "err"); }
+        });
+      });
+    }
+    if (delNir && await confirmBox("Ștergeți recepția?", "Cantitatea va fi scăzută din stoc.")) {
+      try { await api(`/api/purchases/${delNir.dataset.delNir}`, { method: "DELETE" }); toast("Recepția a fost ștearsă."); render(); }
+      catch (err) { toast(err.message, "err"); }
+    }
+  });
+}
+
+/* ================= Clienți ================= */
+
+function clientFormHTML(c = {}) {
+  const types = ["B2B", "B2C", "Marketplace", "Online"];
+  return `
+    <div class="form-grid">
+      <label class="field" style="grid-column:1/-1"><span>Nume client</span><input name="name" required maxlength="120" value="${esc(c.name || "")}" placeholder="ex. Alfa Office SRL"></label>
+      <label class="field"><span>Tip</span><select name="type">${types.map((t) => `<option ${t === (c.type || "B2B") ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+      <label class="field"><span>Oraș</span><input name="city" maxlength="80" value="${esc(c.city || "")}"></label>
+      <label class="field"><span>Agent responsabil</span><input name="agent" maxlength="80" value="${esc(c.agent || "")}"></label>
+      <label class="field"><span>Termen de plată (zile)</span><input type="number" name="payment_terms" min="0" max="365" value="${esc(c.payment_terms ?? 0)}"><small>0 = plătește pe loc.</small></label>
+    </div>`;
+}
+
+function clientPayload(form) {
+  const d = formData(form);
+  return { ...d, payment_terms: Number(d.payment_terms) || 0 };
+}
+
+async function renderClients(view) {
+  const [clients, rec] = await Promise.all([api(`/api/clients?month=${state.month}`), api("/api/receivables")]);
+  const activeMonth = clients.filter((c) => c.month_sales > 0).length;
+  const today = todayISO();
+
+  view.innerHTML = `
+    <section class="stat-strip">
+      <div class="stat"><span>De încasat (cu TVA)</span><strong>${lei(rec.total)}</strong></div>
+      <div class="stat"><span>Trecut de scadență</span><strong style="color:${rec.overdue ? "var(--red)" : "var(--green)"}">${lei(rec.overdue)}</strong></div>
+      <div class="stat"><span>Facturi neîncasate</span><strong>${rec.count}</strong></div>
+      <div class="stat"><span>Clienți activi în ${esc(monthLabel(state.month))}</span><strong>${activeMonth} / ${clients.length}</strong></div>
+    </section>
+
+    <section class="grid cols-2 mt" style="align-items:start">
+      <article class="card glass">
+        <div class="card-head"><div><h2>Clienți</h2><p>Vânzări fără TVA în ${esc(monthLabel(state.month))} și în total</p></div>
+          <button class="btn btn-primary" id="add-client" type="button">${icon("plus")}Client nou</button></div>
+        <div class="table-wrap"><table class="compact">
+          <thead><tr><th>Client</th><th>Termen</th><th class="r">Luna</th><th class="r">Total</th><th class="r">De încasat</th><th></th></tr></thead>
+          <tbody>${clients.map((c) => `<tr>
+            <td><b>${esc(c.name)}</b> <span class="tag">${esc(c.type)}</span><br><small class="muted">${esc([c.city, c.agent].filter(Boolean).join(" · ") || "—")}</small></td>
+            <td>${c.payment_terms ? `${c.payment_terms} zile` : "pe loc"}</td>
+            <td class="r">${lei(c.month_sales)}</td>
+            <td class="r">${lei(c.total_sales)}</td>
+            <td class="r">${c.receivable ? `<b style="color:${c.overdue ? "var(--red)" : "var(--gold)"}">${lei(c.receivable)}</b>` : '<span class="muted">—</span>'}</td>
+            <td class="actions"><button class="icon-btn" data-edit-client="${c.id}" title="Editează">${icon("edit")}</button></td>
+          </tr>`).join("")}</tbody>
+        </table></div>
+      </article>
+
+      <article class="card glass">
+        <div class="card-head"><div><h2>Facturi de încasat</h2><p>Cele mai vechi scadențe primele</p></div></div>
+        ${rec.invoices.length ? `<ul class="due-list" id="due-list">${rec.invoices.map((i) => {
+          const late = i.due_date < today;
+          return `<li class="${late ? "late" : ""}" data-search="${esc(`${i.invoice_number} ${i.client_name}`.toLowerCase())}">
+            <div><b>${esc(i.client_name || "—")}</b><small>${esc(i.invoice_number || "")} · scadent ${formatDate(i.due_date)}${late ? " · restantă" : ""}</small></div>
+            <strong>${lei(i.amount, true)}</strong>
+            <button class="btn btn-sm" data-collect="${i.id}" type="button">${icon("check")}Încasat</button>
+          </li>`;
+        }).join("")}</ul>` : emptyState("Toate facturile sunt încasate.")}
+      </article>
+    </section>`;
+
+  const openForm = (c) => openModal(c ? `Editează ${c.name}` : "Client nou", `<form id="client-form">${clientFormHTML(c)}
+    <div class="form-actions">${c ? `<button class="btn btn-danger" type="button" id="del-client">${icon("trash")}Șterge</button>` : ""}
+    <button class="btn btn-ghost" type="button" onclick="closeModal()">Renunță</button>
+    <button class="btn btn-primary" type="submit">${icon("check")}Salvează</button></div></form>`, (body) => {
+    $("#client-form", body).addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        await api(c ? `/api/clients/${c.id}` : "/api/clients", { method: c ? "PUT" : "POST", body: clientPayload(e.target) });
+        closeModal(); toast("Clientul a fost salvat."); render();
+      } catch (err) { toast(err.message, "err"); }
+    });
+    $("#del-client", body)?.addEventListener("click", async () => {
+      try { await api(`/api/clients/${c.id}`, { method: "DELETE" }); closeModal(); toast("Clientul a fost șters."); render(); }
+      catch (err) { toast(err.message, "err"); }
+    });
+  });
+  $("#add-client").addEventListener("click", () => openForm());
+  view.addEventListener("click", async (e) => {
+    const edit = e.target.closest("[data-edit-client]"), collect = e.target.closest("[data-collect]");
+    if (edit) openForm(clients.find((c) => c.id === Number(edit.dataset.editClient)));
+    if (collect) {
+      try {
+        await api(`/api/sales/${collect.dataset.collect}/paid`, { method: "PATCH", body: { paid: true } });
+        toast("Factura a fost marcată încasată."); render();
+      } catch (err) { toast(err.message, "err"); }
     }
   });
 }
@@ -706,14 +1072,29 @@ function expenseFormHTML(exp = {}) {
       <label class="field"><span>Categorie</span><select name="category" required>
         ${state.categories.map((c) => `<option ${c.name === exp.category ? "selected" : ""}>${esc(c.name)}</option>`).join("")}
       </select></label>
-      <label class="field" style="grid-column:span 2"><span>Descriere</span><input name="description" maxlength="200" placeholder="ex. Factură furnizor" value="${esc(exp.description || "")}"></label>
-      <label class="field"><span>Sumă (lei)</span><input type="number" name="amount" min="0.01" step="0.01" required placeholder="0,00" value="${esc(exp.amount ?? "")}"></label>
-    </div>`;
+      <label class="field" style="grid-column:span 2"><span>Descriere</span><input name="description" maxlength="200" placeholder="ex. Factură energie electrică" value="${esc(exp.description || "")}"></label>
+      <label class="field"><span>Furnizor</span><input name="supplier" maxlength="120" value="${esc(exp.supplier || "")}"></label>
+      <label class="field"><span>Sumă fără TVA (lei)</span><input type="number" name="amount" min="0.01" step="0.01" required placeholder="0,00" value="${esc(exp.amount ?? "")}"></label>
+      <label class="field"><span>Cotă TVA</span><select name="vat_kind">
+        ${Object.entries(VAT_KINDS).map(([k, label]) => `<option value="${k}" ${k === (exp.vat_kind || categoryVat(exp.category || state.categories[0]?.name)) ? "selected" : ""}>${label}</option>`).join("")}
+      </select></label>
+    </div>
+    <p class="muted" style="font-size:12px;margin:8px 0 0">Marfa pentru vânzare se introduce la <a href="#stoc" onclick="closeModal()">Stoc → Recepție marfă</a>, nu aici.</p>`;
+}
+
+const VAT_KINDS = { standard: "Standard (21%)", reduced: "Redusă (11%)", none: "Fără TVA (scutit)" };
+const categoryVat = (name) => state.categories.find((c) => c.name === name)?.vat_kind || "standard";
+
+// Cota de TVA se schimbă automat după categorie (de exemplu comisioanele bancare sunt scutite).
+function wireExpenseForm(form) {
+  const category = $("[name=category]", form), vat = $("[name=vat_kind]", form);
+  category?.addEventListener("change", () => { vat.value = categoryVat(category.value); });
 }
 
 function expensePayload(form) {
   const d = formData(form);
-  return { date: d.date, category: d.category, description: d.description, amount: Number(d.amount) };
+  return { date: d.date, category: d.category, description: d.description, amount: Number(d.amount),
+    supplier: d.supplier, vat_kind: d.vat_kind };
 }
 
 async function renderExpenses(view) {
@@ -748,24 +1129,26 @@ async function renderExpenses(view) {
         <div class="toolbar"><label class="field search">${icon("search")}<input id="exp-search" placeholder="Caută…"></label></div>
       </div>
       ${expenses.length ? `<div class="table-wrap"><table>
-        <thead><tr><th>Data</th><th>Categorie</th><th>Descriere</th><th class="r">Sumă</th><th></th></tr></thead>
+        <thead><tr><th>Data</th><th>Categorie</th><th>Descriere</th><th>Furnizor</th><th class="r">Sumă</th><th></th></tr></thead>
         <tbody id="exp-rows">${expenses.map((x) => `
-          <tr data-search="${esc(`${x.category} ${x.description}`.toLowerCase())}">
+          <tr data-search="${esc(`${x.category} ${x.description} ${x.supplier || ""}`.toLowerCase())}">
             <td>${formatDate(x.date)}</td>
             <td><span class="tag"><span class="sw" style="background:${esc(categoryColor(x.category))}"></span>${esc(x.category)}</span></td>
-            <td>${esc(x.description) || '<span class="muted">—</span>'}</td>
+            <td>${esc(x.description) || '<span class="muted">—</span>'}${x.vat_kind !== "standard" ? ` <span class="tag">${x.vat_kind === "none" ? "fără TVA" : "TVA 11%"}</span>` : ""}</td>
+            <td>${esc(x.supplier || "—")}</td>
             <td class="r"><b>${lei(x.amount, true)}</b></td>
             <td class="actions">
               <button class="icon-btn" data-edit="${x.id}" title="Editează">${icon("edit")}</button>
               <button class="icon-btn danger" data-del="${x.id}" title="Șterge">${icon("trash")}</button>
             </td>
           </tr>`).join("")}</tbody>
-        <tfoot><tr><td colspan="3">Total lună</td><td class="r">${lei(total, true)}</td><td></td></tr></tfoot>
+        <tfoot><tr><td colspan="4">Total lună</td><td class="r">${lei(total, true)}</td><td></td></tr></tfoot>
       </table></div>` : emptyState("Nu există cheltuieli în această lună.")}
     </section>`;
 
   animateBars(view);
   $("#manage-cats").addEventListener("click", () => openCategories(render));
+  wireExpenseForm($("#expense-form"));
   $("#expense-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
@@ -784,6 +1167,7 @@ async function renderExpenses(view) {
       openModal("Editează cheltuiala", `<form id="edit-exp">${expenseFormHTML(exp)}
         <div class="form-actions"><button class="btn btn-ghost" type="button" onclick="closeModal()">Renunță</button>
         <button class="btn btn-primary" type="submit">${icon("check")}Salvează</button></div></form>`, (body) => {
+        wireExpenseForm($("#edit-exp", body));
         $("#edit-exp", body).addEventListener("submit", async (ev) => {
           ev.preventDefault();
           try {
@@ -1038,6 +1422,21 @@ async function renderTaxes(view) {
         <div class="kpi-value" data-count="${yearTaxes}"></div><div class="kpi-foot"><span class="sub">de la începutul anului</span></div></article>
     </section>
 
+    ${d.current.vat ? `
+    <section class="card glass mt vat-card">
+      <div class="card-head"><div><h2>TVA — decont ${esc(monthLabel(state.month))}</h2>
+        <p>TVA nu e un cost al firmei: o încasați de la clienți și o dați statului, minus TVA plătită furnizorilor. Cota standard: ${rateTxt(settings.vat_standard_rate)}%.</p></div></div>
+      <div class="vat-flow">
+        <div class="vat-box in"><span>TVA colectată de la clienți</span><strong>${lei(d.current.vat.collected, true)}</strong><small>${rateTxt(settings.vat_standard_rate)}% din ${lei(d.current.revenue)}</small></div>
+        <div class="vat-op">−</div>
+        <div class="vat-box out"><span>TVA plătită pe marfă</span><strong>${lei(d.current.vat.deductible_purchases, true)}</strong><small>din achizițiile de ${lei(d.current.purchases)}</small></div>
+        <div class="vat-op">−</div>
+        <div class="vat-box out"><span>TVA plătită pe cheltuieli</span><strong>${lei(d.current.vat.deductible_expenses, true)}</strong><small>chirie, utilități, servicii…</small></div>
+        <div class="vat-op">=</div>
+        <div class="vat-box total ${d.current.vat.payable < 0 ? "refund" : ""}"><span>${d.current.vat.payable >= 0 ? "TVA de plată la stat" : "TVA de recuperat"}</span><strong>${lei(Math.abs(d.current.vat.payable), true)}</strong><small>până pe 25 luna următoare</small></div>
+      </div>
+    </section>` : ""}
+
     <section class="grid cols-2-even mt">
       <article class="card glass">
         <div class="card-head"><div><h2>Ce taxe plătiți, pe înțeles</h2><p>${esc(monthLabel(state.month))}</p></div></div>
@@ -1055,7 +1454,7 @@ async function renderTaxes(view) {
           <div style="flex:${sample.income_tax};background:#38bdf8">Imp.</div>
         </div>
         <p class="muted" style="font-size:13px;margin:0 0 18px">Pentru fiecare 100 lei brut, angajatul primește <b style="color:var(--text)">${numberFmt2.format(sample.net)} lei</b>, iar firma mai plătește <b style="color:var(--text)">${numberFmt2.format(sample.cam)} lei</b> CAM. Costul real al unui salariu este brutul + CAM.</p>
-        <div class="card-head" style="margin-bottom:8px"><div><h3>Taxe pe ultimele 12 luni</h3></div></div>
+        <div class="card-head" style="margin-bottom:8px"><div><h3>Taxe lunare</h3></div></div>
         <div class="chart-box sm"><canvas id="tax-chart"></canvas></div>
       </article>
     </section>`;
@@ -1068,6 +1467,7 @@ async function renderTaxes(view) {
       datasets: [
         { label: "Taxe din salarii", data: d.trend.map((m) => m.salary_taxes), backgroundColor: "#a78bfa", borderRadius: 6, stack: "t", maxBarThickness: 20 },
         { label: d.current.company_tax_label, data: d.trend.map((m) => m.company_tax), backgroundColor: "#fbbf24", borderRadius: 6, stack: "t", maxBarThickness: 20 },
+        ...(d.current.vat ? [{ label: "TVA de plată", data: d.trend.map((m) => m.vat_payable), backgroundColor: "#38bdf8", borderRadius: 6, stack: "v", maxBarThickness: 20 }] : []),
       ],
     },
     options: {
@@ -1084,11 +1484,25 @@ async function renderTaxes(view) {
 async function renderReports(view) {
   const d = await api(`/api/dashboard?month=${state.month}`);
   const c = d.current;
+  // Aceeași structură ca în raportul contabilului (contul de profit și pierdere).
   const rows = [
-    ["Venituri din vânzări", c.revenue, "var(--cyan)"], ["Cheltuieli operaționale", -c.operating_expenses],
-    ["Salarii brute", -c.payroll.gross], ["CAM (plătit de firmă)", -c.taxes.cam],
-    ["Profit înainte de impozit", c.profit_before_tax], [c.company_tax_label, -c.taxes.company_tax], ["Profit net", c.profit, c.profit >= 0 ? "var(--green)" : "var(--red)"],
+    ["Venituri din vânzări", c.revenue, "var(--cyan)"],
+    ["Costul mărfii vândute", -c.cogs],
+    ["Marja brută", c.gross_margin, "var(--violet)", `${pct(c.gross_margin_pct)}`],
+    ...Object.entries(c.expenses_by_category).map(([name, value]) => [`&nbsp;&nbsp;&nbsp;${esc(name)}`, -value]),
+    ["&nbsp;&nbsp;&nbsp;Salarii brute", -c.payroll.gross], ["&nbsp;&nbsp;&nbsp;CAM (contribuție angajator)", -c.taxes.cam],
+    ["Total cheltuieli operaționale", -c.opex_total, "var(--text)"],
+    ["Profit înainte de impozit", c.profit_before_tax, "var(--text)"],
+    [c.company_tax_label, -c.taxes.company_tax],
+    ["Profit net", c.profit, c.profit >= 0 ? "var(--green)" : "var(--red)", `marjă ${pct(c.margin)}`],
     ["Impozit pe dividende (estimat)", -c.dividend_tax], ["Rămâne proprietarului", c.owner_income, "var(--gold)"],
+  ];
+  const controls = [
+    ["Achiziții marfă (fără TVA)", lei(c.purchases, true)], ["Valoare stoc la final de lună", lei(c.stock_value, true)],
+    ...(c.vat ? [["TVA de plată", lei(c.vat.payable, true)]] : []),
+    ["Salarii nete de plată", lei(c.payroll.net, true)],
+    ["Contribuții și impozit salarii (CAS+CASS+impozit+CAM)", lei(c.taxes.cas + c.taxes.cass + c.taxes.income_tax + c.taxes.cam, true)],
+    ["Creanțe clienți neîncasate (cu TVA, azi)", lei(d.receivables.total, true)], ["Număr facturi emise", c.sales_count],
   ];
   const year = d.trend;
   const sum = (k) => year.reduce((s, m) => s + m[k], 0);
@@ -1097,7 +1511,7 @@ async function renderReports(view) {
     <section class="grid cols-2-even">
       <button class="card glass export-card" id="exp-excel" type="button">
         <span class="ic" style="background:rgba(52,211,153,.15);color:var(--green)">${icon("excel")}</span>
-        <div><h3>Descarcă Excel</h3><p>Raport ${esc(c.label)}: sumar, vânzări, cheltuieli, salarii — pe foi separate.</p></div>
+        <div><h3>Descarcă Excel</h3><p>Raport ${esc(c.label)} pentru contabil: cont de profit și pierdere, TVA, vânzări, achiziții, cheltuieli, stocuri, salarii.</p></div>
       </button>
       <button class="card glass export-card" id="exp-pdf" type="button">
         <span class="ic" style="background:rgba(248,113,113,.15);color:var(--red)">${icon("pdf")}</span>
@@ -1107,14 +1521,18 @@ async function renderReports(view) {
 
     <section class="grid cols-2-even mt" style="align-items:start">
       <article class="card glass">
-        <div class="card-head"><div><h2>Calculul lunii — ${esc(c.label)}</h2><p>De la venituri la ce vă rămâne</p></div></div>
+        <div class="card-head"><div><h2>Contul de profit și pierdere — ${esc(c.label)}</h2><p>Aceeași structură ca raportul contabilului</p></div></div>
         <div class="table-wrap"><table><tbody>
-          ${rows.map(([name, value, color]) => `<tr><td${color ? ' style="font-weight:700"' : ""}>${name}</td>
-            <td class="r" style="${color ? `color:${color};font-weight:800;font-size:16px` : "color:var(--muted)"}">${value < 0 ? "− " : ""}${lei(Math.abs(value), true)}</td></tr>`).join("")}
+          ${rows.map(([name, value, color, note]) => `<tr><td${color ? ' style="font-weight:700"' : ""}>${name}${note ? ` <small class="muted">${note}</small>` : ""}</td>
+            <td class="r" style="${color ? `color:${color};font-weight:800;font-size:15px` : "color:var(--muted)"}">${value < 0 ? "− " : ""}${lei(Math.abs(value), true)}</td></tr>`).join("")}
+        </tbody></table></div>
+        <h3 style="font-size:14px;margin:22px 0 6px">Indicatori de control</h3>
+        <div class="table-wrap"><table class="compact"><tbody>
+          ${controls.map(([name, value]) => `<tr><td>${name}</td><td class="r"><b>${value}</b></td></tr>`).join("")}
         </tbody></table></div>
       </article>
       <article class="card glass">
-        <div class="card-head"><div><h2>Ultimele 12 luni</h2><p>Comparație lună de lună</p></div></div>
+        <div class="card-head"><div><h2>Evoluție lunară</h2><p>Comparație lună de lună</p></div></div>
         <div class="table-wrap"><table class="compact">
           <thead><tr><th>Luna</th><th class="r">Venituri</th><th class="r">Costuri</th><th class="r">Profit</th><th class="r">Marjă</th></tr></thead>
           <tbody>${year.slice().reverse().map((m) => `<tr${m.month === state.month ? ' style="background:rgba(34,211,238,.07)"' : ""}>
@@ -1159,6 +1577,7 @@ async function renderSettings(view) {
                 <option value="profit" ${s.tax_regime === "profit" ? "selected" : ""}>Impozit pe profit (16% din profit)</option>
                 <option value="micro" ${s.tax_regime === "micro" ? "selected" : ""}>Microîntreprindere (% din venituri)</option>
               </select></label>
+              <label class="check" style="grid-column:1/-1"><input type="checkbox" name="vat_payer" ${s.vat_payer === "1" ? "checked" : ""}><span>Firma este plătitoare de TVA (calculează TVA colectată, deductibilă și de plată)</span></label>
             </div>
             <div class="form-actions"><button class="btn btn-primary" type="submit">${icon("check")}Salvează</button></div>
           </form>
@@ -1200,9 +1619,22 @@ async function renderSettings(view) {
             <button class="btn btn-sm" id="cats-btn" type="button">${icon("edit")}Gestionează</button></div>
           <div class="toolbar">${state.categories.map((c) => `<span class="tag"><span class="sw" style="background:${esc(c.color)}"></span>${esc(c.name)}</span>`).join("")}</div>
         </article>
+        <article class="card glass import-card">
+          <div class="card-head"><div><h2>Import din Excel / CSV</h2><p>Aduceți datele din fișierele folosite până acum: produse, clienți, angajați, vânzări, cheltuieli, inventar sau raportul contabil.</p></div></div>
+          <form id="import-form">
+            <label class="dropzone" id="dropzone">
+              <input type="file" name="files" multiple accept=".csv,.xlsx" hidden>
+              ${icon("excel")}<b>Alegeți fișierele</b><span>sau trageți-le aici · .xlsx sau .csv</span>
+              <span class="files" id="import-files"></span>
+            </label>
+            <label class="check" style="margin-top:12px"><input type="checkbox" name="replace"><span>Înlocuiește datele existente (altfel se adaugă doar ce lipsește)</span></label>
+            <div class="form-actions"><button class="btn btn-primary" type="submit" id="import-btn">${icon("refresh")}Importă</button></div>
+            <div id="import-result"></div>
+          </form>
+        </article>
         <article class="card glass" style="border-color:rgba(248,113,113,.3)">
-          <div class="card-head"><div><h2>Date demonstrative</h2><p>Înlocuiește TOATE datele cu un an de activitate fictivă. Util pentru prezentări.</p></div></div>
-          <button class="btn btn-danger" id="demo-btn" type="button">${icon("alert")}Reîncarcă datele demo</button>
+          <div class="card-head"><div><h2>Datele firmei T3 2026</h2><p>Înlocuiește TOATE datele cu fișierele primite de la firmă (raportul contabil iulie–septembrie 2026).</p></div></div>
+          <button class="btn btn-danger" id="demo-btn" type="button">${icon("alert")}Reîncarcă datele firmei</button>
         </article>
       </div>
     </section>`;
@@ -1210,7 +1642,7 @@ async function renderSettings(view) {
   $("#settings-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const d = formData(e.target);
-    const body = { company_name: d.company_name, owner_name: d.owner_name, tax_regime: d.tax_regime };
+    const body = { company_name: d.company_name, owner_name: d.owner_name, tax_regime: d.tax_regime, vat_payer: $("[name=vat_payer]", e.target).checked };
     try {
       await api("/api/settings", { method: "PUT", body });
       $("#brand-name").textContent = body.company_name;
@@ -1237,11 +1669,47 @@ async function renderSettings(view) {
     } catch (err) { toast(err.message, "err"); }
   });
   $("#cats-btn").addEventListener("click", () => openCategories(render));
+  wireImport(view);
   $("#demo-btn").addEventListener("click", async () => {
-    if (await confirmBox("Reîncărcați datele demo?", "Toate vânzările, cheltuielile și angajații actuali vor fi înlocuiți cu date fictive.", "Da, înlocuiește")) {
-      try { await api("/api/demo", { method: "POST" }); toast("Datele demo au fost încărcate."); location.hash = "#dashboard"; }
+    if (await confirmBox("Reîncărcați datele firmei?", "Toate datele actuale vor fi înlocuite cu cele din raportul contabil T3 2026.", "Da, înlocuiește")) {
+      try { await api("/api/demo", { method: "POST" }); toast("Datele firmei au fost încărcate."); state.month = "2026-09"; location.hash = "#dashboard"; render(); }
       catch (err) { toast(err.message, "err"); }
     }
+  });
+}
+
+const IMPORT_LABELS = { clients: "clienți", products: "produse", stock: "stocuri inițiale", purchases: "recepții",
+  sales: "facturi", expenses: "cheltuieli", employees: "angajați" };
+
+function wireImport(view) {
+  const form = $("#import-form", view);
+  const input = $("[name=files]", form), zone = $("#dropzone", form);
+  const show = () => { $("#import-files", form).textContent = [...input.files].map((f) => f.name).join(", "); };
+  input.addEventListener("change", show);
+  ["dragover", "dragenter"].forEach((ev) => zone.addEventListener(ev, (e) => { e.preventDefault(); zone.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((ev) => zone.addEventListener(ev, () => zone.classList.remove("over")));
+  zone.addEventListener("drop", (e) => { e.preventDefault(); input.files = e.dataTransfer.files; show(); });
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!input.files.length) { toast("Alegeți cel puțin un fișier.", "err"); return; }
+    const data = new FormData();
+    [...input.files].forEach((f) => data.append("files", f));
+    data.append("replace", $("[name=replace]", form).checked ? "true" : "false");
+    const btn = $("#import-btn", form);
+    btn.disabled = true; btn.classList.add("spinning");
+    try {
+      const res = await fetch("/api/import", { method: "POST", body: data, credentials: "same-origin" });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.detail || "Importul nu a reușit.");
+      const parts = Object.entries(result.counts).map(([k, n]) => `<li><b>${n}</b> ${IMPORT_LABELS[k] || k}</li>`);
+      $("#import-result", form).innerHTML = `<div class="preview"><b>Import reușit.</b>
+        ${parts.length ? `<ul>${parts.join("")}</ul>` : "<p class='muted'>Nimic nou: datele existau deja.</p>"}
+        ${result.warnings.map((w) => `<p class="muted">${esc(w)}</p>`).join("")}</div>`;
+      toast("Datele au fost importate.");
+      robot.refresh();
+    } catch (err) {
+      $("#import-result", form).innerHTML = `<p class="error">${esc(err.message)}</p>`;
+    } finally { btn.disabled = false; btn.classList.remove("spinning"); }
   });
 }
 
@@ -1318,6 +1786,14 @@ const robot = {
       const ch = now.changes.revenue;
       msgs.push({ html: `Luna aceasta, până azi: <b>${lei(now.current.revenue)}</b> încasări${ch !== null ? `, <b class="${ch >= 0 ? "pos" : "neg"}">${ch >= 0 ? "+" : "−"}${pct(Math.abs(ch))}</b> față de aceeași perioadă a lunii trecute` : ""}.` });
     }
+    const overdue = now.receivables.clients.filter((x) => x.overdue);
+    if (overdue.length) {
+      msgs.push({ tone: "warn", html: `${icon("wallet")} Ai <b>${lei(now.receivables.overdue)}</b> de încasat de la clienți care au trecut de scadență: ${overdue.slice(0, 3).map((x) => `<b>${esc(x.client)}</b> (${lei(x.overdue)})`).join(", ")}. Merită un telefon.` });
+    }
+    if (now.low_stock.length) {
+      msgs.push({ tone: "warn", html: `${icon("box")} Stoc pe terminate: ${now.low_stock.slice(0, 3).map((x) => `<b>${esc(x.name)}</b> (${x.stock} buc.)`).join(", ")}${now.low_stock.length > 3 ? ` și încă ${now.low_stock.length - 3}` : ""}. Fă o comandă la furnizori.` });
+    }
+    if (p.vat) msgs.push({ html: `${icon("taxes")} Pentru ${esc(p.label)} ai de plătit <b>${lei(p.vat.payable)}</b> TVA, până pe 25 a lunii următoare.` });
     const warn = past.insights.find((n) => n.tone === "warn" || n.tone === "bad");
     if (warn) msgs.push({ html: `${icon("alert")} ${esc(warn.text)}`, tone: "warn" });
 
@@ -1383,7 +1859,7 @@ const robot = {
 /* ================= Adăugare rapidă (mai ales pe telefon) ================= */
 
 async function quickAdd(kind = "sale") {
-  await loadCategories();
+  await Promise.all([loadCategories(), loadCatalog()]);
   const body = (k) => `
     <div class="segmented" style="margin-bottom:16px">
       <button type="button" data-kind="sale" class="${k === "sale" ? "active" : ""}">Vânzare</button>
@@ -1395,14 +1871,15 @@ async function quickAdd(kind = "sale") {
   const mount = (root, k) => {
     $$("[data-kind]", root).forEach((b) => b.addEventListener("click", () => { root.innerHTML = body(b.dataset.kind); mount(root, b.dataset.kind); }));
     const form = $("#quick-form", root);
-    if (k === "sale") wireSaleForm(form);
+    if (k === "sale") wireSaleForm(form); else wireExpenseForm(form);
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       try {
         const payload = k === "sale" ? salePayload(form, "order") : expensePayload(form);
-        await api(k === "sale" ? "/api/sales" : "/api/expenses", { method: "POST", body: payload });
+        const result = await api(k === "sale" ? "/api/sales" : "/api/expenses", { method: "POST", body: payload });
+        if (result.warning) toast(result.warning, "err");
         closeModal();
-        toast(`${k === "sale" ? "Vânzare" : "Cheltuială"} salvată: ${lei(payload.amount, true)}`);
+        toast(k === "sale" ? `Factura ${result.invoice_number} a fost emisă.` : `Cheltuială salvată: ${lei(payload.amount, true)}`);
         setMonthFromDate(payload.date);
         render();
       } catch (err) { toast(err.message, "err"); }

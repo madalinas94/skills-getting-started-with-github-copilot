@@ -6,20 +6,23 @@ Pornire: uvicorn app.main:app --host 0.0.0.0 --port 8000 (din folderul testify_h
 import asyncio
 import re
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, Cookie, Depends, FastAPI, HTTPException, Query, Response
+from fastapi import (APIRouter, Cookie, Depends, FastAPI, File, Form, HTTPException, Query,
+                     Response, UploadFile)
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
-from . import auth, calc, demo, exports, fiscal
+from . import auth, calc, demo, exports, fiscal, importer, inventory
 from .db import DEFAULT_SETTINGS, get_conn, get_settings, init_db, set_setting
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 MONTH_PATTERN = r"^\d{4}-(0[1-9]|1[0-2])$"
+VAT_KIND_PATTERN = r"^(standard|reduced|none)$"
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 
 def run_fiscal_check() -> dict:
@@ -181,11 +184,17 @@ def export_pdf(month: str = Query(pattern=MONTH_PATTERN)):
 # ---------- Vânzări ----------
 
 class SaleIn(BaseModel):
+    """O factură pe un produs din stoc sau un total pe zi/lună (fără produs)."""
     date: str
-    description: str = Field(min_length=1, max_length=200)
-    product: str | None = Field(default=None, max_length=200)
+    product_id: int | None = None
+    client_id: int | None = None
     quantity: int | None = Field(default=None, ge=1)
-    amount: float = Field(gt=0)
+    unit_price: float | None = Field(default=None, gt=0)
+    amount: float | None = Field(default=None, gt=0)
+    cost_total: float | None = Field(default=None, ge=0)
+    description: str = Field(default="", max_length=200)
+    invoice_number: str | None = Field(default=None, max_length=40)
+    paid: bool | None = None
 
     @field_validator("date")
     @classmethod
@@ -193,36 +202,119 @@ class SaleIn(BaseModel):
         return valid_date(value)
 
 
+def next_invoice_number(conn) -> str:
+    numbers = [int(match.group(1)) for (number,) in conn.execute(
+        "SELECT invoice_number FROM sales WHERE invoice_number LIKE 'NB-%'")
+        if (match := re.match(r"NB-(\d+)$", number or ""))]
+    return f"NB-{max(numbers, default=1000) + 1:04d}"
+
+
+def sale_values(conn, body: SaleIn) -> dict:
+    """Completează o vânzare: preț și cost din produs, scadență din termenul clientului."""
+    client = None
+    if body.client_id:
+        client = conn.execute("SELECT * FROM clients WHERE id = ?", (body.client_id,)).fetchone()
+        if not client:
+            raise HTTPException(status_code=404, detail="Clientul nu există.")
+    terms = client["payment_terms"] if client else 0
+    due = (date.fromisoformat(body.date) + timedelta(days=terms)).isoformat()
+    values = {"date": body.date, "client_id": body.client_id, "due_date": due,
+              "paid": int(body.paid if body.paid is not None else terms == 0)}
+    if body.product_id:
+        product = conn.execute("SELECT * FROM products WHERE id = ?", (body.product_id,)).fetchone()
+        if not product:
+            raise HTTPException(status_code=404, detail="Produsul nu există.")
+        quantity = body.quantity or 1
+        price = body.unit_price or product["sale_price"]
+        if not price:
+            raise HTTPException(status_code=422, detail="Completați prețul de vânzare.")
+        values.update(product_id=product["id"], product=product["name"], quantity=quantity,
+                      unit_price=price, unit_cost=product["cost"], amount=round(quantity * price, 2),
+                      description=body.description or f"{product['name']} ×{quantity}")
+    else:
+        if not body.amount:
+            raise HTTPException(status_code=422, detail="Completați suma vânzării.")
+        if not body.description.strip():
+            raise HTTPException(status_code=422, detail="Completați descrierea.")
+        values.update(product_id=None, product=None, quantity=None, unit_price=None,
+                      unit_cost=body.cost_total or 0, amount=round(body.amount, 2),
+                      description=body.description.strip())
+    return values
+
+
+SALE_COLUMNS = ["date", "description", "product", "quantity", "amount", "product_id", "client_id",
+                "unit_price", "unit_cost", "due_date", "paid"]
+
+
+def stock_warning(conn, product_id: int | None) -> str | None:
+    if not product_id:
+        return None
+    product = next((p for p in inventory.products_overview(conn) if p["id"] == product_id), None)
+    if product and product["stock"] < 0:
+        return f"Atenție: stocul pentru „{product['name']}” a ajuns la {product['stock']} buc."
+    if product and product["status"] == "low":
+        return f"Mai sunt doar {product['stock']} buc. din „{product['name']}”."
+    return None
+
+
 @api.get("/sales")
 def list_sales(month: str = Query(default_factory=calc.current_month, pattern=MONTH_PATTERN)):
     start, end = calc.month_bounds(month)
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT * FROM sales WHERE date BETWEEN ? AND ? ORDER BY date DESC, id DESC",
+            "SELECT s.*, c.name AS client_name, c.type AS client_type FROM sales s "
+            "LEFT JOIN clients c ON c.id = s.client_id WHERE s.date BETWEEN ? AND ? "
+            "ORDER BY s.date DESC, s.id DESC",
             (start, end),
         ).fetchall()
     return [dict(row) for row in rows]
 
 
+@api.get("/sales/next-invoice")
+def get_next_invoice():
+    with get_conn() as conn:
+        return {"invoice_number": next_invoice_number(conn)}
+
+
 @api.post("/sales", status_code=201)
 def create_sale(body: SaleIn):
     with get_conn() as conn:
+        values = sale_values(conn, body)
+        values["invoice_number"] = body.invoice_number or next_invoice_number(conn)
+        columns = SALE_COLUMNS + ["invoice_number"]
         cursor = conn.execute(
-            "INSERT INTO sales(date, description, product, quantity, amount) VALUES (?, ?, ?, ?, ?)",
-            (body.date, body.description, body.product or None, body.quantity, body.amount),
+            f"INSERT INTO sales({', '.join(columns)}) VALUES ({', '.join('?' * len(columns))})",
+            [values[column] for column in columns],
         )
-    return {"id": cursor.lastrowid}
+        warning = stock_warning(conn, values["product_id"])
+    return {"id": cursor.lastrowid, "invoice_number": values["invoice_number"], "warning": warning}
 
 
 @api.put("/sales/{sale_id}")
 def update_sale(sale_id: int, body: SaleIn):
     with get_conn() as conn:
+        values = sale_values(conn, body)
+        if body.invoice_number:
+            values["invoice_number"] = body.invoice_number
         cursor = conn.execute(
-            "UPDATE sales SET date = ?, description = ?, product = ?, quantity = ?, amount = ? "
-            "WHERE id = ?",
-            (body.date, body.description, body.product or None, body.quantity, body.amount, sale_id),
+            f"UPDATE sales SET {', '.join(f'{column} = ?' for column in values)} WHERE id = ?",
+            [*values.values(), sale_id],
         )
         if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Vânzarea nu există.")
+        warning = stock_warning(conn, values["product_id"])
+    return {"ok": True, "warning": warning}
+
+
+class PaidIn(BaseModel):
+    paid: bool
+
+
+@api.patch("/sales/{sale_id}/paid")
+def set_sale_paid(sale_id: int, body: PaidIn):
+    with get_conn() as conn:
+        if conn.execute("UPDATE sales SET paid = ? WHERE id = ?",
+                        (int(body.paid), sale_id)).rowcount == 0:
             raise HTTPException(status_code=404, detail="Vânzarea nu există.")
     return {"ok": True}
 
@@ -242,6 +334,8 @@ class ExpenseIn(BaseModel):
     category: str = Field(min_length=1, max_length=100)
     description: str = Field(default="", max_length=200)
     amount: float = Field(gt=0)
+    supplier: str = Field(default="", max_length=120)
+    vat_kind: str = Field(default="standard", pattern=VAT_KIND_PATTERN)
 
     @field_validator("date")
     @classmethod
@@ -252,6 +346,7 @@ class ExpenseIn(BaseModel):
 class CategoryIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     color: str = Field(default="#94a3b8", pattern=r"^#[0-9a-fA-F]{6}$")
+    vat_kind: str = Field(default="standard", pattern=VAT_KIND_PATTERN)
 
 
 @api.get("/expenses")
@@ -269,8 +364,9 @@ def list_expenses(month: str = Query(default_factory=calc.current_month, pattern
 def create_expense(body: ExpenseIn):
     with get_conn() as conn:
         cursor = conn.execute(
-            "INSERT INTO expenses(date, category, description, amount) VALUES (?, ?, ?, ?)",
-            (body.date, body.category, body.description, body.amount),
+            "INSERT INTO expenses(date, category, description, amount, supplier, vat_kind) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (body.date, body.category, body.description, body.amount, body.supplier, body.vat_kind),
         )
     return {"id": cursor.lastrowid}
 
@@ -279,8 +375,10 @@ def create_expense(body: ExpenseIn):
 def update_expense(expense_id: int, body: ExpenseIn):
     with get_conn() as conn:
         cursor = conn.execute(
-            "UPDATE expenses SET date = ?, category = ?, description = ?, amount = ? WHERE id = ?",
-            (body.date, body.category, body.description, body.amount, expense_id),
+            "UPDATE expenses SET date = ?, category = ?, description = ?, amount = ?, supplier = ?, "
+            "vat_kind = ? WHERE id = ?",
+            (body.date, body.category, body.description, body.amount, body.supplier, body.vat_kind,
+             expense_id),
         )
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Cheltuiala nu există.")
@@ -308,7 +406,8 @@ def create_category(body: CategoryIn):
         if conn.execute("SELECT 1 FROM categories WHERE name = ?", (body.name,)).fetchone():
             raise HTTPException(status_code=400, detail="Categoria există deja.")
         cursor = conn.execute(
-            "INSERT INTO categories(name, color) VALUES (?, ?)", (body.name, body.color)
+            "INSERT INTO categories(name, color, vat_kind) VALUES (?, ?, ?)",
+            (body.name, body.color, body.vat_kind),
         )
     return {"id": cursor.lastrowid}
 
@@ -329,6 +428,214 @@ def delete_category(category_id: int):
             )
         conn.execute("DELETE FROM categories WHERE id = ?", (category_id,))
     return {"ok": True}
+
+
+# ---------- Produse, stoc și recepții de marfă ----------
+
+class ProductIn(BaseModel):
+    code: str = Field(min_length=1, max_length=40)
+    name: str = Field(min_length=1, max_length=200)
+    category: str = Field(default="", max_length=100)
+    supplier: str = Field(default="", max_length=120)
+    sale_price: float = Field(ge=0)
+    cost: float = Field(ge=0)
+    min_stock: int = Field(default=0, ge=0)
+    opening_stock: int = Field(default=0, ge=0)
+    active: bool = True
+
+
+class PurchaseIn(BaseModel):
+    date: str
+    product_id: int
+    quantity: int = Field(ge=1)
+    unit_cost: float | None = Field(default=None, gt=0)
+    supplier: str = Field(default="", max_length=120)
+    doc_number: str = Field(default="", max_length=40)
+
+    @field_validator("date")
+    @classmethod
+    def check_date(cls, value):
+        return valid_date(value)
+
+
+@api.get("/products")
+def list_products():
+    with get_conn() as conn:
+        return inventory.products_overview(conn)
+
+
+@api.post("/products", status_code=201)
+def create_product(body: ProductIn):
+    with get_conn() as conn:
+        if conn.execute("SELECT 1 FROM products WHERE code = ?", (body.code,)).fetchone():
+            raise HTTPException(status_code=400, detail="Există deja un produs cu acest cod.")
+        cursor = conn.execute(
+            "INSERT INTO products(code, name, category, supplier, sale_price, cost, min_stock, "
+            "opening_stock, opening_date, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (body.code, body.name, body.category, body.supplier, body.sale_price, body.cost,
+             body.min_stock, body.opening_stock, date.today().isoformat(), int(body.active)),
+        )
+    return {"id": cursor.lastrowid}
+
+
+@api.put("/products/{product_id}")
+def update_product(product_id: int, body: ProductIn):
+    with get_conn() as conn:
+        clash = conn.execute("SELECT id FROM products WHERE code = ? AND id != ?",
+                             (body.code, product_id)).fetchone()
+        if clash:
+            raise HTTPException(status_code=400, detail="Există deja un produs cu acest cod.")
+        cursor = conn.execute(
+            "UPDATE products SET code = ?, name = ?, category = ?, supplier = ?, sale_price = ?, "
+            "cost = ?, min_stock = ?, active = ? WHERE id = ?",
+            (body.code, body.name, body.category, body.supplier, body.sale_price, body.cost,
+             body.min_stock, int(body.active), product_id),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Produsul nu există.")
+    return {"ok": True}
+
+
+@api.delete("/products/{product_id}")
+def delete_product(product_id: int):
+    with get_conn() as conn:
+        used = conn.execute(
+            "SELECT (SELECT COUNT(*) FROM sales WHERE product_id = ?) + "
+            "(SELECT COUNT(*) FROM purchases WHERE product_id = ?)", (product_id, product_id),
+        ).fetchone()[0]
+        if used:
+            raise HTTPException(status_code=400, detail="Produsul are vânzări sau recepții. "
+                                "Îl puteți marca inactiv în loc să-l ștergeți.")
+        if conn.execute("DELETE FROM products WHERE id = ?", (product_id,)).rowcount == 0:
+            raise HTTPException(status_code=404, detail="Produsul nu există.")
+    return {"ok": True}
+
+
+@api.get("/purchases")
+def list_purchases(month: str = Query(default_factory=calc.current_month, pattern=MONTH_PATTERN)):
+    start, end = calc.month_bounds(month)
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT pu.*, p.name AS product_name, p.code AS product_code, "
+            "pu.quantity * pu.unit_cost AS value FROM purchases pu "
+            "JOIN products p ON p.id = pu.product_id WHERE pu.date BETWEEN ? AND ? "
+            "ORDER BY pu.date DESC, pu.id DESC", (start, end)).fetchall()
+    return [dict(row) for row in rows]
+
+
+@api.post("/purchases", status_code=201)
+def create_purchase(body: PurchaseIn):
+    """Recepție de marfă: crește stocul. Costul intră în profit când marfa se vinde."""
+    with get_conn() as conn:
+        product = conn.execute("SELECT * FROM products WHERE id = ?", (body.product_id,)).fetchone()
+        if not product:
+            raise HTTPException(status_code=404, detail="Produsul nu există.")
+        cost = body.unit_cost or product["cost"]
+        doc = body.doc_number or f"NIR-{date.today():%y%m%d}-{body.product_id}"
+        cursor = conn.execute(
+            "INSERT INTO purchases(date, doc_number, supplier, product_id, quantity, unit_cost) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (body.date, doc, body.supplier or product["supplier"], product["id"], body.quantity, cost),
+        )
+        if cost != product["cost"]:  # costul de achiziție se actualizează la ultimul preț
+            conn.execute("UPDATE products SET cost = ? WHERE id = ?", (cost, product["id"]))
+    return {"id": cursor.lastrowid}
+
+
+@api.delete("/purchases/{purchase_id}")
+def delete_purchase(purchase_id: int):
+    with get_conn() as conn:
+        if conn.execute("DELETE FROM purchases WHERE id = ?", (purchase_id,)).rowcount == 0:
+            raise HTTPException(status_code=404, detail="Recepția nu există.")
+    return {"ok": True}
+
+
+@api.get("/inventory")
+def get_inventory(month: str = Query(default_factory=calc.current_month, pattern=MONTH_PATTERN)):
+    with get_conn() as conn:
+        return inventory.inventory_month(conn, month)
+
+
+# ---------- Clienți și încasări ----------
+
+class ClientIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    type: str = Field(default="B2B", max_length=40)
+    city: str = Field(default="", max_length=80)
+    agent: str = Field(default="", max_length=80)
+    payment_terms: int = Field(default=0, ge=0, le=365)
+
+
+@api.get("/clients")
+def list_clients(month: str = Query(default_factory=calc.current_month, pattern=MONTH_PATTERN)):
+    start, end = calc.month_bounds(month)
+    with get_conn() as conn:
+        due = {item["client"]: item for item in calc.receivables(conn)["clients"]}
+        rows = conn.execute(
+            "SELECT c.*, "
+            "COALESCE((SELECT SUM(amount) FROM sales s WHERE s.client_id = c.id "
+            "AND s.date BETWEEN ? AND ?), 0) AS month_sales, "
+            "COALESCE((SELECT SUM(amount) FROM sales s WHERE s.client_id = c.id), 0) AS total_sales, "
+            "(SELECT COUNT(*) FROM sales s WHERE s.client_id = c.id) AS invoices, "
+            "(SELECT MAX(date) FROM sales s WHERE s.client_id = c.id) AS last_sale "
+            "FROM clients c ORDER BY total_sales DESC", (start, end)).fetchall()
+        return [{**dict(row), "receivable": due.get(row["name"], {}).get("amount", 0),
+                 "overdue": due.get(row["name"], {}).get("overdue", 0)} for row in rows]
+
+
+@api.post("/clients", status_code=201)
+def create_client(body: ClientIn):
+    with get_conn() as conn:
+        if conn.execute("SELECT 1 FROM clients WHERE name = ?", (body.name,)).fetchone():
+            raise HTTPException(status_code=400, detail="Clientul există deja.")
+        cursor = conn.execute(
+            "INSERT INTO clients(name, type, city, agent, payment_terms) VALUES (?, ?, ?, ?, ?)",
+            (body.name, body.type, body.city, body.agent, body.payment_terms))
+    return {"id": cursor.lastrowid}
+
+
+@api.put("/clients/{client_id}")
+def update_client(client_id: int, body: ClientIn):
+    with get_conn() as conn:
+        cursor = conn.execute(
+            "UPDATE clients SET name = ?, type = ?, city = ?, agent = ?, payment_terms = ? WHERE id = ?",
+            (body.name, body.type, body.city, body.agent, body.payment_terms, client_id))
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Clientul nu există.")
+    return {"ok": True}
+
+
+@api.delete("/clients/{client_id}")
+def delete_client(client_id: int):
+    with get_conn() as conn:
+        if conn.execute("SELECT 1 FROM sales WHERE client_id = ?", (client_id,)).fetchone():
+            raise HTTPException(status_code=400, detail="Clientul are facturi și nu poate fi șters.")
+        if conn.execute("DELETE FROM clients WHERE id = ?", (client_id,)).rowcount == 0:
+            raise HTTPException(status_code=404, detail="Clientul nu există.")
+    return {"ok": True}
+
+
+@api.get("/receivables")
+def get_receivables():
+    with get_conn() as conn:
+        return calc.receivables(conn)
+
+
+# ---------- Import din fișierele firmei ----------
+
+@api.post("/import")
+async def import_data(files: list[UploadFile] = File(...), replace: bool = Form(False)):
+    contents = []
+    for upload in files:
+        data = await upload.read()
+        if len(data) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail=f"„{upload.filename}” depășește 10 MB.")
+        contents.append((upload.filename or "fisier", data))
+    try:
+        with get_conn() as conn:
+            return importer.import_files(conn, contents, replace=replace)
+    except (ValueError, KeyError) as error:
+        raise HTTPException(status_code=400, detail=f"Importul nu a reușit: {error}")
 
 
 # ---------- Angajați și salarii ----------
@@ -447,6 +754,7 @@ class SettingsIn(BaseModel):
     company_name: str = Field(min_length=1, max_length=120)
     owner_name: str = Field(default="", max_length=60)
     tax_regime: str = Field(pattern="^(profit|micro)$")
+    vat_payer: bool = True
 
 
 @api.get("/settings")
@@ -460,7 +768,7 @@ def read_settings():
 def write_settings(body: SettingsIn):
     with get_conn() as conn:
         for key, value in body.model_dump().items():
-            set_setting(conn, key, str(value))
+            set_setting(conn, key, ("1" if value else "0") if isinstance(value, bool) else str(value))
     return {"ok": True}
 
 
@@ -487,8 +795,7 @@ def fiscal_seen():
 @api.post("/demo")
 def reload_demo():
     with get_conn() as conn:
-        demo.load_demo_data(conn)
-    return {"ok": True}
+        return demo.load_demo_data(conn)
 
 
 app.include_router(api)
