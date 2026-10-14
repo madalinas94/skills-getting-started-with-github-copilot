@@ -80,6 +80,15 @@ class ChangePasswordIn(BaseModel):
     new: str = Field(min_length=4, max_length=200)
 
 
+class RecoverIn(BaseModel):
+    code: str = Field(min_length=4, max_length=40)
+    password: str = Field(min_length=4, max_length=200)
+
+
+class CurrentPasswordIn(BaseModel):
+    current: str
+
+
 def start_session(response: Response, conn) -> None:
     token = auth.create_session(conn)
     response.set_cookie(auth.COOKIE_NAME, token, httponly=True, samesite="strict",
@@ -95,6 +104,7 @@ def auth_status(testify_session: str | None = Cookie(default=None)):
             "logged_in": auth.is_valid_session(conn, testify_session),
             "company": settings.get("company_name"),
             "owner_name": settings.get("owner_name", ""),
+            "has_recovery": auth.has_recovery_code(conn),
         }
 
 
@@ -104,19 +114,39 @@ def auth_setup(body: SetupIn, response: Response):
         if auth.is_setup_done(conn):
             raise HTTPException(status_code=400, detail="Parola a fost deja setată.")
         auth.set_password(conn, body.password)
+        code = auth.set_recovery_code(conn)
         if body.demo:
             demo.load_demo_data(conn)
         start_session(response, conn)
-    return {"ok": True}
+    return {"ok": True, "recovery_code": code}
 
 
 @app.post("/api/auth/login")
 def auth_login(body: PasswordIn, response: Response):
+    auth.limiter.check()
     with get_conn() as conn:
         if not auth.check_password(conn, body.password):
+            auth.limiter.failed()
             raise HTTPException(status_code=401, detail="Parolă greșită.")
+        auth.limiter.reset()
         start_session(response, conn)
     return {"ok": True}
+
+
+@app.post("/api/auth/recover")
+def auth_recover(body: RecoverIn, response: Response):
+    """Parolă uitată: cu codul de recuperare se pune o parolă nouă și se primește un cod nou."""
+    auth.limiter.check()
+    with get_conn() as conn:
+        if not auth.check_recovery_code(conn, body.code):
+            auth.limiter.failed()
+            raise HTTPException(status_code=400, detail="Codul de recuperare nu este corect.")
+        auth.limiter.reset()
+        auth.set_password(conn, body.password)
+        auth.end_all_sessions(conn)  # cine era conectat cu parola veche iese
+        code = auth.set_recovery_code(conn)  # codul folosit nu mai e valabil
+        start_session(response, conn)
+    return {"ok": True, "recovery_code": code}
 
 
 @app.post("/api/auth/logout")
@@ -138,6 +168,14 @@ def change_password(body: ChangePasswordIn):
             raise HTTPException(status_code=400, detail="Parola actuală nu este corectă.")
         auth.set_password(conn, body.new)
     return {"ok": True}
+
+
+@api.post("/auth/recovery-code")
+def new_recovery_code(body: CurrentPasswordIn):
+    with get_conn() as conn:
+        if not auth.check_password(conn, body.current):
+            raise HTTPException(status_code=400, detail="Parola actuală nu este corectă.")
+        return {"recovery_code": auth.set_recovery_code(conn)}
 
 
 # ---------- Dashboard și rapoarte ----------

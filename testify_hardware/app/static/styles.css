@@ -539,3 +539,19 @@ button.tag:hover { filter: brightness(1.25); }
 .prod-cell { min-width: 230px; }
 .prod-cell small { white-space: nowrap; }
 .due-list li.later { border-left-color: var(--border-strong); }
+
+/* Cod de recuperare */
+.recovery-code { font: 700 22px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .08em; text-align: center;
+  padding: 18px 12px; margin: 18px 0 12px; border-radius: 14px; color: var(--gold); background: rgba(251, 191, 36, .08);
+  border: 1px dashed rgba(251, 191, 36, .5); user-select: all; word-break: break-all; }
+.recovery-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 12px; }
+.code-input { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important; letter-spacing: .08em; text-transform: uppercase; }
+.recovery-status { display: flex; gap: 12px; align-items: center; margin-top: 16px; padding: 12px 14px; border-radius: 14px;
+  background: rgba(52, 211, 153, .07); border: 1px solid rgba(52, 211, 153, .25); }
+.recovery-status > span { color: var(--green); }
+.recovery-status.missing { background: rgba(251, 191, 36, .08); border-color: rgba(251, 191, 36, .35); }
+.recovery-status.missing > span { color: var(--gold); }
+.recovery-status div { flex: 1; display: flex; flex-direction: column; }
+.recovery-status small { color: var(--muted); font-size: 12px; }
+#auth-switch { margin-top: -4px; }
+.btn:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; transform: none; }

@@ -62,7 +62,11 @@ Necesită Python 3.10 sau mai nou.
   aplicația în browser.
 - **macOS / Linux:** `./start.sh`, apoi deschideți <http://localhost:8000>.
 
-La prima pornire alegeți parola. Dacă bifați „Încarcă datele firmei”, aplicația se umple cu
+La prima pornire alegeți parola și primiți un **cod de recuperare** (de forma `ABCD-EFGH-JKMN-PQRS`),
+pe care îl notați pe hârtie, îl salvați ca fișier sau îl printați. Dacă uitați parola, pe ecranul de
+intrare apăsați „Am uitat parola”, introduceți codul și alegeți o parolă nouă; codul folosit expiră și
+primiți automat unul nou. Din **Setări** se poate genera oricând un cod nou (cu parola actuală).
+După 5 încercări greșite la rând, intrarea se blochează 5 minute. Dacă bifați „Încarcă datele firmei”, aplicația se umple cu
 datele din T3 2026 primite de la firmă.
 
 **De pe telefon:** cu telefonul conectat la Wi-Fi-ul de la birou, deschideți

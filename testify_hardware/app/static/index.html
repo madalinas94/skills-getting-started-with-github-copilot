@@ -27,8 +27,12 @@
       <h1 id="auth-title">Bun venit înapoi</h1>
       <p id="auth-subtitle" class="muted">Introduceți parola ca să vedeți cifrele firmei.</p>
       <form id="auth-form" autocomplete="on">
+        <label class="field hidden" id="auth-code-wrap">
+          <span>Codul de recuperare</span>
+          <input id="auth-code" class="code-input" maxlength="24" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX">
+        </label>
         <label class="field">
-          <span>Parolă</span>
+          <span id="auth-password-label">Parolă</span>
           <input type="password" id="auth-password" required minlength="4" autocomplete="current-password" placeholder="••••••••">
         </label>
         <label class="field hidden" id="auth-confirm-wrap">
@@ -41,7 +45,10 @@
         </label>
         <p id="auth-error" class="error" role="alert"></p>
         <button class="btn btn-primary btn-block" type="submit" id="auth-submit">Intră în aplicație</button>
+        <button class="btn btn-ghost btn-block" type="button" id="auth-switch">Am uitat parola</button>
       </form>
+      <!-- Codul de recuperare, arătat o singură dată după crearea sau resetarea parolei -->
+      <div id="recovery-panel" class="hidden"></div>
     </div>
   </section>
 

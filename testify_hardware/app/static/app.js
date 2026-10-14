@@ -135,6 +135,7 @@ async function boot() {
     const status = await api("/api/auth/status");
     if (status.company) $("#brand-name").textContent = status.company;
     state.ownerName = status.owner_name;
+    state.hasRecovery = status.has_recovery;
     if (status.logged_in) return showApp();
     authMode = status.setup_done ? "login" : "setup";
     showAuth();
@@ -143,21 +144,41 @@ async function boot() {
   }
 }
 
+const AUTH_TEXT = {
+  setup: { title: "Bun venit la Testify Hardware", subtitle: "Prima pornire: alegeți o parolă. Doar dumneavoastră veți avea acces la aplicație.",
+    label: "Parolă nouă", submit: "Creează parola și intră" },
+  login: { title: "Bun venit înapoi", subtitle: "Introduceți parola ca să vedeți cifrele firmei.",
+    label: "Parolă", submit: "Intră în aplicație", switchTo: "Am uitat parola" },
+  recover: { title: "Ați uitat parola?", subtitle: "Introduceți codul de recuperare primit când ați creat parola și alegeți o parolă nouă.",
+    label: "Parolă nouă", submit: "Schimbă parola și intră", switchTo: "Înapoi la autentificare" },
+};
+
 function showAuth(expired = false) {
   $("#app").classList.add("hidden");
   $("#auth-screen").classList.remove("hidden");
-  const setup = authMode === "setup";
-  $("#auth-title").textContent = setup ? "Bun venit la Testify Hardware" : "Bun venit înapoi";
-  $("#auth-subtitle").textContent = setup
-    ? "Prima pornire: alegeți o parolă. Doar dumneavoastră veți avea acces la aplicație."
-    : expired ? "Sesiunea a expirat. Introduceți parola din nou." : "Introduceți parola ca să vedeți cifrele firmei.";
-  $("#auth-confirm-wrap").classList.toggle("hidden", !setup);
-  $("#auth-demo-wrap").classList.toggle("hidden", !setup);
-  $("#auth-submit").textContent = setup ? "Creează parola și intră" : "Intră în aplicație";
-  $("#auth-password").autocomplete = setup ? "new-password" : "current-password";
+  $("#auth-form").classList.remove("hidden");
+  $("#recovery-panel").classList.add("hidden");
+  const text = AUTH_TEXT[authMode];
+  const newPassword = authMode !== "login";
+  $("#auth-title").textContent = text.title;
+  $("#auth-subtitle").textContent = expired && authMode === "login" ? "Sesiunea a expirat. Introduceți parola din nou." : text.subtitle;
+  $("#auth-password-label").textContent = text.label;
+  $("#auth-code-wrap").classList.toggle("hidden", authMode !== "recover");
+  $("#auth-code").required = authMode === "recover";
+  $("#auth-confirm-wrap").classList.toggle("hidden", !newPassword);
+  $("#auth-demo-wrap").classList.toggle("hidden", authMode !== "setup");
+  $("#auth-submit").textContent = text.submit;
+  $("#auth-switch").classList.toggle("hidden", !text.switchTo);
+  $("#auth-switch").textContent = text.switchTo || "";
+  $("#auth-password").autocomplete = newPassword ? "new-password" : "current-password";
   $("#auth-error").textContent = "";
-  setTimeout(() => $("#auth-password").focus(), 50);
+  setTimeout(() => (authMode === "recover" ? $("#auth-code") : $("#auth-password")).focus(), 50);
 }
+
+$("#auth-switch").addEventListener("click", () => {
+  authMode = authMode === "recover" ? "login" : "recover";
+  showAuth();
+});
 
 $("#auth-form").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -165,24 +186,74 @@ $("#auth-form").addEventListener("submit", async (e) => {
   const err = $("#auth-error");
   err.textContent = "";
   try {
+    if (authMode !== "login" && password !== $("#auth-confirm").value) {
+      err.textContent = "Parolele nu coincid.";
+      return;
+    }
+    let result;
     if (authMode === "setup") {
-      if (password !== $("#auth-confirm").value) {
-        err.textContent = "Parolele nu coincid.";
-        return;
-      }
       $("#auth-submit").textContent = "Se pregătește aplicația…";
-      await api("/api/auth/setup", { method: "POST", body: { password, demo: $("#auth-demo").checked } });
+      result = await api("/api/auth/setup", { method: "POST", body: { password, demo: $("#auth-demo").checked } });
+    } else if (authMode === "recover") {
+      result = await api("/api/auth/recover", { method: "POST", body: { code: $("#auth-code").value, password } });
     } else {
-      await api("/api/auth/login", { method: "POST", body: { password } });
+      result = await api("/api/auth/login", { method: "POST", body: { password } });
     }
     $("#auth-password").value = "";
     $("#auth-confirm").value = "";
+    $("#auth-code").value = "";
+    if (result.recovery_code) {
+      // Codul nou se arată o singură dată, înainte de intrarea în aplicație.
+      state.hasRecovery = true;
+      $("#auth-form").classList.add("hidden");
+      $("#auth-title").textContent = authMode === "setup" ? "Notați codul de recuperare" : "Parola a fost schimbată";
+      $("#auth-subtitle").textContent = "Dacă vă uitați parola, cu acest cod vă puteți pune una nouă. Codul se arată acum o singură dată.";
+      const panel = $("#recovery-panel");
+      panel.classList.remove("hidden");
+      mountRecoveryCode(panel, result.recovery_code, "Continuă în aplicație", () => { authMode = "login"; showApp(); });
+      return;
+    }
     showApp();
   } catch (ex) {
     err.textContent = ex.message;
-    if (authMode === "setup") $("#auth-submit").textContent = "Creează parola și intră";
+    $("#auth-submit").textContent = AUTH_TEXT[authMode].submit;
   }
 });
+
+// Afișează codul de recuperare cu opțiuni de copiere, salvare și printare.
+function mountRecoveryCode(root, code, continueLabel, onContinue) {
+  root.innerHTML = `
+    <div class="recovery-code" aria-label="Cod de recuperare">${esc(code)}</div>
+    <div class="recovery-actions">
+      <button class="btn btn-sm" type="button" data-act="copy">Copiază</button>
+      <button class="btn btn-sm" type="button" data-act="save">Salvează ca fișier</button>
+      <button class="btn btn-sm" type="button" data-act="print">Printează</button>
+    </div>
+    <p class="muted" style="font-size:12px;margin:0 0 12px">Păstrați-l pe hârtie sau într-un loc sigur, separat de calculator. După ce îl folosiți, primiți automat unul nou.</p>
+    <label class="check"><input type="checkbox" data-act="ack"><span>Am notat codul într-un loc sigur</span></label>
+    <button class="btn btn-primary btn-block" type="button" data-act="continue" disabled style="margin-top:14px">${esc(continueLabel)}</button>`;
+  const text = `Testify Hardware — cod de recuperare a parolei\n\n${code}\n\nGenerat la ${new Date().toLocaleString("ro-RO")}.\nPăstrați acest cod într-un loc sigur.`;
+  $("[data-act=copy]", root).onclick = async () => {
+    try { await navigator.clipboard.writeText(code); toast("Codul a fost copiat."); }
+    catch { toast("Copierea nu a mers. Notați codul de mână.", "err"); }
+  };
+  $("[data-act=save]", root).onclick = () => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+    a.download = "testify-cod-recuperare.txt";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  $("[data-act=print]", root).onclick = () => {
+    const w = window.open("", "_blank", "width=480,height=360");
+    if (!w) return;
+    w.document.write(`<pre style="font:18px/1.6 monospace;padding:24px">${esc(text)}</pre>`);
+    w.document.close();
+    w.print();
+  };
+  $("[data-act=ack]", root).onchange = (e) => { $("[data-act=continue]", root).disabled = !e.target.checked; };
+  $("[data-act=continue]", root).onclick = onContinue;
+}
 
 $("#logout-btn").addEventListener("click", async () => {
   await api("/api/auth/logout", { method: "POST" }).catch(() => {});
@@ -1694,6 +1765,13 @@ async function renderSettings(view) {
             <label class="field"><span>Parola nouă</span><input type="password" name="new" required minlength="4" autocomplete="new-password"></label>
             <div class="form-actions" style="grid-column:1/-1;margin-top:0"><button class="btn" type="submit">${icon("check")}Schimbă parola</button></div>
           </form>
+          <div class="recovery-status ${state.hasRecovery ? "" : "missing"}">
+            <span>${icon(state.hasRecovery ? "check" : "alert")}</span>
+            <div><b>Cod de recuperare</b><small>${state.hasRecovery
+              ? "Aveți un cod activ. Dacă l-ați pierdut, generați unul nou (cel vechi nu mai merge)."
+              : "Nu aveți încă un cod. Fără el, dacă uitați parola nu mai puteți intra."}</small></div>
+            <button class="btn btn-sm ${state.hasRecovery ? "" : "btn-gold"}" id="recovery-btn" type="button">${state.hasRecovery ? "Cod nou" : "Generează"}</button>
+          </div>
         </article>
         <article class="card glass">
           <div class="card-head"><div><h2>Categorii de cheltuieli</h2><p>${state.categories.length} categorii</p></div>
@@ -1751,6 +1829,23 @@ async function renderSettings(view) {
   });
   $("#cats-btn").addEventListener("click", () => openCategories(render));
   wireImport(view);
+  $("#recovery-btn").addEventListener("click", () => {
+    openModal("Cod de recuperare nou", `<form id="recovery-form">
+      <p class="muted" style="margin-top:0">Pentru siguranță, confirmați parola actuală. Codul vechi nu va mai funcționa.</p>
+      <label class="field"><span>Parola actuală</span><input type="password" name="current" required autocomplete="current-password"></label>
+      <div class="form-actions"><button class="btn btn-ghost" type="button" onclick="closeModal()">Renunță</button>
+      <button class="btn btn-primary" type="submit">Generează codul</button></div></form>`, (body) => {
+      $("#recovery-form", body).addEventListener("submit", async (e) => {
+        e.preventDefault();
+        try {
+          const { recovery_code: code } = await api("/api/auth/recovery-code", { method: "POST", body: formData(e.target) });
+          state.hasRecovery = true;
+          $("#modal-title").textContent = "Notați noul cod de recuperare";
+          mountRecoveryCode(body, code, "Gata", () => { closeModal(); render(); });
+        } catch (err) { toast(err.message, "err"); }
+      });
+    });
+  });
   $("#demo-btn").addEventListener("click", async () => {
     if (await confirmBox("Reîncărcați datele firmei?", "Toate datele actuale vor fi înlocuite cu cele din raportul contabil T3 2026.", "Da, înlocuiește")) {
       try { await api("/api/demo", { method: "POST" }); toast("Datele firmei au fost încărcate."); state.month = "2026-09"; location.hash = "#dashboard"; render(); }
@@ -1898,6 +1993,9 @@ const robot = {
       const checked = fiscalInfo.last_check && fiscalInfo.last_status === "ok"
         ? ` (verificat ${new Date(fiscalInfo.last_check).toLocaleString("ro-RO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })})` : "";
       msgs.push({ tone: "law", html: `${icon("check")} Regulile fiscale sunt la zi${esc(checked)}: impozit pe profit ${rateTxt(r.profit_tax_rate)}%, dividende ${rateTxt(r.dividend_tax_rate)}%. Te anunț eu dacă se schimbă ceva.` });
+    }
+    if (state.hasRecovery === false) {
+      msgs.push({ tone: "warn", html: `${icon("alert")} Nu ai încă un <b>cod de recuperare</b> a parolei. Dacă o uiți, nu mai poți intra. Generează-l din Setări, durează 10 secunde.` });
     }
     this.messages = msgs;
     this.actions = [

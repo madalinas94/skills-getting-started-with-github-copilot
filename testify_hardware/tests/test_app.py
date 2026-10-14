@@ -237,3 +237,64 @@ def test_small_categories_are_grouped_in_money_flow(client):
     grouped = flow[-1]
     assert grouped["name"] == "Alte 11 categorii"
     assert grouped["amount"] == sum(item["amount"] for item in grouped["details"])
+
+
+def fresh_client(monkeypatch, tmp):
+    monkeypatch.setenv("TESTIFY_DB", os.path.join(tmp, "test.db"))
+    from app import auth
+    from app.main import app
+    auth.limiter.reset()
+    return TestClient(app)
+
+
+def test_recovery_code_resets_forgotten_password(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp, fresh_client(monkeypatch, tmp) as client:
+        code = client.post("/api/auth/setup", json={"password": "veche123"}).json()["recovery_code"]
+        assert len(code) == 19 and code.count("-") == 3
+        assert client.get("/api/auth/status").json()["has_recovery"] is True
+        client.cookies.clear()
+
+        # Codul merge și scris cu litere mici sau fără cratime.
+        typed = code.replace("-", "").lower()
+        result = client.post("/api/auth/recover", json={"code": typed, "password": "noua1234"})
+        assert result.status_code == 200
+        new_code = result.json()["recovery_code"]
+        assert new_code != code
+        assert client.get("/api/dashboard").status_code == 200  # intră direct după resetare
+
+        client.cookies.clear()
+        assert client.post("/api/auth/login", json={"password": "veche123"}).status_code == 401
+        assert client.post("/api/auth/login", json={"password": "noua1234"}).status_code == 200
+        # Codul folosit nu mai merge a doua oară.
+        assert client.post("/api/auth/recover", json={"code": code, "password": "alta1234"}).status_code == 400
+
+
+def test_recovery_logs_out_other_sessions(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp, fresh_client(monkeypatch, tmp) as client:
+        code = client.post("/api/auth/setup", json={"password": "veche123"}).json()["recovery_code"]
+        old_cookie = client.cookies.get("testify_session")
+        client.cookies.clear()
+        client.post("/api/auth/recover", json={"code": code, "password": "noua1234"})
+        client.cookies.clear()
+        client.cookies.set("testify_session", old_cookie)
+        assert client.get("/api/dashboard").status_code == 401
+
+
+def test_too_many_wrong_attempts_lock_temporarily(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp, fresh_client(monkeypatch, tmp) as client:
+        client.post("/api/auth/setup", json={"password": "corecta1"})
+        client.cookies.clear()
+        for _ in range(5):
+            assert client.post("/api/auth/recover", json={"code": "AAAA-BBBB-CCCC-DDDD",
+                                                           "password": "x1234"}).status_code == 400
+        # Blocat: nici parola corectă nu merge câteva minute.
+        assert client.post("/api/auth/login", json={"password": "corecta1"}).status_code == 429
+        from app import auth
+        auth.limiter.reset()
+        assert client.post("/api/auth/login", json={"password": "corecta1"}).status_code == 200
+
+
+def test_new_recovery_code_needs_current_password(client):
+    assert client.post("/api/auth/recovery-code", json={"current": "gresit"}).status_code == 400
+    response = client.post("/api/auth/recovery-code", json={"current": "parola123"})
+    assert response.status_code == 200 and len(response.json()["recovery_code"]) == 19
