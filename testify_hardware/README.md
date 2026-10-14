@@ -25,6 +25,11 @@ schimbă Codul fiscal.
 - **Testi, asistentul:** un robot animat care îl salută pe proprietar la intrare, îi spune pe
   scurt cum a mers luna, îl avertizează când o cheltuială crește prea repede și îi explică
   noutățile fiscale în limbaj simplu.
+- **Testi cu AI (opțional):** din **Setări → Testi cu inteligență artificială**, cu o cheie API
+  Anthropic, Robert poate pune întrebări libere („De ce a scăzut profitul în august?”, „Ce produse
+  să comand?”). Răspunsurile vin de la modelul Claude (`claude-opus-5-5`), pe baza unui rezumat al
+  datelor firmei trimis la fiecare întrebare. Fără cheie, opțiunea nu apare și aplicația rămâne
+  complet locală. Vedeți secțiunea „Asistentul AI” de mai jos.
 - **Adăugare rapidă:** butonul „+ Adaugă” din colț, pentru o vânzare sau o cheltuială din câteva atingeri.
 - **Versiune de telefon:** interfața se adaptează la ecranul mic, are meniu jos și se poate
   instala ca aplicație (vezi mai jos).
@@ -97,6 +102,20 @@ poată citi automat, iar textul legii nu poate fi interpretat automat în sigura
 când se schimbă legea, cine întreține aplicația adaugă o regulă nouă în `ro.json` și o publică.
 De acolo, toate instalările se actualizează singure. Programele de facturare din România
 funcționează la fel.
+
+## Asistentul AI (opțional)
+
+- **Pornire:** Setări → bifați „Activează asistentul AI” și lipiți cheia API Anthropic (din
+  console.anthropic.com). Cheia se poate da și prin variabila de mediu `ANTHROPIC_API_KEY`.
+- **Ce se trimite:** la fiecare întrebare, un rezumat JSON cu lunile (venituri, costuri, profit,
+  TVA), stocul, clienții, furnizorii, angajații și salariile, plus ultimele mesaje din conversație.
+  Parola, codul de recuperare și cheia API nu se trimit niciodată.
+- **Cost și internet:** fiecare întrebare consumă din contul Anthropic (rezumatul are ~3.000 de
+  tokeni) și cere conexiune la internet. Instrucțiunile fixe sunt marcate pentru cache, ca să coste mai puțin.
+- **Siguranță:** cheia se păstrează local, în baza de date a aplicației, și nu se afișează niciodată
+  întreagă în interfață. Dacă modelul refuză o întrebare, o preia automat modelul de rezervă
+  recomandat de Anthropic (`fallbacks: "default"`).
+- **Teste:** `tests/test_ai.py` folosește un client simulat, deci rulează fără cheie și fără cost.
 
 ## Cum se calculează
 

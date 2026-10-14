@@ -555,3 +555,21 @@ button.tag:hover { filter: brightness(1.25); }
 .recovery-status small { color: var(--muted); font-size: 12px; }
 #auth-switch { margin-top: -4px; }
 .btn:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; transform: none; }
+
+/* Testi cu AI */
+.assistant-ask { padding: 0 16px 14px; display: grid; gap: 8px; }
+.assistant-ask:empty { display: none; }
+.ask-ideas { display: flex; gap: 6px; flex-wrap: wrap; }
+.ask-ideas .tag { border: none; cursor: pointer; font: inherit; font-size: 12px; text-align: left; }
+.ask-form { display: flex; gap: 8px; }
+.ask-form input { flex: 1; min-width: 0; background: rgba(7, 11, 20, .6); border: 1px solid var(--border-strong); border-radius: 12px; padding: 10px 12px; color: var(--text); outline: none; }
+.ask-form input:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(34, 211, 238, .15); }
+.ask-note { font-size: 11px; display: flex; gap: 6px; align-items: center; }
+.ask-note svg { width: 12px; height: 12px; color: var(--gold); }
+.bubble.me { align-self: flex-end; border-radius: 16px 4px 16px 16px; background: linear-gradient(135deg, rgba(34, 211, 238, .22), rgba(59, 130, 246, .22)); border-color: rgba(34, 211, 238, .35); }
+.bubble.ai { border-color: rgba(167, 139, 250, .35); background: linear-gradient(135deg, rgba(167, 139, 250, .1), rgba(34, 211, 238, .06)); }
+.bubble p { margin: 0 0 6px; } .bubble p:last-child { margin-bottom: 0; }
+.ai-card { border-color: rgba(167, 139, 250, .3); }
+.ai-consent ul { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
+/* Notificările stau deasupra butonului lui Testi, ca să nu-l acopere (pe telefon, regula de mai sus). */
+@media (min-width: 861px) { .toasts { bottom: 104px; } }

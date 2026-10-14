@@ -15,7 +15,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
-from . import auth, calc, demo, exports, fiscal, importer, inventory
+from . import assistant_ai, auth, calc, demo, exports, fiscal, importer, inventory
 from .db import DEFAULT_SETTINGS, DEFAULT_SUPPLIER_TERMS, get_conn, get_settings, init_db, set_setting
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -913,6 +913,45 @@ def fiscal_seen():
     with get_conn() as conn:
         fiscal.mark_seen(conn)
     return {"ok": True}
+
+
+# ---------- Asistentul AI (opțional) ----------
+
+class AISettingsIn(BaseModel):
+    enabled: bool
+    api_key: str | None = Field(default=None, max_length=300)
+    clear_key: bool = False
+
+
+class ChatMessage(BaseModel):
+    role: str = Field(pattern="^(user|assistant)$")
+    content: str = Field(max_length=4000)
+
+
+class ChatIn(BaseModel):
+    messages: list[ChatMessage] = Field(min_length=1, max_length=40)
+
+
+@api.get("/ai/status")
+def ai_status():
+    with get_conn() as conn:
+        return assistant_ai.status(conn)
+
+
+@api.put("/ai/settings")
+def ai_settings(body: AISettingsIn):
+    with get_conn() as conn:
+        assistant_ai.save_settings(conn, body.enabled, body.api_key, body.clear_key)
+        return assistant_ai.status(conn)
+
+
+@api.post("/ai/chat")
+def ai_chat(body: ChatIn):
+    try:
+        with get_conn() as conn:
+            return assistant_ai.ask(conn, [m.model_dump() for m in body.messages])
+    except assistant_ai.AIError as error:
+        raise HTTPException(status_code=error.status, detail=str(error))
 
 
 @api.post("/demo")

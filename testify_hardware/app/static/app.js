@@ -1711,7 +1711,8 @@ async function renderReports(view) {
 /* ================= Setări ================= */
 
 async function renderSettings(view) {
-  const [s, f] = await Promise.all([api("/api/settings"), api("/api/fiscal"), loadCategories()]);
+  const [s, f, ai] = await Promise.all([api("/api/settings"), api("/api/fiscal"), api("/api/ai/status"), loadCategories()]);
+  state.ai = ai;
   const statusText = f.last_check
     ? `Ultima verificare: ${new Date(f.last_check).toLocaleString("ro-RO", { dateStyle: "medium", timeStyle: "short" })} · ${f.last_status === "ok" ? "la zi" : "nu am putut verifica online, folosesc ultimele reguli salvate"}`
     : "Încă nu s-a făcut nicio verificare online.";
@@ -1778,6 +1779,28 @@ async function renderSettings(view) {
             <button class="btn btn-sm" id="cats-btn" type="button">${icon("edit")}Gestionează</button></div>
           <div class="toolbar">${state.categories.map((c) => `<span class="tag"><span class="sw" style="background:${esc(c.color)}"></span>${esc(c.name)}</span>`).join("")}</div>
         </article>
+        <article class="card glass ai-card">
+          <div class="card-head"><div><h2>Testi cu inteligență artificială <span class="tag ${ai.enabled ? "paid" : ""}">${ai.enabled ? "activ" : "oprit"}</span></h2>
+            <p>Opțional: puneți întrebări libere despre firmă („De ce a scăzut profitul?”), iar Testi răspunde folosind Claude (Anthropic).</p></div></div>
+          <form id="ai-form">
+            <label class="check"><input type="checkbox" name="enabled" ${ai.switched_on ? "checked" : ""}><span>Activează asistentul AI</span></label>
+            <label class="field" style="margin-top:12px"><span>Cheie API Anthropic</span>
+              <input type="password" name="api_key" autocomplete="off" placeholder="${ai.key_hint ? esc(ai.key_hint) + " (salvată)" : ai.key_source ? "din " + esc(ai.key_source) : "sk-ant-…"}">
+              <small>O obțineți din contul Anthropic (console.anthropic.com). Lăsați gol ca să păstrați cheia salvată.</small></label>
+            <div class="preview ai-consent">
+              <b>Ce trebuie să știți:</b>
+              <ul>
+                <li>La fiecare întrebare, cifrele firmei (vânzări, stoc, clienți, furnizori, salarii) se trimit la Anthropic ca să se genereze răspunsul. Parola și cheia nu se trimit.</li>
+                <li>Are nevoie de internet, iar fiecare întrebare costă câțiva bani din contul Anthropic.</li>
+                <li>Fără cheie, aplicația rămâne complet locală.</li>
+              </ul>
+            </div>
+            <div class="form-actions">
+              ${ai.key_hint ? `<button class="btn btn-ghost" type="button" id="ai-clear">${icon("trash")}Șterge cheia</button>` : ""}
+              <button class="btn btn-primary" type="submit">${icon("check")}Salvează</button>
+            </div>
+          </form>
+        </article>
         <article class="card glass import-card">
           <div class="card-head"><div><h2>Import din Excel / CSV</h2><p>Aduceți datele din fișierele folosite până acum: produse, clienți, angajați, vânzări, cheltuieli, inventar sau raportul contabil.</p></div></div>
           <form id="import-form">
@@ -1829,6 +1852,21 @@ async function renderSettings(view) {
   });
   $("#cats-btn").addEventListener("click", () => openCategories(render));
   wireImport(view);
+  const saveAI = async (body) => {
+    try {
+      state.ai = await api("/api/ai/settings", { method: "PUT", body });
+      robot.renderAsk();
+      toast(state.ai.enabled ? "Asistentul AI e activ. Întrebați-l pe Testi din colțul din dreapta jos." : "Setările AI au fost salvate.");
+      render();
+    } catch (err) { toast(err.message, "err"); }
+  };
+  $("#ai-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const enabled = e.target.enabled.checked, key = e.target.api_key.value.trim();
+    if (enabled && !key && !state.ai.has_key) { toast("Introduceți cheia API ca să porniți asistentul.", "err"); return; }
+    saveAI({ enabled, api_key: key || null });
+  });
+  $("#ai-clear")?.addEventListener("click", () => saveAI({ enabled: false, clear_key: true }));
   $("#recovery-btn").addEventListener("click", () => {
     openModal("Cod de recuperare nou", `<form id="recovery-form">
       <p class="muted" style="margin-top:0">Pentru siguranță, confirmați parola actuală. Codul vechi nu va mai funcționa.</p>
@@ -1916,8 +1954,11 @@ const robot = {
   actions: [],
   playing: 0,
 
+  chat: [],  // conversația cu AI-ul: [{role, content}]
+
   init() {
     $("#assistant").classList.remove("hidden");
+    api("/api/ai/status").then((st) => { state.ai = st; this.renderAsk(); }).catch(() => {});
     $("#assistant-fab").innerHTML = `${robotSVG("mini")}<span class="fab-dot hidden" id="assistant-dot"></span>`;
     $("#assistant-avatar").innerHTML = robotSVG("waving");
     $("#assistant-fab").onclick = () => this.toggle();
@@ -2036,8 +2077,78 @@ const robot = {
       b.onclick = a.run;
       actions.append(b);
     });
+    this.chat.forEach((m) => this.addBubble(m.role, m.content));
+    this.renderAsk();
+  },
+
+  addBubble(role, text, extraClass = "") {
+    const box = $("#assistant-messages");
+    const el = document.createElement("div");
+    el.className = `bubble ${role === "user" ? "me" : "ai"} ${extraClass}`;
+    el.innerHTML = role === "user" ? esc(text) : renderMarkdown(text);
+    box.append(el);
+    box.scrollTop = box.scrollHeight;
+    return el;
+  },
+
+  renderAsk() {
+    const holder = $("#assistant-ask");
+    if (!holder) return;
+    if (!state.ai?.enabled) { holder.innerHTML = ""; return; }
+    if (holder.childElementCount) return;
+    const ideas = ["De ce a scăzut profitul în august?", "Ce produse ar trebui să comand?", "Cine îmi datorează cei mai mulți bani?"];
+    holder.innerHTML = `
+      <div class="ask-ideas">${ideas.map((q) => `<button type="button" class="tag order" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>
+      <form class="ask-form">
+        <input name="q" maxlength="1000" autocomplete="off" placeholder="Întreabă-l pe Testi orice despre firmă…">
+        <button class="btn btn-primary btn-sm" type="submit" aria-label="Trimite">${icon("up")}</button>
+      </form>
+      <small class="muted ask-note">${icon("star")} Răspunsuri generate cu AI (Claude) din cifrele firmei. Verificați deciziile importante.</small>`;
+    const form = $(".ask-form", holder);
+    $$("[data-q]", holder).forEach((b) => b.addEventListener("click", () => { form.q.value = b.dataset.q; form.requestSubmit(); }));
+    form.addEventListener("submit", (e) => { e.preventDefault(); this.askAI(form); });
+  },
+
+  async askAI(form) {
+    const question = form.q.value.trim();
+    if (!question || this.thinking) return;
+    form.q.value = "";
+    this.thinking = true;
+    form.querySelector("button").disabled = true;
+    this.chat.push({ role: "user", content: question });
+    this.addBubble("user", question);
+    const typing = this.addBubble("assistant", "", "typing");
+    typing.innerHTML = "<i></i><i></i><i></i>";
+    try {
+      const { reply } = await api("/api/ai/chat", { method: "POST", body: { messages: this.chat } });
+      typing.remove();
+      this.chat.push({ role: "assistant", content: reply });
+      this.addBubble("assistant", reply);
+    } catch (err) {
+      typing.remove();
+      this.chat.pop();  // întrebarea fără răspuns nu rămâne în istoric
+      this.addBubble("assistant", err.message, "warn");
+    } finally {
+      this.thinking = false;
+      form.querySelector("button").disabled = false;
+      form.q.focus();
+    }
   },
 };
+
+// Text simplu din răspunsul AI: **îngroșat**, liste cu „- ” și rânduri noi. Totul e escapat întâi.
+function renderMarkdown(text) {
+  const lines = esc(text).split("\n");
+  let html = "", inList = false;
+  for (const line of lines) {
+    const item = line.match(/^\s*[-•*]\s+(.*)$/);
+    if (item && !inList) { html += "<ul>"; inList = true; }
+    if (!item && inList) { html += "</ul>"; inList = false; }
+    html += item ? `<li>${item[1]}</li>` : (line.trim() ? `<p>${line}</p>` : "");
+  }
+  if (inList) html += "</ul>";
+  return html.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+}
 
 /* ================= Adăugare rapidă (mai ales pe telefon) ================= */
 
