@@ -1,3 +1,7 @@
+<!doctype html>
+<html lang="ro">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Busola</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -748,6 +752,7 @@ label.f { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var
         </div>
         <div id="idCard"></div>
         <div id="liPanel"></div>
+        <div id="syncPanel"></div>
       </div>
 
       <div class="panel">
@@ -987,7 +992,7 @@ async function initStore() {
   db = await use("db");
   if (!db) {
     state.profile = local.profile; state.jobs = Object.entries(local.jobs).map(([id, v]) => ({ id, ...v })); state.apps = local.apps; state.meta = local.meta; state.career = local.career || null; state.growth = local.growth || null; state.gprog = local.gprog || {}; state.digest = local.digest || null; state.asks = local.asks || null; state.targets = Object.entries(local.targets || {}).map(([id, v]) => ({ id, ...v })); state.contacts = Object.entries(local.contacts || {}).map(([id, v]) => ({ id, ...v }));
-    state.loaded = true; state.offline = true; onData(); return;
+    state.loaded = true; state.offline = true; onData(); loadFeed(); return;
   }
   db.doc("growth/plan").onSnapshot((s) => { state.growth = s.exists ? s.data() : null; onData(); }, (e) => console.warn(e));
   db.collection("targets").onSnapshot((s) => { state.targets = s.docs.map((d) => ({ id: d.id, ...d.data() })); onData(); }, (e) => console.warn(e));
@@ -1003,6 +1008,20 @@ async function initStore() {
   db.collection("jobs").onSnapshot((s) => { state.jobs = s.docs.map((d) => ({ id: d.id, ...d.data() })); done(); }, onErr);
   db.collection("applications").onSnapshot((s) => { const a = {}; s.docs.forEach((d) => (a[d.id] = d.data())); state.apps = a; done(); }, onErr);
   db.doc("meta/research").onSnapshot((s) => { state.meta = s.exists ? s.data() : null; done(); }, onErr);
+}
+async function loadFeed() {
+  let f;
+  try { const r = await fetch("data/jobs.json", { cache: "no-cache" }); if (!r.ok) return; f = await r.json(); } catch { return; }
+  if (!f || typeof f.jobs !== "object") return;
+  let added = 0;
+  for (const [id, v] of Object.entries(local.jobs)) if (v._feed && !f.jobs[id] && !local.apps[id]) delete local.jobs[id];
+  for (const [id, v] of Object.entries(f.jobs)) { if (!local.jobs[id]) added++; if (!local.jobs[id] || local.jobs[id]._feed) local.jobs[id] = { ...v, _feed: true }; }
+  local.feedAt = f.updatedAt || null;
+  if (f.meta) local.meta = { ...(local.meta || {}), ...f.meta };
+  saveLocal();
+  state.jobs = Object.entries(local.jobs).map(([i, v]) => ({ id: i, ...v })); state.meta = local.meta;
+  onData();
+  if (added) toast(L(`${added} joburi noi din research-ul zilnic.`, `${added} new roles from the daily research.`));
 }
 async function writeDoc(path, data) {
   if (db) {
@@ -1030,14 +1049,60 @@ async function saveApp(jobId, patch) {
 }
 
 async function getSample() { if (!sampleFn) sampleFn = await use("sample"); return sampleFn; }
+const AKEY = "busola-akey";
+const GH_URL = "https://madalinas94.github.io/skills-getting-started-with-github-copilot/busola/";
+const apiErr = (code) => { const e = new Error(code); e.code = code; return e; };
+async function apiClaude(prompt, opts) {
+  const key = lsGet(AKEY, "");
+  if (!key) throw apiErr("not_granted");
+  const body = { model: "claude-opus-5-5", max_tokens: 16000, output_config: { effort: "medium" }, fallbacks: "default",
+    messages: [{ role: "user", content: opts.json ? prompt + "\n\nRăspunde doar cu JSON valid, fără text în jur și fără ```." : prompt }] };
+  const stream = !!opts.onText && !opts.json;
+  if (stream) body.stream = true;
+  let res;
+  try {
+    res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", body: JSON.stringify(body), headers: {
+      "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01",
+      "anthropic-beta": "server-side-fallback-2026-07-01", "anthropic-dangerous-direct-browser-access": "true" } });
+  } catch { throw apiErr("network"); }
+  if (!res.ok) throw apiErr(res.status === 401 || res.status === 403 ? "bad_key" : res.status === 429 ? "rate_limited" : res.status === 402 || res.status === 400 && /credit/i.test(await res.text().catch(() => "")) ? "no_credit" : "api_error");
+  let text = "", stop = "";
+  if (stream) {
+    const rd = res.body.getReader(), dec = new TextDecoder(); let buf = "";
+    for (;;) {
+      const { value, done } = await rd.read(); if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n"); buf = lines.pop();
+      for (const ln of lines) {
+        if (!ln.startsWith("data:")) continue;
+        let ev; try { ev = JSON.parse(ln.slice(5)); } catch { continue; }
+        if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") { text += ev.delta.text; opts.onText({ text }); }
+        else if (ev.type === "message_delta" && ev.delta?.stop_reason) stop = ev.delta.stop_reason;
+        else if (ev.type === "error") throw apiErr(ev.error?.type === "overloaded_error" ? "rate_limited" : "api_error");
+      }
+    }
+  } else {
+    const m = await res.json();
+    stop = m.stop_reason;
+    text = (m.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
+  }
+  if (stop === "refusal") throw apiErr("refusal");
+  if (!opts.json) return { text };
+  const a = text.indexOf("{"), b = text.lastIndexOf("}");
+  try { return JSON.parse(text.slice(a, b + 1)); } catch { throw apiErr("invalid_json"); }
+}
 async function askClaude(prompt, opts = {}) {
   const s = await getSample();
-  if (!s) { const e = new Error("no-sample"); e.code = "not_granted"; throw e; }
+  if (!s) return apiClaude(prompt, opts);
   return opts.json ? s.json(prompt, { modelTier: opts.tier || "default" }) : s(prompt, { onText: opts.onText, modelTier: opts.tier || "default", cache: false });
 }
 function claudeError(e) {
   const c = e?.code;
-  if (c === "not_granted") return "Busola nu are acces la Claude în această fereastră. Deschide pagina în claude.ai și permite accesul când ți se cere.";
+  if (c === "not_granted") return state.offline ? L("Pentru funcțiile de AI adaugă cheia ta Anthropic în Profil → Busola pe GitHub.", "For the AI features, add your Anthropic key in Profile → Busola on GitHub.") : "Busola nu are acces la Claude în această fereastră. Deschide pagina în claude.ai și permite accesul când ți se cere.";
+  if (c === "bad_key") return L("Cheia Anthropic nu e validă. Verific-o în Profil.", "The Anthropic key isn't valid. Check it in Profile.");
+  if (c === "no_credit") return L("Contul Anthropic nu are credit. Adaugă credit în console.anthropic.com.", "Your Anthropic account has no credit. Add some at console.anthropic.com.");
+  if (c === "network") return L("Nu m-am putut conecta la Claude. Verifică internetul.", "Couldn't reach Claude. Check your connection.");
+  if (c === "refusal") return L("Claude a refuzat cererea asta. Reformulează și încearcă din nou.", "Claude declined this request. Rephrase and try again.");
   if (c === "rate_limited") return "Prea multe cereri într-un timp scurt. Mai încearcă peste un minut.";
   if (c === "invalid_json") return "Răspunsul a venit incomplet. Mai încearcă o dată.";
   return "Claude nu a putut termina cererea. Încearcă din nou.";
@@ -2119,7 +2184,7 @@ function personCard(c) {
     ${c.note ? `<p class="note">${esc(c.note)}</p>` : ""}${c.why ? `<p style="font-size:13.5px">${esc(gtext(c, "why"))}</p>` : ""}
     <div class="seg" role="group" aria-label="Status">${CSTAT.map(([k, ro, en]) => `<button data-cstat="${esc(c.id)}" data-v="${k}" aria-pressed="${st === k}">${LANG === "en" ? en : ro}</button>`).join("")}</div>
     ${c.msg ? `<div class="msg"><textarea id="ref-${esc(c.id)}">${esc(c.msg)}</textarea></div>` : ""}
-    <div class="actions">${busy ? `<button class="btn sm" disabled><span class="spinner"></span> ${L("Se scrie…", "Writing…")}</button>` : `<button class="btn sm primary" data-refmsg="${esc(c.id)}" data-lang="en-msg">✦ ${L("Mesaj (EN)", "Message (EN)")}</button><button class="btn sm" data-refmsg="${esc(c.id)}" data-lang="ro-msg">✦ ${L("Mesaj (RO)", "Message (RO)")}</button>`}
+    <div class="actions">${busy ? `<button class="btn sm" disabled><span class="spinner"></span> ${L("Se scrie…", "Writing…")}</button>` : `<button class="btn sm primary" data-refmsg="${esc(c.id)}" data-rlang="en">✦ ${L("Mesaj (EN)", "Message (EN)")}</button><button class="btn sm" data-refmsg="${esc(c.id)}" data-rlang="ro">✦ ${L("Mesaj (RO)", "Message (RO)")}</button>`}
       ${c.msg ? `<button class="btn sm" data-refcopy="${esc(c.id)}">${L("Copiază", "Copy")}</button>` : ""}${url ? `<a class="btn sm" href="${esc(url)}" target="_blank" rel="noopener">${L("Profil ↗", "Profile ↗")}</a>` : ""}<button class="btn sm ghost" data-cdel="${esc(c.id)}">${L("Șterge", "Delete")}</button></div>
   </article>`;
 }
@@ -2352,6 +2417,47 @@ function chipList(el, all, sel, removable) {
   const items = [...new Set([...all, ...sel])];
   el.innerHTML = items.map((v) => `<span class="chip" role="button" tabindex="0" data-v="${esc(v)}" aria-pressed="${set.has(v)}">${esc(v)}${removable && set.has(v) && !all.includes(v) ? `<button class="x" data-rm="${esc(v)}" aria-label="Elimină ${esc(v)}">×</button>` : ""}</span>`).join("");
 }
+function exportObj() {
+  const byId = (arr) => Object.fromEntries((arr || []).map(({ id, ...v }) => [id, v]));
+  return { busola: 1, exportedAt: new Date().toISOString(), profile: state.profile, jobs: byId(state.jobs), apps: state.apps, meta: state.meta, career: state.career, growth: state.growth, gprog: state.gprog, digest: state.digest, asks: state.asks, targets: byId(state.targets), contacts: byId(state.contacts) };
+}
+async function exportData() {
+  const data = JSON.stringify(exportObj(), null, 1), filename = "busola-date-" + new Date().toISOString().slice(0, 10) + ".json";
+  if (!downloads) downloads = await use("downloads");
+  if (downloads) {
+    try { await downloads.save({ filename, data, mimeType: "application/json" }); toast(L("Am salvat fișierul cu datele tale.", "Your data file is saved.")); } catch (e) { if (e?.code !== "declined") toast(L("Nu am putut salva fișierul.", "Couldn't save the file."), true); }
+    return;
+  }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([data], { type: "application/json" })); a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+async function importData(file) {
+  let d; try { d = JSON.parse(await file.text()); } catch { toast(L("Fișierul nu e un export Busola.", "That file isn't a Busola export."), true); return; }
+  if (!d || d.busola !== 1) { toast(L("Fișierul nu e un export Busola.", "That file isn't a Busola export."), true); return; }
+  if (!confirm(L("Înlocuiesc datele din acest browser cu cele din fișier?", "Replace the data in this browser with the file's?"))) return;
+  for (const k of ["profile", "meta", "career", "growth", "gprog", "digest", "asks"]) local[k] = d[k] ?? null;
+  for (const k of ["jobs", "apps", "targets", "contacts"]) local[k] = d[k] || {};
+  saveLocal(); location.reload();
+}
+function renderSync() {
+  const el = $("#syncPanel"); if (!el) return;
+  const key = lsGet(AKEY, "");
+  if (!state.offline) {
+    el.innerHTML = `<div class="panel" data-notr><h3>${L("Busola pe GitHub", "Busola on GitHub")}</h3>
+      <p class="sub">${L("Varianta publică a aplicației merge și în afara claude.ai. Descarcă-ți datele aici, apoi încarcă fișierul acolo, în Profil. Joburile noi ajung acolo singure, în fiecare dimineață.", "The public version of the app also works outside claude.ai. Download your data here, then load the file there, in Profile. New roles arrive there on their own every morning.")}</p>
+      <div class="actions"><button class="btn primary" data-export>${L("Descarcă datele mele", "Download my data")}</button><a class="btn" href="${GH_URL}" target="_blank" rel="noopener">${L("Deschide pe GitHub ↗", "Open on GitHub ↗")}</a></div></div>`;
+    return;
+  }
+  el.innerHTML = `<div class="panel" data-notr><h3>${L("Busola pe GitHub", "Busola on GitHub")}</h3>
+    <p class="sub">${L("Aici datele stau doar în acest browser. Joburile noi vin singure, din research-ul zilnic", "Here your data lives only in this browser. New roles arrive on their own from the daily research")}${local.feedAt ? " · " + L("ultima actualizare", "last update") + " " + esc(ago(local.feedAt)) : ""}.</p>
+    <div class="eyebrow">${L("Funcțiile de AI", "AI features")}</div>
+    ${key ? `<p class="note">${L("Cheia ta Anthropic e salvată în acest browser", "Your Anthropic key is saved in this browser")}: <span class="mono">…${esc(key.slice(-4))}</span></p>
+      <div class="actions"><button class="btn sm ghost" data-delkey>${L("Șterge cheia", "Remove key")}</button></div>`
+    : `<p class="note">${L("Pentru CV-uri, scrisori și mesaje, pune aici o cheie API de pe", "For CVs, letters and messages, paste an API key from")} <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>. ${L("Plătești doar ce folosești. Cheia rămâne doar în acest browser și nu ajunge pe GitHub.", "You pay only for what you use. The key stays only in this browser and never reaches GitHub.")}</p>
+      <form id="keyForm" class="ask-form"><input id="keyIn" type="password" autocomplete="off" placeholder="sk-ant-…"><button class="btn primary">${L("Salvează", "Save")}</button></form>`}
+    <div class="eyebrow" style="margin-top:6px">${L("Datele tale", "Your data")}</div>
+    <p class="note">${L("Ca să ai aici profilul, planurile și companiile de vis, descarcă-le din Busola de pe claude.ai (Profil → Descarcă datele mele) și încarcă fișierul aici.", "To get your profile, plans and dream companies here, download them from Busola on claude.ai (Profile → Download my data) and load the file here.")}</p>
+    <div class="actions"><label class="btn primary" for="importFile">${L("Încarcă fișierul cu date", "Load data file")}</label><input type="file" id="importFile" accept=".json,application/json" hidden><button class="btn" data-export>${L("Descarcă datele", "Download data")}</button></div></div>`;
+}
 function renderProfile(force) {
   const d = getDraft();
   if (force || !d._filled) {
@@ -2369,7 +2475,7 @@ function renderProfile(force) {
   $("#plugins").innerHTML = PLUGINS.map((p) => `<button class="plugin" data-v="${esc(p.id)}" aria-pressed="${(d.plugins || []).includes(p.id)}"><b>${esc(p.id)}<i class="sw"></i></b><span>${esc(p.d)}</span></button>`).join("");
   $("#skillChips").innerHTML = (d.skills || []).map((s) => `<span class="chip" aria-pressed="true">${esc(s)}<button class="x" data-rmskill="${esc(s)}" aria-label="Elimină ${esc(s)}">×</button></span>`).join("") || `<span style="color:var(--muted);font-size:13px">Apar automat după analiza CV-ului.</span>`;
   renderIdCard();
-  renderLinkedIn();
+  renderLinkedIn(); renderSync();
 }
 function renderIdCard() {
   const p = state.profile;
@@ -2544,7 +2650,9 @@ document.addEventListener("click", (e) => {
   const adc = t.closest("[data-addcontact]"); if (adc) { state.addContactFor = state.addContactFor === adc.dataset.addcontact ? null : adc.dataset.addcontact; renderNetwork(); setTimeout(() => $("#cName")?.focus(), 30); return; }
   if (t.closest("[data-cancelcontact]")) { state.addContactFor = null; renderNetwork(); return; }
   const cs = t.closest("[data-cstat]"); if (cs) { const c = state.contacts.find((x) => x.id === cs.dataset.cstat); if (c) writeDoc("contacts/" + c.id, { ...stripId(c), status: cs.dataset.v, statusAt: new Date().toISOString() }); return; }
-  const rm = t.closest("[data-refmsg]"); if (rm) { refMessage(rm.dataset.refmsg, rm.dataset.lang === "ro-msg" ? "ro" : "en"); return; }
+  if (t.closest("[data-export]")) { exportData(); return; }
+  if (t.closest("[data-delkey]")) { try { localStorage.removeItem(AKEY); } catch {} renderSync(); toast(L("Cheia a fost ștearsă.", "Key removed.")); return; }
+  const rm = t.closest("[data-refmsg]"); if (rm) { refMessage(rm.dataset.refmsg, rm.dataset.rlang === "ro" ? "ro" : "en"); return; }
   const rc = t.closest("[data-refcopy]"); if (rc) { const ta = $("#ref-" + CSS.escape(rc.dataset.refcopy)); copyStr(ta?.value || ""); return; }
   const cdl = t.closest("[data-cdel]"); if (cdl) { delDoc("contacts/" + cdl.dataset.cdel); return; }
   const ac = t.closest("[data-askchip]"); if (ac) { const c = ASK_CHIPS[Number(ac.dataset.askchip)]; askGrowth(LANG === "en" ? c[1] : c[0]); return; }
@@ -2593,6 +2701,7 @@ document.addEventListener("click", (e) => {
 });
 document.addEventListener("submit", (e) => {
   if (e.target.id === "askForm") { e.preventDefault(); askGrowth($("#askQ")?.value); }
+  if (e.target.id === "keyForm") { e.preventDefault(); const k = $("#keyIn").value.trim(); if (!/^sk-ant-/.test(k)) { toast(L("Cheia începe de obicei cu sk-ant-.", "Keys usually start with sk-ant-."), true); return; } lsSet(AKEY, k); renderSync(); toast(L("Cheia e salvată. Funcțiile de AI sunt pornite.", "Key saved. AI features are on.")); }
   if (e.target.id === "tForm") { e.preventDefault(); addTarget($("#tName")?.value); }
   if (e.target.id === "cForm") { e.preventDefault(); const cid = e.target.dataset.company; const name = $("#cName").value.trim(); if (!name) return;
     writeDoc("contacts/" + slug(name + "-" + cid).slice(0, 60) + "-" + Date.now().toString(36).slice(-4), { companyId: cid, name, headline: $("#cHead").value.trim(), connection: $("#cConn").value, url: safeUrl($("#cUrl").value.trim()), note: $("#cNote").value.trim(), status: "todo", source: "manual", addedAt: new Date().toISOString() });
@@ -2619,6 +2728,7 @@ document.addEventListener("input", (e) => {
   if (e.target.closest("#view-profile")) { getDraft()._dirty = true; }
 });
 document.addEventListener("change", (e) => {
+  if (e.target.id === "importFile" && e.target.files?.[0]) { importData(e.target.files[0]); e.target.value = ""; }
   const mv = e.target.closest("[data-move]"); if (mv) { const id = mv.dataset.move; const patch = { status: mv.value }; if (mv.value === "aplicat" && !state.apps[id]?.appliedAt) patch.appliedAt = new Date().toISOString(); saveApp(id, patch); }
   if (e.target.id === "fDomain") { state.f.domain = e.target.value; renderList(); }
   if (e.target.id === "fSort") { state.f.sort = e.target.value; lsSet("busola-f", { region: state.f.region, sort: state.f.sort }); renderList(); }

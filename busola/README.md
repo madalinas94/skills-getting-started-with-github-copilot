@@ -19,9 +19,13 @@ Aplicația e făcută pentru a rula ca Artifact pe claude.ai, unde primește:
 - funcțiile de AI (`window.claude`), folosite pentru CV-uri, scrisori, mesaje și analize,
 - descărcarea fișierelor.
 
-Deschisă direct în browser (sau pe GitHub Pages), interfața funcționează și salvează datele local, în `localStorage`, dar funcțiile de AI nu sunt disponibile.
+Pe GitHub Pages (https://madalinas94.github.io/skills-getting-started-with-github-copilot/busola/) aplicația merge și singură:
 
-Datele personale (CV, joburi, aplicări, contacte) **nu** sunt în acest repository: stau în baza de date privată a aplicației.
+- **Datele** stau doar în browser (`localStorage`). Profilul, planurile și companiile de vis se mută cu Profil → „Descarcă datele mele” pe claude.ai și „Încarcă fișierul cu date” pe GitHub.
+- **Funcțiile de AI** folosesc o cheie API Anthropic proprie, introdusă în Profil. Cheia rămâne doar în browser și cererile merg direct la `api.anthropic.com`.
+- **Joburile noi** vin din `data/jobs.json`, pe care research-ul zilnic îl actualizează în fiecare dimineață.
+
+Datele personale (CV, aplicări, contacte, profil) **nu** sunt în acest repository. `data/jobs.json` conține doar anunțurile publice, fără scorurile și comentariile legate de profil.
 
 ## Capturi
 
