@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Montaj — agent de editare video</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%237c5cff'/%3E%3Cpath d='M11 9l13 7-13 7z' fill='white'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M11 9l13 7-13 7z"/></svg></span>
+    <span class="brand-name">Montaj</span>
+    <span class="brand-sub">agent de editare video</span>
+  </div>
+  <div class="project-switch">
+    <select id="projectSelect" aria-label="Proiect"></select>
+    <button class="ghost" id="newProject" title="Proiect nou">＋ Proiect</button>
+  </div>
+  <div class="status">
+    <span class="pill" id="pillFfmpeg">ffmpeg</span>
+    <span class="pill" id="pillAi">AI</span>
+    <button class="ghost icon" id="openSettings" title="Setări" aria-label="Setări">⚙</button>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- MEDIA BIN -->
+  <aside class="panel bin">
+    <div class="panel-head">
+      <h2>1 · Material</h2>
+      <span class="muted small" id="binCount"></span>
+    </div>
+    <label class="drop" id="drop">
+      <input type="file" id="fileInput" multiple accept="video/*,image/*,audio/*">
+      <span class="drop-icon">⬆</span>
+      <strong>Trage aici video, poze, muzică</strong>
+      <span class="muted small">sau apasă ca să alegi fișiere</span>
+      <span class="drop-progress" id="uploadProgress" hidden><span></span></span>
+    </label>
+    <div class="role-hint small muted">
+      <b>Material</b> = intră în montaj · <b>Exemplu</b> = stilul pe care îl copiază agentul · <b>Muzică</b> = coloana sonoră
+    </div>
+    <ul class="media-list" id="mediaList"></ul>
+  </aside>
+
+  <section class="work">
+    <!-- BRIEF -->
+    <section class="panel brief">
+      <div class="panel-head"><h2>2 · Reguli și stil</h2></div>
+      <div class="presets" id="presets" role="radiogroup" aria-label="Stil"></div>
+      <label class="field">
+        <span>Regulile tale <span class="muted">(ce vrei, ce nu vrei, pentru cine e)</span></span>
+        <textarea id="rules" rows="4" placeholder="Ex: Video de 30 de secunde pentru Instagram despre weekendul la munte. Începe cu peisajul cel mai spectaculos. Fără cadre tremurate. Pune numele locurilor pe ecran. Final cu „Ne vedem la următoarea tură!”"></textarea>
+      </label>
+      <div class="grid3">
+        <label class="field"><span>Titlu / hook</span><input id="title" placeholder="Weekend în Bucegi"></label>
+        <label class="field"><span>Text final</span><input id="outro" placeholder="Urmărește pentru mai mult"></label>
+        <label class="field"><span>Durată țintă: <b id="durationLabel">30s</b></span>
+          <input type="range" id="duration" min="10" max="180" step="5" value="30"></label>
+      </div>
+      <div class="row wrap">
+        <div class="segmented" id="aspect" role="radiogroup" aria-label="Format">
+          <button data-v="">Auto</button><button data-v="9:16">9:16</button><button data-v="16:9">16:9</button>
+          <button data-v="1:1">1:1</button><button data-v="4:5">4:5</button>
+        </div>
+        <label class="toggle"><input type="checkbox" id="captions"><span></span>Subtitrări</label>
+        <label class="toggle"><input type="checkbox" id="autoColor" checked><span></span>Corecție automată de culoare</label>
+      </div>
+      <div class="row actions">
+        <button class="primary big" id="generateAi"><span class="spark">✦</span> Generează cu AI</button>
+        <button class="secondary big" id="generateAuto">Montaj automat (fără AI)</button>
+      </div>
+    </section>
+
+    <!-- JOB -->
+    <section class="panel job" id="jobPanel" hidden>
+      <div class="job-top">
+        <div class="spinner" id="jobSpinner"></div>
+        <div class="job-text"><strong id="jobMessage">Pornesc…</strong><span class="muted small" id="jobKind"></span></div>
+        <span class="job-pct" id="jobPct">0%</span>
+      </div>
+      <div class="bar"><span id="jobBar"></span></div>
+      <ul class="job-log" id="jobLog"></ul>
+    </section>
+
+    <!-- PREVIEW + PLAN -->
+    <section class="panel stage" id="stage" hidden>
+      <div class="stage-video">
+        <div class="player" id="player"><video id="video" controls playsinline></video></div>
+        <div class="row small muted" id="previewInfo"></div>
+      </div>
+      <div class="stage-side">
+        <div class="plan-head">
+          <h3 id="planTitle"></h3>
+          <span class="badge" id="planLabel"></span>
+        </div>
+        <p id="planSummary" class="muted"></p>
+        <ul class="issues" id="issues"></ul>
+        <div class="chat">
+          <div class="chat-log" id="chatLog"></div>
+          <form class="chat-form" id="chatForm">
+            <input id="chatInput" placeholder="Spune-i agentului ce să schimbe: „mai dinamic”, „scoate poza 3”, „text mai mare”…" autocomplete="off">
+            <button class="primary" type="submit">Trimite</button>
+          </form>
+          <div class="quick" id="quick"></div>
+        </div>
+        <div class="row">
+          <button class="ghost" id="undo">↶ Versiunea anterioară</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TIMELINE -->
+    <section class="panel tl-panel" id="tlPanel" hidden>
+      <div class="panel-head">
+        <h2>3 · Timeline</h2>
+        <span class="muted small">trage clipurile ca să le reordonezi · apasă pe un clip ca să-l editezi</span>
+      </div>
+      <div class="timeline" id="timeline">
+        <div class="tl-ruler" id="ruler"></div>
+        <div class="tl-track" id="track"></div>
+        <div class="tl-text" id="textTrack"></div>
+        <div class="tl-music" id="musicTrack"></div>
+        <div class="tl-playhead" id="playhead"></div>
+      </div>
+    </section>
+
+    <!-- EXPORT -->
+    <section class="panel export" id="exportPanel" hidden>
+      <div class="panel-head"><h2>4 · Export</h2></div>
+      <div class="row wrap">
+        <div class="segmented" id="quality">
+          <button data-v="720p">720p</button><button data-v="1080p" class="on">1080p</button>
+        </div>
+        <button class="primary big" id="exportBtn">⬇ Randează final</button>
+      </div>
+      <p class="small muted">Primești: <b>MP4</b> gata de postat · <b>MP3</b> · copertă <b>JPG + PNG</b> ·
+        <b>FCPXML</b> și <b>EDL</b> pentru DaVinci Resolve (File → Import → Timeline) ·
+        <b>SRT</b> cu textele (CapCut, YouTube) · planul în JSON.</p>
+      <div id="exports"></div>
+    </section>
+
+    <section class="empty" id="emptyState">
+      <div class="empty-art" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <h3>Încarcă materialul, scrie regulile, apasă „Generează”.</h3>
+      <p class="muted">Agentul se uită la cadre, alege momentele bune, le pune pe ritmul muzicii,
+        corectează lumina și culorile, adaugă text și tranziții — și îți dă un draft pe care îl poți rafina prin chat.</p>
+    </section>
+  </section>
+</main>
+
+<!-- CLIP INSPECTOR -->
+<aside class="drawer" id="inspector" hidden aria-label="Editare clip">
+  <div class="drawer-head">
+    <h3 id="inspTitle">Clip</h3>
+    <button class="ghost icon" id="inspClose" aria-label="Închide">✕</button>
+  </div>
+  <div class="drawer-body" id="inspBody"></div>
+  <div class="drawer-foot">
+    <button class="danger" id="inspDelete">Șterge clipul</button>
+    <button class="primary" id="inspApply">Aplică și re-randează</button>
+  </div>
+</aside>
+
+<!-- SETTINGS -->
+<dialog id="settings">
+  <form method="dialog" class="dialog">
+    <h3>Setări AI</h3>
+    <label class="field"><span>Cheie API Anthropic</span>
+      <input id="apiKey" type="password" placeholder="sk-ant-…" autocomplete="off"></label>
+    <p class="small muted" id="keyHint">Cheia se salvează doar local, în <code>montaj/workspace/settings.json</code>. Fără cheie merge doar montajul automat.</p>
+    <label class="field"><span>Model</span><select id="model"></select></label>
+    <label class="field"><span>Efort (cât de atent gândește)</span>
+      <select id="effort"><option value="low">Mic — rapid, ieftin</option><option value="medium">Mediu — recomandat</option>
+        <option value="high">Mare</option><option value="xhigh">Foarte mare</option><option value="max">Maxim</option></select></label>
+    <div class="row end">
+      <button value="cancel" class="ghost">Renunță</button>
+      <button value="save" class="primary" id="saveSettings">Salvează</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>

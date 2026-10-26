@@ -1,0 +1,148 @@
+"""Rule-based planner: a decent first cut with no AI (and the fallback when there's no API key)."""
+
+from . import presets
+from .plan import Caption, Clip, Color, EditPlan, Music, Overlay, Thumbnail
+
+
+def _shots(duration: float, cuts):
+    """Split a video into shots at scene cuts; [(start, end)]."""
+    points = [0.0] + [c for c in cuts if 0.3 < c < duration - 0.3] + [duration]
+    return [(a, b) for a, b in zip(points, points[1:]) if b - a >= 0.6]
+
+
+def _silent(t0, t1, silences):
+    """Fraction of [t0, t1] that is silent."""
+    total = 0.0
+    for s, e in silences:
+        e = t1 if e is None else e
+        total += max(0.0, min(t1, e) - max(t0, s))
+    return total / max(t1 - t0, 1e-6)
+
+
+def _sort_key(m):
+    return (m.get("creation_time") or "", m["name"].lower())
+
+
+def build(media: list, analysis: dict, settings: dict) -> EditPlan:
+    """media: material records (role == 'material'), analysis: id -> analyze() output."""
+    style = presets.get(settings.get("preset"))
+    aspect = settings.get("aspect") or style["aspect"]
+    target = float(settings.get("duration") or style["duration"])
+    pace = style["pace"]
+    use_color = settings.get("auto_color", True)
+    transitions = style["transitions"]
+    motions = style["motions"]
+
+    visuals = sorted([m for m in media if m["kind"] in ("video", "image")], key=_sort_key)
+    audio = [m for m in media if m["kind"] == "audio"]
+    music_media = next((m for m in audio if m["id"] == settings.get("music_id")), audio[0] if audio else None)
+
+    videos = [m for m in visuals if m["kind"] == "video"]
+    photos = [m for m in visuals if m["kind"] == "image"]
+    photo_len = max(1.6, min(3.5, pace * 1.2))
+    video_budget = max(0.0, target - photo_len * len(photos))
+    total_video = sum(m["duration"] for m in videos) or 1.0
+
+    picks = {}  # media id -> list of (start, end)
+    for m in videos:
+        info = analysis.get(m["id"], {})
+        share = max(pace, video_budget * m["duration"] / total_video)
+        n = max(1, round(share / pace))
+        shots = _shots(m["duration"], info.get("scenes") or [])
+        sil = info.get("silences") or []
+        if not shots:
+            shots = [(0.0, m["duration"])]
+        if len(shots) < n:  # long takes: split them so each pick comes from its own window
+            split = []
+            for a, b in shots:
+                parts = max(1, round(n * (b - a) / m["duration"]))
+                step = (b - a) / parts
+                split += [(a + j * step, a + (j + 1) * step) for j in range(parts)]
+            shots = split
+        chosen = []
+        # spread the picks over the shots, preferring the least silent part of each
+        for k in range(n):
+            a, b = shots[int(k * len(shots) / n)]
+            seg = min(pace * (1.6 if style.get("keep_audio") else 1.0), b - a)
+            if seg < 0.5:
+                continue
+            best, best_score = a, 9.0
+            steps = max(1, int((b - a - seg) / 0.5))
+            for s in range(steps + 1):
+                t0 = a + 0.25 + s * 0.5 if b - a - seg > 0.5 else a
+                t0 = min(t0, b - seg)
+                score = _silent(t0, t0 + seg, sil) if style.get("keep_audio") else abs((t0 + seg / 2) - (a + b) / 2) / max(b - a, 1)
+                if score < best_score:
+                    best, best_score = t0, score
+            chosen.append((round(best, 2), round(best + seg, 2)))
+        picks[m["id"]] = sorted(set(chosen))
+
+    clips = []
+    for m in visuals:
+        info = analysis.get(m["id"], {})
+        color = Color(**(info.get("auto_color") if use_color and info.get("auto_color") else {}))
+        color.look = style["look"]
+        color.vignette = bool(style.get("vignette"))
+        wide = m["width"] >= m["height"]
+        want_wide = aspect in ("16:9",)
+        fit = style["fit"] if wide != want_wide else "fill"
+        if m["kind"] == "image":
+            clips.append(Clip(media_id=m["id"], start=0, end=photo_len, fit=fit,
+                              motion=motions[len(clips) % len(motions)] if motions != ["none"] else "zoom_in",
+                              color=color, keep_audio=False, reason="Fotografie cu mișcare Ken Burns"))
+        else:
+            for s, e in picks.get(m["id"], []):
+                clips.append(Clip(media_id=m["id"], start=s, end=e, fit=fit,
+                                  motion=motions[len(clips) % len(motions)],
+                                  color=color.model_copy(),
+                                  keep_audio=bool(style.get("keep_audio")) and m["has_audio"],
+                                  reason="Cel mai bun moment din scenă (fără pauze)" if style.get("keep_audio")
+                                  else "Mijlocul scenei, cadrul cel mai stabil"))
+
+    for i, c in enumerate(clips):
+        c.transition_in = "cut" if i == 0 else transitions[i % len(transitions)]
+        c.transition_duration = 0.5 if c.transition_in in ("dissolve", "fadeblack", "fade", "fadewhite") else 0.3
+
+    title = (settings.get("title") or "").strip()
+    if clips and title:
+        clips[0].overlays.append(Overlay(text=title, start=0.2, duration=min(2.5, (clips[0].end - clips[0].start) - 0.3),
+                                         style="title" if style["pace"] >= 3 else "big_word", position="center"))
+    outro = (settings.get("outro") or "").strip()
+    if clips and outro:
+        last = clips[-1]
+        length = (last.end - last.start) / last.speed
+        last.overlays.append(Overlay(text=outro, start=max(0, length - 2), duration=min(2, length),
+                                     style="caption", position="bottom"))
+
+    music = None
+    if music_media:
+        music = Music(media_id=music_media["id"], volume=0.35 if style.get("keep_audio") else 0.9,
+                      duck=bool(style.get("keep_audio")))
+
+    thumb = None
+    first_video = next((c for c in clips if media_by_id(media, c.media_id)["kind"] == "video"), None)
+    if first_video:
+        thumb = Thumbnail(media_id=first_video.media_id, time=(first_video.start + first_video.end) / 2,
+                          text=title)
+
+    notes = []
+    available = sum(m["duration"] for m in videos) + photo_len * len(photos)
+    if visuals and available < target * 0.8:
+        notes.append(f"Ai material pentru ~{available:.0f}s, mai puțin decât ținta de {target:.0f}s. "
+                     "Mai adaugă clipuri sau poze.")
+    if not visuals:
+        notes.append("Nu ai încărcat niciun video sau poză.")
+    if not music_media:
+        notes.append("Adaugă o melodie (MP3) ca să pot tăia pe ritm.")
+    notes.append("Plan făcut automat, fără AI. Adaugă cheia API Anthropic pentru un montaj gândit cadru cu cadru.")
+
+    return EditPlan(title=title or "Montaj nou", summary=f"Montaj automat în stilul „{style['label']}”, "
+                    f"{len(clips)} cadre, ordonate cronologic.", aspect=aspect, fps=30, clips=clips,
+                    music=music, captions=[], thumbnail=thumb, snap_to_beat=bool(music_media), notes=notes)
+
+
+def media_by_id(media, mid):
+    return next(m for m in media if m["id"] == mid)
+
+
+__all__ = ["build", "Caption"]

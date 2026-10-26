@@ -1,0 +1,362 @@
+"""Turn an EditPlan into video files with ffmpeg.
+
+Each clip is rendered to a normalised segment (same size, fps, pixel format, stereo 48 kHz
+audio). Segments are cached by content hash, so re-rendering after a small edit only redoes
+the clips that changed. A second pass joins the segments with transitions, mixes the music
+(with ducking under speech), burns captions and normalises loudness for social media.
+"""
+
+import hashlib
+import json
+import shutil
+import textwrap
+from pathlib import Path
+
+from . import ff
+from .plan import ASPECT_SIZE, Clip, EditPlan, Overlay, clip_length, timeline, transition_len
+
+FONT_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
+FONT_BOLD = "InterDisplay-ExtraBold.otf"
+FONT_TEXT = "Inter-SemiBold.otf"
+
+QUALITY = {
+    # short side in px, x264 preset, crf, audio bitrate
+    "preview": (480, "veryfast", 28, "128k"),
+    "720p": (720, "medium", 21, "160k"),
+    "1080p": (1080, "medium", 19, "192k"),
+}
+
+LOOKS = {
+    "none": [],
+    "cinematic": ["colorbalance=rs=-0.04:gs=0.0:bs=0.07:rh=0.07:gh=0.02:bh=-0.06",
+                  "curves=preset=medium_contrast", "eq=saturation=0.92"],
+    "warm": ["colorbalance=rm=0.07:gm=0.01:bm=-0.06:rh=0.04:bh=-0.03"],
+    "cool": ["colorbalance=rm=-0.05:bm=0.07:bh=0.04"],
+    "vintage": ["curves=preset=vintage", "eq=saturation=0.85"],
+    "bw": ["hue=s=0", "curves=preset=medium_contrast"],
+    "vivid": ["eq=saturation=1.3:contrast=1.06"],
+    "film": ["curves=preset=increase_contrast", "eq=saturation=0.9", "noise=alls=5:allf=t"],
+    "matte": ["curves=all='0/0.07 0.5/0.5 1/0.93'", "eq=saturation=0.88"],
+}
+
+
+def frame_size(aspect: str, quality: str):
+    w, h = ASPECT_SIZE[aspect]
+    short = QUALITY[quality][0]
+    scale = short / min(w, h)
+
+    def even8(x):
+        return max(16, int(round(x * scale / 8)) * 8)
+
+    return even8(w), even8(h)
+
+
+# ----------------------------------------------------------------- per-clip filters
+
+def fit_filter(fit: str, W: int, H: int, src="[vin]", out="[vfit]") -> str:
+    if fit == "fit":
+        return (f"{src}scale={W}:{H}:force_original_aspect_ratio=decrease,"
+                f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:black,setsar=1{out}")
+    if fit == "blur_bg":
+        bw, bh = max(16, W // 8 * 2), max(16, H // 8 * 2)  # quarter size, even
+        return (f"{src}split=2[bgs][fgs];"
+                f"[bgs]scale={bw}:{bh}:force_original_aspect_ratio=increase,crop={bw}:{bh},"
+                f"boxblur=8:2,scale={W}:{H},eq=brightness=-0.07:saturation=1.1[bg];"
+                f"[fgs]scale={W}:{H}:force_original_aspect_ratio=decrease[fg];"
+                f"[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1{out}")
+    return (f"{src}scale={W}:{H}:force_original_aspect_ratio=increase,"
+            f"crop={W}:{H},setsar=1{out}")
+
+
+def motion_filter(motion: str, W: int, H: int, L: float) -> list:
+    """Smooth Ken Burns moves via per-frame scale + centred crop."""
+    L = max(L, 0.1)
+    if motion == "none":
+        return []
+    if motion in ("zoom_in", "zoom_out", "punch_in"):
+        if motion == "zoom_in":
+            z = f"(1+0.14*t/{L:.3f})"
+        elif motion == "zoom_out":
+            z = f"(1.14-0.14*t/{L:.3f})"
+        else:  # quick punch-in during the first 0.25 s, then hold
+            z = "(1+0.1*min(t/0.25\\,1))"
+        return [f"scale=w='trunc({W}*{z}/2)*2':h='trunc({H}*{z}/2)*2':eval=frame",
+                f"crop={W}:{H}:'(iw-{W})/2':'(ih-{H})/2'"]
+    pw, ph = int(W * 1.16) // 2 * 2, int(H * 1.16) // 2 * 2
+    x = f"(iw-{W})*t/{L:.3f}" if motion == "pan_right" else f"(iw-{W})*(1-t/{L:.3f})"
+    return [f"scale={pw}:{ph}", f"crop={W}:{H}:'{x}':'(ih-{H})/2'"]
+
+
+def color_filters(clip: Clip) -> list:
+    c = clip.color
+    out = []
+    if abs(c.brightness) > 1e-3 or abs(c.contrast - 1) > 1e-3 or abs(c.saturation - 1) > 1e-3:
+        out.append(f"eq=brightness={c.brightness:.3f}:contrast={c.contrast:.3f}:saturation={c.saturation:.3f}")
+    if abs(c.warmth) > 1e-3:
+        w = c.warmth * 0.1
+        out.append(f"colorbalance=rm={w:.3f}:bm={-w:.3f}:rh={w / 2:.3f}:bh={-w / 2:.3f}")
+    out += LOOKS.get(c.look, [])
+    if c.vignette:
+        out.append("vignette=angle=PI/5")
+    return out
+
+
+def _wrap(text: str, fontsize: int, W: int):
+    max_chars = max(8, int(W * 0.86 / (fontsize * 0.56)))
+    return textwrap.wrap(text, max_chars)[:4] or [text]
+
+
+STYLE = {
+    # size factor of the short side, font, colour, border, box
+    "title": (0.085, FONT_BOLD, "white", 0, True),
+    "caption": (0.052, FONT_BOLD, "white", 5, False),
+    "lower_third": (0.042, FONT_TEXT, "white", 0, True),
+    "label": (0.034, FONT_TEXT, "white", 0, True),
+    "big_word": (0.15, FONT_BOLD, "0xFFE14D", 7, False),
+}
+
+
+def text_filters(texts, W: int, H: int, workdir: Path, prefix: str) -> list:
+    """drawtext filters for [(Overlay, start, end)] with soft fade in/out.
+
+    Text goes through textfile= so no user text ever needs filtergraph escaping.
+    """
+    out = []
+    short = min(W, H)
+    vertical = H > W
+    for n, (o, s, e) in enumerate(texts):
+        factor, font, colour, border, box = STYLE.get(o.style, STYLE["caption"])
+        size = max(12, int(short * factor))
+        lines = _wrap(o.text.upper() if o.style == "big_word" else o.text, size, W)
+        line_h = int(size * 1.25)
+        block = line_h * len(lines)
+        if o.position == "top" or o.style == "label":
+            y0 = int(H * (0.12 if vertical else 0.08))
+        elif o.position == "center" or o.style in ("title", "big_word"):
+            y0 = (H - block) // 2
+        elif o.position == "lower_third" or o.style == "lower_third":
+            y0 = int(H * 0.72)
+        else:  # bottom; keep clear of the TikTok/Reels UI on vertical video
+            y0 = int(H * (0.70 if vertical else 0.84)) - block // 2
+        fade = min(0.25, (e - s) / 3)
+        alpha = (f"if(lt(t,{s + fade:.3f}),(t-{s:.3f})/{fade:.3f},"
+                 f"if(gt(t,{e - fade:.3f}),({e:.3f}-t)/{fade:.3f},1))")
+        for li, line in enumerate(lines):
+            fname = f"{prefix}_t{n}_{li}.txt"
+            (workdir / fname).write_text(line, encoding="utf-8")
+            if o.style in ("lower_third", "label"):
+                x = f"{int(W * 0.06)}"
+            else:
+                x = "(w-text_w)/2"
+            parts = [f"fontfile={font}", f"textfile={fname}", f"fontsize={size}",
+                     f"fontcolor={colour}", f"x={x}", f"y={y0 + li * line_h}",
+                     f"enable='between(t,{s:.3f},{e:.3f})'", f"alpha='{alpha}'"]
+            if border:
+                parts += [f"borderw={max(2, int(size * border / 100 * 1.6))}", "bordercolor=black@0.85"]
+            if box:
+                parts += ["box=1", "boxcolor=black@0.5", f"boxborderw={int(size * 0.35)}"]
+            else:
+                parts += ["shadowcolor=black@0.5", f"shadowx={max(1, size // 25)}", f"shadowy={max(1, size // 25)}"]
+            out.append("drawtext=" + ":".join(parts))
+    return out
+
+
+def atempo_chain(speed: float) -> list:
+    chain, s = [], speed
+    while s > 2.0:
+        chain.append("atempo=2.0")
+        s /= 2.0
+    while s < 0.5:
+        chain.append("atempo=0.5")
+        s /= 0.5
+    chain.append(f"atempo={s:.4f}")
+    return chain
+
+
+def _copy_fonts(workdir: Path):
+    for f in (FONT_BOLD, FONT_TEXT):
+        if not (workdir / f).exists():
+            shutil.copy(FONT_DIR / f, workdir / f)
+
+
+def segment_key(clip: Clip, m: dict, W: int, H: int, fps: int, quality: str) -> str:
+    blob = json.dumps({"clip": clip.model_dump(exclude={"reason"}), "src": m["file"],
+                       "size": [W, H], "fps": fps, "q": quality, "v": 4}, sort_keys=True)
+    return hashlib.sha1(blob.encode()).hexdigest()[:16]
+
+
+def render_segment(clip: Clip, m: dict, src: Path, dest: Path, W: int, H: int, fps: int,
+                   quality: str, workdir: Path):
+    L = clip_length(clip)
+    _, preset, crf, abr = QUALITY[quality]
+    args = []
+    if m["kind"] == "image":
+        args += ["-loop", "1", "-framerate", str(fps), "-t", f"{L + 0.5:.3f}", "-i", src]
+    else:
+        args += ["-ss", f"{clip.start:.3f}", "-t", f"{clip.end - clip.start:.3f}", "-i", src]
+    args += ["-f", "lavfi", "-t", f"{L + 0.5:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
+
+    vf = [f"[0:v]setpts=(PTS-STARTPTS)/{clip.speed:.4f},fps={fps},format=yuv420p[vin]",
+          fit_filter(clip.fit, W, H)]
+    chain = motion_filter(clip.motion, W, H, L) + color_filters(clip)
+    texts = [(o, o.start, min(L, o.start + o.duration)) for o in clip.overlays]
+    chain += text_filters(texts, W, H, workdir, dest.stem)
+    chain += ["tpad=stop_mode=clone:stop_duration=1", "setsar=1", "format=yuv420p"]
+    vf.append("[vfit]" + ",".join(chain) + "[v]")
+
+    if clip.keep_audio and m.get("has_audio") and m["kind"] == "video":
+        af = ([f"[0:a]asetpts=PTS-STARTPTS"] + atempo_chain(clip.speed) +
+              [f"volume={clip.volume:.3f}", "aresample=48000",
+               "aformat=sample_fmts=fltp:channel_layouts=stereo",
+               "afade=t=in:d=0.04", "apad"])
+        vf.append(",".join(af) + "[a]")
+    else:
+        vf.append("[1:a]anull[a]")
+
+    args += ["-filter_complex", ";".join(vf), "-map", "[v]", "-map", "[a]",
+             "-t", f"{L:.3f}", "-r", str(fps),
+             "-c:v", "libx264", "-preset", preset, "-crf", str(crf), "-pix_fmt", "yuv420p",
+             "-c:a", "aac", "-b:a", abr, "-ar", "48000", "-ac", "2", dest.name]
+    ff.run(args, cwd=workdir)
+
+
+# ----------------------------------------------------------------- whole edit
+
+def render(plan: EditPlan, media: dict, media_dir: Path, workdir: Path, out_path: Path,
+           quality: str = "preview", on_progress=None) -> dict:
+    """Render the plan to out_path. Returns {"duration", "width", "height"}."""
+    workdir.mkdir(parents=True, exist_ok=True)
+    cache = workdir / "segments"
+    cache.mkdir(exist_ok=True)
+    _copy_fonts(cache)
+    _copy_fonts(workdir)
+    W, H = frame_size(plan.aspect, quality)
+    fps = plan.fps
+    progress = on_progress or (lambda p, msg="": None)
+
+    segs = []
+    n = len(plan.clips)
+    for i, clip in enumerate(plan.clips):
+        m = media[clip.media_id]
+        key = segment_key(clip, m, W, H, fps, quality)
+        seg = cache / f"seg_{key}.mp4"
+        if not seg.exists():
+            progress(0.65 * i / n, f"Randez clipul {i + 1}/{n}")
+            tmp = cache / f"tmp_{key}.mp4"
+            render_segment(clip, m, media_dir / m["file"], tmp, W, H, fps, quality, cache)
+            tmp.replace(seg)
+        segs.append(seg)
+    progress(0.65, "Lipesc clipurile, tranziții și muzică")
+
+    total = _join(plan, media, media_dir, segs, workdir, out_path, W, H, fps, quality,
+                  lambda p: progress(0.65 + 0.35 * p, "Lipesc clipurile, tranziții și muzică"))
+    progress(1.0, "Gata")
+    return {"duration": total, "width": W, "height": H}
+
+
+def _join(plan, media, media_dir, segs, workdir, out_path, W, H, fps, quality, on_progress):
+    _, preset, crf, abr = QUALITY[quality]
+    args, fc = [], []
+    for seg in segs:
+        args += ["-i", seg]
+    for i in range(len(segs)):
+        fc.append(f"[{i}:v]settb=AVTB,setsar=1,setpts=PTS-STARTPTS[v{i}]")
+        fc.append(f"[{i}:a]asetpts=PTS-STARTPTS[a{i}]")
+
+    tl = timeline(plan)
+    cur_v, cur_a, cur_len = "[v0]", "[a0]", tl[0][2]
+    for i in range(1, len(segs)):
+        clip, prev = plan.clips[i], plan.clips[i - 1]
+        L = tl[i][2]
+        d = transition_len(prev, clip)
+        ov, oa = f"[jv{i}]", f"[ja{i}]"
+        if d <= 0:
+            fc.append(f"{cur_v}{cur_a}[v{i}][a{i}]concat=n=2:v=1:a=1[cv{i}][ca{i}]")
+            fc.append(f"[cv{i}]settb=AVTB{ov}")
+            fc.append(f"[ca{i}]anull{oa}")
+            cur_len += L
+        else:
+            off = max(0.0, cur_len - d)
+            fc.append(f"{cur_v}[v{i}]xfade=transition={clip.transition_in}:duration={d:.3f}:offset={off:.3f}{ov}")
+            fc.append(f"{cur_a}[a{i}]acrossfade=d={d:.3f}:c1=tri:c2=tri{oa}")
+            cur_len += L - d
+        cur_v, cur_a = ov, oa
+    total = round(cur_len, 3)
+
+    # Captions are burned on the final timeline
+    caps = [(Overlay(text=c.text, style="caption", position="bottom"), c.start, c.end)
+            for c in plan.captions]
+    cap_filters = text_filters(caps, W, H, workdir, "cap")
+    final_v = "[vout]"
+    fc.append(f"{cur_v}" + ",".join(cap_filters + ["format=yuv420p"]) + final_v)
+
+    voice = cur_a
+    any_voice = any(c.keep_audio and media[c.media_id].get("has_audio") for c in plan.clips)
+    if plan.music:
+        mu = plan.music
+        m = media[mu.media_id]
+        args += ["-stream_loop", "-1", "-ss", f"{mu.start:.3f}", "-i", media_dir / m["file"]]
+        mi = len(segs)
+        fo = min(mu.fade_out, total / 3)
+        fc.append(f"[{mi}:a]atrim=0:{total:.3f},asetpts=PTS-STARTPTS,aresample=48000,"
+                  f"aformat=sample_fmts=fltp:channel_layouts=stereo,volume={mu.volume:.3f},"
+                  f"afade=t=in:d={min(mu.fade_in, total / 3):.3f},"
+                  f"afade=t=out:st={max(0, total - fo):.3f}:d={fo:.3f}[mus]")
+        if mu.duck and any_voice:
+            fc.append(f"{voice}asplit=2[vo1][vo2]")
+            fc.append("[mus][vo1]sidechaincompress=threshold=0.02:ratio=8:attack=15:release=350[duck]")
+            fc.append("[vo2][duck]amix=inputs=2:duration=first:normalize=0[mix]")
+        else:
+            fc.append(f"{voice}[mus]amix=inputs=2:duration=first:normalize=0[mix]")
+        voice = "[mix]"
+    fc.append(f"{voice}loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[aout]")
+
+    tmp = out_path.with_suffix(".part.mp4")
+    args += ["-filter_complex", ";".join(fc), "-map", final_v, "-map", "[aout]",
+             "-t", f"{total:.3f}", "-r", str(fps),
+             "-c:v", "libx264", "-preset", preset, "-crf", str(crf), "-pix_fmt", "yuv420p",
+             "-c:a", "aac", "-b:a", abr, "-ar", "48000", "-movflags", "+faststart",
+             str(tmp.resolve())]
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    # cwd=workdir: fonts and caption text files are referenced by bare name
+    ff.run_progress(args, total, on_progress, cwd=workdir)
+    tmp.replace(out_path)
+    return total
+
+
+# ----------------------------------------------------------------- extra outputs
+
+def export_mp3(video: Path, dest: Path):
+    ff.run(["-i", video, "-vn", "-c:a", "libmp3lame", "-q:a", "2", dest])
+
+
+def export_cover(plan: EditPlan, media: dict, media_dir: Path, workdir: Path, dest_base: Path,
+                 quality: str = "1080p"):
+    """Cover image (JPG + PNG) for the post: chosen frame, same grade, hook text."""
+    th = plan.thumbnail
+    clip = None
+    if th:
+        clip = next((c for c in plan.clips if c.media_id == th.media_id), None)
+    if not th or clip is None:
+        clip = plan.clips[0]
+        th_media, th_time, th_text = clip.media_id, clip.start, plan.title
+    else:
+        th_media, th_time, th_text = th.media_id, th.time, th.text or plan.title
+    m = media[th_media]
+    W, H = frame_size(plan.aspect, quality)
+    _copy_fonts(workdir)
+    args = []
+    if m["kind"] == "video":
+        args += ["-ss", f"{min(th_time, max(0, m['duration'] - 0.1)):.3f}"]
+    args += ["-i", media_dir / m["file"]]
+    chain = color_filters(clip)
+    if th_text:
+        chain += text_filters([(Overlay(text=th_text, style="title", position="center"), 0, 9999)],
+                              W, H, workdir, "cover")
+    fc = fit_filter(clip.fit, W, H, "[0:v]", "[f]") + ";[f]" + ",".join(chain or ["null"]) + "[o]"
+    jpg, png = dest_base.with_suffix(".jpg"), dest_base.with_suffix(".png")
+    for target in (jpg, png):
+        ff.run([*args, "-filter_complex", fc, "-map", "[o]", "-frames:v", "1",
+                *(["-q:v", "2"] if target.suffix == ".jpg" else []), str(target.resolve())],
+               cwd=workdir)
+    return jpg, png
