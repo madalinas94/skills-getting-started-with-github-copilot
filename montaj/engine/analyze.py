@@ -5,7 +5,12 @@ import re
 import subprocess
 from pathlib import Path
 
-from . import ff
+from . import ff, speech
+
+try:
+    from . import vision
+except ImportError:  # numpy missing: quality checks and face tracking are skipped
+    vision = None
 
 FRAME_WIDTH = 512  # frames sent to the AI: small enough to be cheap, big enough to read
 
@@ -175,7 +180,25 @@ def beats(src, max_seconds=600):
     return {"bpm": round(60 / (period * frame_sec), 1), "beats": times}
 
 
-def analyze(media: dict, src: Path, frames_dir: Path, frame_count: int, deep: bool = True) -> dict:
+def music_mood(src, bpm, max_seconds=600) -> dict:
+    """Loudness and dynamics of a track, summarised as calm / medium / energetic."""
+    text = _stderr_of(["-t", str(max_seconds), "-i", src, "-vn", "-af", "ebur128=framelog=quiet",
+                       "-f", "null", "-"])
+    lufs = ff.parse_float_lines(text, r"\bI")
+    lra = ff.parse_float_lines(text, "LRA")
+    loud = lufs[-1] if lufs else None
+    score = 0
+    if bpm:
+        score += 1 if bpm >= 105 else 0
+        score += 1 if bpm >= 125 else 0
+    if loud is not None:
+        score += 1 if loud > -12 else 0
+    mood = ["calm", "medium", "energetic", "energetic"][score]
+    return {"lufs": loud, "lra": lra[-1] if lra else None, "mood": mood}
+
+
+def analyze(media: dict, src: Path, frames_dir: Path, frame_count: int, deep: bool = True,
+            transcribe: bool = True) -> dict:
     """Everything the planner needs about one file."""
     info = {"frames": [], "scenes": [], "silences": [], "stats": {}, "beats": None}
     kind = media["kind"]
@@ -183,12 +206,23 @@ def analyze(media: dict, src: Path, frames_dir: Path, frame_count: int, deep: bo
         info["frames"] = extract_frames(media, src, frames_dir, frame_count)
         info["stats"] = picture_stats(src, kind, media["duration"])
         info["auto_color"] = auto_color(info["stats"])
+        if deep and vision is not None:
+            q = vision.scan(src, media)
+            info["quality"] = {"issues": q["issues"], "score": q["score"]}
+            info["faces"] = q["faces"]
+            info["face_ratio"] = q["face_ratio"]
     if kind == "video" and deep:
         info["scenes"] = scenes(src)
         if media["has_audio"]:
             info["silences"] = silences(src)
+            if transcribe and speech.available():
+                try:
+                    info["speech"] = speech.transcribe(src)
+                except Exception as exc:  # model download blocked, corrupt audio, ...
+                    info["speech_error"] = f"Whisper nu a putut transcrie: {exc}"[:300]
     if kind == "audio" and deep:
         info["beats"] = beats(src)
+        info["mood"] = music_mood(src, info["beats"].get("bpm"))
     return info
 
 

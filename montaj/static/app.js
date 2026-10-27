@@ -9,7 +9,10 @@ const TRANSITIONS = ["cut", "fade", "dissolve", "wipeleft", "wiperight", "slideu
 const TRANS_RO = { cut: "Tăietură", fade: "Fade", dissolve: "Dizolvare", wipeleft: "Ștergere ←", wiperight: "Ștergere →", slideup: "Glisare ↑", slidedown: "Glisare ↓", circleopen: "Cerc", zoomin: "Zoom", smoothleft: "Swipe", fadeblack: "Prin negru", fadewhite: "Prin alb" };
 const LOOKS = { none: "Natural", cinematic: "Cinematic", warm: "Cald", cool: "Rece", vintage: "Vintage", bw: "Alb-negru", vivid: "Viu", film: "Film", matte: "Mat" };
 const MOTIONS = { none: "Fără", zoom_in: "Zoom in lent", zoom_out: "Zoom out lent", pan_left: "Panoramare ←", pan_right: "Panoramare →", punch_in: "Punch-in rapid" };
-const FITS = { fill: "Umple cadrul (crop)", blur_bg: "Întreg + fundal blurat", fit: "Întreg + benzi negre" };
+const FITS = { fill: "Umple cadrul (crop)", track: "Urmărește fața", blur_bg: "Întreg + fundal blurat", fit: "Întreg + benzi negre" };
+const ANIMS = { fade: "Fade", pop: "Pop", slide_up: "Glisează în sus", typewriter: "Mașină de scris", zoom_out: "Zoom", none: "Fără" };
+const ISSUE_RO = { shaky: "tremurat", blurry: "neclar", dark: "întunecat", bright: "ars" };
+const MOOD_RO = { calm: "calm", medium: "mediu", energetic: "energic" };
 const STYLES = { title: "Titlu", caption: "Subtitrare", lower_third: "Bandă jos", label: "Etichetă", big_word: "Cuvânt mare" };
 const POSITIONS = { top: "Sus", center: "Centru", bottom: "Jos", lower_third: "Treimea de jos" };
 const ROLES = { material: "Material", example: "Exemplu", music: "Muzică" };
@@ -63,18 +66,29 @@ async function loadStatus() {
   $("#model").innerHTML = Object.entries(s.models).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
   $("#model").value = s.model;
   $("#effort").value = s.effort;
+  $("#elevenVoice").value = s.eleven_voice || "";
+  $("#whisperModel").value = s.whisper_model;
+  const feat = (ok, yes, no) => `<li>${ok ? "✅" : "⚪"} ${ok ? yes : no}</li>`;
+  $("#features").innerHTML = [
+    feat(s.whisper, "Whisper instalat — subtitrări din vorbire", "Whisper lipsește — <code>pip install faster-whisper</code>"),
+    feat(s.faces, "OpenCV instalat — urmărirea feței", "OpenCV lipsește — <code>pip install opencv-python-headless</code>"),
+    feat(s.quality, "Verificare cadre tremurate / neclare / întunecate", "numpy lipsește — <code>pip install numpy</code>"),
+    feat(s.has_eleven, "ElevenLabs conectat — voce off", "Fără cheie ElevenLabs — vocea off e oprită"),
+  ].join("");
   $("#keyHint").innerHTML = s.key_from_env
     ? "Folosesc cheia din variabila <code>ANTHROPIC_API_KEY</code>. Poți pune alta aici."
     : "Cheia se salvează doar local, în <code>montaj/workspace/settings.json</code>. Fără cheie merge doar montajul automat.";
   renderPresets();
 }
 
-$("#openSettings").onclick = () => { $("#apiKey").value = ""; $("#settings").showModal(); };
+$("#openSettings").onclick = () => { $("#apiKey").value = ""; $("#elevenKey").value = ""; $("#settings").showModal(); };
 $("#pillAi").onclick = () => $("#openSettings").click();
 $("#settings").addEventListener("close", async () => {
   if ($("#settings").returnValue !== "save") return;
-  const body = { model: $("#model").value, effort: $("#effort").value };
+  const body = { model: $("#model").value, effort: $("#effort").value,
+    eleven_voice: $("#elevenVoice").value, whisper_model: $("#whisperModel").value };
   if ($("#apiKey").value.trim()) body.api_key = $("#apiKey").value.trim();
+  if ($("#elevenKey").value.trim()) body.eleven_key = $("#elevenKey").value.trim();
   try { await api("/api/settings", { method: "POST", body }); await loadStatus(); toast("Setări salvate"); }
   catch (e) { toast(e.message, true); }
 });
@@ -121,6 +135,7 @@ function renderAll() {
   renderMedia();
   renderBrief();
   renderStage();
+  renderVariants();
   renderTimeline();
   renderExports();
 }
@@ -143,10 +158,30 @@ function renderMedia() {
     return `<li class="media ${m.role}" data-id="${m.id}">
       <div class="thumb" ${bg}>${m.thumb ? "" : icon}${dur}</div>
       <div class="meta"><div class="name" title="${esc(m.name)}">${esc(m.name)}</div>
-        <div class="info">${info}</div>
+        <div class="info">${info}</div>${badges(m)}
         <select data-role aria-label="Rol">${roles}</select></div>
       <button class="ghost" data-del title="Șterge" aria-label="Șterge">✕</button></li>`;
   }).join("");
+}
+
+function badges(m) {
+  const a = state.project.analysis[m.id];
+  if (!a) return `<div class="badges"><i>se analizează…</i></div>`;
+  const out = [];
+  const q = a.quality;
+  if (q && q.score != null) {
+    const kinds = [...new Set(q.issues.map((i) => i.kind))];
+    if (!kinds.length) out.push(`<i class="good">✓ cadre bune</i>`);
+    kinds.forEach((k) => {
+      const where = q.issues.filter((i) => i.kind === k).map((i) => `${fmt(i.start)}–${fmt(i.end)}`).join(", ");
+      out.push(`<i class="warn" title="${esc(where)}">⚠ ${ISSUE_RO[k] || k}</i>`);
+    });
+  }
+  if (a.face_ratio > 0.2) out.push(`<i>🙂 fețe</i>`);
+  if (a.speech && a.speech.words.length) out.push(`<i title="${esc(a.speech.text.slice(0, 300))}">🗣 ${a.speech.words.length} cuvinte</i>`);
+  if (a.speech_error) out.push(`<i class="warn" title="${esc(a.speech_error)}">🗣 fără transcriere</i>`);
+  if (a.beats && a.beats.bpm) out.push(`<i>♪ ${Math.round(a.beats.bpm)} BPM${a.mood ? " · " + (MOOD_RO[a.mood.mood] || a.mood.mood) : ""}</i>`);
+  return `<div class="badges">${out.join("")}</div>`;
 }
 
 $("#mediaList").addEventListener("change", async (e) => {
@@ -182,6 +217,7 @@ function upload(files) {
     if (xhr.status >= 400) return toast(data.detail || "Încărcarea a eșuat", true);
     state.project = data.project;
     renderMedia();
+    if (data.job) watchJob(data.job, true);
     if (data.errors && data.errors.length) toast(data.errors.join(" · "), true);
     else toast(`Am adăugat ${files.length} fișier${files.length > 1 ? "e" : ""}`);
   };
@@ -199,11 +235,35 @@ drop.addEventListener("drop", (e) => { e.preventDefault(); upload(e.dataTransfer
 
 function renderPresets() {
   if (!state.status) return;
-  const cur = state.project ? state.project.settings.preset : "reels";
+  const s = state.project ? state.project.settings : { preset: "reels" };
+  const cur = s.style_id ? "" : s.preset;
   $("#presets").innerHTML = Object.entries(state.status.presets).map(([k, p]) =>
     `<button class="preset ${k === cur ? "on" : ""}" data-k="${k}" role="radio" aria-checked="${k === cur}" title="${esc(p.brief)}">
       <b>${esc(p.label)}</b><span>${p.aspect} · ~${p.duration}s</span></button>`).join("");
+  const mine = state.status.styles || [];
+  $("#myStyles").innerHTML = mine.length ? `<span class="small muted" style="align-self:center">Stilurile mele:</span>` + mine.map((st) =>
+    `<span class="style-chip ${st.id === s.style_id ? "on" : ""}" data-sid="${st.id}" title="${esc(st.brief)}">★ ${esc(st.name)}
+      <button data-del-style="${st.id}" aria-label="Șterge stilul">✕</button></span>`).join("") : "";
 }
+
+$("#myStyles").onclick = async (e) => {
+  const del = e.target.closest("[data-del-style]");
+  if (del) {
+    e.stopPropagation();
+    if (!confirm("Șterg stilul salvat?")) return;
+    state.status = { ...state.status, ...(await api(`/api/styles/${del.dataset.delStyle}`, { method: "DELETE" })) };
+    if (state.project.settings.style_id === del.dataset.delStyle) state.project.settings.style_id = "";
+    renderPresets(); saveBrief();
+    return;
+  }
+  const chip = e.target.closest(".style-chip");
+  if (!chip) return;
+  const st = state.status.styles.find((x) => x.id === chip.dataset.sid);
+  state.project.settings.style_id = chip.dataset.sid;
+  if (st) { $("#duration").value = Math.min(180, Math.max(10, st.duration)); $("#durationLabel").textContent = `${$("#duration").value}s`; }
+  renderPresets();
+  saveBrief();
+};
 
 function renderBrief() {
   const s = state.project.settings;
@@ -213,17 +273,25 @@ function renderBrief() {
   $("#outro").value = s.outro || "";
   $("#duration").value = s.duration || 30;
   $("#durationLabel").textContent = `${s.duration || 30}s`;
-  $("#captions").checked = !!s.captions;
+  $("#captionStyle").value = s.caption_style || "";
+  $("#beatFx").value = s.beat_fx || "";
   $("#autoColor").checked = s.auto_color !== false;
+  $("#musicAlign").checked = s.music_align !== false;
+  $("#selfReview").checked = s.self_review !== false;
+  $("#voiceover").checked = !!s.voiceover;
+  $("#voiceText").value = s.voiceover_text || "";
+  $("#voiceBox").hidden = !s.voiceover;
   $$("#aspect button").forEach((b) => b.classList.toggle("on", b.dataset.v === (s.aspect || "")));
 }
 
 function readBrief() {
   const s = state.project.settings;
   return {
-    preset: s.preset, aspect: s.aspect || "",
+    preset: s.preset, style_id: s.style_id || "", aspect: s.aspect || "",
     duration: +$("#duration").value, rules: $("#rules").value, title: $("#title").value,
-    outro: $("#outro").value, captions: $("#captions").checked, auto_color: $("#autoColor").checked,
+    outro: $("#outro").value, auto_color: $("#autoColor").checked,
+    caption_style: $("#captionStyle").value, beat_fx: $("#beatFx").value, music_align: $("#musicAlign").checked,
+    self_review: $("#selfReview").checked, voiceover: $("#voiceover").checked, voiceover_text: $("#voiceText").value,
   };
 }
 
@@ -241,6 +309,7 @@ $("#presets").onclick = (e) => {
   if (!b) return;
   const p = state.status.presets[b.dataset.k];
   state.project.settings.preset = b.dataset.k;
+  state.project.settings.style_id = "";
   $("#duration").value = p.duration;
   $("#durationLabel").textContent = `${p.duration}s`;
   renderPresets();
@@ -254,13 +323,18 @@ $("#aspect").onclick = (e) => {
   saveBrief();
 };
 $("#duration").oninput = () => { $("#durationLabel").textContent = `${$("#duration").value}s`; saveBrief(); };
-["#rules", "#title", "#outro"].forEach((s) => $(s).addEventListener("input", () => saveBrief()));
-["#captions", "#autoColor"].forEach((s) => $(s).addEventListener("change", () => saveBrief()));
+["#rules", "#title", "#outro", "#voiceText"].forEach((s) => $(s).addEventListener("input", () => saveBrief()));
+["#captionStyle", "#beatFx", "#autoColor", "#musicAlign", "#selfReview"].forEach((s) => $(s).addEventListener("change", () => saveBrief()));
+$("#voiceover").addEventListener("change", () => {
+  $("#voiceBox").hidden = !$("#voiceover").checked;
+  if ($("#voiceover").checked && !state.status.has_eleven) toast("Pentru voce off pune cheia ElevenLabs în Setări ⚙", true);
+  saveBrief();
+});
 
-async function generate(mode) {
+async function generate(mode, what = "generate") {
   try {
     await saveBrief(true);
-    const job = await api(`/api/projects/${pid()}/generate`, { method: "POST", body: { mode } });
+    const job = await api(`/api/projects/${pid()}/${what}`, { method: "POST", body: { mode } });
     watchJob(job);
   } catch (e) {
     toast(e.message, true);
@@ -269,16 +343,18 @@ async function generate(mode) {
 }
 $("#generateAi").onclick = () => generate("ai");
 $("#generateAuto").onclick = () => generate("auto");
+$("#generateVariants").onclick = () => generate(state.status.has_key ? "ai" : "auto", "variants");
 
 // ------------------------------------------------------------------ jobs
 
-const JOB_KIND = { generate: "Montaj nou", revise: "Revizie", preview: "Previzualizare", export: "Export final" };
+const JOB_KIND = { generate: "Montaj nou", revise: "Revizie", preview: "Previzualizare", export: "Export final",
+  analyze: "Analiza materialului", variants: "3 variante", review: "Auto-verificare" };
 
-function watchJob(job) {
+function watchJob(job, quiet = false) {
   state.job = job;
   clearInterval(state.pollTimer);
   renderJob();
-  $("#jobPanel").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  if (!quiet) $("#jobPanel").scrollIntoView({ behavior: "smooth", block: "nearest" });
   setBusy(true);
   state.pollTimer = setInterval(async () => {
     try { state.job = await api(`/api/jobs/${state.job.id}`); }
@@ -287,11 +363,16 @@ function watchJob(job) {
     if (state.job.status !== "running") {
       clearInterval(state.pollTimer);
       setBusy(false);
+      const kind = state.job.kind;
+      const DONE = { export: "Export gata! Fișierele sunt mai jos.", analyze: "Am analizat materialul.",
+        variants: "Cele 3 variante sunt gata — alege una.", review: "Verificare terminată." };
       if (state.job.status === "error") toast(state.job.error, true);
-      else toast(state.job.kind === "export" ? "Export gata! Fișierele sunt mai jos." : "Gata! Uită-te la previzualizare.");
+      else toast(DONE[kind] || "Gata! Uită-te la previzualizare.");
       await refresh();
-      if (state.job.kind === "export") $("#exportPanel").scrollIntoView({ behavior: "smooth" });
-      else if (state.job.status === "done") $("#stage").scrollIntoView({ behavior: "smooth" });
+      if (state.job.status !== "done" || kind === "analyze") { /* stay put */ }
+      else if (kind === "export") $("#exportPanel").scrollIntoView({ behavior: "smooth" });
+      else if (kind === "variants") $("#variantsPanel").scrollIntoView({ behavior: "smooth" });
+      else $("#stage").scrollIntoView({ behavior: "smooth" });
       if (state.job.status === "done") setTimeout(() => ($("#jobPanel").hidden = true), 2500);
     }
   }, 700);
@@ -310,7 +391,8 @@ function renderJob() {
 }
 
 function setBusy(busy) {
-  ["#generateAi", "#generateAuto", "#exportBtn", "#undo", "#inspApply"].forEach((s) => ($(s).disabled = busy));
+  ["#generateAi", "#generateAuto", "#generateVariants", "#exportBtn", "#undo", "#inspApply", "#reviewBtn", "#saveStyle"]
+    .forEach((s) => ($(s).disabled = busy));
   $("#chatForm button").disabled = busy;
 }
 
@@ -345,7 +427,49 @@ function renderStage() {
   $("#chatLog").scrollTop = 1e6;
   $("#quick").innerHTML = QUICK.map((q) => `<button type="button">${esc(q)}</button>`).join("");
   $("#undo").disabled = !p.history.length;
+  const r = p.review;
+  $("#review").hidden = !r;
+  if (r) {
+    const ring = r.score >= 8 ? "var(--ok)" : r.score >= 6 ? "var(--warn)" : "var(--err)";
+    $("#review").innerHTML = `<div class="score" style="--p:${r.score * 10};--ring:${ring}"><span>${r.score}</span></div>
+      <div><b>Auto-verificare (runda ${r.round}):</b> ${esc(r.verdict)}
+      ${r.problems.length ? `<ul>${r.problems.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div>`;
+  }
 }
+
+function renderVariants() {
+  const vs = state.project.variants || [];
+  $("#variantsPanel").hidden = !vs.length;
+  $("#variantGrid").innerHTML = vs.map((v, i) => `<div class="variant">
+    <video src="${file(v.preview.file)}" controls playsinline preload="metadata"></video>
+    <h4>${esc(v.label)} <span class="badge">${fmt(v.preview.duration)} · ${v.plan.clips.length} clipuri</span></h4>
+    <p>${esc(v.plan.summary)}</p>
+    <button class="primary" data-choose="${i}">Alege varianta asta</button></div>`).join("");
+}
+
+$("#variantGrid").onclick = async (e) => {
+  const b = e.target.closest("[data-choose]");
+  if (!b) return;
+  try {
+    state.project = await api(`/api/projects/${pid()}/variants/choose`, { method: "POST", body: { index: +b.dataset.choose } });
+    renderAll();
+    toast("Varianta aleasă e acum montajul tău. O poți rafina în chat sau pe timeline.");
+    $("#stage").scrollIntoView({ behavior: "smooth" });
+  } catch (err) { toast(err.message, true); }
+};
+$("#saveStyle").onclick = async () => {
+  const name = prompt("Numele stilului:", state.project.plan.title);
+  if (name === null) return;
+  try {
+    state.status = { ...state.status, ...(await api(`/api/projects/${pid()}/styles`, { method: "POST", body: { name } })) };
+    renderPresets();
+    toast("Stil salvat! Îl găsești la „Stilurile mele”.");
+  } catch (e) { toast(e.message, true); }
+};
+$("#reviewBtn").onclick = async () => {
+  try { watchJob(await api(`/api/projects/${pid()}/review`, { method: "POST" })); }
+  catch (e) { toast(e.message, true); if (/cheia API/i.test(e.message)) $("#openSettings").click(); }
+};
 
 $("#quick").onclick = (e) => { if (e.target.matches("button")) { $("#chatInput").value = e.target.textContent; $("#chatInput").focus(); } };
 $("#chatForm").onsubmit = async (e) => {
@@ -487,6 +611,8 @@ function overlayHtml(o, k) {
     <div class="grid2">
       <label class="field"><span>Stil</span><select name="style">${opts(STYLES, o.style)}</select></label>
       <label class="field"><span>Poziție</span><select name="position">${opts(POSITIONS, o.position)}</select></label>
+      <label class="field"><span>Animație</span><select name="animation">${opts(ANIMS, o.animation || "fade")}</select></label>
+      <span></span>
       <label class="field"><span>Apare la (s)</span><input type="number" step="0.1" min="0" name="start" value="${o.start}"></label>
       <label class="field"><span>Durată (s)</span><input type="number" step="0.1" min="0.3" name="duration" value="${o.duration}"></label>
     </div>
@@ -548,7 +674,7 @@ $("#inspBody").addEventListener("input", (e) => {
 $("#inspBody").addEventListener("click", (e) => {
   if (e.target.id === "addOvl") {
     readInspector();
-    state.editing.overlays.push({ text: "Text nou", start: 0, duration: 2, style: "caption", position: "bottom" });
+    state.editing.overlays.push({ text: "Text nou", start: 0, duration: 2, style: "caption", position: "bottom", animation: "pop" });
     $("#ovls").insertAdjacentHTML("beforeend", overlayHtml(state.editing.overlays.at(-1), state.editing.overlays.length - 1));
   }
   if (e.target.matches("[data-rm-ovl]")) e.target.closest(".ovl").remove();
@@ -564,7 +690,7 @@ function readInspector() {
   });
   c.overlays = $$("#ovls .ovl").map((box) => {
     const get = (n) => $(`[name=${n}]`, box);
-    return { text: get("text").value, style: get("style").value, position: get("position").value,
+    return { text: get("text").value, style: get("style").value, position: get("position").value, animation: get("animation").value,
              start: +get("start").value, duration: +get("duration").value };
   });
   return c;
@@ -591,19 +717,45 @@ $("#quality").onclick = (e) => {
   $$("#quality button").forEach((x) => x.classList.toggle("on", x === b));
 };
 $("#exportBtn").onclick = async () => {
-  try { watchJob(await api(`/api/projects/${pid()}/export`, { method: "POST", body: { quality: state.quality } })); }
+  const formats = $$("#formats input:checked").map((i) => i.value);
+  try { watchJob(await api(`/api/projects/${pid()}/export`, { method: "POST", body: { quality: state.quality, formats } })); }
   catch (e) { toast(e.message, true); }
 };
 
-const FILE_LABEL = [[/_coperta\.jpg$/, "🖼 Copertă JPG"], [/_coperta\.png$/, "🖼 Copertă PNG"], [/\.mp4$/, "🎬 Video MP4"], [/\.mp3$/, "🎵 Audio MP3"],
+const FILE_LABEL = [[/_coperta\.jpg$/, "🖼 Copertă JPG"], [/_coperta\.png$/, "🖼 Copertă PNG"],
+  [/_(\d+)x(\d+)\.mp4$/, (f) => `🎬 Video ${f.match(/_(\d+)x(\d+)\.mp4$/).slice(1).join(":")}`], [/\.mp4$/, "🎬 Video MP4"], [/\.mp3$/, "🎵 Audio MP3"],
+  [/postare\.txt$/, "✍ Texte pentru postare"],
   [/\.fcpxml$/, "🎛 DaVinci / FCPXML"], [/\.edl$/, "🎛 EDL"], [/\.srt$/, "💬 Subtitrări SRT"], [/_plan\.json$/, "{ } Plan JSON"]];
 
+function renderSocial() {
+  const c = state.project.social;
+  $("#social").hidden = !c;
+  if (!c) return;
+  const copyBtn = (txt) => `<button class="ghost" data-copy="${esc(txt)}">Copiază</button>`;
+  $("#social").innerHTML = `<h4>✍ Texte pentru postare</h4>
+    <div class="small"><b>Hook-uri:</b> ${c.hooks.map(esc).join(" · ")}</div>
+    <div class="small"><b>Titlu YouTube:</b> ${esc(c.youtube_title)} ${copyBtn(c.youtube_title)}</div>
+    ${c.posts.map((p) => {
+      const tags = p.hashtags.map((t) => "#" + t.replace(/^#/, "")).join(" ");
+      const full = `${p.caption}\n\n${tags}`;
+      return `<div class="post"><b>${esc(p.platform)} ${copyBtn(full)}</b>${esc(p.caption)}\n<span class="tags">${esc(tags)}</span></div>`;
+    }).join("")}
+    <div class="small muted" style="margin-top:8px">🕖 ${esc(c.best_time)}</div>`;
+}
+$("#social").onclick = async (e) => {
+  const b = e.target.closest("[data-copy]");
+  if (!b) return;
+  try { await navigator.clipboard.writeText(b.dataset.copy); toast("Copiat!"); } catch { toast("Nu pot copia automat — selectează textul.", true); }
+};
+
 function renderExports() {
+  renderSocial();
   const ex = state.project.exports || [];
   $("#exports").innerHTML = ex.map((e) => {
     const d = new Date(e.time * 1000);
     const files = e.files.map((f) => {
-      const label = (FILE_LABEL.find(([re]) => re.test(f)) || [null, f.split("/").pop()])[1];
+      let label = (FILE_LABEL.find(([re]) => re.test(f)) || [null, f.split("/").pop()])[1];
+      if (typeof label === "function") label = label(f);
       return `<a href="${file(f)}?download=true" download>${label}</a>`;
     }).join("");
     const mp4 = e.files.find((f) => f.endsWith(".mp4"));

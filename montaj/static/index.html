@@ -50,6 +50,7 @@
     <section class="panel brief">
       <div class="panel-head"><h2>2 · Reguli și stil</h2></div>
       <div class="presets" id="presets" role="radiogroup" aria-label="Stil"></div>
+      <div class="my-styles" id="myStyles"></div>
       <label class="field">
         <span>Regulile tale <span class="muted">(ce vrei, ce nu vrei, pentru cine e)</span></span>
         <textarea id="rules" rows="4" placeholder="Ex: Video de 30 de secunde pentru Instagram despre weekendul la munte. Începe cu peisajul cel mai spectaculos. Fără cadre tremurate. Pune numele locurilor pe ecran. Final cu „Ne vedem la următoarea tură!”"></textarea>
@@ -65,11 +66,28 @@
           <button data-v="">Auto</button><button data-v="9:16">9:16</button><button data-v="16:9">16:9</button>
           <button data-v="1:1">1:1</button><button data-v="4:5">4:5</button>
         </div>
-        <label class="toggle"><input type="checkbox" id="captions"><span></span>Subtitrări</label>
-        <label class="toggle"><input type="checkbox" id="autoColor" checked><span></span>Corecție automată de culoare</label>
+        <label class="field inline"><span>Subtitrări din vorbire</span>
+          <select id="captionStyle"><option value="">Din stil</option><option value="none">Fără</option>
+            <option value="karaoke">Karaoke (cuvânt cu cuvânt)</option><option value="bold">Mari, bold</option>
+            <option value="clean">Simple</option></select></label>
+        <label class="field inline"><span>Efecte pe beat</span>
+          <select id="beatFx"><option value="">Din stil</option><option value="none">Fără</option>
+            <option value="flash">Flash</option><option value="zoom">Zoom pulse</option>
+            <option value="shake">Shake</option><option value="mix">Mix</option></select></label>
       </div>
+      <div class="row wrap toggles">
+        <label class="toggle"><input type="checkbox" id="autoColor" checked><span></span>Corecție automată de culoare</label>
+        <label class="toggle"><input type="checkbox" id="musicAlign" checked><span></span>Melodia se termină odată cu video-ul</label>
+        <label class="toggle" title="Agentul se uită la draft, își dă o notă și se corectează singur"><input type="checkbox" id="selfReview" checked><span></span>Auto-verificare AI</label>
+        <label class="toggle"><input type="checkbox" id="voiceover"><span></span>Voce off</label>
+      </div>
+      <label class="field" id="voiceBox" hidden>
+        <span>Textul vocii off <span class="muted">(gol = îl scrie agentul; necesită cheie ElevenLabs)</span></span>
+        <textarea id="voiceText" rows="3" placeholder="Ex: Weekendul ăsta am fugit de oraș. Trei zile, doi prieteni și cele mai frumoase apusuri din Bucegi."></textarea>
+      </label>
       <div class="row actions">
         <button class="primary big" id="generateAi"><span class="spark">✦</span> Generează cu AI</button>
+        <button class="secondary big" id="generateVariants" title="Dinamic, Cinematic și Scurt 15s, una lângă alta">⧉ 3 variante</button>
         <button class="secondary big" id="generateAuto">Montaj automat (fără AI)</button>
       </div>
     </section>
@@ -85,6 +103,12 @@
       <ul class="job-log" id="jobLog"></ul>
     </section>
 
+    <!-- VARIANTS -->
+    <section class="panel variants" id="variantsPanel" hidden>
+      <div class="panel-head"><h2>Alege varianta</h2><span class="muted small">același material, trei montaje diferite</span></div>
+      <div class="variant-grid" id="variantGrid"></div>
+    </section>
+
     <!-- PREVIEW + PLAN -->
     <section class="panel stage" id="stage" hidden>
       <div class="stage-video">
@@ -97,6 +121,7 @@
           <span class="badge" id="planLabel"></span>
         </div>
         <p id="planSummary" class="muted"></p>
+        <div class="review" id="review" hidden></div>
         <ul class="issues" id="issues"></ul>
         <div class="chat">
           <div class="chat-log" id="chatLog"></div>
@@ -108,6 +133,8 @@
         </div>
         <div class="row">
           <button class="ghost" id="undo">↶ Versiunea anterioară</button>
+          <button class="ghost" id="saveStyle">★ Salvează stilul</button>
+          <button class="ghost" id="reviewBtn">🔍 Verifică montajul</button>
         </div>
       </div>
     </section>
@@ -134,11 +161,20 @@
         <div class="segmented" id="quality">
           <button data-v="720p">720p</button><button data-v="1080p" class="on">1080p</button>
         </div>
+        <span class="small muted">Și în formatele:</span>
+        <div class="formats" id="formats">
+          <label class="chip"><input type="checkbox" value="9:16"><span>9:16 TikTok/Reels</span></label>
+          <label class="chip"><input type="checkbox" value="1:1"><span>1:1 Feed</span></label>
+          <label class="chip"><input type="checkbox" value="4:5"><span>4:5 Instagram</span></label>
+          <label class="chip"><input type="checkbox" value="16:9"><span>16:9 YouTube</span></label>
+        </div>
         <button class="primary big" id="exportBtn">⬇ Randează final</button>
       </div>
       <p class="small muted">Primești: <b>MP4</b> gata de postat · <b>MP3</b> · copertă <b>JPG + PNG</b> ·
         <b>FCPXML</b> și <b>EDL</b> pentru DaVinci Resolve (File → Import → Timeline) ·
-        <b>SRT</b> cu textele (CapCut, YouTube) · planul în JSON.</p>
+        <b>SRT</b> cu textele (CapCut, YouTube) · <b>postare.txt</b> cu descrieri și hashtag-uri · planul în JSON.
+        Formatele în plus sunt re-încadrate automat: cadrul urmărește fața.</p>
+      <div class="social" id="social" hidden></div>
       <div id="exports"></div>
     </section>
 
@@ -174,6 +210,15 @@
       <input id="apiKey" type="password" placeholder="sk-ant-…" autocomplete="off"></label>
     <p class="small muted" id="keyHint">Cheia se salvează doar local, în <code>montaj/workspace/settings.json</code>. Fără cheie merge doar montajul automat.</p>
     <label class="field"><span>Model</span><select id="model"></select></label>
+    <label class="field"><span>Cheie ElevenLabs <span class="muted">(pentru vocea off)</span></span>
+      <input id="elevenKey" type="password" placeholder="opțional" autocomplete="off"></label>
+    <label class="field"><span>ID voce ElevenLabs <span class="muted">(gol = Rachel, vorbește și română)</span></span>
+      <input id="elevenVoice" placeholder="21m00Tcm4TlvDq8ikWAM" autocomplete="off"></label>
+    <label class="field"><span>Model Whisper pentru subtitrări</span>
+      <select id="whisperModel"><option value="tiny">tiny — foarte rapid</option><option value="base">base — rapid</option>
+        <option value="small">small — recomandat pentru română</option><option value="medium">medium — precis, lent</option>
+        <option value="large-v3">large-v3 — cel mai precis, foarte lent</option></select></label>
+    <ul class="features small" id="features"></ul>
     <label class="field"><span>Efort (cât de atent gândește)</span>
       <select id="effort"><option value="low">Mic — rapid, ieftin</option><option value="medium">Mediu — recomandat</option>
         <option value="high">Mare</option><option value="xhigh">Foarte mare</option><option value="max">Maxim</option></select></label>

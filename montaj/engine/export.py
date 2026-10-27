@@ -142,3 +142,14 @@ def srt(plan: EditPlan) -> str:
 
 
 __all__ = ["fcpxml", "edl", "srt", "clip_length"]
+
+
+def post_text(copy) -> str:
+    """postare.txt: ready-to-paste copy for each platform."""
+    lines = ["HOOK-URI (prima frază / primul text pe ecran):"]
+    lines += [f"  {i}. {h}" for i, h in enumerate(copy.hooks, 1)]
+    lines += ["", f"TITLU YOUTUBE: {copy.youtube_title}", ""]
+    for p in copy.posts:
+        lines += [f"=== {p.platform} ===", p.caption, " ".join("#" + t.lstrip("#") for t in p.hashtags), ""]
+    lines += [f"Când să postezi: {copy.best_time}"]
+    return "\n".join(lines) + "\n"

@@ -13,9 +13,12 @@ Transition = Literal["cut", "fade", "dissolve", "wipeleft", "wiperight", "slideu
                      "circleopen", "zoomin", "smoothleft", "fadeblack", "fadewhite"]
 Look = Literal["none", "cinematic", "warm", "cool", "vintage", "bw", "vivid", "film", "matte"]
 Motion = Literal["none", "zoom_in", "zoom_out", "pan_left", "pan_right", "punch_in"]
-Fit = Literal["fill", "blur_bg", "fit"]
+Fit = Literal["fill", "track", "blur_bg", "fit"]
 TextStyle = Literal["title", "caption", "lower_third", "label", "big_word"]
 Position = Literal["top", "center", "bottom", "lower_third"]
+Animation = Literal["fade", "pop", "slide_up", "typewriter", "zoom_out", "none"]
+CaptionStyle = Literal["none", "karaoke", "bold", "clean"]
+BeatFx = Literal["none", "flash", "zoom", "shake", "mix"]
 
 ASPECT_SIZE = {"9:16": (1080, 1920), "16:9": (1920, 1080), "1:1": (1080, 1080), "4:5": (1080, 1350)}
 
@@ -35,6 +38,8 @@ class Overlay(BaseModel):
     duration: float = Field(2.0, description="Seconds the text stays on screen")
     style: TextStyle = "caption"
     position: Position = "bottom"
+    animation: Animation = Field("fade", description="How the text appears: pop and slide_up feel energetic, "
+                                 "typewriter suits quotes, zoom_out suits titles")
 
 
 class Clip(BaseModel):
@@ -42,7 +47,9 @@ class Clip(BaseModel):
     start: float = Field(0.0, description="In-point in seconds in the source (0 for images)")
     end: float = Field(description="Out-point in seconds in the source; for images the on-screen duration")
     speed: float = Field(1.0, description="0.5..2.5; >1 speeds up, <1 slow motion")
-    fit: Fit = Field("fill", description="fill = crop to frame, blur_bg = fit with blurred background, fit = letterbox")
+    fit: Fit = Field("fill", description="fill = crop centre, track = crop that follows the detected face "
+                     "(use when a person is in a shot of another aspect), blur_bg = whole shot over a blurred copy, "
+                     "fit = letterbox")
     motion: Motion = Field("none", description="Camera move; use zoom/pan (Ken Burns) on photos")
     color: Color = Field(default_factory=Color)
     transition_in: Transition = Field("cut", description="Transition from the previous clip (ignored on the first clip)")
@@ -60,6 +67,12 @@ class Music(BaseModel):
     duck: bool = Field(True, description="Lower the music automatically when clips have speech")
     fade_in: float = 1.0
     fade_out: float = 2.0
+    align_end: bool = Field(True, description="Start the song so that it ends exactly when the video ends")
+
+
+class VoiceLine(BaseModel):
+    start: float = Field(description="Seconds on the final timeline")
+    text: str = Field(description="One or two spoken sentences, in the user's language")
 
 
 class Caption(BaseModel):
@@ -82,7 +95,14 @@ class EditPlan(BaseModel):
     clips: List[Clip]
     music: Optional[Music] = None
     captions: List[Caption] = Field(default_factory=list,
-                                    description="Subtitles on the final timeline; leave empty if nothing is said")
+                                    description="Extra subtitles on the final timeline. Leave empty: speech in "
+                                    "clips is transcribed and captioned automatically")
+    caption_style: CaptionStyle = Field("none", description="Look of the automatic word-by-word captions: "
+                                        "karaoke = active word highlighted, bold = big uppercase, clean = plain")
+    beat_fx: BeatFx = Field("none", description="Effect on music beats: flash, zoom pulse, shake, or mix")
+    beat_fx_every: int = Field(2, description="1 = every beat, 2 = every second beat, 4 = once per bar")
+    voiceover: List[VoiceLine] = Field(default_factory=list,
+                                       description="Narration lines; only when the user asked for a voice-over")
     thumbnail: Optional[Thumbnail] = None
     snap_to_beat: bool = Field(False, description="Nudge cut points onto music beats")
     notes: List[str] = Field(default_factory=list, description="Advice for the user: what's missing, what to reshoot")

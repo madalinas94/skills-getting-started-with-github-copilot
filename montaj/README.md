@@ -47,12 +47,31 @@ direct în aplicație.
 - **Merge și fără AI**: butonul „Montaj automat” face un draft din reguli fixe (scene, pauze,
   beat-uri, culoare).
 
+## Funcțiile „wow” (v2)
+
+| # | Funcție | Cum merge |
+|---|---------|-----------|
+| 1 | **Subtitrări din vorbire, cuvânt cu cuvânt** | Whisper (local, gratuit) transcrie clipurile. Subtitrările urmează exact vorbirea, în 3 stiluri: karaoke (cuvântul rostit devine galben), mari bold, simple. Agentul primește transcrierea, taie pe propoziții și alege replica cea mai bună pentru hook. |
+| 2 | **3 variante deodată** | Butonul „3 variante” face în paralel Dinamic, Cinematic și Scurt (15s). Le vezi una lângă alta și o alegi pe cea bună. |
+| 3 | **Un video, toate formatele** | La export bifezi 9:16, 1:1, 4:5 și 16:9. Fiecare format e re-încadrat: cadrul urmărește fața sau, dacă nu există, pune fundal blurat. |
+| 4 | **Urmărirea feței** | OpenCV găsește fața în fiecare cadru, iar decupajul vertical o urmează lin („Urmărește fața” în editorul de clip). |
+| 5 | **Efecte pe beat** | Flash, zoom pulse, shake sau mix, exact pe beat-urile melodiei, la fiecare beat, la două sau o dată pe măsură. |
+| 6 | **Text animat** | Pop, glisare în sus, mașină de scris, zoom, fade, pentru fiecare text în parte. |
+| 7 | **Calitatea cadrelor** | La încărcare, fiecare clip e verificat: tremurat, neclar, întunecat, ars. Pe fișiere apar etichete, iar agentul evită momentele proaste. |
+| 8 | **Agentul se verifică singur** | După randare, AI-ul se uită la draft, își dă o notă de la 1 la 10 și se corectează singur (până la 2 runde), înainte să ți-l arate. |
+| 9 | **Texte pentru postare** | La export primești 3 hook-uri, descrieri și hashtag-uri pentru TikTok, Reels și Shorts, titlu YouTube și ora potrivită (`postare.txt` + butoane „Copiază”). |
+| 10 | **Stilurile mele** | „★ Salvează stilul” păstrează ritmul, culoarea, tranzițiile, animațiile și efectele. Data viitoare le aplici cu un clic. |
+| 11 | **Muzica potrivită** | Fiecare melodie primește BPM și energie (calm / mediu / energic). Se alege cea care se potrivește stilului, iar piesa e tăiată ca finalul ei să cadă pe finalul video-ului, fără să strice tăieturile pe beat. |
+| 12 | **Voce off** | Scrii textul sau îl lași pe agent să-l scrie. ElevenLabs îl citește (merge și în română), muzica scade sub voce, iar subtitrările urmează vocea. Necesită cheie ElevenLabs. |
+
 ## Instalare (Windows)
 
 1. Instalează **Python 3.10+** de pe python.org (bifează „Add Python to PATH”).
 2. Instalează **ffmpeg**: deschide PowerShell și rulează `winget install Gyan.FFmpeg`.
 3. Dublu-click pe **`Porneste-Montaj.bat`**. Se deschide browserul la http://127.0.0.1:8765
 4. În aplicație: ⚙ **Setări** → pune cheia API Anthropic (de pe console.anthropic.com).
+   Tot acolo, opțional: cheia ElevenLabs pentru voce off și modelul Whisper.
+   La prima transcriere, Whisper descarcă modelul o singură dată (~0,5 GB pentru „small”).
    Modelul implicit e **Claude Sonnet 5.5**; în Setări poți alege Opus 5.5 sau Haiku 5.5.
 
 macOS / Linux: `./start.sh` (ffmpeg din `brew install ffmpeg` sau `sudo apt install ffmpeg`).

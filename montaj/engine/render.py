@@ -12,7 +12,7 @@ import shutil
 import textwrap
 from pathlib import Path
 
-from . import ff
+from . import ff, subs
 from .plan import ASPECT_SIZE, Clip, EditPlan, Overlay, clip_length, timeline, transition_len
 
 FONT_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
@@ -40,6 +40,10 @@ LOOKS = {
 }
 
 
+# xfade's own "dissolve" is a pixel-noise effect; a soft cross-dissolve is its "fade"
+XFADE = {"dissolve": "fade"}
+
+
 def frame_size(aspect: str, quality: str):
     w, h = ASPECT_SIZE[aspect]
     short = QUALITY[quality][0]
@@ -53,7 +57,39 @@ def frame_size(aspect: str, quality: str):
 
 # ----------------------------------------------------------------- per-clip filters
 
-def fit_filter(fit: str, W: int, H: int, src="[vin]", out="[vfit]") -> str:
+def track_expr(points, scale_px: str, size: int) -> str:
+    """Piecewise-linear crop offset following [(t, centre 0..1)] in clip time."""
+    if not points:
+        return f"({scale_px}-{size})/2"
+    expr = f"{points[-1][1]:.4f}"
+    for (t0, v0), (t1, v1) in reversed(list(zip(points, points[1:]))):
+        if t1 - t0 < 1e-3:
+            continue
+        expr = f"if(lt(t\\,{t1:.3f})\\,{v0:.4f}+({v1 - v0:.4f})*(t-{t0:.3f})/{t1 - t0:.3f}\\,{expr})"
+    return f"clip({expr}*{scale_px}-{size}/2\\,0\\,{scale_px}-{size})"
+
+
+def face_points(track, clip: Clip, L: float, axis: int, limit: int = 24):
+    """Face centre keyframes in clip-output time for one axis (1 = x, 2 = y)."""
+    from .vision import face_at
+    if not track:
+        return []
+    n = max(2, min(limit, int(L / 0.5) + 1))
+    pts = []
+    for i in range(n):
+        t = L * i / (n - 1)
+        src_t = clip.start + t * clip.speed
+        c = face_at(track, src_t)
+        pts.append((round(t, 3), c[axis - 1]))
+    return pts
+
+
+def fit_filter(fit: str, W: int, H: int, src="[vin]", out="[vfit]", track=None, clip=None, L=0.0) -> str:
+    if fit == "track" and track:
+        xs = face_points(track, clip, L, 1)
+        ys = face_points(track, clip, L, 2)
+        return (f"{src}scale={W}:{H}:force_original_aspect_ratio=increase,"
+                f"crop={W}:{H}:x='{track_expr(xs, 'iw', W)}':y='{track_expr(ys, 'ih', H)}',setsar=1{out}")
     if fit == "fit":
         return (f"{src}scale={W}:{H}:force_original_aspect_ratio=decrease,"
                 f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:black,setsar=1{out}")
@@ -179,14 +215,16 @@ def _copy_fonts(workdir: Path):
             shutil.copy(FONT_DIR / f, workdir / f)
 
 
-def segment_key(clip: Clip, m: dict, W: int, H: int, fps: int, quality: str) -> str:
-    blob = json.dumps({"clip": clip.model_dump(exclude={"reason"}), "src": m["file"],
-                       "size": [W, H], "fps": fps, "q": quality, "v": 4}, sort_keys=True)
+def segment_key(clip: Clip, m: dict, W: int, H: int, fps: int, quality: str, track=None) -> str:
+    # text is burned on the whole timeline, so editing it never re-renders segments
+    blob = json.dumps({"clip": clip.model_dump(exclude={"reason", "overlays"}), "src": m["file"],
+                       "size": [W, H], "fps": fps, "q": quality, "track": track if clip.fit == "track" else None,
+                       "v": 5}, sort_keys=True)
     return hashlib.sha1(blob.encode()).hexdigest()[:16]
 
 
 def render_segment(clip: Clip, m: dict, src: Path, dest: Path, W: int, H: int, fps: int,
-                   quality: str, workdir: Path):
+                   quality: str, workdir: Path, track=None):
     L = clip_length(clip)
     _, preset, crf, abr = QUALITY[quality]
     args = []
@@ -197,10 +235,8 @@ def render_segment(clip: Clip, m: dict, src: Path, dest: Path, W: int, H: int, f
     args += ["-f", "lavfi", "-t", f"{L + 0.5:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
 
     vf = [f"[0:v]setpts=(PTS-STARTPTS)/{clip.speed:.4f},fps={fps},format=yuv420p[vin]",
-          fit_filter(clip.fit, W, H)]
+          fit_filter(clip.fit if clip.fit != "track" or track else "fill", W, H, track=track, clip=clip, L=L)]
     chain = motion_filter(clip.motion, W, H, L) + color_filters(clip)
-    texts = [(o, o.start, min(L, o.start + o.duration)) for o in clip.overlays]
-    chain += text_filters(texts, W, H, workdir, dest.stem)
     chain += ["tpad=stop_mode=clone:stop_duration=1", "setsar=1", "format=yuv420p"]
     vf.append("[vfit]" + ",".join(chain) + "[v]")
 
@@ -223,8 +259,12 @@ def render_segment(clip: Clip, m: dict, src: Path, dest: Path, W: int, H: int, f
 # ----------------------------------------------------------------- whole edit
 
 def render(plan: EditPlan, media: dict, media_dir: Path, workdir: Path, out_path: Path,
-           quality: str = "preview", on_progress=None) -> dict:
-    """Render the plan to out_path. Returns {"duration", "width", "height"}."""
+           quality: str = "preview", on_progress=None, extras: dict | None = None) -> dict:
+    """Render the plan to out_path. Returns {"duration", "width", "height"}.
+
+    extras (see timing.prepare): words for captions, beat grid, voice-over tracks, face tracks.
+    """
+    extras = extras or {}
     workdir.mkdir(parents=True, exist_ok=True)
     cache = workdir / "segments"
     cache.mkdir(exist_ok=True)
@@ -238,23 +278,47 @@ def render(plan: EditPlan, media: dict, media_dir: Path, workdir: Path, out_path
     n = len(plan.clips)
     for i, clip in enumerate(plan.clips):
         m = media[clip.media_id]
-        key = segment_key(clip, m, W, H, fps, quality)
+        track = (extras.get("faces") or {}).get(clip.media_id) if clip.fit == "track" else None
+        key = segment_key(clip, m, W, H, fps, quality, track)
         seg = cache / f"seg_{key}.mp4"
         if not seg.exists():
             progress(0.65 * i / n, f"Randez clipul {i + 1}/{n}")
             tmp = cache / f"tmp_{key}.mp4"
-            render_segment(clip, m, media_dir / m["file"], tmp, W, H, fps, quality, cache)
+            render_segment(clip, m, media_dir / m["file"], tmp, W, H, fps, quality, cache, track)
             tmp.replace(seg)
         segs.append(seg)
     progress(0.65, "Lipesc clipurile, tranziții și muzică")
 
-    total = _join(plan, media, media_dir, segs, workdir, out_path, W, H, fps, quality,
+    total = _join(plan, media, media_dir, segs, workdir, out_path, W, H, fps, quality, extras,
                   lambda p: progress(0.65 + 0.35 * p, "Lipesc clipurile, tranziții și muzică"))
     progress(1.0, "Gata")
     return {"duration": total, "width": W, "height": H}
 
 
-def _join(plan, media, media_dir, segs, workdir, out_path, W, H, fps, quality, on_progress):
+def beat_filters(kind: str, grid: dict, every: int, W: int, H: int, total: float) -> list:
+    """Per-frame effects that hit on the music's beats."""
+    if kind == "none" or not grid:
+        return []
+    per = grid["period"] * max(1, every)
+    ph = grid["phase"]
+    # P: 1 on the beat, decaying to 0 over 0.15 s
+    p = f"(gte(t\\,{ph:.4f})*max(0\\,1-mod(t-{ph:.4f}\\,{per:.4f})/0.15))"
+    out = []
+    if kind in ("zoom", "mix"):
+        z = f"(1+0.07*{p})"
+        out += [f"scale=w='trunc({W}*{z}/2)*2':h='trunc({H}*{z}/2)*2':eval=frame",
+                f"crop={W}:{H}:'(iw-{W})/2':'(ih-{H})/2'"]
+    if kind == "shake":
+        pw, ph2 = int(W * 1.08) // 2 * 2, int(H * 1.08) // 2 * 2
+        out += [f"scale={pw}:{ph2}",
+                f"crop={W}:{H}:'(iw-{W})/2+{0.03 * W:.1f}*{p}*sin(t*83)':'(ih-{H})/2+{0.025 * H:.1f}*{p}*cos(t*71)'"]
+    if kind in ("flash", "mix"):
+        amount = 0.25 if kind == "flash" else 0.12
+        out.append(f"eq=brightness='{amount}*{p}':eval=frame")
+    return out + ["setsar=1"]
+
+
+def _join(plan, media, media_dir, segs, workdir, out_path, W, H, fps, quality, extras, on_progress):
     _, preset, crf, abr = QUALITY[quality]
     args, fc = [], []
     for seg in segs:
@@ -277,26 +341,40 @@ def _join(plan, media, media_dir, segs, workdir, out_path, W, H, fps, quality, o
             cur_len += L
         else:
             off = max(0.0, cur_len - d)
-            fc.append(f"{cur_v}[v{i}]xfade=transition={clip.transition_in}:duration={d:.3f}:offset={off:.3f}{ov}")
+            kind = XFADE.get(clip.transition_in, clip.transition_in)
+            fc.append(f"{cur_v}[v{i}]xfade=transition={kind}:duration={d:.3f}:offset={off:.3f}{ov}")
             fc.append(f"{cur_a}[a{i}]acrossfade=d={d:.3f}:c1=tri:c2=tri{oa}")
             cur_len += L - d
         cur_v, cur_a = ov, oa
     total = round(cur_len, 3)
 
-    # Captions are burned on the final timeline
-    caps = [(Overlay(text=c.text, style="caption", position="bottom"), c.start, c.end)
-            for c in plan.captions]
-    cap_filters = text_filters(caps, W, H, workdir, "cap")
+    # Beat effects, then all text (titles, animated overlays, captions) in one ASS pass
+    vf = beat_filters(plan.beat_fx, extras.get("beat"), plan.beat_fx_every, W, H, total)
+    ass_name = f"{out_path.stem}.ass"
+    if subs.write(plan, W, H, workdir / ass_name, extras.get("words")):
+        vf.append(f"ass={ass_name}:fontsdir=.")
     final_v = "[vout]"
-    fc.append(f"{cur_v}" + ",".join(cap_filters + ["format=yuv420p"]) + final_v)
+    fc.append(f"{cur_v}" + ",".join(vf + ["format=yuv420p"]) + final_v)
 
     voice = cur_a
     any_voice = any(c.keep_audio and media[c.media_id].get("has_audio") for c in plan.clips)
+    tracks = extras.get("voice") or []
+    if tracks:
+        labels = [voice]
+        for k, tr in enumerate(tracks):
+            idx = len(segs) + k
+            args += ["-i", tr["file"]]
+            ms = int(tr["start"] * 1000)
+            fc.append(f"[{idx}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
+                      f"adelay={ms}|{ms},volume=1.6[vo{k}]")
+            labels.append(f"[vo{k}]")
+        fc.append("".join(labels) + f"amix=inputs={len(labels)}:duration=first:normalize=0[voices]")
+        voice, any_voice = "[voices]", True
     if plan.music:
         mu = plan.music
         m = media[mu.media_id]
         args += ["-stream_loop", "-1", "-ss", f"{mu.start:.3f}", "-i", media_dir / m["file"]]
-        mi = len(segs)
+        mi = len(segs) + len(tracks)
         fo = min(mu.fade_out, total / 3)
         fc.append(f"[{mi}:a]atrim=0:{total:.3f},asetpts=PTS-STARTPTS,aresample=48000,"
                   f"aformat=sample_fmts=fltp:channel_layouts=stereo,volume={mu.volume:.3f},"

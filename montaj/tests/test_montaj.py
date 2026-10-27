@@ -142,3 +142,119 @@ def test_ai_request_and_parse(library, monkeypatch):
     fixed, _ = validate.validate(plan, by_id, an)
     assert [c.media_id for c in fixed.clips] == ["m2", "m3"]
     assert fixed.clips[0].reason == "Cadrul cel mai clar"
+
+
+# ----------------------------------------------------------------- v2 features
+
+from engine import styles, subs, timing  # noqa: E402
+
+try:
+    from engine import vision  # noqa: E402
+except ImportError:
+    vision = None
+
+
+def test_karaoke_and_animated_text():
+    plan = EditPlan.model_validate({"title": "t", "summary": "s", "caption_style": "karaoke", "clips": [
+        {"media_id": "m1", "start": 0, "end": 3, "overlays": [
+            {"text": "Salut {lume} \\N", "animation": a, "start": 0, "duration": 1} for a in
+            ("pop", "slide_up", "typewriter", "zoom_out", "fade", "none")]}]})
+    words = [[0.1, 0.4, "Bună"], [0.4, 0.8, "ziua,"], [1.5, 1.9, "prieteni!"]]
+    doc = subs.build(plan, 1080, 1920, words)
+    assert "{lume}" not in doc and "(lume)" in doc  # user braces can't inject ASS tags
+    assert doc.count("karaoke,,") == 3  # one event per spoken word
+    assert "\\c&H004DE1FF" in doc  # active word highlighted
+    assert "\\move(" in doc and "\\alpha&HFF&" in doc and "\\fscx30" in doc
+    assert subs.group_words(words, True) == [words[:2], words[2:]]  # broken after the comma
+
+
+def test_clip_words_follow_trim_and_speed():
+    an = {"m1": {"speech": {"words": [[1.0, 1.4, "a"], [5.0, 5.5, "b"], [9.0, 9.2, "outside"]]}}}
+    plan = EditPlan.model_validate({"title": "t", "summary": "s", "caption_style": "clean", "clips": [
+        {"media_id": "m1", "start": 0.5, "end": 2.5, "keep_audio": True},
+        {"media_id": "m1", "start": 4.0, "end": 6.0, "speed": 2.0, "keep_audio": True}]})
+    words = timing.clip_words(plan, an)
+    assert words == [[0.5, 0.9, "a"], [2.5, 2.75, "b"]]
+
+
+def test_styles_roundtrip(tmp_path):
+    plan = EditPlan.model_validate({"title": "Vara", "summary": "s", "beat_fx": "zoom", "clips": [
+        {"media_id": "m1", "start": 0, "end": 2, "color": {"look": "warm"}},
+        {"media_id": "m1", "start": 2, "end": 5, "color": {"look": "warm"}, "transition_in": "dissolve"}]})
+    lib = styles.Library(tmp_path / "styles.json")
+    st = lib.add(styles.derive(plan, "Vara mea"))
+    assert st["look"] == "warm" and st["pace"] == 2.5 and st["beat_fx"] == "zoom"
+    eff = styles.resolve({"style_id": st["id"], "preset": "vlog"}, lib)
+    assert eff["look"] == "warm" and eff["label"] == "Vara mea"
+    lib.delete(st["id"])
+    assert lib.all() == []
+
+
+def test_music_ends_with_video(library):
+    _d, _media, by_id, an = library
+    plan = EditPlan.model_validate({"title": "t", "summary": "s", "clips": [
+        {"media_id": "m1", "start": 0, "end": 4}], "music": {"media_id": "m4", "align_end": True}})
+    plan, _ = validate.validate(plan, by_id, an)
+    song = by_id["m4"]["duration"]
+    assert abs(plan.music.start + total_length(plan) - song) <= 0.26  # within half a beat
+    assert timing.beat_grid(plan, an)["period"] == pytest.approx(0.5, abs=0.02)
+
+
+def test_beat_fx_voice_and_tracking_render(library, tmp_path):
+    d, _media, by_id, an = library
+    vo = tmp_path / "vo.mp3"
+    ff.run(["-f", "lavfi", "-i", "sine=f=300:d=1.5", vo])
+    plan = EditPlan.model_validate({"title": "t", "summary": "s", "aspect": "9:16", "beat_fx": "mix",
+                                    "beat_fx_every": 1, "caption_style": "karaoke", "clips": [
+        {"media_id": "m1", "start": 0, "end": 3, "fit": "track"},
+        {"media_id": "m3", "start": 0, "end": 2, "fit": "track", "transition_in": "dissolve"}],
+        "music": {"media_id": "m4"}})
+    plan, _ = validate.validate(plan, by_id, an)
+    extras = {"beat": timing.beat_grid(plan, an), "words": [[0.2, 0.6, "Test"], [0.6, 1.0, "unu"]],
+              "voice": [{"file": str(vo), "start": 1.0, "duration": 1.5}],
+              "faces": {"m1": [[0, 0.2, 0.5], [3, 0.8, 0.5]], "m3": [[0, 0.5, 0.4]]}}
+    out = tmp_path / "fx.mp4"
+    render.render(plan, by_id, d, tmp_path / "work", out, "preview", extras=extras)
+    assert ff.probe(out)["duration"] == pytest.approx(total_length(plan), abs=0.15)
+
+
+@pytest.mark.skipif(vision is None, reason="numpy missing")
+def test_quality_flags_shaky_footage(tmp_path):
+    shaky = tmp_path / "shaky.mp4"
+    ff.run(["-f", "lavfi", "-i", "testsrc=s=1280x720:r=30:d=4",
+            "-vf", "crop=1000:560:x='140+60*random(1)*between(t,1,3)':y='80+40*random(2)*between(t,1,3)',scale=1280:720",
+            "-c:v", "libx264", shaky])
+    steady = tmp_path / "steady.mp4"
+    ff.run(["-f", "lavfi", "-i", "testsrc=s=1280x720:r=30:d=4", "-c:v", "libx264", steady])
+    rs = vision.scan(shaky, ff.probe(shaky))
+    rq = vision.scan(steady, ff.probe(steady))
+    assert any(i["kind"] == "shaky" for i in rs["issues"])
+    assert not any(i["kind"] == "shaky" for i in rq["issues"])
+
+
+def test_review_and_copy_requests(library, monkeypatch, tmp_path):
+    d, media, _by, an = library
+    replies = [
+        {"score": 6, "verdict": "Hook slab", "problems": ["Începutul e lent"], "fixes": "Start with clip 2"},
+        {"hooks": ["a", "b", "c"], "posts": [{"platform": "TikTok", "caption": "x", "hashtags": ["vara"]}],
+         "youtube_title": "T", "best_time": "seara"},
+    ]
+    seen = []
+
+    def handler(request):
+        seen.append(json.loads(request.content))
+        return httpx2.Response(200, json={
+            "id": "msg", "type": "message", "role": "assistant", "model": "claude-sonnet-5-5",
+            "content": [{"type": "text", "text": json.dumps(replies[len(seen) - 1])}], "stop_reason": "end_turn",
+            "stop_sequence": None, "usage": {"input_tokens": 1, "output_tokens": 1}})
+
+    fake = anthropic.Anthropic(api_key="t", http_client=anthropic.DefaultHttpxClient(
+        transport=httpx2.MockTransport(handler)))
+    monkeypatch.setattr(agent, "client_for", lambda key: fake)
+    frame = tmp_path / "f.jpg"
+    analyze.extract_frame(d / "wide.mp4", 1.0, frame)
+    plan = EditPlan.model_validate({"title": "t", "summary": "s", "clips": [{"media_id": "m1", "start": 0, "end": 2}]})
+    review = agent.review_preview([(1.0, frame)], plan, {"rules": "scurt"}, "t")
+    assert review.score == 6 and seen[0]["system"].startswith("You are a demanding")
+    copy = agent.social_copy([(1.0, frame)], plan, {}, "t")
+    assert "#vara" in export.post_text(copy)

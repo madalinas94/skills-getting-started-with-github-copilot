@@ -1,7 +1,9 @@
 """Rule-based planner: a decent first cut with no AI (and the fallback when there's no API key)."""
 
+import re
+
 from . import presets
-from .plan import Caption, Clip, Color, EditPlan, Music, Overlay, Thumbnail
+from .plan import Caption, Clip, Color, EditPlan, Music, Overlay, Thumbnail, VoiceLine
 
 
 def _shots(duration: float, cuts):
@@ -19,13 +21,47 @@ def _silent(t0, t1, silences):
     return total / max(t1 - t0, 1e-6)
 
 
+def _bad(t0, t1, issues):
+    """Fraction of [t0, t1] inside a shaky / blurry / dark range."""
+    total = 0.0
+    for it in issues:
+        total += max(0.0, min(t1, it["end"]) - max(t0, it["start"]))
+    return total / max(t1 - t0, 1e-6)
+
+
+def pick_music(audio: list, analysis: dict, pace: float, wanted_id=None):
+    """The track whose energy fits the edit: fast pace → energetic, slow → calm."""
+    if not audio:
+        return None
+    chosen = next((m for m in audio if m["id"] == wanted_id), None)
+    if chosen:
+        return chosen
+    want = "energetic" if pace < 2.5 else "calm" if pace > 3.2 else "medium"
+    rank = {"calm": 0, "medium": 1, "energetic": 2}
+
+    def score(m):
+        mood = ((analysis.get(m["id"]) or {}).get("mood") or {}).get("mood", "medium")
+        return abs(rank[mood] - rank[want])
+    return min(audio, key=score)
+
+
+def split_script(text: str, total: float):
+    """User-written voice-over script → lines spread over the edit."""
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
+    if not sentences:
+        return []
+    step = max(1.0, (total - 0.5) / len(sentences))
+    return [VoiceLine(start=round(0.4 + i * step, 2), text=s) for i, s in enumerate(sentences)]
+
+
 def _sort_key(m):
     return (m.get("creation_time") or "", m["name"].lower())
 
 
-def build(media: list, analysis: dict, settings: dict) -> EditPlan:
-    """media: material records (role == 'material'), analysis: id -> analyze() output."""
-    style = presets.get(settings.get("preset"))
+def build(media: list, analysis: dict, settings: dict, style: dict | None = None) -> EditPlan:
+    """media: material records (role == 'material'), analysis: id -> analyze() output.
+    style: a preset or saved style (styles.resolve); defaults to the settings' preset."""
+    style = style or presets.get(settings.get("preset"))
     aspect = settings.get("aspect") or style["aspect"]
     target = float(settings.get("duration") or style["duration"])
     pace = style["pace"]
@@ -35,7 +71,7 @@ def build(media: list, analysis: dict, settings: dict) -> EditPlan:
 
     visuals = sorted([m for m in media if m["kind"] in ("video", "image")], key=_sort_key)
     audio = [m for m in media if m["kind"] == "audio"]
-    music_media = next((m for m in audio if m["id"] == settings.get("music_id")), audio[0] if audio else None)
+    music_media = pick_music(audio, analysis, pace, settings.get("music_id"))
 
     videos = [m for m in visuals if m["kind"] == "video"]
     photos = [m for m in visuals if m["kind"] == "image"]
@@ -50,6 +86,7 @@ def build(media: list, analysis: dict, settings: dict) -> EditPlan:
         n = max(1, round(share / pace))
         shots = _shots(m["duration"], info.get("scenes") or [])
         sil = info.get("silences") or []
+        bad = (info.get("quality") or {}).get("issues") or []
         if not shots:
             shots = [(0.0, m["duration"])]
         if len(shots) < n:  # long takes: split them so each pick comes from its own window
@@ -72,6 +109,7 @@ def build(media: list, analysis: dict, settings: dict) -> EditPlan:
                 t0 = a + 0.25 + s * 0.5 if b - a - seg > 0.5 else a
                 t0 = min(t0, b - seg)
                 score = _silent(t0, t0 + seg, sil) if style.get("keep_audio") else abs((t0 + seg / 2) - (a + b) / 2) / max(b - a, 1)
+                score += 3 * _bad(t0, t0 + seg, bad)  # avoid shaky / blurry / dark moments
                 if score < best_score:
                     best, best_score = t0, score
             chosen.append((round(best, 2), round(best + seg, 2)))
@@ -81,11 +119,16 @@ def build(media: list, analysis: dict, settings: dict) -> EditPlan:
     for m in visuals:
         info = analysis.get(m["id"], {})
         color = Color(**(info.get("auto_color") if use_color and info.get("auto_color") else {}))
+        for k, v in (style.get("color") or {}).items():  # saved styles carry their grade
+            if k != "brightness" or not use_color:
+                setattr(color, k, v)
         color.look = style["look"]
         color.vignette = bool(style.get("vignette"))
         wide = m["width"] >= m["height"]
         want_wide = aspect in ("16:9",)
         fit = style["fit"] if wide != want_wide else "fill"
+        if fit == "fill" and wide != want_wide and (info.get("face_ratio") or 0) > 0.3:
+            fit = "track"
         if m["kind"] == "image":
             clips.append(Clip(media_id=m["id"], start=0, end=photo_len, fit=fit,
                               motion=motions[len(clips) % len(motions)] if motions != ["none"] else "zoom_in",
@@ -103,21 +146,25 @@ def build(media: list, analysis: dict, settings: dict) -> EditPlan:
         c.transition_in = "cut" if i == 0 else transitions[i % len(transitions)]
         c.transition_duration = 0.5 if c.transition_in in ("dissolve", "fadeblack", "fade", "fadewhite") else 0.3
 
+    anims = style.get("animations") or ["fade"]
     title = (settings.get("title") or "").strip()
     if clips and title:
         clips[0].overlays.append(Overlay(text=title, start=0.2, duration=min(2.5, (clips[0].end - clips[0].start) - 0.3),
-                                         style="title" if style["pace"] >= 3 else "big_word", position="center"))
+                                         style="title" if style["pace"] >= 3 else "big_word", position="center",
+                                         animation=anims[0]))
     outro = (settings.get("outro") or "").strip()
     if clips and outro:
         last = clips[-1]
         length = (last.end - last.start) / last.speed
         last.overlays.append(Overlay(text=outro, start=max(0, length - 2), duration=min(2, length),
-                                     style="caption", position="bottom"))
+                                     style="caption", position="bottom", animation=anims[-1]))
 
     music = None
     if music_media:
-        music = Music(media_id=music_media["id"], volume=0.35 if style.get("keep_audio") else 0.9,
-                      duck=bool(style.get("keep_audio")))
+        music = Music(media_id=music_media["id"],
+                      volume=style.get("music_volume") or (0.35 if style.get("keep_audio") else 0.9),
+                      duck=bool(style.get("keep_audio")) or bool(settings.get("voiceover_text")),
+                      align_end=settings.get("music_align", True))
 
     thumb = None
     first_video = next((c for c in clips if media_by_id(media, c.media_id)["kind"] == "video"), None)
@@ -136,9 +183,16 @@ def build(media: list, analysis: dict, settings: dict) -> EditPlan:
         notes.append("Adaugă o melodie (MP3) ca să pot tăia pe ritm.")
     notes.append("Plan făcut automat, fără AI. Adaugă cheia API Anthropic pentru un montaj gândit cadru cu cadru.")
 
-    return EditPlan(title=title or "Montaj nou", summary=f"Montaj automat în stilul „{style['label']}”, "
+    plan = EditPlan(title=title or "Montaj nou", summary=f"Montaj automat în stilul „{style['label']}”, "
                     f"{len(clips)} cadre, ordonate cronologic.", aspect=aspect, fps=30, clips=clips,
-                    music=music, captions=[], thumbnail=thumb, snap_to_beat=bool(music_media), notes=notes)
+                    music=music, captions=[], thumbnail=thumb, snap_to_beat=bool(music_media), notes=notes,
+                    caption_style=settings.get("caption_style") or style.get("captions", "none"),
+                    beat_fx=(settings.get("beat_fx") or style.get("beat_fx", "none")) if music_media else "none",
+                    beat_fx_every=style.get("beat_every", 2))
+    if settings.get("voiceover_text"):
+        from .plan import total_length
+        plan.voiceover = split_script(settings["voiceover_text"], total_length(plan))
+    return plan
 
 
 def media_by_id(media, mid):

@@ -73,11 +73,19 @@ def validate(plan: EditPlan, media: dict, analysis: dict | None = None):
     if plan.fps not in (24, 25, 30, 50, 60):
         plan.fps = 30
 
+    beat_info = ((analysis or {}).get(plan.music.media_id) or {}).get("beats") or {} if plan.music else {}
     if plan.snap_to_beat and plan.music and analysis:
-        beat_info = (analysis.get(plan.music.media_id) or {}).get("beats") or {}
         moved = snap_to_beats(plan, beat_info.get("beats") or [], media)
         if moved:
             issues.append(f"Am aliniat {moved} tăieturi pe ritmul muzicii.")
+    if plan.music and plan.music.align_end:
+        if align_music_end(plan, media[plan.music.media_id], beat_info):
+            issues.append("Melodia se termină odată cu video-ul.")
+
+    if plan.beat_fx_every not in (1, 2, 4):
+        plan.beat_fx_every = 2
+    if plan.beat_fx != "none" and not plan.music:
+        plan.beat_fx = "none"
 
     total = timeline(plan)[-1]
     end = total[1] + total[2]
@@ -85,9 +93,31 @@ def validate(plan: EditPlan, media: dict, analysis: dict | None = None):
     for c in plan.captions:
         c.start = _clamp(c.start, 0, end)
         c.end = _clamp(c.end, c.start + 0.3, end)
+    plan.voiceover = sorted([v for v in plan.voiceover if v.text.strip() and 0 <= v.start < end],
+                            key=lambda v: v.start)
     if plan.thumbnail and plan.thumbnail.media_id not in media:
         plan.thumbnail = None
     return plan, issues
+
+
+def align_music_end(plan: EditPlan, song: dict, beat_info: dict) -> bool:
+    """Choose the song's start so its ending lands on the video's ending. The shift is a whole
+    number of beats away from the current start, so cuts already snapped stay on the beat."""
+    from .plan import total_length
+    total = total_length(plan)
+    want = song["duration"] - total
+    if want <= 0.5:
+        return False
+    start = want
+    if beat_info.get("bpm"):
+        period = 60.0 / beat_info["bpm"]
+        k = round((want - plan.music.start) / period)
+        start = plan.music.start + k * period
+        if start < 0 or start > song["duration"] - total + period / 2:
+            start = want
+    plan.music.start = round(max(0.0, start), 3)
+    plan.music.fade_out = min(plan.music.fade_out, 1.0)
+    return True
 
 
 def snap_to_beats(plan: EditPlan, beats, media) -> int:
