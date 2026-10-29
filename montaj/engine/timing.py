@@ -68,7 +68,74 @@ def voiceover(plan: EditPlan, workdir: Path, api_key: str | None, voice: str | N
     return tracks, words, issues
 
 
-def prepare(plan: EditPlan, analysis: dict, workdir: Path, eleven_key=None, voice=None, step=None):
+SFX_DIR = Path(__file__).resolve().parent.parent / "assets" / "sfx"
+
+
+def emphasis_moments(plan: EditPlan, analysis: dict):
+    """Timeline [start, end] of stressed words in clips that keep their sound."""
+    out = []
+    for clip, start, length in timeline(plan):
+        if not clip.keep_audio:
+            continue
+        sp = (analysis.get(clip.media_id) or {}).get("speech") or {}
+        words = sp.get("words") or []
+        for i in sp.get("stressed") or []:
+            if i >= len(words):
+                continue
+            s, e, _w = words[i]
+            if clip.start <= s < clip.end:
+                ts = start + (s - clip.start) / clip.speed
+                te = min(start + length, ts + max(0.9, (e - s) / clip.speed + 0.5))
+                if not out or ts - out[-1][1] > 1.5:
+                    out.append([round(ts, 3), round(te, 3)])
+    return out
+
+
+def sfx_cues(plan: EditPlan):
+    """Whoosh on transitions, boom on big words, pop when other text appears, riser before the end."""
+    cues = []
+    tl = timeline(plan)
+    for i, (clip, start, length) in enumerate(tl):
+        if i > 0 and clip.transition_in != "cut":
+            cues.append({"file": str(SFX_DIR / "whoosh.wav"), "start": start - 0.15, "volume": 0.45})
+        for o in clip.overlays:
+            kind = "boom" if o.style in ("big_word", "title") else "pop"
+            cues.append({"file": str(SFX_DIR / f"{kind}.wav"), "start": start + o.start,
+                         "volume": 0.5 if kind == "boom" else 0.4})
+    if tl and plan.music is None and len(tl) > 3:
+        end = tl[-1][1] + tl[-1][2]
+        cues.append({"file": str(SFX_DIR / "riser.wav"), "start": max(0, end - 1.4), "volume": 0.3})
+    cues.sort(key=lambda c: c["start"])
+    spaced = []
+    for c in cues:  # never two effects on top of each other
+        if c["start"] >= 0 and (not spaced or c["start"] - spaced[-1]["start"] >= 0.4):
+            spaced.append(c)
+    return spaced
+
+
+def person_masks(plan: EditPlan, media: dict, media_dir: Path, workdir: Path, step=None):
+    """Person masks for clips with a portrait / replaced background. Returns (masks, issues)."""
+    from . import people
+    from .render import mask_key
+    need = [c for c in plan.clips if c.background != "none"]
+    if not need:
+        return {}, []
+    if not people.available():
+        return {}, ["Decuparea fundalului are nevoie de MediaPipe (pip install mediapipe)."]
+    masks = {}
+    for i, clip in enumerate(need):
+        m = media[clip.media_id]
+        if step:
+            step(f"Decupez persoana din {m['name']} ({i + 1}/{len(need)})")
+        key = mask_key(clip).replace(":", "_")
+        dest = workdir / "masks" / f"{key}.mkv"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        masks[mask_key(clip)] = people.mask_video(media_dir / m["file"], m, clip.start, clip.end - clip.start, dest)
+    return masks, []
+
+
+def prepare(plan: EditPlan, analysis: dict, workdir: Path, eleven_key=None, voice=None, step=None,
+            media: dict | None = None, media_dir: Path | None = None):
     """Build the render extras dict; returns (extras, issues)."""
     tracks, vo_words, issues = voiceover(plan, workdir, eleven_key, voice, step)
     words = sorted(clip_words(plan, analysis) + vo_words) if plan.caption_style != "none" else []
@@ -77,6 +144,14 @@ def prepare(plan: EditPlan, analysis: dict, workdir: Path, eleven_key=None, voic
         if clip.fit == "track":
             faces[clip.media_id] = (analysis.get(clip.media_id) or {}).get("faces") or []
     extras = {"beat": beat_grid(plan, analysis), "words": words, "voice": tracks, "faces": faces}
+    if plan.emphasis_zoom:
+        extras["emphasis"] = emphasis_moments(plan, analysis)
+    if plan.sfx:
+        extras["sfx"] = sfx_cues(plan)
+    if media is not None and media_dir is not None:
+        masks, more = person_masks(plan, media, media_dir, workdir, step)
+        extras["masks"] = masks
+        issues += more
     if plan.caption_style != "none" and not words:
         if not speech.available():
             issues.append("Subtitrările automate au nevoie de Whisper (pip install faster-whisper).")

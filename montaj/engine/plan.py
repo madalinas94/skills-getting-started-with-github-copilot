@@ -12,7 +12,7 @@ Aspect = Literal["9:16", "16:9", "1:1", "4:5"]
 Transition = Literal["cut", "fade", "dissolve", "wipeleft", "wiperight", "slideup", "slidedown",
                      "circleopen", "zoomin", "smoothleft", "fadeblack", "fadewhite"]
 Look = Literal["none", "cinematic", "warm", "cool", "vintage", "bw", "vivid", "film", "matte"]
-Motion = Literal["none", "zoom_in", "zoom_out", "pan_left", "pan_right", "punch_in"]
+Motion = Literal["none", "zoom_in", "zoom_out", "pan_left", "pan_right", "punch_in", "close_up"]
 Fit = Literal["fill", "track", "blur_bg", "fit"]
 TextStyle = Literal["title", "caption", "lower_third", "label", "big_word"]
 Position = Literal["top", "center", "bottom", "lower_third"]
@@ -42,6 +42,16 @@ class Overlay(BaseModel):
                                  "typewriter suits quotes, zoom_out suits titles")
 
 
+Background = Literal["none", "portrait", "replace"]
+
+
+class Broll(BaseModel):
+    media_id: str = Field(description="id of a video or photo to show over the talking clip")
+    at: float = Field(description="Seconds from the start of THIS clip (on screen) when the B-roll appears")
+    duration: float = Field(2.0, description="1.5..4 seconds")
+    source_start: float = Field(0.0, description="In-point inside the B-roll video")
+
+
 class Clip(BaseModel):
     media_id: str = Field(description="id of a video or image from the media list")
     start: float = Field(0.0, description="In-point in seconds in the source (0 for images)")
@@ -57,6 +67,12 @@ class Clip(BaseModel):
     keep_audio: bool = Field(True, description="Keep the clip's own sound (speech, ambience)")
     volume: float = Field(1.0, description="0..2 for the clip's own sound")
     overlays: List[Overlay] = Field(default_factory=list)
+    broll: List[Broll] = Field(default_factory=list,
+                               description="Cutaways shown full-frame while this clip's sound keeps playing; "
+                               "match them to what is being said")
+    background: Background = Field("none", description="portrait = blur everything behind the person, "
+                                   "replace = put the person over background_media")
+    background_media: Optional[str] = Field(None, description="id of a photo/video used when background=replace")
     reason: str = Field("", description="One short sentence: why this shot, here")
 
 
@@ -103,6 +119,10 @@ class EditPlan(BaseModel):
     beat_fx_every: int = Field(2, description="1 = every beat, 2 = every second beat, 4 = once per bar")
     voiceover: List[VoiceLine] = Field(default_factory=list,
                                        description="Narration lines; only when the user asked for a voice-over")
+    tighten: bool = Field(False, description="Cut pauses, filler sounds and repeated words out of speech (jump cuts)")
+    voice_enhance: bool = Field(False, description="Studio voice: remove noise and hum, add presence and compression")
+    emphasis_zoom: bool = Field(False, description="Punch in on the words the speaker stresses")
+    sfx: bool = Field(False, description="Sound effects: whoosh on transitions, pop/boom when text appears")
     thumbnail: Optional[Thumbnail] = None
     snap_to_beat: bool = Field(False, description="Nudge cut points onto music beats")
     notes: List[str] = Field(default_factory=list, description="Advice for the user: what's missing, what to reshoot")

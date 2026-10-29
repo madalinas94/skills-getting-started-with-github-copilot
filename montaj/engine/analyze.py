@@ -218,6 +218,7 @@ def analyze(media: dict, src: Path, frames_dir: Path, frame_count: int, deep: bo
             if transcribe and speech.available():
                 try:
                     info["speech"] = speech.transcribe(src)
+                    info["speech"]["stressed"] = speech.stressed(src, info["speech"]["words"])
                 except Exception as exc:  # model download blocked, corrupt audio, ...
                     info["speech_error"] = f"Whisper nu a putut transcrie: {exc}"[:300]
     if kind == "audio" and deep:

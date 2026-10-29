@@ -61,6 +61,13 @@ def validate(plan: EditPlan, media: dict, analysis: dict | None = None):
         return plan, issues
     plan.clips[0].transition_in = "cut"
 
+    if plan.tighten and analysis:
+        from . import tighten
+        plan, removed = tighten.apply(plan, media, analysis)
+        if removed > 0.2:
+            issues.append(f"Am scos {removed:.1f}s de pauze și ezitări (jump cuts).")
+
+
     if plan.music:
         m = media.get(plan.music.media_id)
         if not m or m["kind"] not in ("audio", "video") or (m["kind"] == "video" and not m.get("has_audio")):

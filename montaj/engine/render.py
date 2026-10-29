@@ -13,6 +13,7 @@ import textwrap
 from pathlib import Path
 
 from . import ff, subs
+from .tighten import VOICE_CHAIN
 from .plan import ASPECT_SIZE, Clip, EditPlan, Overlay, clip_length, timeline, transition_len
 
 FONT_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
@@ -109,6 +110,9 @@ def motion_filter(motion: str, W: int, H: int, L: float) -> list:
     L = max(L, 0.1)
     if motion == "none":
         return []
+    if motion == "close_up":  # static tighter framing, used on alternate jump cuts
+        cw, ch = int(W / 1.15) // 2 * 2, int(H / 1.15) // 2 * 2
+        return [f"crop={cw}:{ch}", f"scale={W}:{H}", "setsar=1"]
     if motion in ("zoom_in", "zoom_out", "punch_in"):
         if motion == "zoom_in":
             z = f"(1+0.14*t/{L:.3f})"
@@ -215,39 +219,106 @@ def _copy_fonts(workdir: Path):
             shutil.copy(FONT_DIR / f, workdir / f)
 
 
-def segment_key(clip: Clip, m: dict, W: int, H: int, fps: int, quality: str, track=None) -> str:
+def segment_key(clip: Clip, m: dict, W: int, H: int, fps: int, quality: str, track=None, opts=None) -> str:
     # text is burned on the whole timeline, so editing it never re-renders segments
     blob = json.dumps({"clip": clip.model_dump(exclude={"reason", "overlays"}), "src": m["file"],
                        "size": [W, H], "fps": fps, "q": quality, "track": track if clip.fit == "track" else None,
-                       "v": 5}, sort_keys=True)
+                       "opts": opts or {}, "v": 6}, sort_keys=True)
     return hashlib.sha1(blob.encode()).hexdigest()[:16]
 
 
+def _source_size(m: dict, cap: int = 1920):
+    """Even working size for compositing at (at most) source resolution."""
+    w, h = m.get("width") or 1920, m.get("height") or 1080
+    s = min(1.0, cap / max(w, h))
+    return max(16, int(w * s) // 2 * 2), max(16, int(h * s) // 2 * 2)
+
+
 def render_segment(clip: Clip, m: dict, src: Path, dest: Path, W: int, H: int, fps: int,
-                   quality: str, workdir: Path, track=None):
+                   quality: str, workdir: Path, track=None, opts=None):
+    """One clip → normalised segment. opts: enhance (studio voice), mask (person mask video),
+    bg (background media path + kind), broll ([(Broll, path, media)]), audio (replacement audio
+    file for this source, e.g. the music-only stem when dubbing)."""
+    opts = opts or {}
     L = clip_length(clip)
     _, preset, crf, abr = QUALITY[quality]
-    args = []
-    if m["kind"] == "image":
-        args += ["-loop", "1", "-framerate", str(fps), "-t", f"{L + 0.5:.3f}", "-i", src]
-    else:
-        args += ["-ss", f"{clip.start:.3f}", "-t", f"{clip.end - clip.start:.3f}", "-i", src]
-    args += ["-f", "lavfi", "-t", f"{L + 0.5:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
+    args, n_in = [], 0
 
-    vf = [f"[0:v]setpts=(PTS-STARTPTS)/{clip.speed:.4f},fps={fps},format=yuv420p[vin]",
-          fit_filter(clip.fit if clip.fit != "track" or track else "fill", W, H, track=track, clip=clip, L=L)]
+    def add_input(*a):
+        nonlocal n_in
+        args.extend(a)
+        n_in += 1
+        return n_in - 1
+
+    if m["kind"] == "image":
+        main = add_input("-loop", "1", "-framerate", str(fps), "-t", f"{L + 0.5:.3f}", "-i", src)
+    else:
+        main = add_input("-ss", f"{clip.start:.3f}", "-t", f"{clip.end - clip.start:.3f}", "-i", src)
+    silence = add_input("-f", "lavfi", "-t", f"{L + 0.5:.3f}", "-i", "anullsrc=r=48000:cl=stereo")
+
+    retime = f"setpts=(PTS-STARTPTS)/{clip.speed:.4f},fps={fps}"
+    vf = [f"[{main}:v]{retime},format=yuv420p[raw]"]
+    base = "[raw]"
+
+    # Person cut-out: composite at source size, before framing, so every later step
+    # (crop, face tracking, Ken Burns, grade) treats person + background as one picture.
+    if clip.background != "none" and opts.get("mask"):
+        SW, SH = _source_size(m)
+        mk = add_input(*(["-stream_loop", "-1", "-t", f"{L + 0.5:.3f}"] if m["kind"] == "image" else []),
+                       "-i", opts["mask"])
+        vf.append(f"[{mk}:v]{retime},scale={SW}:{SH},format=gray[mask]")
+        vf.append(f"{base}scale={SW}:{SH},setsar=1,split=2[fgsrc][bgsrc]")
+        if clip.background == "replace" and opts.get("bg"):
+            bg_path, bg_kind = opts["bg"]
+            bi = add_input(*(["-loop", "1", "-framerate", str(fps)] if bg_kind == "image" else ["-stream_loop", "-1"]),
+                           "-t", f"{L + 0.5:.3f}", "-i", bg_path)
+            vf.append(f"[{bi}:v]setpts=PTS-STARTPTS,fps={fps},scale={SW}:{SH}:force_original_aspect_ratio=increase,"
+                      f"crop={SW}:{SH},setsar=1[bgv];[bgsrc]nullsink")
+        else:  # portrait mode: strong blur behind the person
+            vf.append(f"[bgsrc]scale={SW // 4 // 2 * 2}:{SH // 4 // 2 * 2},boxblur=10:3,scale={SW}:{SH},"
+                      f"eq=brightness=-0.03,setsar=1[bgv]")
+        vf.append("[fgsrc]format=yuva420p[fga];[fga][mask]alphamerge[fg]")
+        vf.append("[bgv][fg]overlay=0:0:shortest=0,format=yuv420p[comp]")
+        base = "[comp]"
+
+    vf.append(fit_filter(clip.fit if clip.fit != "track" or track else "fill", W, H, src=base,
+                         track=track, clip=clip, L=L))
     chain = motion_filter(clip.motion, W, H, L) + color_filters(clip)
     chain += ["tpad=stop_mode=clone:stop_duration=1", "setsar=1", "format=yuv420p"]
-    vf.append("[vfit]" + ",".join(chain) + "[v]")
+    vf.append("[vfit]" + ",".join(chain) + "[v0]")
+
+    # B-roll cut-aways over the clip; its sound keeps playing underneath
+    cur = "[v0]"
+    for k, (b, bpath, bm) in enumerate(opts.get("broll") or []):
+        dur = max(0.3, min(b.duration, L - b.at))
+        if dur <= 0.3 or b.at >= L:
+            continue
+        if bm["kind"] == "image":
+            bi = add_input("-loop", "1", "-framerate", str(fps), "-t", f"{dur:.3f}", "-i", bpath)
+        else:
+            bi = add_input("-ss", f"{min(b.source_start, max(0, bm['duration'] - dur)):.3f}",
+                           "-t", f"{dur:.3f}", "-i", bpath)
+        grade = ",".join(color_filters(clip)) or "null"
+        vf.append(f"[{bi}:v]setpts=PTS-STARTPTS+{b.at:.3f}/TB,fps={fps},"
+                  f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},setsar=1,{grade},"
+                  f"format=yuv420p[br{k}]")
+        vf.append(f"{cur}[br{k}]overlay=0:0:eof_action=pass:enable='between(t,{b.at:.3f},{b.at + dur:.3f})'[vb{k}]")
+        cur = f"[vb{k}]"
+    vf.append(f"{cur}null[v]")
 
     if clip.keep_audio and m.get("has_audio") and m["kind"] == "video":
-        af = ([f"[0:a]asetpts=PTS-STARTPTS"] + atempo_chain(clip.speed) +
+        a_src = f"[{main}:a]"
+        if opts.get("audio"):
+            ai = add_input("-ss", f"{clip.start:.3f}", "-t", f"{clip.end - clip.start:.3f}", "-i", opts["audio"])
+            a_src = f"[{ai}:a]"
+        af = ([f"{a_src}asetpts=PTS-STARTPTS"] + atempo_chain(clip.speed) +
+              (VOICE_CHAIN if opts.get("enhance") else []) +
               [f"volume={clip.volume:.3f}", "aresample=48000",
                "aformat=sample_fmts=fltp:channel_layouts=stereo",
-               "afade=t=in:d=0.04", "apad"])
+               "afade=t=in:d=0.03", "apad"])
         vf.append(",".join(af) + "[a]")
     else:
-        vf.append("[1:a]anull[a]")
+        vf.append(f"[{silence}:a]anull[a]")
 
     args += ["-filter_complex", ";".join(vf), "-map", "[v]", "-map", "[a]",
              "-t", f"{L:.3f}", "-r", str(fps),
@@ -258,11 +329,39 @@ def render_segment(clip: Clip, m: dict, src: Path, dest: Path, W: int, H: int, f
 
 # ----------------------------------------------------------------- whole edit
 
+def mask_key(clip: Clip) -> str:
+    return f"{clip.media_id}:{clip.start:.3f}:{clip.end:.3f}"
+
+
+def _segment_opts(clip: Clip, plan: EditPlan, media: dict, media_dir: Path, extras: dict) -> dict:
+    opts = {}
+    if plan.voice_enhance and clip.keep_audio:
+        opts["enhance"] = True
+    mask = (extras.get("masks") or {}).get(mask_key(clip))
+    if clip.background != "none" and mask:
+        opts["mask"] = str(mask)
+        bm = media.get(clip.background_media or "")
+        if clip.background == "replace" and bm and bm["kind"] in ("image", "video"):
+            opts["bg"] = (str(media_dir / bm["file"]), bm["kind"])
+    brolls = []
+    for b in clip.broll:
+        bm = media.get(b.media_id)
+        if bm and bm["kind"] in ("image", "video") and b.media_id != clip.media_id:
+            brolls.append((b, str(media_dir / bm["file"]), bm))
+    if brolls:
+        opts["broll"] = brolls
+    audio = (extras.get("bg_audio") or {}).get(clip.media_id)
+    if audio:
+        opts["audio"] = str(audio)
+    return opts
+
+
 def render(plan: EditPlan, media: dict, media_dir: Path, workdir: Path, out_path: Path,
            quality: str = "preview", on_progress=None, extras: dict | None = None) -> dict:
     """Render the plan to out_path. Returns {"duration", "width", "height"}.
 
-    extras (see timing.prepare): words for captions, beat grid, voice-over tracks, face tracks.
+    extras (see timing.prepare): words for captions, beat grid, voice-over tracks, face tracks,
+    person masks, emphasis moments, sound effects, dubbing stems and mute ranges.
     """
     extras = extras or {}
     workdir.mkdir(parents=True, exist_ok=True)
@@ -279,12 +378,14 @@ def render(plan: EditPlan, media: dict, media_dir: Path, workdir: Path, out_path
     for i, clip in enumerate(plan.clips):
         m = media[clip.media_id]
         track = (extras.get("faces") or {}).get(clip.media_id) if clip.fit == "track" else None
-        key = segment_key(clip, m, W, H, fps, quality, track)
+        opts = _segment_opts(clip, plan, media, media_dir, extras)
+        key_opts = {k: (v if k != "broll" else [(b.model_dump(), p) for b, p, _m in v]) for k, v in opts.items()}
+        key = segment_key(clip, m, W, H, fps, quality, track, key_opts)
         seg = cache / f"seg_{key}.mp4"
         if not seg.exists():
             progress(0.65 * i / n, f"Randez clipul {i + 1}/{n}")
             tmp = cache / f"tmp_{key}.mp4"
-            render_segment(clip, m, media_dir / m["file"], tmp, W, H, fps, quality, cache, track)
+            render_segment(clip, m, media_dir / m["file"], tmp, W, H, fps, quality, cache, track, opts)
             tmp.replace(seg)
         segs.append(seg)
     progress(0.65, "Lipesc clipurile, tranziții și muzică")
@@ -318,6 +419,24 @@ def beat_filters(kind: str, grid: dict, every: int, W: int, H: int, total: float
     return out + ["setsar=1"]
 
 
+def emphasis_filters(moments, W: int, H: int) -> list:
+    """Punch-in on stressed words: ease to 1.12x, hold, ease back."""
+    if not moments:
+        return []
+    terms = []
+    for a, b in moments[:40]:
+        terms.append(f"min(max((t-{a:.3f})/0.12\\,0)\\,1)*min(max(({b:.3f}-t)/0.18\\,0)\\,1)")
+    z = f"(1+0.12*min(1\\,{'+'.join(terms)}))"
+    return [f"scale=w='trunc({W}*{z}/2)*2':h='trunc({H}*{z}/2)*2':eval=frame",
+            f"crop={W}:{H}:'(iw-{W})/2':'(ih-{H})/2'", "setsar=1"]
+
+
+def _mute_expr(ranges) -> str:
+    """volume expression: original speech down to 6% inside the dubbed ranges."""
+    inside = "+".join(f"between(t\\,{a:.3f}\\,{b:.3f})" for a, b in ranges[:120])
+    return f"volume='if({inside}\\,0.06\\,1)':eval=frame"
+
+
 def _join(plan, media, media_dir, segs, workdir, out_path, W, H, fps, quality, extras, on_progress):
     _, preset, crf, abr = QUALITY[quality]
     args, fc = [], []
@@ -326,6 +445,7 @@ def _join(plan, media, media_dir, segs, workdir, out_path, W, H, fps, quality, e
     for i in range(len(segs)):
         fc.append(f"[{i}:v]settb=AVTB,setsar=1,setpts=PTS-STARTPTS[v{i}]")
         fc.append(f"[{i}:a]asetpts=PTS-STARTPTS[a{i}]")
+    n_in = len(segs)
 
     tl = timeline(plan)
     cur_v, cur_a, cur_len = "[v0]", "[a0]", tl[0][2]
@@ -348,8 +468,9 @@ def _join(plan, media, media_dir, segs, workdir, out_path, W, H, fps, quality, e
         cur_v, cur_a = ov, oa
     total = round(cur_len, 3)
 
-    # Beat effects, then all text (titles, animated overlays, captions) in one ASS pass
-    vf = beat_filters(plan.beat_fx, extras.get("beat"), plan.beat_fx_every, W, H, total)
+    # Emphasis punch-ins, beat effects, then all text in one ASS pass
+    vf = emphasis_filters(extras.get("emphasis"), W, H)
+    vf += beat_filters(plan.beat_fx, extras.get("beat"), plan.beat_fx_every, W, H, total)
     ass_name = f"{out_path.stem}.ass"
     if subs.write(plan, W, H, workdir / ass_name, extras.get("words")):
         vf.append(f"ass={ass_name}:fontsdir=.")
@@ -357,16 +478,21 @@ def _join(plan, media, media_dir, segs, workdir, out_path, W, H, fps, quality, e
     fc.append(f"{cur_v}" + ",".join(vf + ["format=yuv420p"]) + final_v)
 
     voice = cur_a
+    if extras.get("mute"):  # dubbing without separated stems: duck the original speech
+        fc.append(f"{voice}{_mute_expr(extras['mute'])}[muted]")
+        voice = "[muted]"
     any_voice = any(c.keep_audio and media[c.media_id].get("has_audio") for c in plan.clips)
     tracks = extras.get("voice") or []
     if tracks:
         labels = [voice]
         for k, tr in enumerate(tracks):
-            idx = len(segs) + k
             args += ["-i", tr["file"]]
             ms = int(tr["start"] * 1000)
-            fc.append(f"[{idx}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
+            tempo = tr.get("tempo") or 1.0
+            stretch = "," + ",".join(atempo_chain(tempo)) if abs(tempo - 1) > 0.01 else ""
+            fc.append(f"[{n_in}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo{stretch},"
                       f"adelay={ms}|{ms},volume=1.6[vo{k}]")
+            n_in += 1
             labels.append(f"[vo{k}]")
         fc.append("".join(labels) + f"amix=inputs={len(labels)}:duration=first:normalize=0[voices]")
         voice, any_voice = "[voices]", True
@@ -374,7 +500,8 @@ def _join(plan, media, media_dir, segs, workdir, out_path, W, H, fps, quality, e
         mu = plan.music
         m = media[mu.media_id]
         args += ["-stream_loop", "-1", "-ss", f"{mu.start:.3f}", "-i", media_dir / m["file"]]
-        mi = len(segs) + len(tracks)
+        mi = n_in
+        n_in += 1
         fo = min(mu.fade_out, total / 3)
         fc.append(f"[{mi}:a]atrim=0:{total:.3f},asetpts=PTS-STARTPTS,aresample=48000,"
                   f"aformat=sample_fmts=fltp:channel_layouts=stereo,volume={mu.volume:.3f},"
@@ -387,7 +514,21 @@ def _join(plan, media, media_dir, segs, workdir, out_path, W, H, fps, quality, e
         else:
             fc.append(f"{voice}[mus]amix=inputs=2:duration=first:normalize=0[mix]")
         voice = "[mix]"
-    fc.append(f"{voice}loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[aout]")
+    sfx = [s for s in (extras.get("sfx") or []) if s["start"] < total - 0.1]
+    if sfx:  # after ducking, so effects never push the music down
+        labels = [voice]
+        for k, s in enumerate(sfx[:60]):
+            args += ["-i", s["file"]]
+            ms = max(0, int(s["start"] * 1000))
+            fc.append(f"[{n_in}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
+                      f"volume={s.get('volume', 0.5):.2f},adelay={ms}|{ms}[sx{k}]")
+            n_in += 1
+            labels.append(f"[sx{k}]")
+        fc.append("".join(labels) + f"amix=inputs={len(labels)}:duration=first:normalize=0[withsfx]")
+        voice = "[withsfx]"
+    # loudnorm turns pure digital silence into NaNs the encoder rejects, so only normalise real sound
+    audible = any_voice or plan.music or sfx
+    fc.append(f"{voice}{'loudnorm=I=-14:TP=-1.5:LRA=11,' if audible else ''}aresample=48000[aout]")
 
     tmp = out_path.with_suffix(".part.mp4")
     args += ["-filter_complex", ";".join(fc), "-map", final_v, "-map", "[aout]",

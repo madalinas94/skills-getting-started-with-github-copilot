@@ -60,3 +60,33 @@ def words_even(text: str, start: float, duration: float):
         out.append([round(t, 2), round(t + d, 2), tok])
         t += d
     return out
+
+
+def stressed(src, words, max_seconds=1800):
+    """Indices of words said noticeably louder than the speaker's average (emphasis)."""
+    import subprocess
+
+    import numpy as np
+
+    from . import ff
+    if len(words) < 6:
+        return []
+    rate = 16000
+    raw = subprocess.run([ff.binary("ffmpeg"), "-hide_banner", "-nostdin", "-v", "error", "-t", str(max_seconds),
+                          "-i", str(src), "-vn", "-ac", "1", "-ar", str(rate), "-f", "s16le", "-"],
+                         capture_output=True).stdout
+    audio = np.frombuffer(raw[: len(raw) // 2 * 2], np.int16).astype(np.float32)
+    if not len(audio):
+        return []
+    level = []
+    for s, e, _w in words:
+        seg = audio[int(s * rate): max(int(s * rate) + 1, int(e * rate))]
+        level.append(20 * np.log10(np.sqrt(np.mean(seg ** 2)) + 1e-3) if len(seg) else -99.0)
+    level = np.array(level)
+    z = (level - level.mean()) / (level.std() + 1e-6)
+    out, last = [], -9.0
+    for i, (s, _e, w) in enumerate(words):
+        if z[i] > 1.0 and len(w.strip(".,!?;:")) >= 3 and s - last >= 2.5:
+            out.append(i)
+            last = s
+    return out

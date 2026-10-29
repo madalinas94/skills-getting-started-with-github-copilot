@@ -13,7 +13,7 @@ import numpy as np
 from . import ff
 
 MODELS = Path(__file__).resolve().parent.parent / "assets" / "models"
-MASK_W = 320
+MASK_W = 480
 MASK_FPS = 15
 
 try:
