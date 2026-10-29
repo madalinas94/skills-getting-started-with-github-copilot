@@ -2,9 +2,9 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400..700&family=Manrope:wght@400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..700;1,6..96,400..600&family=Manrope:wght@400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: an operations room for a private security house. A dark briefing table: the signal timeline (where principals will be), the target register (who books protection), the approval desk and the pipeline. Champagne marks what needs a decision; claret marks urgency. */
+/* Layout: a private operations room behind a Riviera arrival. The intro is a helicopter crossing Monaco at dusk; inside, a dark briefing table: radar by date, a country atlas, the contact book, the approval desk, the pipeline and a concierge AI at the side. Champagne marks what needs a decision; claret marks urgency. */
 :root {
   --bg: #0E1113;
   --bg-2: #13171A;
@@ -69,13 +69,46 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .muted { color: var(--muted); }
 .eyebrow { font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
 
-/* Header */
+/* ---------- Arrival (intro) ---------- */
+.arrival { position: fixed; inset: 0; z-index: 80; background: #0B1424; color: #F4ECDD; overflow: hidden; display: grid; }
+.arrival svg.scene { position: absolute; inset: 0; width: 100%; height: 100%; }
+.arrival .veil { position: absolute; inset: 0; background: linear-gradient(90deg, rgb(8 12 22 / .7) 0%, rgb(8 12 22 / .3) 50%, rgb(8 12 22 / 0) 75%), linear-gradient(0deg, rgb(8 12 22 / .85) 0%, rgb(8 12 22 / .4) 30%, rgb(8 12 22 / 0) 50%); }
+.arrival .copy { position: relative; align-self: end; padding-block: 0 calc(56px + env(safe-area-inset-bottom, 0px)); padding-left: max(28px, env(safe-area-inset-left, 0px)); padding-right: max(28px, env(safe-area-inset-right, 0px)); max-width: 760px; display: grid; gap: 14px; }
+.arrival .coords { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .18em; text-transform: uppercase; color: #D9C39A; }
+.arrival h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(46px, 9vw, 104px); letter-spacing: .14em; line-height: .95; margin: 0; }
+.arrival h1 em { font-style: italic; letter-spacing: 0; font-size: .42em; display: block; color: #E9D6B0; margin-top: 10px; }
+.arrival p { margin: 0; font-size: 15.5px; color: #D7D0C4; max-width: 52ch; }
+.arrival .row { margin-top: 8px; }
+.enter { background: #E2C892; color: #17130C; border: 0; border-radius: 999px; padding: 14px 30px; font-weight: 700; font-size: 14.5px; letter-spacing: .06em; cursor: pointer; box-shadow: 0 10px 40px rgb(226 200 146 / .25); }
+.enter:hover { filter: brightness(1.06); }
+.arrival .fine { font-size: 12px; color: #A9A397; }
+.arrival.leaving { animation: leave .7s ease forwards; }
+@keyframes leave { to { opacity: 0; transform: scale(1.03); visibility: hidden; } }
+.heli { animation: fly 16s linear infinite; }
+.heli-bob { animation: bob 2.4s ease-in-out infinite; }
+.rotor { transform-box: fill-box; transform-origin: center; animation: spin .11s linear infinite; }
+.tail-rotor { transform-box: fill-box; transform-origin: center; animation: spin2 .08s linear infinite; }
+.navlight { animation: blink 1.1s steps(2) infinite; }
+.twinkle { animation: tw 3.2s ease-in-out infinite; }
+.twinkle:nth-child(3n) { animation-delay: -1.1s; } .twinkle:nth-child(4n) { animation-delay: -2.2s; }
+.shimmer { animation: sh 2.6s ease-in-out infinite; } .shimmer:nth-child(2n) { animation-delay: -1.3s; }
+.yacht { animation: bob 5s ease-in-out infinite; }
+@keyframes fly { from { transform: translate(1750px, 210px); } 50% { transform: translate(760px, 170px); } to { transform: translate(-320px, 120px); } }
+@keyframes bob { 50% { transform: translateY(5px); } }
+@keyframes spin { 50% { transform: scaleX(.12); } }
+@keyframes spin2 { 50% { transform: scaleY(.15); } }
+@keyframes blink { 50% { opacity: .1; } }
+@keyframes tw { 50% { opacity: .35; } }
+@keyframes sh { 50% { opacity: .25; transform: translateX(6px); } }
+@media (prefers-reduced-motion: reduce) { .heli { animation: none; transform: translate(900px, 170px); } .heli-bob, .rotor, .tail-rotor, .navlight, .twinkle, .shimmer, .yacht { animation: none; } .arrival.leaving { animation-duration: .01s; } }
+
+/* ---------- Header ---------- */
 header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
 .top-row { display: flex; align-items: center; gap: 18px; padding-block: 14px; }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .brand svg { flex: none; }
-.brand-name { font-family: var(--f-display); font-size: 22px; letter-spacing: .28em; font-weight: 500; line-height: 1; }
-.brand-sub { display: block; font-family: var(--f-mono); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--faint); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-name { display: block; font-family: var(--f-display); font-size: 22px; letter-spacing: .28em; font-weight: 500; line-height: 1; color: var(--ink); }
+.brand-sub { display: block; font-family: var(--f-mono); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--faint); margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .top-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .icon-btn { position: relative; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; cursor: pointer; }
 .icon-btn:hover { border-color: var(--gold); }
@@ -84,19 +117,18 @@ header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; 
 .search input { border: 0; background: transparent; outline: none; width: 100%; min-width: 0; }
 nav.tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding-bottom: 10px; }
 nav.tabs::-webkit-scrollbar { display: none; }
-nav.tabs a { flex: none; padding: 7px 14px; border-radius: 999px; color: var(--muted); font-weight: 600; font-size: 13px; display: inline-flex; gap: 8px; align-items: center; }
+nav.tabs a { flex: none; padding: 7px 13px; border-radius: 999px; color: var(--muted); font-weight: 600; font-size: 13px; display: inline-flex; gap: 7px; align-items: center; }
 nav.tabs a:hover { color: var(--ink); text-decoration: none; background: var(--surface); }
 nav.tabs a[aria-current="page"] { color: var(--gold-ink); background: var(--gold); }
 nav.tabs .count { font-family: var(--f-mono); font-size: 11px; opacity: .8; }
 @media (max-width: 720px) { .search { display: none; } .brand-sub { display: none; } }
 
-main { padding-block: 28px 80px; }
+main { padding-block: 28px 110px; }
 .view-head { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 24px; margin-bottom: 22px; }
 .view-head h1 { font-family: var(--f-display); font-weight: 500; font-size: clamp(28px, 4vw, 42px); line-height: 1.05; margin: 6px 0 0; text-wrap: balance; letter-spacing: -.01em; }
-.view-head p { margin: 8px 0 0; color: var(--muted); max-width: 62ch; }
+.view-head p { margin: 8px 0 0; color: var(--muted); max-width: 66ch; }
 .view-head .grow { flex: 1 1 380px; min-width: 0; }
 
-/* KPI strip */
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); margin-bottom: 26px; overflow: hidden; }
 .kpi { padding: 16px 18px; border-left: 1px solid var(--line); cursor: pointer; text-align: left; background: none; border-top: 0; border-right: 0; border-bottom: 0; }
 .kpi:first-child { border-left: 0; }
@@ -107,34 +139,36 @@ main { padding-block: 28px 80px; }
 .kpi.gold .n { color: var(--gold); }
 @media (max-width: 720px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi:nth-child(3) { border-left: 0; } .kpi:nth-child(n+3) { border-top: 1px solid var(--line); } }
 
-/* Filters */
-.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 20px; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.filters .lab { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin-right: 4px; }
 .chip { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
 .chip:hover { color: var(--ink); border-color: var(--faint); }
 .chip[aria-pressed="true"] { color: var(--ink); border-color: var(--gold); background: var(--gold-soft); }
-.select { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; }
+.select { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; max-width: 100%; }
 
 /* Timeline */
-.month { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 0 24px; margin-bottom: 8px; }
-.month-label { position: sticky; top: 120px; align-self: start; padding-top: 18px; }
+.month { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 0 24px; margin-bottom: 8px; margin-top: 12px; }
+.month-label { position: sticky; top: 130px; align-self: start; padding-top: 18px; }
 .month-label .m { font-family: var(--f-display); font-size: 26px; font-style: italic; line-height: 1; }
 .month-label .y { font-family: var(--f-mono); font-size: 11px; color: var(--faint); letter-spacing: .14em; margin-top: 4px; }
 .month-items { border-left: 1px solid var(--line); padding-left: 24px; display: grid; gap: 14px; padding-block: 14px; }
 @media (max-width: 720px) { .month { grid-template-columns: minmax(0, 1fr); } .month-label { position: static; padding: 8px 0 0; } .month-items { border-left: 0; padding-left: 0; } }
 
-.ev { position: relative; display: grid; grid-template-columns: 74px minmax(0, 1fr) 200px; gap: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; box-shadow: var(--shadow); }
+.ev { position: relative; display: grid; grid-template-columns: 74px minmax(0, 1fr) 210px; gap: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; box-shadow: var(--shadow); }
 .ev::before { content: ""; position: absolute; left: -29px; top: 28px; width: 9px; height: 9px; border-radius: 50%; background: var(--bg); border: 2px solid var(--gold); }
 .ev.t1::before { background: var(--claret); border-color: var(--claret); }
 @media (max-width: 720px) { .ev::before { display: none; } }
 .ev-date { text-align: center; border-right: 1px solid var(--line); padding-right: 14px; }
 .ev-date .d { font-family: var(--f-display); font-size: 36px; line-height: 1; font-variant-numeric: lining-nums; }
 .ev-date .r { font-family: var(--f-mono); font-size: 11px; color: var(--muted); margin-top: 6px; }
+.ev-date .cc { margin-top: 8px; display: inline-block; font: 500 11px var(--f-mono); letter-spacing: .1em; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; color: var(--muted); }
 .ev-body { min-width: 0; }
 .ev-title { font-family: var(--f-display); font-size: 21px; font-weight: 500; line-height: 1.2; margin: 4px 0 4px; text-wrap: balance; }
 .ev-where { color: var(--muted); font-size: 13px; }
-.ev-angle { margin: 10px 0 0; font-size: 13.5px; max-width: 68ch; }
-.ev-targets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.ev-angle { margin: 10px 0 0; font-size: 13.5px; max-width: 70ch; }
+.ev-targets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
 .tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 6px; background: var(--surface-2); color: var(--muted); border: 1px solid transparent; }
+.tag.need { background: transparent; border-color: var(--line); }
 button.tag { cursor: pointer; }
 button.tag:hover { border-color: var(--gold); color: var(--ink); }
 .pill { display: inline-flex; align-items: center; gap: 6px; font: 500 11px/1 var(--f-mono); letter-spacing: .04em; padding: 5px 8px; border-radius: 999px; text-transform: uppercase; white-space: nowrap; }
@@ -151,9 +185,8 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
 .sources a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; display: block; }
 @media (max-width: 900px) { .ev { grid-template-columns: 64px minmax(0, 1fr); } .ev-side { grid-column: 1 / -1; border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 12px; flex-direction: row; flex-wrap: wrap; align-items: center; } }
 
-/* Buttons */
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; padding: 9px 14px; font-weight: 700; font-size: 13px; border: 1px solid var(--line); background: var(--surface-2); cursor: pointer; white-space: nowrap; }
-.btn:hover { border-color: var(--faint); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 8px; padding: 9px 14px; font-weight: 700; font-size: 13px; border: 1px solid var(--line); background: var(--surface-2); cursor: pointer; white-space: nowrap; color: var(--ink); }
+.btn:hover { border-color: var(--faint); text-decoration: none; }
 .btn.primary { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
 .btn.primary:hover { filter: brightness(1.06); }
 .btn.ghost { background: transparent; }
@@ -161,6 +194,18 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
 .btn.sm { padding: 6px 10px; font-size: 12px; }
 .btn[disabled] { opacity: .5; cursor: default; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* Countries */
+.atlas { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.country { text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; cursor: pointer; display: grid; gap: 4px; }
+.country:hover { border-color: var(--gold); }
+.country[aria-pressed="true"] { border-color: var(--gold); background: var(--gold-soft); }
+.country .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.country .nm { font-family: var(--f-display); font-size: 19px; }
+.country .n { font-family: var(--f-display); font-size: 26px; color: var(--gold); font-variant-numeric: lining-nums; }
+.country .nx { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.country .cc2 { font: 500 10.5px var(--f-mono); letter-spacing: .14em; color: var(--faint); }
+.region-h { margin: 22px 0 10px; }
 
 /* Leads */
 .leads { display: grid; gap: 12px; }
@@ -170,13 +215,28 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
 .score span { position: absolute; inset: 0; display: grid; place-items: center; font: 500 14px var(--f-mono); }
 .lead h3 { font-family: var(--f-display); font-weight: 500; font-size: 20px; margin: 2px 0 2px; line-height: 1.2; }
 .lead .why { margin: 8px 0 0; font-size: 13.5px; }
-.lead .meta { font-size: 12.5px; color: var(--muted); display: grid; gap: 6px; min-width: 0; }
-.lead .meta .lbl { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+.lead .meta { font-size: 12.5px; color: var(--muted); display: grid; gap: 8px; min-width: 0; }
+.lbl { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
 .lead-actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
 .lead-actions select { width: 100%; }
 @media (max-width: 1000px) { .lead { grid-template-columns: 52px minmax(0, 1fr); } .lead .meta, .lead-actions { grid-column: 2 / -1; } .lead-actions { flex-direction: row; flex-wrap: wrap; } .lead-actions select { width: auto; } }
 @media (max-width: 520px) { .lead { grid-template-columns: minmax(0, 1fr); } .lead .meta, .lead-actions { grid-column: 1; } }
 .rolelinks { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+
+/* Contacts */
+.contacts { display: grid; gap: 10px; }
+.ct { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.1fr) auto; gap: 16px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; }
+.ct .nm { font-weight: 700; }
+.ct .rl { font-size: 12.5px; color: var(--muted); }
+.ct .ch { display: grid; gap: 3px; min-width: 0; }
+.ct .ch .mono { overflow-wrap: anywhere; }
+@media (max-width: 900px) { .ct { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
+.copy { border: 0; background: none; color: var(--gold); cursor: pointer; font-size: 11.5px; font-weight: 700; padding: 0 0 0 6px; }
+.find { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; margin-bottom: 26px; }
+.find a { display: grid; gap: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); color: var(--ink); }
+.find a:hover { border-color: var(--gold); text-decoration: none; }
+.find a span { font-size: 12px; color: var(--muted); }
+.find a b { font-weight: 700; }
 
 /* Outreach */
 .subtabs { display: flex; gap: 0; border-bottom: 1px solid var(--line); margin-bottom: 18px; overflow-x: auto; }
@@ -187,7 +247,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
 .draft-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--bg-2); }
 .draft-head h3 { margin: 0; font-family: var(--f-display); font-weight: 500; font-size: 18px; }
 .draft-body { padding: 16px 18px; display: grid; gap: 10px; }
-.field { display: grid; gap: 4px; }
+.field { display: grid; gap: 4px; min-width: 0; }
 .field label { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
 .field input, .field textarea, .field select { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; min-width: 0; }
 .field textarea { min-height: 220px; resize: vertical; line-height: 1.55; font-size: 13.5px; }
@@ -209,13 +269,22 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
 .fu { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); margin-bottom: 8px; }
 .fu .t { font-weight: 700; flex: 1 1 220px; min-width: 0; }
 
+/* Services */
+.services { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.svc { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: grid; gap: 8px; align-content: start; }
+.svc h3 { margin: 0; font-family: var(--f-display); font-weight: 500; font-size: 20px; }
+.svc .k { font: 500 10.5px var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+.svc p { margin: 0; font-size: 13.5px; color: var(--muted); }
+.svc .partners { font-size: 12.5px; }
+
 /* Alerts */
-.alerts { display: grid; gap: 10px; max-width: 820px; }
+.alerts { display: grid; gap: 10px; max-width: 860px; }
 .alert { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
 .alert .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; background: var(--faint); }
 .alert.unread .dot { background: var(--claret); box-shadow: 0 0 0 4px var(--claret-soft); }
 .alert .t { font-weight: 700; }
 .alert .x { font-size: 13px; color: var(--muted); margin-top: 2px; }
+@media (max-width: 560px) { .alert { grid-template-columns: 10px minmax(0, 1fr); } .alert > .row { grid-column: 2; } }
 
 /* Settings */
 .settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; max-width: 860px; }
@@ -226,99 +295,197 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
 .panel ul { margin: 0; padding-left: 18px; color: var(--muted); }
 .panel li { margin: 4px 0; }
 
-/* Empty / toast / modal */
 .empty { border: 1px dashed var(--line); border-radius: var(--r); padding: 36px 24px; text-align: center; color: var(--muted); }
 .empty h3 { font-family: var(--f-display); font-weight: 500; font-size: 22px; color: var(--ink); margin: 0 0 6px; }
-.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-weight: 600; font-size: 13px; z-index: 60; box-shadow: var(--shadow); max-width: calc(100vw - 32px); }
-.scrim { position: fixed; inset: 0; background: rgb(0 0 0 / .55); z-index: 50; display: grid; place-items: center; padding: 16px; }
+.toast { position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-weight: 600; font-size: 13px; z-index: 90; box-shadow: var(--shadow); max-width: calc(100vw - 32px); }
+.scrim { position: fixed; inset: 0; background: rgb(0 0 0 / .55); z-index: 60; display: grid; place-items: center; padding: 16px; }
 .modal { width: min(640px, 100%); max-height: 90vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px; box-shadow: var(--shadow); }
 .modal h2 { font-family: var(--f-display); font-weight: 500; margin: 0 0 4px; font-size: 24px; }
 .modal .grid { display: grid; gap: 12px; margin-top: 16px; }
-.status-line { font-family: var(--f-mono); font-size: 11px; color: var(--faint); letter-spacing: .06em; margin-top: 40px; border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+
+/* Concierge AI */
+.ai-fab { position: fixed; right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 40; display: inline-flex; align-items: center; gap: 10px; padding: 12px 18px 12px 14px; border-radius: 999px; background: var(--gold); color: var(--gold-ink); border: 0; font-weight: 700; cursor: pointer; box-shadow: 0 14px 40px rgb(0 0 0 / .35); }
+.ai-fab:hover { filter: brightness(1.05); }
+.ai-panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100vw); z-index: 70; background: var(--bg-2); border-left: 1px solid var(--line); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; box-shadow: -20px 0 60px rgb(0 0 0 / .35); padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.ai-head { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.ai-head h2 { margin: 0; font-family: var(--f-display); font-weight: 500; font-size: 21px; }
+.ai-head .x { margin-left: auto; }
+.ai-log { overflow-y: auto; padding: 16px 18px; display: grid; gap: 12px; align-content: start; }
+.msg { max-width: 92%; padding: 10px 13px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; overflow-wrap: anywhere; }
+.msg.u { justify-self: end; background: var(--gold); color: var(--gold-ink); border-bottom-right-radius: 4px; }
+.msg.a { justify-self: start; background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.msg.a p { margin: 0 0 8px; } .msg.a p:last-child { margin: 0; }
+.msg.a ul { margin: 4px 0 8px; padding-left: 18px; }
+.msg.s { justify-self: start; font-family: var(--f-mono); font-size: 11px; color: var(--faint); padding: 0 4px; }
+.ai-suggest { display: flex; flex-wrap: wrap; gap: 6px; }
+.ai-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 12px 14px 16px; border-top: 1px solid var(--line); }
+.ai-form textarea { resize: none; min-height: 46px; max-height: 140px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; }
+.ai-form textarea:focus { outline: none; border-color: var(--gold); }
 
 @media (prefers-reduced-motion: no-preference) {
-  .ev, .lead, .draft { animation: rise .35s ease both; }
+  .ev, .lead, .draft, .ct { animation: rise .35s ease both; }
   @keyframes rise { from { transform: translateY(6px); opacity: .6; } to { transform: none; opacity: 1; } }
 }
 </style>
+
+<!-- Arrival: helicopter over Monaco at dusk -->
+<section class="arrival" id="arrival" aria-label="Intrare">
+  <svg class="scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#0A1628"/><stop offset=".38" stop-color="#2C3561"/><stop offset=".62" stop-color="#9A6A78"/><stop offset=".8" stop-color="#E5A777"/><stop offset="1" stop-color="#F6CF8E"/>
+      </linearGradient>
+      <radialGradient id="sun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#FFF1CF"/><stop offset=".35" stop-color="#FFD592" stop-opacity=".9"/><stop offset="1" stop-color="#FFB46B" stop-opacity="0"/></radialGradient>
+      <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3A3E62"/><stop offset=".25" stop-color="#1D2744"/><stop offset="1" stop-color="#08101E"/></linearGradient>
+      <linearGradient id="haze" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3B884" stop-opacity="0"/><stop offset="1" stop-color="#F3B884" stop-opacity=".35"/></linearGradient>
+    </defs>
+    <rect width="1600" height="600" fill="url(#sky)"/>
+    <g fill="#FFF6E5" opacity=".7"><circle cx="210" cy="70" r="1.2"/><circle cx="420" cy="120" r="1"/><circle cx="640" cy="54" r="1.3"/><circle cx="880" cy="96" r="1"/><circle cx="1090" cy="40" r="1.2"/><circle cx="1330" cy="110" r="1"/><circle cx="1500" cy="64" r="1.3"/><circle cx="90" cy="160" r="1"/></g>
+    <circle cx="1170" cy="545" r="150" fill="url(#sun)"/>
+    <circle cx="1170" cy="560" r="46" fill="#FFE2A6"/>
+    <rect y="430" width="1600" height="170" fill="url(#haze)"/>
+    <!-- far ridge: Tête de Chien and the Alpes-Maritimes -->
+    <path d="M0 470 L120 430 L230 452 L330 396 L420 420 L520 368 L600 392 L690 350 L780 380 L860 372 L930 404 L1010 386 L1100 430 L1210 440 L1330 418 L1450 450 L1600 430 L1600 600 L0 600 Z" fill="#4A3A5C" opacity=".85"/>
+    <path d="M0 520 L90 490 L180 506 L300 470 L380 488 L470 452 L560 470 L640 440 L720 462 L800 450 L880 482 L980 470 L1080 500 L1200 505 L1320 492 L1460 515 L1600 500 L1600 600 L0 600 Z" fill="#2E2843"/>
+    <!-- the city: Monte-Carlo terraces and the Rock -->
+    <g fill="#1A1830">
+      <path d="M0 560 L0 520 L40 520 L40 498 L70 498 L70 510 L110 510 L110 480 L150 480 L150 500 L190 500 L190 470 L230 470 L230 492 L270 492 L270 458 L300 458 L300 446 L330 446 L330 476 L370 476 L370 490 L420 490 L420 462 L460 462 L460 484 L510 484 L510 500 L560 500 L560 520 L620 520 L620 540 L700 548 L700 560 Z"/>
+      <path d="M760 560 L780 536 L820 528 L840 510 L880 506 L900 494 L930 494 L944 480 L960 480 L962 470 L972 470 L974 480 L990 482 L1000 496 L1040 500 L1060 520 L1090 530 L1110 560 Z"/>
+    </g>
+    <g fill="#FFD48A">
+      <circle class="twinkle" cx="52" cy="512" r="1.8"/><circle class="twinkle" cx="88" cy="520" r="1.6"/><circle class="twinkle" cx="124" cy="494" r="1.7"/><circle class="twinkle" cx="168" cy="508" r="1.5"/><circle class="twinkle" cx="206" cy="484" r="1.8"/><circle class="twinkle" cx="246" cy="500" r="1.6"/><circle class="twinkle" cx="284" cy="470" r="1.7"/><circle class="twinkle" cx="316" cy="460" r="1.5"/><circle class="twinkle" cx="350" cy="486" r="1.8"/><circle class="twinkle" cx="398" cy="500" r="1.6"/><circle class="twinkle" cx="440" cy="474" r="1.7"/><circle class="twinkle" cx="486" cy="494" r="1.5"/><circle class="twinkle" cx="534" cy="510" r="1.8"/><circle class="twinkle" cx="590" cy="530" r="1.6"/><circle class="twinkle" cx="650" cy="548" r="1.5"/>
+      <circle class="twinkle" cx="826" cy="534" r="1.6"/><circle class="twinkle" cx="868" cy="516" r="1.7"/><circle class="twinkle" cx="912" cy="502" r="1.5"/><circle class="twinkle" cx="952" cy="490" r="1.8"/><circle class="twinkle" cx="967" cy="474" r="1.4"/><circle class="twinkle" cx="1020" cy="508" r="1.6"/><circle class="twinkle" cx="1070" cy="528" r="1.5"/>
+    </g>
+    <!-- sea -->
+    <rect y="560" width="1600" height="340" fill="url(#sea)"/>
+    <g fill="#FFD9A0">
+      <rect class="shimmer" x="1110" y="572" width="120" height="2" rx="1" opacity=".8"/><rect class="shimmer" x="1130" y="590" width="80" height="2" rx="1" opacity=".7"/><rect class="shimmer" x="1096" y="610" width="150" height="2" rx="1" opacity=".55"/><rect class="shimmer" x="1140" y="634" width="60" height="2" rx="1" opacity=".5"/><rect class="shimmer" x="1112" y="662" width="110" height="2" rx="1" opacity=".35"/><rect class="shimmer" x="1150" y="700" width="50" height="2" rx="1" opacity=".3"/>
+    </g>
+    <!-- Port Hercule and yachts -->
+    <path d="M560 566 L760 566 L760 572 L560 572 Z" fill="#14132A"/>
+    <g class="yacht" transform="translate(640 -8)"><path d="M600 600 L690 600 L676 612 L612 612 Z" fill="#E9E4DA"/><path d="M622 592 L668 592 L664 600 L628 600 Z" fill="#CFC8BB"/><circle cx="640" cy="596" r="1.6" fill="#FFD48A"/><circle cx="654" cy="596" r="1.6" fill="#FFD48A"/></g>
+    <g class="yacht" style="animation-delay:-2s" transform="translate(380 0)"><path d="M820 640 L960 640 L940 656 L842 656 Z" fill="#F2EEE6"/><path d="M852 628 L926 628 L918 640 L860 640 Z" fill="#D6D0C3"/><path d="M872 618 L906 618 L902 628 L876 628 Z" fill="#C7C0B2"/><circle cx="880" cy="634" r="1.8" fill="#FFD48A"/><circle cx="898" cy="634" r="1.8" fill="#FFD48A"/><circle cx="912" cy="648" r="1.6" fill="#FFD48A"/></g>
+    <g class="yacht" style="animation-delay:-3.4s" transform="translate(1020 -20)"><path d="M380 700 L500 700 L484 714 L398 714 Z" fill="#E6E0D4"/><path d="M406 690 L470 690 L464 700 L412 700 Z" fill="#CBC4B6"/><circle cx="430" cy="696" r="1.6" fill="#FFD48A"/></g>
+    <g opacity=".25" fill="#FFD48A"><rect x="1280" y="608" width="2" height="18"/><rect x="1270" y="660" width="2" height="22"/><rect x="1450" y="696" width="2" height="16"/></g>
+    <!-- helicopter -->
+    <g class="heli"><g class="heli-bob">
+      <g transform="scale(1.15)">
+        <ellipse class="rotor" cx="60" cy="-4" rx="88" ry="2.2" fill="#0B0F1A" opacity=".75"/>
+        <rect x="56" y="-4" width="6" height="8" fill="#0B0F1A"/>
+        <path d="M14 10 C14 2 30 -2 58 -2 L80 -2 C96 -2 108 6 110 16 C112 26 100 32 84 32 L40 32 C24 32 14 22 14 10 Z" fill="#0B0F1A"/>
+        <path d="M84 6 C94 6 102 11 104 18 L84 18 Z" fill="#3B4760" opacity=".9"/>
+        <path d="M14 14 L-58 10 L-60 18 L14 24 Z" fill="#0B0F1A"/>
+        <path d="M-56 8 L-66 -6 L-60 -6 L-48 10 Z" fill="#0B0F1A"/>
+        <ellipse class="tail-rotor" cx="-60" cy="6" rx="2" ry="13" fill="#0B0F1A" opacity=".7"/>
+        <path d="M30 32 L26 42 M80 32 L84 42 M16 43 L98 43" stroke="#0B0F1A" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <circle class="navlight" cx="-58" cy="14" r="2.4" fill="#FF4D4D"/>
+        <circle cx="108" cy="18" r="1.8" fill="#FFF3D6"/>
+      </g>
+    </g></g>
+  </svg>
+  <div class="veil"></div>
+  <div class="copy">
+    <div class="coords" id="arrCoords">Monaco · 43.7384° N · 7.4246° E</div>
+    <h1>PERIMETRU<em id="arrGreet">Bun venit.</em></h1>
+    <p>Radarul global al protecției private: evenimente, oameni, acces. De pe Riviera, pentru orice colț al lumii.</p>
+    <div class="row"><button class="enter" id="enterBtn">Intră</button><span class="fine" id="arrFine">Accesul vine din contul tău claude.ai.</span></div>
+  </div>
+</section>
 
 <header class="top">
   <div class="wrap">
     <div class="top-row">
       <a class="brand" href="#radar" aria-label="Perimetru, acasă">
         <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="15.5" fill="none" stroke="var(--gold)" stroke-width="1"/><circle cx="17" cy="17" r="10" fill="none" stroke="var(--gold)" stroke-width="1" stroke-dasharray="2 3"/><circle cx="17" cy="17" r="2.6" fill="var(--gold)"/><path d="M17 1.5v5M17 27.5v5M1.5 17h5M27.5 17h5" stroke="var(--gold)" stroke-width="1"/></svg>
-        <span style="min-width:0"><span class="brand-name" style="color:var(--ink)">PERIMETRU</span><span class="brand-sub" id="brandSub">Intelligence &amp; outreach · close protection</span></span>
+        <span style="min-width:0"><span class="brand-name">PERIMETRU</span><span class="brand-sub" id="brandSub">Intelligence · protecție · acces privat</span></span>
       </a>
-      <label class="search" for="q"><svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="var(--muted)" stroke-width="1.5"/><path d="M11 11l3.5 3.5" stroke="var(--muted)" stroke-width="1.5"/></svg><input id="q" type="search" placeholder="Caută eveniment, oraș, companie…" autocomplete="off"></label>
+      <label class="search" for="q"><svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="var(--muted)" stroke-width="1.5"/><path d="M11 11l3.5 3.5" stroke="var(--muted)" stroke-width="1.5"/></svg><input id="q" type="search" placeholder="Caută eveniment, țară, companie, persoană…" autocomplete="off"></label>
       <div class="top-actions">
         <button class="icon-btn" id="bell" aria-label="Notificări" title="Notificări"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a4.5 4.5 0 0 0-4.5 4.5v3L2 11.5h12L12.5 9V6A4.5 4.5 0 0 0 8 1.5zM6.2 13.2a1.9 1.9 0 0 0 3.6 0" fill="none" stroke="var(--ink)" stroke-width="1.3"/></svg><span class="badge" id="bellBadge" hidden>0</span></button>
       </div>
     </div>
     <nav class="tabs" id="tabs" aria-label="Secțiuni">
-      <a href="#radar">Radar evenimente <span class="count" id="c-radar"></span></a>
-      <a href="#targets">Companii țintă <span class="count" id="c-targets"></span></a>
+      <a href="#radar">Radar <span class="count" id="c-radar"></span></a>
+      <a href="#countries">Țări <span class="count" id="c-countries"></span></a>
+      <a href="#contacts">Contacte <span class="count" id="c-contacts"></span></a>
+      <a href="#targets">Companii <span class="count" id="c-targets"></span></a>
+      <a href="#signals">Cereri &amp; semnale <span class="count" id="c-signals"></span></a>
       <a href="#approvals">De aprobat <span class="count" id="c-approvals"></span></a>
-      <a href="#pipeline">Pipeline &amp; follow-up <span class="count" id="c-pipeline"></span></a>
-      <a href="#alerts">Notificări <span class="count" id="c-alerts"></span></a>
+      <a href="#pipeline">Pipeline <span class="count" id="c-pipeline"></span></a>
+      <a href="#services">Servicii</a>
+      <a href="#alerts">Noutăți <span class="count" id="c-alerts"></span></a>
       <a href="#setup">Setări</a>
     </nav>
   </div>
 </header>
 
 <main class="wrap" id="main"></main>
+<button class="ai-fab" id="aiFab" hidden><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7.5" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="9" cy="9" r="2.2" fill="currentColor"/><path d="M9 1.5v3M9 13.5v3M1.5 9h3M13.5 9h3" stroke="currentColor" stroke-width="1.3"/></svg>Concierge AI</button>
+<div id="aiLayer"></div>
 <div id="layer"></div>
 
 <script>
 (() => {
-  // ---------- constants ----------
+  // ---------- vocabulary ----------
   const CATS = {
-    motorsport: "Motorsport",
-    film: "Film & gale",
-    music: "Muzică & turnee",
-    forum: "Forumuri & summit-uri",
-    alpine: "Alpin & sezon lux",
-    art: "Artă & modă",
-    sport: "Sport premium",
-    private: "Evenimente private"
+    concert: "Concerte & turnee", festival: "Festivaluri", film: "Film, gale & premii", summit: "Summit-uri & forumuri",
+    business: "Business, finanțe & târguri", politic: "Politic & diplomatic", motorsport: "Motorsport", sport: "Sport premium",
+    luxury: "Lux, alpin & yachting", art: "Artă, modă & design", charity: "Gale caritabile", private: "Evenimente private"
   };
-  const REGIONS = { europe: "Europa", riviera: "Riviera & Monaco", alps: "Alpi (CH · AT)", gulf: "Golf", us: "SUA", romania: "România", global: "Global" };
+  const LEGACY_CAT = { music: "concert", forum: "summit", alpine: "luxury" };
+  const NEEDS = {
+    personal: "Protecție personală", family: "Protecție familie", delegation: "Delegații & VIP", artist: "Artiști & talent",
+    assets: "Bunuri de valoare", transport: "Transport de lux (auto, jet, elicopter)", venue: "Securitate eveniment"
+  };
+  const REGIONS = { europe: "Europa", riviera: "Riviera & Monaco", alps: "Alpi", gulf: "Golf & Orientul Mijlociu", us: "Americi", asia: "Asia & Pacific", africa: "Africa", romania: "România" };
+  const COUNTRIES = {
+    RO: "România", FR: "Franța", MC: "Monaco", CH: "Elveția", AT: "Austria", IT: "Italia", ES: "Spania", PT: "Portugalia", GB: "Regatul Unit", IE: "Irlanda",
+    DE: "Germania", NL: "Țările de Jos", BE: "Belgia", HU: "Ungaria", BG: "Bulgaria", TR: "Turcia", AZ: "Azerbaidjan", GR: "Grecia", HR: "Croația", PL: "Polonia",
+    AE: "Emiratele Arabe Unite", SA: "Arabia Saudită", QA: "Qatar", BH: "Bahrain", US: "SUA", CA: "Canada", MX: "Mexic", BR: "Brazilia", AR: "Argentina",
+    JP: "Japonia", CN: "China", SG: "Singapore", AU: "Australia", HK: "Hong Kong", IN: "India", ET: "Etiopia", MA: "Maroc", ZA: "Africa de Sud", AL: "Albania", MT: "Malta", LU: "Luxemburg", LI: "Liechtenstein"
+  };
   const ORG_TYPES = {
-    family_office: "Family office",
-    mfo: "Multi-family office & private bank",
-    jet: "Aviație privată & charter",
-    travel: "Travel & lifestyle management",
-    talent: "Agenții de talent & PR",
-    label: "Case de discuri & management",
-    promoter: "Organizatori turnee & evenimente",
-    hospitality: "Hoteluri & yachting",
-    forum: "Organizatori forumuri"
+    family_office: "Family office", mfo: "Multi-family office & bancă privată", jet: "Aviație privată & charter", travel: "Travel & lifestyle management",
+    talent: "Agenții de talent & PR", label: "Case de discuri & management", promoter: "Organizatori turnee & festivaluri", organizer: "Organizatori evenimente & forumuri",
+    hospitality: "Hoteluri, vile & yachting", network: "Rețele de acces (PA, concierge, family office)", forum: "Organizatori forumuri", luxury_brand: "Branduri de lux"
   };
-  const STAGES = [
-    ["nou", "Nou"], ["cercetare", "În cercetare"], ["contactat", "Contactat"],
-    ["raspuns", "A răspuns"], ["intalnire", "Întâlnire"], ["client", "Client"], ["pierdut", "Pierdut / pauză"]
-  ];
+  const ROLE_CATS = {
+    chief_of_staff: "Chief of Staff / Private office", pa: "PA / Executive Assistant", family_office: "Family office", organizer: "Organizator eveniment",
+    concierge: "Concierge / hotel", broker: "Broker charter (yacht / jet)", management: "Management artist / tour", partnerships: "Parteneriate & sponsorizări", press: "Presă & comunicare", general: "Contact general"
+  };
+  const STAGES = [["nou", "Nou"], ["cercetare", "În cercetare"], ["contactat", "Contactat"], ["raspuns", "A răspuns"], ["intalnire", "Întâlnire"], ["client", "Client"], ["pierdut", "Pierdut / pauză"]];
   const STAGE_LABEL = Object.fromEntries(STAGES);
   const MONTHS = ["ianuarie","februarie","martie","aprilie","mai","iunie","iulie","august","septembrie","octombrie","noiembrie","decembrie"];
   const MON3 = ["ian","feb","mar","apr","mai","iun","iul","aug","sep","oct","nov","dec"];
   const FOLLOW_UP_DAYS = 5;
+  const DEFAULT_SERVICES = [
+    { id: "cp", kind: "Protecție", name: "Close protection", desc: "Ofițeri de protecție apropiată, advance & recon, echipe multilingve, 24/7.", partners: "" },
+    { id: "family", kind: "Protecție", name: "Protecția familiei", desc: "Protecție pentru copii și familie, școală, vacanțe, reședințe.", partners: "" },
+    { id: "cars", kind: "Mobilitate", name: "Mașini de lux & blindate cu șofer", desc: "Flotă premium și blindată, șoferi instruiți în conducere defensivă.", partners: "" },
+    { id: "jet", kind: "Aviație", name: "Private jet", desc: "Charter pe orice rută, coordonat cu protecția la sol.", partners: "" },
+    { id: "heli", kind: "Aviație", name: "Elicopter", desc: "Transferuri Nisa–Monaco, Alpi, yachturi, evenimente.", partners: "" },
+    { id: "hotels", kind: "Ospitalitate", name: "Hoteluri & vile", desc: "Rezervări în hoteluri de top și vile private verificate.", partners: "" },
+    { id: "yachts", kind: "Ospitalitate", name: "Yachturi", desc: "Charter de superyachturi cu protecție la bord și la țărm.", partners: "" },
+    { id: "watches", kind: "Lux", name: "Ceasuri & bijuterii", desc: "Acces la piese rare și transport securizat al bunurilor de valoare.", partners: "" },
+    { id: "access", kind: "Acces", name: "Acces la evenimente", desc: "Hospitality F1, gale, festivaluri, mese private.", partners: "" }
+  ];
 
   // ---------- state ----------
   const S = {
-    events: [], orgs: [], drafts: [], alerts: [], contacts: [],
-    config: {},
+    events: [], orgs: [], drafts: [], alerts: [], contacts: [], signals: [], requests: [],
+    config: {}, services: null, me: null,
     ready: false, dbOk: null,
-    f: { cat: "all", region: "all", horizon: 180, type: "all", sub: "de_aprobat", q: "" }
+    f: { cat: "all", need: "all", region: "all", cc: "all", horizon: 400, type: "all", role: "all", sub: "de_aprobat", q: "" }
   };
-  try { Object.assign(S.f, JSON.parse(localStorage.getItem("perimetru.f") || "{}")); } catch (e) {}
-  const saveF = () => { try { localStorage.setItem("perimetru.f", JSON.stringify({ cat: S.f.cat, region: S.f.region, horizon: S.f.horizon, type: S.f.type })); } catch (e) {} };
-
-  let db = null, sample = null;
+  try { Object.assign(S.f, JSON.parse(localStorage.getItem("perimetru.f2") || "{}")); } catch (e) {}
+  const saveF = () => { try { const { q, sub, ...rest } = S.f; localStorage.setItem("perimetru.f2", JSON.stringify(rest)); } catch (e) {} };
+  let db = null, sample = null, userCap = null;
 
   // ---------- helpers ----------
   const $ = (s, el = document) => el.querySelector(s);
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const today = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
-  const parseD = (s) => { if (!s) return null; const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d || 1); };
+  const parseD = (s) => { if (!s) return null; const [y, m, d] = String(s).split("-").map(Number); return new Date(y, m - 1, d || 1); };
   const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
   const daysTo = (s) => Math.round((parseD(s) - today()) / 864e5);
@@ -329,11 +496,14 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
     if (A.getMonth() === B.getMonth()) return `${A.getDate()}–${B.getDate()} ${MON3[A.getMonth()]}`;
     return `${A.getDate()} ${MON3[A.getMonth()]} – ${B.getDate()} ${MON3[B.getMonth()]}`;
   };
+  const catOf = (e) => LEGACY_CAT[e.cat] || e.cat;
+  const ccName = (cc) => COUNTRIES[cc] || cc || "—";
+  const evCountry = (e) => e.cc ? ccName(e.cc) : (e.country || "—");
+  const live = (e) => daysTo(e.end || e.start) >= 0;
   const orgById = (id) => S.orgs.find(o => o.id === id);
   const evById = (id) => S.events.find(e => e.id === id);
   const fill = (txt) => {
     const c = S.config || {};
-    // placeholders stay as {{…}} until Settings are filled, so saved drafts pick up the real values later
     let out = String(txt || "");
     if (c.company) out = out.replaceAll("{{company}}", c.company);
     if (c.sender) out = out.replaceAll("{{sender}}", c.sender);
@@ -343,22 +513,19 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
     if (sig) out = out.replaceAll("{{signature}}", sig);
     return out;
   };
-  const toast = (msg) => {
-    const t = document.createElement("div"); t.className = "toast"; t.setAttribute("role", "status"); t.textContent = msg;
-    document.body.appendChild(t); setTimeout(() => t.remove(), 2600);
-  };
+  const toast = (msg) => { const t = document.createElement("div"); t.className = "toast"; t.setAttribute("role", "status"); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 2800); };
   const scoreRing = (n) => {
     const r = 22, c = 2 * Math.PI * r, v = Math.max(0, Math.min(100, n || 0));
     const col = v >= 80 ? "var(--gold)" : v >= 60 ? "var(--steel)" : "var(--faint)";
-    return `<div class="score" title="Scor de potrivire ${v}/100"><svg width="52" height="52" viewBox="0 0 52 52"><circle cx="26" cy="26" r="${r}" fill="none" stroke="var(--line)" stroke-width="3"/><circle cx="26" cy="26" r="${r}" fill="none" stroke="${col}" stroke-width="3" stroke-linecap="round" stroke-dasharray="${(c * v / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 26 26)"/></svg><span>${v}</span></div>`;
+    return `<div class="score" title="Scor ${v}/100"><svg width="52" height="52" viewBox="0 0 52 52"><circle cx="26" cy="26" r="${r}" fill="none" stroke="var(--line)" stroke-width="3"/><circle cx="26" cy="26" r="${r}" fill="none" stroke="${col}" stroke-width="3" stroke-linecap="round" stroke-dasharray="${(c * v / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 26 26)"/></svg><span>${v}</span></div>`;
   };
-  const opCode = (e) => {
-    const d = parseD(e.start); const city = (e.city || "XXX").normalize("NFD").replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase();
-    return `OP-${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, "0")}-${city}`;
-  };
+  const opCode = (e) => { const d = parseD(e.start); return `OP-${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, "0")}-${(e.cc || "XX")}`; };
   const matchesQ = (...parts) => { const q = S.f.q.trim().toLowerCase(); if (!q) return true; return parts.join(" ").toLowerCase().includes(q); };
+  const li = (kw, type = "content") => `https://www.linkedin.com/search/results/${type}/?keywords=${encodeURIComponent(kw)}`;
+  const liJobs = (kw) => `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(kw)}`;
+  const services = () => (S.services && S.services.length ? S.services : DEFAULT_SERVICES);
 
-  // ---------- data writes ----------
+  // ---------- writes ----------
   async function put(col, id, data) {
     if (!db) { toast("Baza de date nu e disponibilă în această vizualizare."); return false; }
     try { await db.collection(col).doc(id).set(data); return true; }
@@ -371,52 +538,72 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
   }
   const newId = (p) => `${p}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
+  // ---------- event filters ----------
+  function filteredEvents(extra = {}) {
+    const f = { ...S.f, ...extra };
+    const t0 = today(), until = addDays(t0, +f.horizon || 400);
+    return S.events
+      .filter(e => live(e) && parseD(e.start) <= until)
+      .filter(e => f.cat === "all" || catOf(e) === f.cat)
+      .filter(e => f.need === "all" || (e.needs || []).includes(f.need))
+      .filter(e => f.region === "all" || e.region === f.region)
+      .filter(e => f.cc === "all" || e.cc === f.cc)
+      .filter(e => matchesQ(e.title, e.city, evCountry(e), e.venue, e.angle))
+      .sort((a, b) => a.start.localeCompare(b.start));
+  }
+  const usedCountries = () => { const m = {}; S.events.filter(live).forEach(e => { if (e.cc) (m[e.cc] ||= []).push(e); }); return m; };
+
+  function eventFilters({ showCountry = true } = {}) {
+    const present = new Set(S.events.filter(live).map(catOf));
+    const catChips = [["all", "Toate"], ...Object.entries(CATS).filter(([k]) => present.has(k))].map(([k, v]) => `<button class="chip" data-f="cat" data-v="${k}" aria-pressed="${S.f.cat === k}">${esc(v)}</button>`).join("");
+    const needOpts = [["all", "Orice tip de protecție"], ...Object.entries(NEEDS)].map(([k, v]) => `<option value="${k}" ${S.f.need === k ? "selected" : ""}>${esc(v)}</option>`).join("");
+    const regionOpts = [["all", "Toate regiunile"], ...Object.entries(REGIONS)].map(([k, v]) => `<option value="${k}" ${S.f.region === k ? "selected" : ""}>${esc(v)}</option>`).join("");
+    const uc = usedCountries();
+    const ccOpts = [["all", "Toate țările"], ...Object.keys(uc).sort((a, b) => ccName(a).localeCompare(ccName(b), "ro")).map(k => [k, `${ccName(k)} (${uc[k].length})`])].map(([k, v]) => `<option value="${k}" ${S.f.cc === k ? "selected" : ""}>${esc(v)}</option>`).join("");
+    const horizonOpts = [[60, "60 de zile"], [120, "120 de zile"], [180, "6 luni"], [270, "9 luni"], [400, "12+ luni"]].map(([k, v]) => `<option value="${k}" ${+S.f.horizon === k ? "selected" : ""}>${v}</option>`).join("");
+    return `<div class="filters"><span class="lab">Categorie</span>${catChips}</div>
+      <div class="filters">${showCountry ? `<select class="select" id="fCc" aria-label="Țară">${ccOpts}</select>` : ""}
+        <select class="select" id="fRegion" aria-label="Regiune">${regionOpts}</select>
+        <select class="select" id="fNeed" aria-label="Tip de protecție">${needOpts}</select>
+        <select class="select" id="fHorizon" aria-label="Orizont">${horizonOpts}</select>
+        ${(S.f.cat !== "all" || S.f.need !== "all" || S.f.region !== "all" || S.f.cc !== "all") ? `<button class="btn ghost sm" data-act="clear-f">Resetează filtrele</button>` : ""}</div>`;
+  }
+
+  function timeline(evs) {
+    if (!S.ready) return emptyLoading();
+    if (!evs.length) return `<div class="empty"><h3>Niciun eveniment pe acest filtru</h3><p>${S.events.length ? "Lărgește orizontul sau schimbă filtrele." : "Radarul se umple la prima rulare a cercetării."}</p></div>`;
+    const groups = {};
+    evs.forEach(e => { const d = parseD(e.start); const k = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`; (groups[k] ||= { y: d.getFullYear(), m: d.getMonth(), items: [] }).items.push(e); });
+    return Object.keys(groups).sort().map(k => groups[k]).map(g => `
+      <section class="month" aria-label="${MONTHS[g.m]} ${g.y}">
+        <div class="month-label"><div class="m">${MONTHS[g.m]}</div><div class="y">${g.y} · ${g.items.length} ${g.items.length === 1 ? "semnal" : "semnale"}</div></div>
+        <div class="month-items">${g.items.map(evCard).join("")}</div>
+      </section>`).join("");
+  }
+
   // ---------- views ----------
   function viewRadar() {
-    const t0 = today();
-    const until = addDays(t0, S.f.horizon);
-    const evs = S.events
-      .filter(e => (parseD(e.end || e.start) >= t0) && parseD(e.start) <= until)
-      .filter(e => S.f.cat === "all" || e.cat === S.f.cat)
-      .filter(e => S.f.region === "all" || e.region === S.f.region)
-      .filter(e => matchesQ(e.title, e.city, e.country, e.venue, e.angle))
-      .sort((a, b) => a.start.localeCompare(b.start));
-
-    const upcoming90 = S.events.filter(e => { const n = daysTo(e.start); return n >= 0 && n <= 90; }).length;
-    const advanceNow = S.events.filter(e => { const n = daysTo(e.start); return n >= 0 && n <= 45; }).length;
+    const evs = filteredEvents();
+    const all = S.events.filter(live);
+    const in90 = all.filter(e => daysTo(e.start) <= 90).length;
+    const advanceNow = all.filter(e => { const n = daysTo(e.start); return n <= (e.advanceDays || 21) + 14; }).length;
     const toApprove = S.drafts.filter(d => d.status === "de_aprobat").length;
-    const fuDue = dueFollowUps().length;
-
-    const groups = {};
-    evs.forEach(e => { const d = parseD(e.start); const k = `${d.getFullYear()}-${d.getMonth()}`; (groups[k] ||= { y: d.getFullYear(), m: d.getMonth(), items: [] }).items.push(e); });
-
-    const catChips = [["all", "Toate"], ...Object.entries(CATS)].map(([k, v]) => `<button class="chip" data-f="cat" data-v="${k}" aria-pressed="${S.f.cat === k}">${esc(v)}</button>`).join("");
-    const regionOpts = [["all", "Toate regiunile"], ...Object.entries(REGIONS)].map(([k, v]) => `<option value="${k}" ${S.f.region === k ? "selected" : ""}>${esc(v)}</option>`).join("");
-    const horizonOpts = [[60, "60 de zile"], [120, "120 de zile"], [180, "6 luni"], [270, "9 luni"], [400, "12+ luni"]].map(([k, v]) => `<option value="${k}" ${+S.f.horizon === k ? "selected" : ""}>${v}</option>`).join("");
-
+    const nCountries = Object.keys(usedCountries()).length;
     return `
       <div class="view-head"><div class="grow">
-        <div class="eyebrow">Radar · semnale de timing</div>
+        <div class="eyebrow">Radar global · actualizat la două zile</div>
         <h1>Unde vor fi principalii în următoarele luni</h1>
-        <p>Evenimente publice unde clienții cu profil înalt au nevoie de protecție apropiată. Fiecare intrare are sursa, data verificării și fereastra de advance: momentul în care oferta trebuie să ajungă la organizator, PA sau family office.</p>
+        <p>Concerte, festivaluri, gale, summit-uri, alegeri, Formula 1, sezonul alpin și Riviera. Fiecare intrare are sursa, data verificării, tipul de protecție cerut și fereastra de advance, adică data până la care trebuie trimisă oferta.</p>
       </div></div>
       <div class="kpis">
-        <button class="kpi gold" data-go="radar" data-h="90"><div class="n">${upcoming90}</div><div class="l">evenimente în 90 de zile</div></button>
-        <button class="kpi hot" data-go="radar" data-h="60"><div class="n">${advanceNow}</div><div class="l">în fereastra de advance (≤ 45 zile)</div></button>
+        <button class="kpi gold" data-go="radar" data-h="90"><div class="n">${in90}</div><div class="l">evenimente în 90 de zile</div></button>
+        <button class="kpi hot" data-go="radar" data-h="60"><div class="n">${advanceNow}</div><div class="l">cu fereastra de advance deschisă sau aproape</div></button>
+        <button class="kpi" data-go="countries"><div class="n">${nCountries}</div><div class="l">țări acoperite</div></button>
         <button class="kpi" data-go="approvals"><div class="n">${toApprove}</div><div class="l">e-mailuri așteaptă aprobarea</div></button>
-        <button class="kpi" data-go="pipeline"><div class="n">${fuDue}</div><div class="l">follow-up-uri scadente</div></button>
       </div>
-      <div class="filters">${catChips}
-        <select class="select" id="fRegion" aria-label="Regiune">${regionOpts}</select>
-        <select class="select" id="fHorizon" aria-label="Orizont">${horizonOpts}</select>
-      </div>
-      ${!S.ready ? emptyLoading() : evs.length === 0 ? `<div class="empty"><h3>Niciun eveniment pe acest filtru</h3><p>${S.events.length ? "Lărgește orizontul sau schimbă categoria." : "Radarul se umple la prima rulare a cercetării zilnice."}</p></div>` :
-        Object.values(groups).map(g => `
-        <section class="month" aria-label="${MONTHS[g.m]} ${g.y}">
-          <div class="month-label"><div class="m">${MONTHS[g.m]}</div><div class="y">${g.y} · ${g.items.length} ${g.items.length === 1 ? "semnal" : "semnale"}</div></div>
-          <div class="month-items">${g.items.map(evCard).join("")}</div>
-        </section>`).join("")}
-    `;
+      ${eventFilters()}
+      <div class="note" style="margin:6px 0 4px">${evs.length} evenimente afișate din ${all.length}.</div>
+      ${timeline(evs)}`;
   }
 
   function evCard(e) {
@@ -424,18 +611,19 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
     const adv = addDays(d, -(e.advanceDays || 21));
     const advN = Math.round((adv - today()) / 864e5);
     const conf = e.confidence === "confirmat" ? `<span class="pill ok">confirmat</span>` : `<span class="pill warn">de reconfirmat</span>`;
-    const urgency = n <= 30 ? `<span class="pill hot">T-${n} zile</span>` : `<span class="pill info">T-${n} zile</span>`;
-    const targets = (e.targets || []).map(id => orgById(id)).filter(Boolean)
-      .map(o => `<button class="tag" data-act="open-org" data-id="${o.id}">${esc(o.name)}</button>`).join("");
+    const urgency = n <= 0 ? `<span class="pill hot">în desfășurare</span>` : n <= 30 ? `<span class="pill hot">T-${n} zile</span>` : `<span class="pill info">T-${n} zile</span>`;
+    const targets = (e.targets || []).map(orgById).filter(Boolean).map(o => `<button class="tag" data-act="open-org" data-id="${esc(o.id)}">${esc(o.name)}</button>`).join("");
+    const needs = (e.needs || []).map(k => `<span class="tag need">${esc(NEEDS[k] || k)}</span>`).join("");
     const src = (e.sources || []).map(s => `<a href="${esc(s.url)}" target="_blank" rel="noopener">↗ ${esc(s.label)}</a>`).join("");
     return `<article class="ev ${e.tier === 1 ? "t1" : ""}" id="ev-${esc(e.id)}">
-      <div class="ev-date"><div class="d">${d.getDate()}</div><div class="r">${esc(range(e.start, e.end))}</div></div>
+      <div class="ev-date"><div class="d">${d.getDate()}</div><div class="r">${esc(range(e.start, e.end))}</div>${e.cc ? `<button class="cc tag" style="background:none" data-act="open-cc" data-id="${esc(e.cc)}" title="${esc(ccName(e.cc))}">${esc(e.cc)}</button>` : ""}</div>
       <div class="ev-body">
-        <div class="row"><span class="eyebrow">${esc(CATS[e.cat] || e.cat)} · ${opCode(e)}</span></div>
+        <div class="eyebrow">${esc(CATS[catOf(e)] || catOf(e))} · ${opCode(e)}</div>
         <h3 class="ev-title">${esc(e.title)}</h3>
-        <div class="ev-where">${esc([e.venue, e.city, e.country].filter(Boolean).join(" · "))}</div>
+        <div class="ev-where">${esc([e.venue, e.city, evCountry(e)].filter(Boolean).join(" · "))}</div>
         <p class="ev-angle">${esc(e.angle)}</p>
-        ${targets ? `<div class="ev-targets"><span class="eyebrow" style="align-self:center">Cui scriem</span>${targets}</div>` : ""}
+        ${needs ? `<div class="ev-targets">${needs}</div>` : ""}
+        ${targets ? `<div class="ev-targets"><span class="eyebrow">Cui scriem</span>${targets}</div>` : ""}
       </div>
       <div class="ev-side">
         <div class="row">${urgency}${conf}</div>
@@ -446,32 +634,93 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
     </article>`;
   }
 
-  function viewTargets() {
-    const list = S.orgs
-      .filter(o => S.f.type === "all" || o.type === S.f.type)
-      .filter(o => matchesQ(o.name, o.hq, o.why, ORG_TYPES[o.type]))
-      .sort((a, b) => (b.score || 0) - (a.score || 0));
-    const chips = [["all", "Toate"], ...Object.entries(ORG_TYPES)].map(([k, v]) => {
-      const c = k === "all" ? S.orgs.length : S.orgs.filter(o => o.type === k).length;
-      return `<button class="chip" data-f="type" data-v="${k}" aria-pressed="${S.f.type === k}">${esc(v)} <span class="mono">${c}</span></button>`;
-    }).join("");
+  function viewCountries() {
+    const uc = usedCountries();
+    const sel = S.f.cc !== "all" ? S.f.cc : null;
+    const byRegion = {};
+    Object.entries(uc).forEach(([cc, evs]) => { const r = evs[0].region || "europe"; (byRegion[r] ||= []).push([cc, evs]); });
+    const regionOrder = ["romania", "riviera", "alps", "europe", "gulf", "us", "asia", "africa"];
+    const card = ([cc, evs]) => {
+      const nx = [...evs].sort((a, b) => a.start.localeCompare(b.start))[0];
+      return `<button class="country" data-act="open-cc" data-id="${cc}" aria-pressed="${sel === cc}"><div class="top"><span class="nm">${esc(ccName(cc))}</span><span class="n">${evs.length}</span></div><span class="cc2">${cc}</span><span class="nx">Următorul: ${esc(fmtD(nx.start))} · ${esc(nx.title)}</span></button>`;
+    };
+    const atlas = regionOrder.filter(r => byRegion[r]).map(r => `<div class="eyebrow region-h">${esc(REGIONS[r])}</div><div class="atlas">${byRegion[r].sort((a, b) => b[1].length - a[1].length).map(card).join("")}</div>`).join("");
+    const evs = sel ? filteredEvents({ cc: sel, horizon: 400 }) : [];
+    const ctsHere = sel ? S.contacts.filter(c => c.cc === sel || (orgById(c.orgId)?.cc === sel)) : [];
     return `
       <div class="view-head"><div class="grow">
-        <div class="eyebrow">Registru · lead-uri la nivel de companie</div>
-        <h1>Cine cumpără protecție, în mod recurent</h1>
-        <p>Family offices, aviație privată, travel management, agenții de talent, case de discuri și promotori. Scorul combină nevoia recurentă, potențialul de recomandare și apropierea de evenimentele din radar.</p>
-      </div>
-      <button class="btn" data-act="new-org">+ Adaugă companie</button></div>
+        <div class="eyebrow">Atlas · pe țări</div>
+        <h1>${sel ? esc(ccName(sel)) : "Fiecare țară, cu evenimentele ei"}</h1>
+        <p>${sel ? `${evs.length} evenimente în ${esc(ccName(sel))}${ctsHere.length ? ` și ${ctsHere.length} contacte locale` : ""}. Filtrează pe categorie sau pe tipul de protecție.` : "Alege o țară ca să vezi tot ce se întâmplă acolo, în ordinea datelor."}</p>
+      </div>${sel ? `<button class="btn" data-act="open-cc" data-id="all">Toate țările</button>` : ""}</div>
+      ${!S.ready ? emptyLoading() : sel ? `${eventFilters({ showCountry: false })}${timeline(evs)}` : atlas || `<div class="empty"><h3>Încă nu sunt țări</h3></div>`}`;
+  }
+
+  function viewContacts() {
+    const roles = [["all", "Toate"], ...Object.entries(ROLE_CATS)];
+    const list = S.contacts
+      .filter(c => S.f.role === "all" || c.roleCat === S.f.role)
+      .filter(c => { const o = orgById(c.orgId); return matchesQ(c.name, c.role, c.email, c.phone, o?.name, ccName(c.cc || o?.cc)); })
+      .sort((a, b) => (orgById(a.orgId)?.name || "").localeCompare(orgById(b.orgId)?.name || "", "ro"));
+    const chips = roles.map(([k, v]) => { const n = k === "all" ? S.contacts.length : S.contacts.filter(c => c.roleCat === k).length; return `<button class="chip" data-f="role" data-v="${k}" aria-pressed="${S.f.role === k}">${esc(v)} <span class="mono">${n}</span></button>`; }).join("");
+    const finders = [
+      ["Chief of Staff la family office", li("chief of staff family office", "people"), "Persoanele care organizează viața și deplasările principalului"],
+      ["Chief of Staff to Principal / Private Office", li("\"chief of staff\" principal private office", "people"), "Private office-uri de UHNW"],
+      ["Executive Assistant to UHNW / Founder", li("executive assistant UHNW family", "people"), "PA care rezervă transport, hoteluri, protecție"],
+      ["Private Office Manager", li("private office manager", "people"), "Monaco, Londra, Geneva, Dubai"],
+      ["Head of Security la family office", li("head of security family office", "people"), "Cumpărătorul direct de servicii"],
+      ["Tour Manager / Tour Director", li("tour manager world tour", "people"), "Echipa artistului în turneu"],
+      ["Artist Manager", li("artist manager management company", "people"), "Decide echipa artistului"],
+      ["Event Director festival / forum", li("event director festival", "people"), "Organizatori de evenimente"],
+      ["Chef concierge (Les Clefs d'Or)", li("chef concierge Les Clefs d'Or", "people"), "Recomandă furnizori oaspeților"],
+      ["Charter broker yacht / jet", li("charter broker superyacht", "people"), "Clienți UHNW în tranzit"]
+    ].map(([t, u, s]) => `<a href="${u}" target="_blank" rel="noopener"><b>${esc(t)} ↗</b><span>${esc(s)}</span></a>`).join("");
+    return `
+      <div class="view-head"><div class="grow">
+        <div class="eyebrow">Agenda de contacte</div>
+        <h1>Oamenii la care trebuie să ajungem</h1>
+        <p>Contacte de business publicate de companii și organizatori: e-mail, telefon, persoană și rol, fiecare cu sursa. Cele marcate „de verificat” vin din surse secundare; confirmă-le înainte de primul mesaj. Pentru PA și Chief of Staff, căutările de mai jos deschid LinkedIn direct pe rolul potrivit.</p>
+      </div><button class="btn" data-act="new-contact">+ Adaugă contact</button></div>
+      <div class="eyebrow" style="margin-bottom:10px">Găsește decidenții pe LinkedIn</div>
+      <div class="find">${finders}</div>
       <div class="filters">${chips}</div>
-      ${!S.ready ? emptyLoading() : list.length === 0 ? `<div class="empty"><h3>Nicio companie aici încă</h3><p>Adaug-o manual sau așteaptă rularea de dimineață.</p></div>` :
-      `<div class="leads">${list.map(orgCard).join("")}</div>`}`;
+      ${!S.ready ? emptyLoading() : list.length === 0 ? `<div class="empty"><h3>Niciun contact pe acest filtru</h3><p>Radarul adaugă contacte noi la fiecare rulare; poți adăuga și tu.</p></div>` :
+      `<div class="contacts">${list.map(ctRow).join("")}</div>`}`;
+  }
+
+  function ctRow(c) {
+    const o = orgById(c.orgId);
+    const status = c.status === "verificat" ? `<span class="pill ok">verificat</span>` : `<span class="pill warn">de verificat</span>`;
+    return `<div class="ct" id="ct-${esc(c.id)}">
+      <div style="min-width:0"><div class="nm">${esc(c.name || c.role)}</div><div class="rl">${esc(c.name ? c.role : ROLE_CATS[c.roleCat] || "")}${o ? ` · <button class="tag" data-act="open-org" data-id="${esc(o.id)}">${esc(o.name)}</button>` : ""}</div></div>
+      <div class="ch">
+        ${c.email ? `<span class="mono">${esc(c.email)}<button class="copy" data-act="copy-text" data-v="${esc(c.email)}">copiază</button></span>` : `<span class="note">fără e-mail public</span>`}
+        ${c.phone ? `<span class="mono">${esc(c.phone)}<button class="copy" data-act="copy-text" data-v="${esc(c.phone)}">copiază</button></span>` : ""}
+      </div>
+      <div class="ch"><div class="row">${status}<span class="tag">${esc(ROLE_CATS[c.roleCat] || "Contact")}</span></div>${c.source ? `<a class="note" href="${esc(c.source)}" target="_blank" rel="noopener" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">↗ sursa (${esc(fmtD(c.verified))})</a>` : ""}</div>
+      <div class="row">${c.email && o && !o.dnc ? `<button class="btn primary sm" data-act="draft-contact" data-id="${esc(c.id)}">Scrie e-mail</button>` : ""}${c.name ? `<a class="btn ghost sm" href="${li(`${c.name} ${o?.name || ""}`, "people")}" target="_blank" rel="noopener">LinkedIn</a>` : ""}</div>
+    </div>`;
+  }
+
+  function viewTargets() {
+    const list = S.orgs.filter(o => S.f.type === "all" || o.type === S.f.type).filter(o => matchesQ(o.name, o.hq, o.why, ORG_TYPES[o.type])).sort((a, b) => (b.score || 0) - (a.score || 0));
+    const present = new Set(S.orgs.map(o => o.type));
+    const chips = [["all", "Toate"], ...Object.entries(ORG_TYPES).filter(([k]) => present.has(k))].map(([k, v]) => { const c = k === "all" ? S.orgs.length : S.orgs.filter(o => o.type === k).length; return `<button class="chip" data-f="type" data-v="${k}" aria-pressed="${S.f.type === k}">${esc(v)} <span class="mono">${c}</span></button>`; }).join("");
+    return `
+      <div class="view-head"><div class="grow">
+        <div class="eyebrow">Registru · companii țintă</div>
+        <h1>Cine cumpără protecție și lux, în mod recurent</h1>
+        <p>Family offices, aviație privată, concierge, agenții de talent, case de discuri, organizatori, hoteluri și yachting, plus rețelele prin care ajungi la PA și Chief of Staff. Scorul combină nevoia recurentă, potențialul de recomandare și apropierea de evenimentele din radar.</p>
+      </div><button class="btn" data-act="new-org">+ Adaugă companie</button></div>
+      <div class="filters">${chips}</div>
+      ${!S.ready ? emptyLoading() : list.length === 0 ? `<div class="empty"><h3>Nicio companie aici încă</h3></div>` : `<div class="leads">${list.map(orgCard).join("")}</div>`}`;
   }
 
   function orgCard(o) {
-    const evs = S.events.filter(e => (e.targets || []).includes(o.id) && daysTo(e.end || e.start) >= 0).sort((a, b) => a.start.localeCompare(b.start));
-    const roles = (o.roles || []).map(r => `<a href="https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(r + " " + o.name)}" target="_blank" rel="noopener">${esc(r)}</a>`).join("");
-    const contacts = S.contacts.filter(c => c.orgId === o.id);
-    const stageOpts = STAGES.map(([k, v]) => `<option value="${k}" ${o.status === k ? "selected" : ""}>${v}</option>`).join("");
+    const evs = S.events.filter(e => (e.targets || []).includes(o.id) && live(e)).sort((a, b) => a.start.localeCompare(b.start));
+    const roles = (o.roles || []).map(r => `<a href="${li(r + " " + o.name, "people")}" target="_blank" rel="noopener">${esc(r)}</a>`).join("");
+    const cts = S.contacts.filter(c => c.orgId === o.id);
+    const stageOpts = STAGES.map(([k, v]) => `<option value="${k}" ${(o.status || "nou") === k ? "selected" : ""}>${v}</option>`).join("");
     return `<article class="lead" id="org-${esc(o.id)}">
       ${scoreRing(o.score)}
       <div style="min-width:0">
@@ -479,87 +728,110 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
         <h3>${esc(o.name)}</h3>
         ${o.dnc ? `<span class="pill hot">nu contacta</span>` : ""}
         <p class="why">${esc(o.why)}</p>
-        ${evs.length ? `<div class="ev-targets">${evs.slice(0, 4).map(e => `<button class="tag" data-act="open-ev" data-id="${e.id}">${esc(fmtD(e.start))} · ${esc(e.title)}</button>`).join("")}</div>` : ""}
+        ${evs.length ? `<div class="ev-targets">${evs.slice(0, 4).map(e => `<button class="tag" data-act="open-ev" data-id="${esc(e.id)}">${esc(fmtD(e.start))} · ${esc(e.title)}</button>`).join("")}</div>` : ""}
       </div>
       <div class="meta">
-        <div><div class="lbl">Rute de contact</div>
+        <div><div class="lbl">Contact</div>
           ${o.website ? `<a href="${esc(o.website)}" target="_blank" rel="noopener">↗ Site oficial</a>` : ""}
-          ${o.contactUrl ? ` · <a href="${esc(o.contactUrl)}" target="_blank" rel="noopener">↗ Pagina de contact</a>` : ""}
-          ${o.publicEmail ? `<div class="mono">${esc(o.publicEmail)} <span class="muted">(${esc(o.emailSource || "public")})</span></div>` : ""}
+          ${cts.length ? cts.slice(0, 4).map(c => `<div>${esc(c.name || ROLE_CATS[c.roleCat] || "")}${c.name ? ` · ${esc(c.role)}` : ""}${c.email ? `<br><span class="mono">${esc(c.email)}</span>` : ""}${c.phone ? `<br><span class="mono">${esc(c.phone)}</span>` : ""}</div>`).join("") : `<div>Fără contact direct încă</div>`}
+          ${cts.length > 4 ? `<button class="tag" data-act="org-contacts" data-id="${esc(o.id)}">+${cts.length - 4} contacte</button>` : ""}
         </div>
-        ${contacts.length ? `<div><div class="lbl">Persoane verificate</div>${contacts.map(c => `<div>${esc(c.name)} · ${esc(c.role)}${c.email ? ` · <span class="mono">${esc(c.email)}</span>` : ""}</div>`).join("")}</div>` : ""}
-        ${roles ? `<div><div class="lbl">Decidenți de căutat (LinkedIn)</div><div class="rolelinks">${roles}</div></div>` : ""}
+        ${roles ? `<div><div class="lbl">Decidenți (LinkedIn)</div><div class="rolelinks">${roles}</div></div>` : ""}
       </div>
       <div class="lead-actions">
         <select class="select" data-act="stage" data-id="${esc(o.id)}" aria-label="Etapă pentru ${esc(o.name)}">${stageOpts}</select>
         <button class="btn primary sm" data-act="draft-org" data-id="${esc(o.id)}" ${o.dnc ? "disabled" : ""}>Pregătește e-mail</button>
+        <button class="btn ghost sm" data-act="new-contact" data-org="${esc(o.id)}">+ Contact</button>
         <button class="btn ghost sm" data-act="edit-org" data-id="${esc(o.id)}">Editează</button>
       </div>
     </article>`;
   }
 
+  function viewSignals() {
+    const searches = [
+      ["Postări: caută close protection", li("\"looking for close protection\" OR \"need close protection\"")],
+      ["Postări: recomandări de bodyguard", li("\"recommend a bodyguard\" OR \"recommendations for a bodyguard\"")],
+      ["Postări: executive protection RFP", li("\"executive protection\" RFP OR tender")],
+      ["Postări: securitate pentru turneu", li("\"tour security\" hiring OR looking")],
+      ["Postări: Monaco / Riviera security", li("security Monaco \"close protection\"")],
+      ["Postări: Dubai / Golf protection", li("\"close protection\" Dubai looking")],
+      ["Joburi: Executive Protection (cumpărători)", liJobs("executive protection")],
+      ["Joburi: Close Protection Officer", liJobs("close protection officer")],
+      ["Joburi: Family office security", liJobs("family office security")]
+    ].map(([t, u]) => `<a href="${u}" target="_blank" rel="noopener"><b>${esc(t)} ↗</b><span>Se deschide în contul tău LinkedIn</span></a>`).join("");
+    const tenders = [
+      ["Licitații UE (TED): servicii de pază și protecție", "https://ted.europa.eu/en/search/result?FT=close%20protection"],
+      ["SEAP / e-licitatie.ro: servicii de protecție", "https://www.e-licitatie.ro/"],
+      ["Google News: „close protection” ultimele știri", "https://news.google.com/search?q=%22close%20protection%22&hl=en"],
+      ["Google News: vizite oficiale și summit-uri", "https://news.google.com/search?q=state%20visit%20OR%20summit%20Europe&hl=en"]
+    ].map(([t, u]) => `<a href="${u}" target="_blank" rel="noopener"><b>${esc(t)} ↗</b><span>Sursă publică</span></a>`).join("");
+    const list = [...S.signals].sort((a, b) => (b.found || "").localeCompare(a.found || "")).filter(s => matchesQ(s.title, s.text, s.who));
+    return `
+      <div class="view-head"><div class="grow">
+        <div class="eyebrow">Cereri & semnale de cerere</div>
+        <h1>Cine caută protecție chiar acum</h1>
+        <p>Oameni și companii care cer public close protection: postări LinkedIn, joburi (o firmă care angajează executive protection e un cumpărător), licitații și știri. Radarul salvează aici ce găsește public; căutările LinkedIn se deschid în contul vostru, pentru că LinkedIn nu permite citirea lor din afară.</p>
+      </div></div>
+      <div class="eyebrow" style="margin-bottom:10px">LinkedIn</div><div class="find">${searches}</div>
+      <div class="eyebrow" style="margin-bottom:10px">Licitații & știri</div><div class="find">${tenders}</div>
+      <div class="eyebrow" style="margin:6px 0 10px">Semnale găsite de radar · ${list.length}</div>
+      ${!S.ready ? emptyLoading() : list.length === 0 ? `<div class="empty"><h3>Niciun semnal salvat încă</h3><p>Radarul caută la fiecare două zile postări publice, joburi și licitații și le adaugă aici.</p></div>` :
+      `<div class="alerts">${list.map(s => `<div class="alert"><span class="dot"></span><div><div class="t">${esc(s.title)}</div><div class="x">${esc(s.text || "")}</div><div class="mono muted" style="margin-top:4px">${esc(s.kind || "")} · ${esc(fmtD(s.found))}${s.cc ? ` · ${esc(ccName(s.cc))}` : ""}</div></div><div class="row">${s.url ? `<a class="btn sm" href="${esc(s.url)}" target="_blank" rel="noopener">Deschide</a>` : ""}</div></div>`).join("")}</div>`}`;
+  }
+
   function viewApprovals() {
     const sub = S.f.sub;
-    const list = S.drafts.filter(d => d.status === sub).filter(d => { const o = orgById(d.orgId); return matchesQ(d.subject, d.body, o?.name); })
-      .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    const list = S.drafts.filter(d => d.status === sub).filter(d => { const o = orgById(d.orgId); return matchesQ(d.subject, d.body, o?.name, d.to); }).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
     const count = (s) => S.drafts.filter(d => d.status === s).length;
-    const tabs = [["de_aprobat", "De aprobat"], ["aprobat", "Aprobate, de trimis"], ["trimis", "Trimise"], ["respins", "Respinse"]]
-      .map(([k, v]) => `<button data-sub="${k}" aria-pressed="${sub === k}">${v} <span class="mono muted">${count(k)}</span></button>`).join("");
+    const tabs = [["de_aprobat", "De aprobat"], ["aprobat", "Aprobate, de trimis"], ["trimis", "Trimise"], ["respins", "Respinse"]].map(([k, v]) => `<button data-sub="${k}" aria-pressed="${sub === k}">${v} <span class="mono muted">${count(k)}</span></button>`).join("");
     return `
       <div class="view-head"><div class="grow">
         <div class="eyebrow">Biroul de aprobare</div>
-        <h1>Nimic nu pleacă fără aprobarea ta</h1>
-        <p>Fiecare e-mail e scris pentru o companie și un eveniment anume. Editezi, aprobi, iar mesajul se deschide gata completat în Gmail sau Outlook. După trimitere, aplicația programează follow-up-ul la ${FOLLOW_UP_DAYS} zile.</p>
+        <h1>Nimic nu pleacă fără aprobarea voastră</h1>
+        <p>Fiecare e-mail e scris pentru o persoană, o companie și un eveniment. Editezi, aprobi, iar mesajul se deschide gata completat în Gmail sau Outlook. După trimitere, follow-up-ul se programează la ${FOLLOW_UP_DAYS} zile.</p>
       </div></div>
       <div class="subtabs" role="group" aria-label="Stare">${tabs}</div>
-      ${!S.ready ? emptyLoading() : list.length === 0 ? `<div class="empty"><h3>${sub === "de_aprobat" ? "Nimic de aprobat acum" : "Gol"}</h3><p>${sub === "de_aprobat" ? "Apasă „Pregătește outreach” pe un eveniment sau „Pregătește e-mail” pe o companie." : "Mesajele apar aici pe măsură ce le muți."}</p></div>` :
-      `<div class="drafts">${list.map(draftCard).join("")}</div>`}`;
+      ${!S.ready ? emptyLoading() : list.length === 0 ? `<div class="empty"><h3>${sub === "de_aprobat" ? "Nimic de aprobat acum" : "Gol"}</h3><p>${sub === "de_aprobat" ? "Apasă „Pregătește outreach” pe un eveniment, „Scrie e-mail” pe un contact sau cere-i Concierge-ului AI." : "Mesajele apar aici pe măsură ce le muți."}</p></div>` : `<div class="drafts">${list.map(draftCard).join("")}</div>`}`;
   }
 
   function draftCard(d) {
-    const o = orgById(d.orgId), e = evById(d.eventId);
+    const o = orgById(d.orgId), e = evById(d.eventId), c = S.contacts.find(x => x.id === d.contactId);
     const ro = d.status !== "de_aprobat";
     const step = d.step === 2 ? `<span class="pill gold">follow-up</span>` : `<span class="pill info">primul contact</span>`;
+    const emailsForOrg = S.contacts.filter(x => x.orgId === d.orgId && x.email);
     let foot = "";
     if (d.status === "de_aprobat") foot = `
       <button class="btn primary" data-act="approve" data-id="${d.id}">Aprobă</button>
       <button class="btn" data-act="ai-rewrite" data-id="${d.id}" data-mode="scurt">Mai scurt</button>
       <button class="btn" data-act="ai-rewrite" data-id="${d.id}" data-mode="en">În engleză</button>
-      <button class="btn" data-act="save-draft" data-id="${d.id}">Salvează modificările</button>
-      <span class="spacer"></span>
-      <button class="btn danger" data-act="reject" data-id="${d.id}">Respinge</button>`;
+      <button class="btn" data-act="ai-rewrite" data-id="${d.id}" data-mode="lux">Adaugă oferta de lux</button>
+      <button class="btn" data-act="save-draft" data-id="${d.id}">Salvează</button>
+      <span class="spacer"></span><button class="btn danger" data-act="reject" data-id="${d.id}">Respinge</button>`;
     else if (d.status === "aprobat") foot = `
       <a class="btn primary" href="${gmailUrl(d)}" target="_blank" rel="noopener">Deschide în Gmail</a>
       <a class="btn" href="${outlookUrl(d)}" target="_blank" rel="noopener">Deschide în Outlook</a>
       <button class="btn" data-act="copy" data-id="${d.id}">Copiază textul</button>
-      <span class="spacer"></span>
-      <button class="btn primary" data-act="mark-sent" data-id="${d.id}">Am trimis</button>`;
+      <span class="spacer"></span><button class="btn primary" data-act="mark-sent" data-id="${d.id}">Am trimis</button>`;
     else if (d.status === "trimis") foot = `
       <span class="note">Trimis ${esc(fmtD(d.sentAt))}${d.followUpAt ? ` · follow-up ${esc(fmtD(d.followUpAt))}` : ""}${d.repliedAt ? ` · răspuns ${esc(fmtD(d.repliedAt))}` : ""}</span>
-      <span class="spacer"></span>
-      ${d.repliedAt ? "" : `<button class="btn" data-act="replied" data-id="${d.id}">A răspuns</button>`}
-      ${d.repliedAt || d.followUpDone ? "" : `<button class="btn primary" data-act="followup" data-id="${d.id}">Scrie follow-up</button>`}`;
+      <span class="spacer"></span>${d.repliedAt ? "" : `<button class="btn" data-act="replied" data-id="${d.id}">A răspuns</button>`}${d.repliedAt || d.followUpDone ? "" : `<button class="btn primary" data-act="followup" data-id="${d.id}">Scrie follow-up</button>`}`;
     else foot = `<span class="spacer"></span><button class="btn" data-act="restore" data-id="${d.id}">Readu la aprobare</button>`;
     return `<article class="draft" id="dr-${esc(d.id)}">
-      <div class="draft-head"><h3>${esc(o?.name || "Companie")}</h3>${step}${e ? `<span class="tag">${esc(e.title)} · ${esc(fmtD(e.start))}</span>` : ""}<span class="mono muted" style="margin-left:auto">${esc(d.lang || "ro").toUpperCase()}</span></div>
+      <div class="draft-head"><h3>${esc(c?.name ? `${c.name} · ${o?.name || ""}` : o?.name || "Companie")}</h3>${step}${e ? `<span class="tag">${esc(e.title)} · ${esc(fmtD(e.start))}</span>` : ""}<span class="mono muted" style="margin-left:auto">${esc(d.lang || "en").toUpperCase()}</span></div>
       <div class="draft-body">
         ${d.rationale ? `<div class="ctx">${esc(d.rationale)}</div>` : ""}
         ${!S.config?.company ? `<div class="note">Câmpurile {{company}} și {{signature}} se completează singure după ce salvezi <a href="#setup">Setările</a>.</div>` : ""}
-        <div class="field"><label for="to-${d.id}">Către</label><input id="to-${d.id}" value="${esc(d.to || o?.publicEmail || "")}" placeholder="adresa verificată (vezi rutele de contact ale companiei)" ${ro ? "readonly" : ""}></div>
+        <div class="field"><label for="to-${d.id}">Către</label><input id="to-${d.id}" list="dl-${d.id}" value="${esc(d.to || "")}" placeholder="alege un contact sau scrie adresa" ${ro ? "readonly" : ""}>
+          <datalist id="dl-${d.id}">${emailsForOrg.map(x => `<option value="${esc(x.email)}">${esc(x.name || x.role || "")}</option>`).join("")}</datalist></div>
         <div class="field"><label for="su-${d.id}">Subiect</label><input id="su-${d.id}" value="${esc(fill(d.subject))}" ${ro ? "readonly" : ""}></div>
         <div class="field"><label for="bo-${d.id}">Mesaj</label><textarea id="bo-${d.id}" ${ro ? "readonly" : ""}>${esc(fill(d.body))}</textarea></div>
       </div>
       <div class="draft-foot">${foot}</div>
     </article>`;
   }
-
   const gmailUrl = (d) => `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(d.to || "")}&su=${encodeURIComponent(fill(d.subject))}&body=${encodeURIComponent(fill(d.body))}`;
   const outlookUrl = (d) => `https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(d.to || "")}&subject=${encodeURIComponent(fill(d.subject))}&body=${encodeURIComponent(fill(d.body))}`;
-
-  function dueFollowUps() {
-    const t = iso(today());
-    return S.drafts.filter(d => d.status === "trimis" && !d.repliedAt && !d.followUpDone && d.followUpAt && d.followUpAt <= t);
-  }
+  const dueFollowUps = () => { const t = iso(today()); return S.drafts.filter(d => d.status === "trimis" && !d.repliedAt && !d.followUpDone && d.followUpAt && d.followUpAt <= t); };
 
   function viewPipeline() {
     const due = dueFollowUps();
@@ -567,61 +839,60 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
       const items = S.orgs.filter(o => (o.status || "nou") === k).filter(o => matchesQ(o.name, o.hq));
       return `<div class="col"><h4><span>${v}</span><span>${items.length}</span></h4>${items.map(o => {
         const last = S.drafts.filter(d => d.orgId === o.id && d.sentAt).sort((a, b) => b.sentAt.localeCompare(a.sentAt))[0];
-        return `<div class="card"><div class="t">${esc(o.name)}</div><div class="s">${esc(ORG_TYPES[o.type] || "")}${last ? ` · ultimul e-mail ${esc(fmtD(last.sentAt))}` : ""}</div>
-          <select data-act="stage" data-id="${esc(o.id)}" aria-label="Etapă pentru ${esc(o.name)}">${STAGES.map(([sk, sv]) => `<option value="${sk}" ${k === sk ? "selected" : ""}>${sv}</option>`).join("")}</select></div>`;
+        return `<div class="card"><div class="t">${esc(o.name)}</div><div class="s">${esc(ORG_TYPES[o.type] || "")}${last ? ` · ultimul e-mail ${esc(fmtD(last.sentAt))}` : ""}</div><select data-act="stage" data-id="${esc(o.id)}" aria-label="Etapă pentru ${esc(o.name)}">${STAGES.map(([sk, sv]) => `<option value="${sk}" ${k === sk ? "selected" : ""}>${sv}</option>`).join("")}</select></div>`;
       }).join("")}</div>`;
     }).join("");
     return `
-      <div class="view-head"><div class="grow">
-        <div class="eyebrow">CRM</div>
-        <h1>Cine a răspuns și cui îi scriem din nou</h1>
-        <p>Muți compania între etape din meniul fiecărei carduri. Follow-up-ul apare aici automat la ${FOLLOW_UP_DAYS} zile după un e-mail trimis fără răspuns.</p>
-      </div></div>
+      <div class="view-head"><div class="grow"><div class="eyebrow">CRM</div><h1>Cine a răspuns și cui îi scriem din nou</h1>
+        <p>Muți compania între etape din meniul fiecărui card. Follow-up-ul apare automat la ${FOLLOW_UP_DAYS} zile după un e-mail trimis fără răspuns.</p></div></div>
       <section class="followups"><div class="eyebrow" style="margin-bottom:10px">Follow-up scadent · ${due.length}</div>
         ${due.length ? due.map(d => { const o = orgById(d.orgId); return `<div class="fu"><span class="pill hot">scadent ${esc(fmtD(d.followUpAt))}</span><span class="t">${esc(o?.name || "")} · ${esc(fill(d.subject))}</span><button class="btn sm" data-act="replied" data-id="${d.id}">A răspuns</button><button class="btn primary sm" data-act="followup" data-id="${d.id}">Scrie follow-up</button></div>`; }).join("") : `<div class="note">Niciun follow-up scadent azi.</div>`}
       </section>
       ${S.ready ? `<div class="board">${cols}</div>` : emptyLoading()}`;
   }
 
+  function viewServices() {
+    return `
+      <div class="view-head"><div class="grow"><div class="eyebrow">Portofoliu · ce putem oferi</div><h1>Protecție și tot ce ține de lux, într-o singură ofertă</h1>
+        <p>Pe lângă close protection: mașini, private jet, elicopter, hoteluri, yachturi, ceasuri și acces la evenimente, prin partenerii voștri. Ce scrieți aici folosește AI-ul când propune oferte integrate în e-mailuri.</p></div>
+        <button class="btn" data-act="edit-services">Editează serviciile și partenerii</button></div>
+      <div class="services">${services().map(s => `<div class="svc"><span class="k">${esc(s.kind)}</span><h3>${esc(s.name)}</h3><p>${esc(s.desc)}</p><div class="partners"><span class="lbl">Parteneri</span><br>${s.partners ? esc(s.partners) : `<span class="muted">Adaugă partenerii voștri</span>`}</div></div>`).join("")}</div>`;
+  }
+
   function viewAlerts() {
     const list = [...S.alerts].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
     const unread = list.filter(a => !a.read).length;
+    const reqs = [...S.requests].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
     return `
-      <div class="view-head"><div class="grow">
-        <div class="eyebrow">Notificări</div>
-        <h1>Ce s-a schimbat de la ultima vizită</h1>
-        <p>Cercetarea de dimineață adaugă aici evenimentele noi, schimbările de dată și drafturile pregătite. Primești și o notificare push pe telefon.</p>
-      </div>${unread ? `<button class="btn" data-act="read-all">Marchează toate ca citite</button>` : ""}</div>
-      ${!S.ready ? emptyLoading() : list.length === 0 ? `<div class="empty"><h3>Nicio notificare</h3><p>Prima vine după rularea de mâine dimineață.</p></div>` :
+      <div class="view-head"><div class="grow"><div class="eyebrow">Noutăți</div><h1>Ce a găsit radarul</h1>
+        <p>La fiecare două zile, cercetarea adaugă aici evenimentele noi, schimbările de dată, contactele și drafturile pregătite. Primești și o notificare push pe telefon.</p></div>
+        ${unread ? `<button class="btn" data-act="read-all">Marchează toate ca citite</button>` : ""}</div>
+      ${!S.ready ? emptyLoading() : list.length === 0 ? `<div class="empty"><h3>Nicio noutate</h3></div>` :
       `<div class="alerts">${list.map(a => `<div class="alert ${a.read ? "" : "unread"}"><span class="dot"></span><div><div class="t">${esc(a.title)}</div><div class="x">${esc(a.text)}</div><div class="mono muted" style="margin-top:4px">${esc(fmtD((a.createdAt || "").slice(0, 10)))}</div></div>
-        <div class="row">${a.link ? `<button class="btn sm" data-act="alert-open" data-id="${a.id}">Deschide</button>` : ""}${a.read ? "" : `<button class="btn ghost sm" data-act="alert-read" data-id="${a.id}">Citit</button>`}</div></div>`).join("")}</div>`}`;
+        <div class="row">${a.link ? `<button class="btn sm" data-act="alert-open" data-id="${esc(a.id)}">Deschide</button>` : ""}${a.read ? "" : `<button class="btn ghost sm" data-act="alert-read" data-id="${esc(a.id)}">Citit</button>`}</div></div>`).join("")}</div>`}
+      ${reqs.length ? `<div class="panel"><h3>Cereri de cercetare trimise radarului</h3><ul>${reqs.map(r => `<li>${esc(r.question)} · <span class="mono">${r.status === "rezolvat" ? "rezolvat" : "în așteptare"}</span>${r.answer ? ` · ${esc(r.answer)}` : ""}</li>`).join("")}</ul></div>` : ""}`;
   }
 
   function viewSetup() {
     const c = S.config || {};
-    const f = (id, label, ph, full) => `<div class="field ${full ? "full" : ""}"><label for="cfg-${id}">${label}</label><input id="cfg-${id}" value="${esc(c[id] || "")}" placeholder="${esc(ph)}"></div>`;
+    const f = (id, label, ph) => `<div class="field"><label for="cfg-${id}">${label}</label><input id="cfg-${id}" value="${esc(c[id] || "")}" placeholder="${esc(ph)}"></div>`;
     return `
-      <div class="view-head"><div class="grow">
-        <div class="eyebrow">Setări</div>
-        <h1>Identitatea din e-mailuri</h1>
-        <p>Aceste date se pun automat în fiecare draft. Până le completezi, drafturile arată locurile goale între paranteze drepte.</p>
-      </div></div>
+      <div class="view-head"><div class="grow"><div class="eyebrow">Setări</div><h1>Identitatea din e-mailuri</h1>
+        <p>Aceste date se pun automat în fiecare draft. Până le completezi, drafturile păstrează locurile goale și nu pot fi aprobate.</p></div></div>
       <form id="cfgForm" class="settings">
-        ${f("company", "Numele companiei", "ex. … Close Protection")}
-        ${f("sender", "Cine semnează", "Nume Prenume")}
-        ${f("title", "Funcția", "Managing Director")}
-        ${f("base", "Baza de operare", "București")}
-        ${f("phone", "Telefon", "+40 …")}
-        ${f("website", "Site", "https://…")}
-        <div class="field full"><label for="cfg-signature">Semnătura completă</label><textarea id="cfg-signature" style="min-height:110px" placeholder="Nume&#10;Funcție, Companie&#10;Telefon · site">${esc(c.signature || "")}</textarea></div>
-        <div class="field full"><label for="cfg-pitch">Ce vă diferențiază (folosit de AI în drafturi)</label><textarea id="cfg-pitch" style="min-height:110px" placeholder="ex. echipe vorbitoare de engleză/franceză/italiană, ex-forțe speciale, licențe în UE, acoperire 24/7, advance & recon, transport blindat…">${esc(c.pitch || "")}</textarea></div>
+        ${f("company", "Numele companiei", "ex. … Close Protection")}${f("sender", "Cine semnează", "Nume Prenume")}
+        ${f("title", "Funcția", "Managing Director")}${f("base", "Baza de operare", "București")}
+        ${f("phone", "Telefon", "+40 …")}${f("website", "Site", "https://…")}
+        <div class="field full"><label for="cfg-signature">Semnătura completă</label><textarea id="cfg-signature" style="min-height:110px">${esc(c.signature || "")}</textarea></div>
+        <div class="field full"><label for="cfg-pitch">Ce vă diferențiază (folosit de AI)</label><textarea id="cfg-pitch" style="min-height:110px" placeholder="ex. echipe vorbitoare de engleză/franceză/italiană, licențe în UE, flotă blindată, parteneri aviație…">${esc(c.pitch || "")}</textarea></div>
         <div class="row full"><button class="btn primary" type="submit">Salvează</button></div>
       </form>
-      <div class="panel"><h3>Reguli de lucru incluse</h3><ul>
-        <li>Fiecare eveniment și fiecare companie au sursa publică și data verificării. Ce nu e confirmat oficial apare „de reconfirmat”.</li>
-        <li>Nu inventăm adrese. Folosim adresele publicate de companie sau persoane găsite în surse publice, marcate ca atare.</li>
-        <li>Fiecare e-mail are o frază de dezabonare. Companiile marcate „nu contacta” nu mai primesc drafturi (GDPR).</li>
-        <li>Monitorizăm evenimente și companii, nu mișcările persoanelor private.</li>
+      <div class="panel"><h3>Cum lucrează radarul</h3><ul>
+        <li>Rulează la două zile dimineața, caută în surse publice (organizatori, presă, calendare oficiale, liste de bilete) și scrie aici noutățile.</li>
+        <li>Ce nu e confirmat de organizator sau de două surse independente apare „de reconfirmat”.</li>
+        <li>Contactele sunt doar date de business publicate (site-ul companiei, comunicate, directoare). Nu inventăm adrese și nu colectăm numere personale ale persoanelor private.</li>
+        <li>Fiecare e-mail are o frază de dezabonare; companiile marcate „nu contacta” nu mai primesc drafturi (GDPR).</li>
+        <li>Monitorizăm evenimente, companii și cereri publice, nu deplasările persoanelor.</li>
       </ul></div>`;
   }
 
@@ -633,87 +904,94 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
     L.innerHTML = `<div class="scrim" id="scrim"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`;
     $("#scrim").addEventListener("click", (ev) => { if (ev.target.id === "scrim") closeModal(); });
     onMount?.($(".modal", L));
-    $(".modal input, .modal select, .modal textarea, .modal button", L)?.focus();
+    $(".modal input, .modal select, .modal textarea", L)?.focus();
   }
   const closeModal = () => { $("#layer").innerHTML = ""; };
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { if ($("#layer").innerHTML) closeModal(); else closeAI(); } });
 
-  function openDraftComposer({ eventId, orgId }) {
+  function openDraftComposer({ eventId, orgId, contactId }) {
+    const c = contactId ? S.contacts.find(x => x.id === contactId) : null;
+    if (c) orgId = c.orgId;
     const e = evById(eventId);
-    const orgs = (e ? (e.targets || []).map(orgById).filter(Boolean) : S.orgs).filter(o => !o.dnc);
-    const evOpts = S.events.filter(x => daysTo(x.end || x.start) >= 0).sort((a, b) => a.start.localeCompare(b.start));
+    const orgs = (orgId ? [orgById(orgId)] : e ? (e.targets || []).map(orgById) : S.orgs).filter(o => o && !o.dnc);
+    const evOpts = S.events.filter(live).sort((a, b) => a.start.localeCompare(b.start));
+    const ctOpts = (oid) => [`<option value="">Fără persoană anume</option>`, ...S.contacts.filter(x => x.orgId === oid && x.email).map(x => `<option value="${esc(x.id)}" ${x.id === contactId ? "selected" : ""}>${esc(x.name || ROLE_CATS[x.roleCat] || "")} · ${esc(x.email)}</option>`)].join("");
     modal(`
-      <div class="eyebrow">Draft nou</div>
-      <h2>Pregătește un e-mail personalizat</h2>
-      <p class="muted" style="margin:0">AI-ul scrie pe baza companiei, a evenimentului și a setărilor tale. Draftul intră în „De aprobat”; nimic nu se trimite singur.</p>
+      <div class="eyebrow">Draft nou</div><h2>Pregătește un e-mail personalizat</h2>
+      <p class="muted" style="margin:0">AI-ul scrie pe baza persoanei, companiei, evenimentului și serviciilor voastre. Draftul intră în „De aprobat”; nimic nu se trimite singur.</p>
       <div class="grid">
-        <div class="field"><label for="dc-org">Companie</label><select id="dc-org">${(orgId ? [orgById(orgId)] : orgs).filter(Boolean).map(o => `<option value="${o.id}">${esc(o.name)} · ${esc(ORG_TYPES[o.type] || "")}</option>`).join("")}</select></div>
-        <div class="field"><label for="dc-ev">Eveniment-ancoră</label><select id="dc-ev"><option value="">Fără eveniment (prezentare generală)</option>${evOpts.map(x => `<option value="${x.id}" ${x.id === eventId ? "selected" : ""}>${esc(fmtD(x.start))} · ${esc(x.title)}</option>`).join("")}</select></div>
-        <div class="field"><label for="dc-lang">Limba</label><select id="dc-lang"><option value="en">Engleză</option><option value="ro">Română</option><option value="fr">Franceză</option><option value="it">Italiană</option><option value="de">Germană</option></select></div>
-        <div class="field"><label for="dc-note">Indicații pentru acest mesaj (opțional)</label><input id="dc-note" placeholder="ex. menționează echipa vorbitoare de franceză"></div>
-        <div class="row"><button class="btn primary" id="dc-go">Scrie draftul</button><button class="btn ghost" id="dc-tpl">Folosește șablonul fără AI</button><button class="btn ghost" id="dc-x">Renunță</button><span class="note" id="dc-st"></span></div>
+        <div class="field"><label for="dc-org">Companie</label><select id="dc-org">${orgs.map(o => `<option value="${esc(o.id)}" ${o.id === orgId ? "selected" : ""}>${esc(o.name)} · ${esc(ORG_TYPES[o.type] || "")}</option>`).join("")}</select></div>
+        <div class="field"><label for="dc-ct">Persoană</label><select id="dc-ct">${ctOpts(orgId || orgs[0]?.id)}</select></div>
+        <div class="field"><label for="dc-ev">Eveniment-ancoră</label><select id="dc-ev"><option value="">Fără eveniment (prezentare generală)</option>${evOpts.map(x => `<option value="${esc(x.id)}" ${x.id === eventId ? "selected" : ""}>${esc(fmtD(x.start))} · ${esc(x.title)} (${esc(x.cc || "")})</option>`).join("")}</select></div>
+        <div class="field"><label for="dc-offer">Ce oferim în mesaj</label><select id="dc-offer"><option value="cp">Doar protecție</option><option value="bundle">Protecție + servicii de lux (auto, jet, elicopter, hotel)</option><option value="lux">Concierge de lux (fără accent pe securitate)</option></select></div>
+        <div class="field"><label for="dc-lang">Limba</label><select id="dc-lang"><option value="en">Engleză</option><option value="ro">Română</option><option value="fr">Franceză</option><option value="it">Italiană</option><option value="de">Germană</option><option value="ar">Arabă</option></select></div>
+        <div class="field"><label for="dc-note">Indicații (opțional)</label><input id="dc-note" placeholder="ex. menționează echipa vorbitoare de franceză"></div>
+        <div class="row"><button class="btn primary" id="dc-go">Scrie draftul</button><button class="btn ghost" id="dc-tpl">Șablon fără AI</button><button class="btn ghost" id="dc-x">Renunță</button><span class="note" id="dc-st"></span></div>
       </div>`, (m) => {
-      if (orgId) { const o = orgById(orgId); const linked = S.events.find(x => (x.targets || []).includes(orgId) && daysTo(x.start) >= 0); if (linked && !eventId) $("#dc-ev", m).value = linked.id; if (o?.lang) $("#dc-lang", m).value = o.lang; }
+      const sync = () => { const oid = $("#dc-org", m).value; $("#dc-ct", m).innerHTML = ctOpts(oid); if (!eventId) { const linked = S.events.filter(live).find(x => (x.targets || []).includes(oid)); $("#dc-ev", m).value = linked ? linked.id : ""; } };
+      $("#dc-org", m).onchange = sync; if (!contactId) sync();
       $("#dc-x", m).onclick = closeModal;
-      $("#dc-tpl", m).onclick = () => createDraft({ orgId: $("#dc-org", m).value, eventId: $("#dc-ev", m).value, lang: $("#dc-lang", m).value, useAI: false });
-      $("#dc-go", m).onclick = async () => {
-        $("#dc-go", m).disabled = true; $("#dc-st", m).textContent = "Scriu…";
-        await createDraft({ orgId: $("#dc-org", m).value, eventId: $("#dc-ev", m).value, lang: $("#dc-lang", m).value, note: $("#dc-note", m).value, useAI: true });
-      };
+      const args = () => ({ orgId: $("#dc-org", m).value, contactId: $("#dc-ct", m).value, eventId: $("#dc-ev", m).value, lang: $("#dc-lang", m).value, offer: $("#dc-offer", m).value, note: $("#dc-note", m).value });
+      $("#dc-tpl", m).onclick = () => createDraft({ ...args(), useAI: false });
+      $("#dc-go", m).onclick = async () => { $("#dc-go", m).disabled = true; $("#dc-st", m).textContent = "Scriu… (10–40 secunde)"; await createDraft({ ...args(), useAI: true }); $("#dc-go", m) && ($("#dc-go", m).disabled = false); };
     });
   }
 
-  function template(o, e, lang) {
+  function template(o, e, lang, c, offer) {
     const evLine = e ? `${e.title} (${range(e.start, e.end)}${e.title.includes(e.city) ? "" : ", " + e.city})` : "";
+    const greet = c?.name ? c.name.split(" ")[0] : null;
+    const bundleEn = offer !== "cp" ? "Alongside protection, we can arrange chauffeured and armoured cars, private jet and helicopter transfers, hotels, villas and yachts through our partners, so your team has one point of contact.\n\n" : "";
+    const bundleRo = offer !== "cp" ? "Pe lângă protecție, putem organiza prin partenerii noștri mașini cu șofer și blindate, transferuri cu jet privat și elicopter, hoteluri, vile și yachturi, cu un singur punct de contact.\n\n" : "";
     if (lang === "ro") return {
-      subject: e ? `Protecție discretă pentru ${e.title}` : `Protecție apropiată pentru clienții ${o.name}`,
-      body: `Bună ziua,\n\nVă scriu din partea {{company}}. Oferim protecție apropiată discretă pentru clienți privați, artiști și delegații de business, cu echipe gata de deplasare în Europa și în afara ei.\n\n${e ? `Știm că ${evLine} aduce în zonă oaspeți cu profil înalt. Dacă aveți clienți sau artiști care participă, putem prelua advance-ul, transferurile și protecția pe toată durata șederii.\n\n` : ""}${o.pitchHook ? o.pitchHook + "\n\n" : ""}Ați fi deschis la o discuție de 15 minute săptămâna viitoare?\n\nCu stimă,\n{{signature}}\n\nDacă nu doriți să mai primiți mesaje de la noi, răspundeți cu „stop” și vă scoatem din listă.`
+      subject: e ? `Protecție discretă pentru ${e.title}` : `Protecție și servicii private pentru ${o.name}`,
+      body: `Bună ziua${greet ? `, ${greet}` : ""},\n\nVă scriu din partea {{company}}. Oferim protecție apropiată discretă pentru clienți privați, familii, artiști și delegații, cu echipe gata de deplasare în Europa și în afara ei.\n\n${e ? `${evLine} aduce în zonă oaspeți cu profil înalt. Dacă aveți clienți sau artiști care participă, putem prelua advance-ul, transferurile și protecția pe toată durata șederii.\n\n` : ""}${bundleRo}Ați fi deschis la o discuție de 15 minute săptămâna viitoare?\n\nCu stimă,\n{{signature}}\n\nDacă nu doriți să mai primiți mesaje de la noi, răspundeți cu „stop”.`
     };
     return {
-      subject: e ? `Close protection for ${e.title}` : `Discreet close protection for ${o.name} clients`,
-      body: `Dear ${o.greeting || "team"},\n\nI'm writing from {{company}}. We provide discreet close protection for private clients, artists and business delegations, with teams ready to deploy across Europe and beyond.\n\n${e ? `With ${evLine} coming up, if any of your clients or talent will attend, we can handle the advance work, secure transfers and protection for the full stay.\n\n` : ""}${o.pitchHook ? o.pitchHook + "\n\n" : ""}Would you be open to a 15-minute call next week?\n\nKind regards,\n{{signature}}\n\nIf you'd rather not hear from us again, reply "stop" and we'll remove you.`
+      subject: e ? `Close protection for ${e.title}` : `Discreet protection and private services for ${o.name}`,
+      body: `Dear ${greet || o.greeting || "team"},\n\nI'm writing from {{company}}. We provide discreet close protection for private clients, families, artists and business delegations, with teams ready to deploy across Europe and beyond.\n\n${e ? `With ${evLine} coming up, if any of your clients or talent will attend, we can take on the advance work, secure transfers and protection for the full stay.\n\n` : ""}${bundleEn}Would you be open to a 15-minute call next week?\n\nKind regards,\n{{signature}}\n\nIf you'd rather not hear from us again, reply "stop" and we'll remove you.`
     };
   }
 
-  async function createDraft({ orgId, eventId, lang, note, useAI }) {
-    const o = orgById(orgId), e = evById(eventId);
-    if (!o) return;
-    let out = template(o, e, lang), rationale = e ? `Ancoră: ${e.title}, ${fmtD(e.start)} · ${e.city}. Advance recomandat înainte de ${fmtD(iso(addDays(parseD(e.start), -(e.advanceDays || 21))))}.` : `Prezentare generală pentru ${ORG_TYPES[o.type] || o.type}.`;
-    if (useAI && sample) {
+  async function createDraft({ orgId, contactId, eventId, lang, offer = "cp", note, useAI, subject, body, quiet }) {
+    const o = orgById(orgId), e = evById(eventId), c = S.contacts.find(x => x.id === contactId);
+    if (!o) return null;
+    let out = subject && body ? { subject, body } : template(o, e, lang, c, offer);
+    const rationale = e ? `Ancoră: ${e.title}, ${fmtD(e.start)} · ${e.city}, ${evCountry(e)}. Advance recomandat înainte de ${fmtD(iso(addDays(parseD(e.start), -(e.advanceDays || 21))))}.` : `Prezentare generală pentru ${ORG_TYPES[o.type] || o.type}.`;
+    if (useAI && sample && !(subject && body)) {
       try {
-        const c = S.config || {};
+        const cfg = S.config || {};
+        const svc = services().map(s => `${s.name}${s.partners ? ` (parteneri: ${s.partners})` : ""}`).join("; ");
         const res = await sample.json(
-`You write first-contact B2B emails for a close protection (executive protection) company. Write ONE email.
-Rules: language = ${lang}. 110-170 words. Warm, discreet, senior tone; no hype, no fear-mongering, no invented facts, no invented names, no claims about the recipient's clients that are not in the data. Mention the event only as public information. Offer a 15-minute call. Sign with the literal placeholder {{signature}} and refer to the company as {{company}} unless a name is given. End with a one-line opt-out ("reply stop") in the same language.
+`You write first-contact B2B emails for a close protection and private luxury services company. Write ONE email.
+Rules: language = ${lang}. 110-170 words. Warm, discreet, senior tone; no hype, no fear-mongering, no invented facts or names. Mention the event only as public information. Offer a 15-minute call. Sign with the literal placeholder {{signature}} and refer to the company as {{company}} unless a name is given. End with a one-line opt-out ("reply stop") in the same language.
+Offer focus: ${offer === "cp" ? "close protection only" : offer === "bundle" ? "close protection plus one short sentence on luxury logistics through partners (cars, private jet, helicopter, hotels, yachts)" : "private luxury concierge (cars, jet, helicopter, hotels, yachts, watches, event access) with protection as a quiet extra"}.
 Return JSON: {"subject": string, "body": string}.
 
-Sender company: ${c.company || "{{company}}"}; base: ${c.base || "Bucharest"}; differentiators: ${c.pitch || "discreet, multilingual teams; advance and recon; secure transfers; 24/7"}.
-Recipient organisation: ${o.name} (${ORG_TYPES[o.type] || o.type}, ${o.hq || ""}). Why they need protection: ${o.why || ""}. ${o.pitchHook ? "Angle: " + o.pitchHook : ""}
-${e ? `Anchor event: ${e.title}, ${range(e.start, e.end)} ${parseD(e.start).getFullYear()}, ${e.venue || ""} ${e.city}, ${e.country}. Context: ${e.angle}` : "No anchor event: general introduction."}
+Sender: ${cfg.company || "{{company}}"}; base: ${cfg.base || "Bucharest"}; differentiators: ${cfg.pitch || "discreet multilingual teams; advance and recon; secure transfers; 24/7"}. Services: ${svc}.
+Recipient organisation: ${o.name} (${ORG_TYPES[o.type] || o.type}, ${o.hq || ""}). Why relevant: ${o.why || ""}.
+${c ? `Recipient person: ${c.name || "(no name)"}, ${c.role || ""}. Greet them by first name if a name is given.` : "No named person: greet the team."}
+${e ? `Anchor event: ${e.title}, ${range(e.start, e.end)} ${parseD(e.start).getFullYear()}, ${e.venue || ""} ${e.city}, ${evCountry(e)}. Context: ${e.angle}` : "No anchor event: general introduction."}
 ${note ? "Extra instruction from the owner: " + note : ""}`, { modelTier: "default" });
         if (res?.subject && res?.body) out = res;
-      } catch (err) {
-        if (err?.code === "rate_limited") toast("AI-ul e ocupat; am folosit șablonul.");
-        else if (err?.code !== "not_granted") toast("AI indisponibil; am folosit șablonul.");
-      }
+      } catch (err) { toast(err?.code === "rate_limited" ? "AI-ul e ocupat; am folosit șablonul." : err?.code === "not_granted" ? "AI-ul nu are acordul tău; am folosit șablonul." : "AI indisponibil; am folosit șablonul."); }
     }
     const id = newId("dr");
-    const ok = await put("drafts", id, { orgId, eventId: eventId || "", lang, subject: out.subject, body: out.body, to: o.publicEmail || "", status: "de_aprobat", step: 1, rationale, createdAt: new Date().toISOString(), by: useAI ? "ai" : "sablon" });
-    if (ok) { closeModal(); S.f.sub = "de_aprobat"; location.hash = "#approvals"; toast("Draft pregătit pentru aprobare"); }
+    const ok = await put("drafts", id, { orgId, contactId: contactId || "", eventId: eventId || "", lang, offer, subject: out.subject, body: out.body, to: c?.email || "", status: "de_aprobat", step: 1, rationale, createdAt: new Date().toISOString(), by: useAI ? "ai" : "sablon" });
+    if (ok && !quiet) { closeModal(); S.f.sub = "de_aprobat"; location.hash = "#approvals"; toast("Draft pregătit pentru aprobare"); }
+    return ok ? id : null;
   }
 
   function openOrgEditor(o) {
-    const isNew = !o; o = o || { name: "", type: "family_office", hq: "", website: "", contactUrl: "", publicEmail: "", why: "", score: 60, roles: [], status: "nou" };
+    const isNew = !o; o = o || { name: "", type: "family_office", hq: "", cc: "", website: "", why: "", score: 60, roles: [], status: "nou" };
     modal(`
       <div class="eyebrow">${isNew ? "Companie nouă" : "Editează"}</div><h2>${esc(o.name || "Adaugă o companie")}</h2>
       <form id="oe" class="grid">
         <div class="field"><label for="oe-name">Nume</label><input id="oe-name" required value="${esc(o.name)}"></div>
         <div class="field"><label for="oe-type">Tip</label><select id="oe-type">${Object.entries(ORG_TYPES).map(([k, v]) => `<option value="${k}" ${o.type === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
         <div class="field"><label for="oe-hq">Sediu</label><input id="oe-hq" value="${esc(o.hq)}"></div>
+        <div class="field"><label for="oe-cc">Țară (cod)</label><select id="oe-cc"><option value="">—</option>${Object.entries(COUNTRIES).map(([k, v]) => `<option value="${k}" ${o.cc === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
         <div class="field"><label for="oe-web">Site</label><input id="oe-web" value="${esc(o.website)}"></div>
-        <div class="field"><label for="oe-cu">Pagina de contact</label><input id="oe-cu" value="${esc(o.contactUrl)}"></div>
-        <div class="field"><label for="oe-em">E-mail public (doar dacă e publicat de companie)</label><input id="oe-em" value="${esc(o.publicEmail)}"></div>
-        <div class="field"><label for="oe-why">De ce au nevoie de protecție</label><textarea id="oe-why" style="min-height:90px">${esc(o.why)}</textarea></div>
+        <div class="field"><label for="oe-why">De ce e o țintă bună</label><textarea id="oe-why" style="min-height:90px">${esc(o.why)}</textarea></div>
         <div class="field"><label for="oe-roles">Roluri de căutat (separate prin virgulă)</label><input id="oe-roles" value="${esc((o.roles || []).join(", "))}"></div>
         <div class="field"><label for="oe-score">Scor (0–100)</label><input id="oe-score" type="number" min="0" max="100" value="${esc(o.score)}"></div>
         <label class="row"><input type="checkbox" id="oe-dnc" ${o.dnc ? "checked" : ""}> Nu contacta (a cerut dezabonare)</label>
@@ -722,31 +1000,158 @@ ${note ? "Extra instruction from the owner: " + note : ""}`, { modelTier: "defau
       $("#oe-x", m).onclick = closeModal;
       $("#oe", m).onsubmit = async (ev) => {
         ev.preventDefault();
-        const data = { ...o, name: $("#oe-name", m).value.trim(), type: $("#oe-type", m).value, hq: $("#oe-hq", m).value.trim(), website: $("#oe-web", m).value.trim(), contactUrl: $("#oe-cu", m).value.trim(), publicEmail: $("#oe-em", m).value.trim(), why: $("#oe-why", m).value.trim(), roles: $("#oe-roles", m).value.split(",").map(s => s.trim()).filter(Boolean), score: +$("#oe-score", m).value || 0, dnc: $("#oe-dnc", m).checked, updatedAt: new Date().toISOString() };
+        const data = { ...o, name: $("#oe-name", m).value.trim(), type: $("#oe-type", m).value, hq: $("#oe-hq", m).value.trim(), cc: $("#oe-cc", m).value, website: $("#oe-web", m).value.trim(), why: $("#oe-why", m).value.trim(), roles: $("#oe-roles", m).value.split(",").map(s => s.trim()).filter(Boolean), score: +$("#oe-score", m).value || 0, dnc: $("#oe-dnc", m).checked, updatedAt: new Date().toISOString() };
         const id = o.id || newId("org"); delete data.id;
-        if (!data.name) return;
-        if (await put("orgs", id, data)) { closeModal(); toast("Salvat"); }
+        if (data.name && await put("orgs", id, data)) { closeModal(); toast("Salvat"); }
       };
     });
+  }
+
+  function openContactEditor(orgId) {
+    modal(`
+      <div class="eyebrow">Contact nou</div><h2>Adaugă o persoană sau un canal</h2>
+      <form id="ce" class="grid">
+        <div class="field"><label for="ce-org">Companie</label><select id="ce-org">${[...S.orgs].sort((a, b) => a.name.localeCompare(b.name, "ro")).map(o => `<option value="${esc(o.id)}" ${o.id === orgId ? "selected" : ""}>${esc(o.name)}</option>`).join("")}</select></div>
+        <div class="field"><label for="ce-name">Nume (opțional)</label><input id="ce-name"></div>
+        <div class="field"><label for="ce-role">Funcție</label><input id="ce-role" placeholder="ex. Chief of Staff, Head of Events"></div>
+        <div class="field"><label for="ce-rc">Tip</label><select id="ce-rc">${Object.entries(ROLE_CATS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
+        <div class="field"><label for="ce-email">E-mail</label><input id="ce-email" type="email"></div>
+        <div class="field"><label for="ce-phone">Telefon</label><input id="ce-phone"></div>
+        <div class="field"><label for="ce-src">Sursa (link)</label><input id="ce-src" placeholder="unde e publicat contactul"></div>
+        <label class="row"><input type="checkbox" id="ce-ok"> L-am verificat (ex. am vorbit cu persoana)</label>
+        <div class="row"><button class="btn primary" type="submit">Salvează</button><button class="btn ghost" type="button" id="ce-x">Renunță</button></div>
+      </form>`, (m) => {
+      $("#ce-x", m).onclick = closeModal;
+      $("#ce", m).onsubmit = async (ev) => {
+        ev.preventDefault();
+        const oid = $("#ce-org", m).value;
+        const data = { orgId: oid, cc: orgById(oid)?.cc || "", name: $("#ce-name", m).value.trim(), role: $("#ce-role", m).value.trim(), roleCat: $("#ce-rc", m).value, email: $("#ce-email", m).value.trim(), phone: $("#ce-phone", m).value.trim(), source: $("#ce-src", m).value.trim(), status: $("#ce-ok", m).checked ? "verificat" : "de verificat", verified: iso(today()), by: "manual" };
+        if (!data.email && !data.phone && !data.name) { toast("Completează măcar numele, e-mailul sau telefonul."); return; }
+        if (await put("contacts", newId("ct"), data)) { closeModal(); toast("Contact salvat"); }
+      };
+    });
+  }
+
+  function openServicesEditor() {
+    const list = services();
+    modal(`
+      <div class="eyebrow">Portofoliu</div><h2>Servicii și parteneri</h2>
+      <form id="se" class="grid">
+        ${list.map((s, i) => `<div class="field"><label for="se-p-${i}">${esc(s.name)} · parteneri</label><input id="se-p-${i}" value="${esc(s.partners || "")}" placeholder="ex. nume partener, oraș"><input id="se-d-${i}" value="${esc(s.desc)}" aria-label="Descriere ${esc(s.name)}" style="margin-top:6px"></div>`).join("")}
+        <div class="row"><button class="btn primary" type="submit">Salvează</button><button class="btn ghost" type="button" id="se-x">Renunță</button></div>
+      </form>`, (m) => {
+      $("#se-x", m).onclick = closeModal;
+      $("#se", m).onsubmit = async (ev) => {
+        ev.preventDefault();
+        const items = list.map((s, i) => ({ ...s, partners: $(`#se-p-${i}`, m).value.trim(), desc: $(`#se-d-${i}`, m).value.trim() }));
+        if (await put("config", "services", { items })) { closeModal(); toast("Servicii salvate"); }
+      };
+    });
+  }
+
+  // ---------- Concierge AI ----------
+  const AI = { turns: [], busy: false, ctl: null };
+  try { AI.turns = JSON.parse(sessionStorage.getItem("perimetru.ai") || "[]"); } catch (e) {}
+  const saveAI = () => { try { sessionStorage.setItem("perimetru.ai", JSON.stringify(AI.turns.slice(-20))); } catch (e) {} };
+  const md = (t) => {
+    const lines = esc(t).split("\n"); let html = "", inList = false;
+    for (const l of lines) {
+      const b = l.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(https?:\/\/[^\s<)]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+      if (/^\s*[-•*]\s+/.test(l)) { if (!inList) { html += "<ul>"; inList = true; } html += `<li>${b.replace(/^\s*[-•*]\s+/, "")}</li>`; }
+      else { if (inList) { html += "</ul>"; inList = false; } if (b.trim()) html += `<p>${b.replace(/^#+\s*/, "")}</p>`; }
+    }
+    return html + (inList ? "</ul>" : "");
+  };
+  function openAI() {
+    if ($("#aiLayer").innerHTML) return;
+    $("#aiLayer").innerHTML = `<aside class="ai-panel" role="dialog" aria-label="Concierge AI">
+      <div class="ai-head"><div><div class="eyebrow">Asistent</div><h2>Concierge AI</h2></div><button class="btn ghost sm" id="aiClear">Conversație nouă</button><button class="icon-btn x" id="aiClose" aria-label="Închide">✕</button></div>
+      <div class="ai-log" id="aiLog"></div>
+      <form class="ai-form" id="aiForm"><textarea id="aiIn" rows="2" placeholder="Întreabă orice: evenimente, țări, contacte, strategie…"></textarea><button class="btn primary" id="aiSend" type="submit">Trimite</button></form>
+    </aside>`;
+    $("#aiClose").onclick = closeAI;
+    $("#aiClear").onclick = () => { AI.ctl?.abort(); AI.turns = []; saveAI(); renderAI(); };
+    $("#aiForm").onsubmit = (e) => { e.preventDefault(); askAI($("#aiIn").value); };
+    $("#aiIn").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); askAI($("#aiIn").value); } });
+    renderAI(); $("#aiIn").focus();
+  }
+  function closeAI() { $("#aiLayer").innerHTML = ""; }
+  function renderAI(streaming) {
+    const log = $("#aiLog"); if (!log) return;
+    const sugg = ["Ce evenimente sunt în Monaco și Franța în 2027?", "Care sunt cele mai bune 5 ținte pentru luna asta și de ce?", "Pe cine contactez pentru Snow Polo St. Moritz?", "Scrie un e-mail pentru Burgess Yachts despre Monaco GP, cu oferta de lux", "Cum ajungem la PA-urile și Chief of Staff-ii familiilor UHNW?"];
+    log.innerHTML = (AI.turns.length ? "" : `<div class="msg a"><p>Bună${S.me?.name ? ", " + esc(S.me.name.split(" ")[0]) : ""}. Știu tot ce e în aplicație: ${S.events.filter(live).length} evenimente în ${Object.keys(usedCountries()).length} țări, ${S.orgs.length} companii și ${S.contacts.length} contacte. Pot căuta, compara, propune strategie și scrie drafturi. Ce nu găsesc aici trimit la radar ca cerere de cercetare.</p></div><div class="ai-suggest">${sugg.map(s => `<button class="chip" data-ai-q="${esc(s)}">${esc(s)}</button>`).join("")}</div>`)
+      + AI.turns.map(t => t.role === "user" ? `<div class="msg u">${esc(t.content)}</div>` : `<div class="msg a">${md(t.content)}</div>`).join("")
+      + (streaming != null ? `<div class="msg a" id="aiLive">${streaming ? md(streaming) : "<p>Mă gândesc…</p>"}</div><div class="msg s" id="aiTool"></div>` : "");
+    log.scrollTop = log.scrollHeight;
+    const send = $("#aiSend"); if (send) { send.textContent = AI.busy ? "Oprește" : "Trimite"; send.type = AI.busy ? "button" : "submit"; send.onclick = AI.busy ? () => AI.ctl?.abort() : null; }
+  }
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-ai-q]"); if (b) askAI(b.dataset.aiQ); });
+
+  const evBrief = (e) => ({ id: e.id, title: e.title, category: CATS[catOf(e)], country: evCountry(e), cc: e.cc, city: e.city, venue: e.venue, start: e.start, end: e.end, confidence: e.confidence, tier: e.tier, needs: (e.needs || []).map(k => NEEDS[k]), angle: e.angle, targets: (e.targets || []).map(id => orgById(id)?.name).filter(Boolean), advance_by: iso(addDays(parseD(e.start), -(e.advanceDays || 21))), sources: (e.sources || []).map(s => s.url) });
+  const AI_TOOLS = [
+    { name: "find_events", description: "Search events in the app. Returns up to 40 upcoming events with dates, country, category, protection needs, angle, target companies and sources.", inputSchema: { type: "object", properties: { query: { type: "string", description: "free text over title/city/venue/angle" }, country_code: { type: "string", description: "ISO2 like FR, MC, RO" }, category: { type: "string", enum: Object.keys(CATS) }, from: { type: "string", description: "YYYY-MM-DD" }, to: { type: "string", description: "YYYY-MM-DD" } } },
+      execute: (i) => { const q = String(i.query || "").toLowerCase(); return S.events.filter(live).filter(e => !i.country_code || e.cc === String(i.country_code).toUpperCase()).filter(e => !i.category || catOf(e) === i.category).filter(e => !i.from || e.start >= i.from).filter(e => !i.to || e.start <= i.to).filter(e => !q || [e.title, e.city, e.venue, e.angle, evCountry(e)].join(" ").toLowerCase().includes(q)).sort((a, b) => a.start.localeCompare(b.start)).slice(0, 40).map(evBrief); } },
+    { name: "find_companies", description: "Search target companies. Returns id, name, type, HQ, score, pipeline stage, why, decision-maker roles and linked upcoming events.", inputSchema: { type: "object", properties: { query: { type: "string" }, type: { type: "string", enum: Object.keys(ORG_TYPES) } } },
+      execute: (i) => { const q = String(i.query || "").toLowerCase(); return S.orgs.filter(o => !i.type || o.type === i.type).filter(o => !q || [o.name, o.hq, o.why].join(" ").toLowerCase().includes(q)).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 30).map(o => ({ id: o.id, name: o.name, type: ORG_TYPES[o.type], hq: o.hq, score: o.score, stage: STAGE_LABEL[o.status || "nou"], dnc: !!o.dnc, why: o.why, roles: o.roles, events: S.events.filter(e => live(e) && (e.targets || []).includes(o.id)).map(e => `${e.start} ${e.title}`) })); } },
+    { name: "find_contacts", description: "Search contacts (people, roles, emails, phones) with their company, role category, verification status and source URL.", inputSchema: { type: "object", properties: { query: { type: "string" }, role_category: { type: "string", enum: Object.keys(ROLE_CATS) }, company_id: { type: "string" } } },
+      execute: (i) => { const q = String(i.query || "").toLowerCase(); return S.contacts.filter(c => !i.role_category || c.roleCat === i.role_category).filter(c => !i.company_id || c.orgId === i.company_id).filter(c => !q || [c.name, c.role, c.email, orgById(c.orgId)?.name].join(" ").toLowerCase().includes(q)).slice(0, 40).map(c => ({ id: c.id, name: c.name, role: c.role, category: ROLE_CATS[c.roleCat], company: orgById(c.orgId)?.name, company_id: c.orgId, email: c.email, phone: c.phone, status: c.status, source: c.source })); } },
+    { name: "pipeline_status", description: "Overview: counts per pipeline stage, drafts waiting for approval, sent emails without reply, follow-ups due, countries covered.", execute: () => ({ stages: Object.fromEntries(STAGES.map(([k, v]) => [v, S.orgs.filter(o => (o.status || "nou") === k).map(o => o.name)])), drafts_to_approve: S.drafts.filter(d => d.status === "de_aprobat").length, sent_no_reply: S.drafts.filter(d => d.status === "trimis" && !d.repliedAt).length, followups_due: dueFollowUps().map(d => orgById(d.orgId)?.name), countries: Object.fromEntries(Object.entries(usedCountries()).map(([k, v]) => [ccName(k), v.length])), services: services().map(s => s.name + (s.partners ? ` (${s.partners})` : "")) }) },
+    { name: "create_draft", description: "Create an email draft that goes to the approval queue (never sends). Provide company_id; optionally contact_id, event_id, language, and your own subject and body. Body must use {{company}} and {{signature}} placeholders and end with a reply-stop opt-out line. Returns the draft id.", inputSchema: { type: "object", properties: { company_id: { type: "string" }, contact_id: { type: "string" }, event_id: { type: "string" }, language: { type: "string" }, subject: { type: "string" }, body: { type: "string" } }, required: ["company_id"] },
+      execute: async (i) => { const o = orgById(String(i.company_id)); if (!o) throw new Error("unknown company_id"); if (o.dnc) throw new Error("company is marked do-not-contact"); const id = await createDraft({ orgId: o.id, contactId: String(i.contact_id || ""), eventId: String(i.event_id || ""), lang: String(i.language || "en"), offer: "bundle", subject: i.subject ? String(i.subject) : undefined, body: i.body ? String(i.body) : undefined, useAI: false, quiet: true }); if (!id) throw new Error("could not save draft"); return { draft_id: id, status: "waiting for approval in De aprobat" }; } },
+    { name: "request_research", description: "Ask the background radar (runs every two days with web search) to research something the app does not have yet: an event, a country, a person's public business contact, a company. Returns confirmation.", inputSchema: { type: "object", properties: { question: { type: "string" } }, required: ["question"] },
+      execute: async (i) => { const ok = await put("requests", newId("rq"), { question: String(i.question).slice(0, 600), status: "nou", createdAt: new Date().toISOString() }); if (!ok) throw new Error("could not save request"); return "Saved. The radar will answer in Noutăți at its next run."; } }
+  ];
+  async function askAI(text) {
+    text = String(text || "").trim(); if (!text || AI.busy) return;
+    if (!sample) { toast("Concierge AI nu e disponibil în această vizualizare."); return; }
+    if ($("#aiIn")) $("#aiIn").value = "";
+    AI.turns.push({ role: "user", content: text }); AI.busy = true; AI.ctl = new AbortController(); renderAI("");
+    const cfg = S.config || {};
+    const RULES = `Ești Concierge AI din „Perimetru”, aplicația internă a unei companii de close protection și servicii private de lux (${cfg.company || "numele companiei nu e încă setat"}, baza: ${cfg.base || "București"}). Utilizatorul e proprietarul sau fratele lui. Răspunde în română, concis, ca un consilier senior: concret, cu nume, date și pași următori. Azi este ${iso(today())}.
+Ai unelte care citesc datele aplicației (evenimente, companii, contacte, pipeline) și una care creează drafturi de e-mail pentru aprobare. Folosește-le ori de câte ori întrebarea atinge aceste date; citează data, țara și sursa când dai un eveniment. Poți folosi și cunoștințele tale generale (industrie, strategie, piețe, protocol), dar spune clar ce vine din aplicație și ce e cunoaștere generală. Nu poți naviga pe internet: pentru informații noi sau recente folosește request_research și spune-i utilizatorului că radarul răspunde la următoarea rulare.
+Nu inventa contacte, adrese de e-mail, telefoane sau date. Nu urmări persoane private și nu căuta date personale (adrese de domiciliu, telefoane personale, deplasări). Contactele legitime sunt date de business publicate. Nu trimite niciun e-mail: drafturile merg la „De aprobat”.
+Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})` : "")).join("; ")}.`;
+    let shown = "";
+    try {
+      const { text: answer } = await sample([{ role: "user", content: RULES }, { role: "assistant", content: "Înțeles. Sunt gata." }, ...AI.turns.slice(-12)], {
+        cache: false, signal: AI.ctl.signal, modelTier: "default",
+        tools: AI_TOOLS.map(t => ({ ...t, execute: async (input, ctx) => { const tl = $("#aiTool"); if (tl) tl.textContent = `caut: ${t.name.replace("_", " ")}…`; return t.execute(input, ctx); } })),
+        onText: ({ text: t }) => { shown = t; const el = $("#aiLive"); if (el) { el.innerHTML = md(t); const log = $("#aiLog"); log.scrollTop = log.scrollHeight; } }
+      });
+      AI.turns.push({ role: "assistant", content: answer || shown || "…" });
+    } catch (err) {
+      const keep = err?.text || shown;
+      if (keep) AI.turns.push({ role: "assistant", content: keep });
+      if (err?.code !== "cancelled") AI.turns.push({ role: "assistant", content: err?.code === "rate_limited" ? "Sunt ocupat acum. Încearcă din nou peste un minut." : err?.code === "not_granted" ? "Am nevoie de acordul tău ca să folosesc Claude din această pagină. Reîncearcă și apasă Permite." : "Nu am putut răspunde acum. Încearcă din nou." });
+    }
+    AI.busy = false; saveAI(); renderAI();
   }
 
   // ---------- actions ----------
   document.addEventListener("click", async (ev) => {
     const el = ev.target.closest("[data-act],[data-f],[data-go],[data-sub]");
-    if (!el) return;
+    if (!el || el.closest(".ai-panel") && !el.dataset.act) return;
     if (el.dataset.f) { S.f[el.dataset.f] = el.dataset.v; saveF(); render(); return; }
-    if (el.dataset.go) { if (el.dataset.h) { S.f.horizon = +el.dataset.h; saveF(); } location.hash = "#" + el.dataset.go; render(); return; }
+    if (el.dataset.go) { if (el.dataset.h) { S.f.horizon = +el.dataset.h; saveF(); } if (location.hash === "#" + el.dataset.go) render(); else location.hash = "#" + el.dataset.go; return; }
     if (el.dataset.sub) { S.f.sub = el.dataset.sub; render(); return; }
     const id = el.dataset.id, act = el.dataset.act;
     const d = S.drafts.find(x => x.id === id);
     const readEdits = () => ({ to: $(`#to-${id}`)?.value.trim() ?? d.to, subject: $(`#su-${id}`)?.value ?? d.subject, body: $(`#bo-${id}`)?.value ?? d.body });
+    const goTo = (hash, anchor) => { closeAI(); if (location.hash === hash) render(); else location.hash = hash; requestAnimationFrame(() => setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "center" }), 30)); };
     switch (act) {
+      case "clear-f": Object.assign(S.f, { cat: "all", need: "all", region: "all", cc: "all" }); saveF(); render(); break;
+      case "open-cc": S.f.cc = id; S.f.cat = "all"; S.f.need = "all"; S.f.region = "all"; saveF(); goTo("#countries"); window.scrollTo(0, 0); break;
       case "draft-event": openDraftComposer({ eventId: id }); break;
       case "draft-org": openDraftComposer({ orgId: id }); break;
+      case "draft-contact": openDraftComposer({ contactId: id }); break;
       case "new-org": openOrgEditor(null); break;
       case "edit-org": openOrgEditor(orgById(id)); break;
-      case "open-org": S.f.type = "all"; location.hash = "#targets"; render(); requestAnimationFrame(() => document.getElementById("org-" + id)?.scrollIntoView({ behavior: "smooth", block: "center" })); break;
-      case "open-ev": S.f.cat = "all"; S.f.region = "all"; S.f.horizon = 400; location.hash = "#radar"; render(); requestAnimationFrame(() => document.getElementById("ev-" + id)?.scrollIntoView({ behavior: "smooth", block: "center" })); break;
+      case "new-contact": openContactEditor(el.dataset.org); break;
+      case "edit-services": openServicesEditor(); break;
+      case "org-contacts": S.f.role = "all"; S.f.q = orgById(id)?.name || ""; $("#q").value = S.f.q; goTo("#contacts"); break;
+      case "open-org": S.f.type = "all"; goTo("#targets", "org-" + id); break;
+      case "open-ev": Object.assign(S.f, { cat: "all", need: "all", region: "all", cc: "all", horizon: 400 }); goTo("#radar", "ev-" + id); break;
+      case "copy-text": try { await navigator.clipboard.writeText(el.dataset.v); toast("Copiat"); } catch (e) { toast(el.dataset.v); } break;
       case "save-draft": if (await patch("drafts", id, readEdits())) toast("Modificări salvate"); break;
       case "approve": {
         const e = readEdits();
@@ -757,43 +1162,31 @@ ${note ? "Extra instruction from the owner: " + note : ""}`, { modelTier: "defau
       }
       case "reject": if (await patch("drafts", id, { status: "respins" })) toast("Respins"); break;
       case "restore": if (await patch("drafts", id, { status: "de_aprobat" })) toast("Readus la aprobare"); break;
-      case "copy": {
-        const txt = `Către: ${d.to}\nSubiect: ${fill(d.subject)}\n\n${fill(d.body)}`;
-        try { await navigator.clipboard.writeText(txt); toast("Copiat"); } catch (e) { const ta = $(`#bo-${id}`); ta?.select(); toast("Selectat. Apasă Ctrl/Cmd+C."); }
-        break;
-      }
+      case "copy": { const txt = `Către: ${d.to}\nSubiect: ${fill(d.subject)}\n\n${fill(d.body)}`; try { await navigator.clipboard.writeText(txt); toast("Copiat"); } catch (e) { $(`#bo-${id}`)?.select(); toast("Selectat. Apasă Ctrl/Cmd+C."); } break; }
       case "mark-sent": {
-        const sent = iso(today());
-        if (await patch("drafts", id, { status: "trimis", sentAt: sent, followUpAt: iso(addDays(today(), FOLLOW_UP_DAYS)) })) {
+        if (await patch("drafts", id, { status: "trimis", sentAt: iso(today()), followUpAt: iso(addDays(today(), FOLLOW_UP_DAYS)) })) {
           const o = orgById(d.orgId); if (o && ["nou", "cercetare"].includes(o.status || "nou")) await patch("orgs", o.id, { status: "contactat" });
           S.f.sub = "trimis"; toast(`Marcat trimis. Follow-up pe ${fmtD(iso(addDays(today(), FOLLOW_UP_DAYS)))}.`);
         }
         break;
       }
-      case "replied": {
-        if (await patch("drafts", id, { repliedAt: iso(today()) })) { const o = orgById(d.orgId); if (o) await patch("orgs", o.id, { status: "raspuns" }); toast("Notat: a răspuns"); }
-        break;
-      }
+      case "replied": if (await patch("drafts", id, { repliedAt: iso(today()) })) { const o = orgById(d.orgId); if (o) await patch("orgs", o.id, { status: "raspuns" }); toast("Notat: a răspuns"); } break;
       case "followup": {
-        const o = orgById(d.orgId), e = evById(d.eventId);
-        const ro = d.lang === "ro";
-        const body = ro
-          ? `Bună ziua,\n\nRevin scurt la mesajul de pe ${fmtD(d.sentAt)}${e ? ` legat de ${e.title}` : ""}. Dacă protecția pentru clienții dumneavoastră e gestionată de altcineva, îmi puteți indica persoana potrivită?\n\nMulțumesc,\n{{signature}}\n\nDacă nu doriți să mai primiți mesaje, răspundeți cu „stop”.`
-          : `Hello,\n\nA quick follow-up on my note from ${fmtD(d.sentAt)}${e ? ` about ${e.title}` : ""}. If protection for your clients sits with someone else, could you point me to the right person?\n\nThank you,\n{{signature}}\n\nIf you'd rather not hear from us, just reply "stop".`;
-        const nid = newId("dr");
-        if (await put("drafts", nid, { orgId: d.orgId, eventId: d.eventId || "", lang: d.lang, to: d.to, subject: (ro ? "Revin: " : "Re: ") + fill(d.subject).replace(/^(Re|Revin): /, ""), body, status: "de_aprobat", step: 2, rationale: `Follow-up la e-mailul trimis ${fmtD(d.sentAt)} către ${o?.name || ""}, fără răspuns.`, createdAt: new Date().toISOString(), by: "sablon" })) {
+        const e = evById(d.eventId), ro = d.lang === "ro", o = orgById(d.orgId);
+        const body = ro ? `Bună ziua,\n\nRevin scurt la mesajul de pe ${fmtD(d.sentAt)}${e ? ` legat de ${e.title}` : ""}. Dacă protecția și logistica pentru clienții dumneavoastră sunt gestionate de altcineva, îmi puteți indica persoana potrivită?\n\nMulțumesc,\n{{signature}}\n\nDacă nu doriți să mai primiți mesaje, răspundeți cu „stop”.`
+          : `Hello,\n\nA quick follow-up on my note from ${fmtD(d.sentAt)}${e ? ` about ${e.title}` : ""}. If protection and travel logistics for your clients sit with someone else, could you point me to the right person?\n\nThank you,\n{{signature}}\n\nIf you'd rather not hear from us, just reply "stop".`;
+        if (await put("drafts", newId("dr"), { orgId: d.orgId, contactId: d.contactId || "", eventId: d.eventId || "", lang: d.lang, to: d.to, subject: (ro ? "Revin: " : "Re: ") + fill(d.subject).replace(/^(Re|Revin): /, ""), body, status: "de_aprobat", step: 2, rationale: `Follow-up la e-mailul trimis ${fmtD(d.sentAt)} către ${o?.name || ""}, fără răspuns.`, createdAt: new Date().toISOString(), by: "sablon" })) {
           await patch("drafts", id, { followUpDone: true }); S.f.sub = "de_aprobat"; location.hash = "#approvals"; toast("Follow-up pregătit pentru aprobare");
         }
         break;
       }
       case "ai-rewrite": {
         if (!sample) { toast("AI indisponibil în această vizualizare."); return; }
-        const e = readEdits(); el.disabled = true; el.textContent = "Scriu…";
-        const mode = el.dataset.mode;
-        try {
-          const res = await sample.json(`Rewrite this B2B email for a close protection company. ${mode === "en" ? "Translate it into polished British English." : "Make it shorter (max 110 words) while keeping the event reference, the call-to-action and the opt-out line."} Keep the placeholders {{signature}} and {{company}} if present. Do not add facts. Return JSON {"subject": string, "body": string}.\n\nSubject: ${e.subject}\n\n${e.body}`, { modelTier: "quick" });
-          if (res?.subject && res?.body) { await patch("drafts", id, { ...e, subject: res.subject, body: res.body, lang: mode === "en" ? "en" : d.lang }); toast("Rescris"); }
-        } catch (err) { toast(err?.code === "rate_limited" ? "AI-ul e ocupat, încearcă peste un minut." : "Nu am putut rescrie acum."); }
+        const e = readEdits(), mode = el.dataset.mode; el.disabled = true; el.textContent = "Scriu…";
+        const instr = mode === "en" ? "Translate it into polished British English." : mode === "lux" ? `Add one or two sentences offering, through partners, luxury logistics: ${services().filter(s => s.id !== "cp").map(s => s.name).join(", ")}. Keep it discreet and under 180 words.` : "Make it shorter (max 110 words) while keeping the event reference, the call-to-action and the opt-out line.";
+        try { const res = await sample.json(`Rewrite this B2B email for a close protection and luxury services company. ${instr} Keep the placeholders {{signature}} and {{company}} if present. Do not add facts. Return JSON {"subject": string, "body": string}.\n\nSubject: ${e.subject}\n\n${e.body}`, { modelTier: "quick" });
+          if (res?.subject && res?.body) { await patch("drafts", id, { ...e, subject: res.subject, body: res.body, lang: mode === "en" ? "en" : d.lang }); toast("Rescris"); } }
+        catch (err) { toast(err?.code === "rate_limited" ? "AI-ul e ocupat, încearcă peste un minut." : "Nu am putut rescrie acum."); }
         el.disabled = false; break;
       }
       case "read-all": for (const a of S.alerts.filter(x => !x.read)) await patch("alerts", a.id, { read: true }); break;
@@ -801,21 +1194,23 @@ ${note ? "Extra instruction from the owner: " + note : ""}`, { modelTier: "defau
       case "alert-open": {
         const a = S.alerts.find(x => x.id === id); if (!a) return;
         if (!a.read) patch("alerts", id, { read: true });
-        if (a.link?.view === "event") { el.dataset.act = "open-ev"; S.f.cat = "all"; S.f.region = "all"; S.f.horizon = 400; location.hash = "#radar"; render(); requestAnimationFrame(() => document.getElementById("ev-" + a.link.id)?.scrollIntoView({ behavior: "smooth", block: "center" })); }
-        else if (a.link?.view === "org") { S.f.type = "all"; location.hash = "#targets"; render(); requestAnimationFrame(() => document.getElementById("org-" + a.link.id)?.scrollIntoView({ behavior: "smooth", block: "center" })); }
-        else if (a.link?.view === "approvals") { S.f.sub = "de_aprobat"; location.hash = "#approvals"; }
+        const l = a.link || {};
+        if (l.view === "event") { Object.assign(S.f, { cat: "all", need: "all", region: "all", cc: "all", horizon: 400 }); goTo("#radar", "ev-" + l.id); }
+        else if (l.view === "org") { S.f.type = "all"; goTo("#targets", "org-" + l.id); }
+        else if (l.view === "country") { S.f.cc = l.id; goTo("#countries"); }
+        else if (l.view === "contacts") goTo("#contacts");
+        else if (l.view === "signals") goTo("#signals");
+        else if (l.view === "approvals") { S.f.sub = "de_aprobat"; goTo("#approvals"); }
         break;
       }
     }
   });
-
   document.addEventListener("change", async (ev) => {
     const el = ev.target;
-    if (el.id === "fRegion") { S.f.region = el.value; saveF(); render(); }
-    else if (el.id === "fHorizon") { S.f.horizon = +el.value; saveF(); render(); }
+    const map = { fRegion: "region", fHorizon: "horizon", fNeed: "need", fCc: "cc" };
+    if (map[el.id]) { S.f[map[el.id]] = map[el.id] === "horizon" ? +el.value : el.value; saveF(); render(); }
     else if (el.dataset?.act === "stage") { if (await patch("orgs", el.dataset.id, { status: el.value })) toast(`Mutat la „${STAGE_LABEL[el.value]}”`); }
   });
-
   document.addEventListener("submit", async (ev) => {
     if (ev.target.id !== "cfgForm") return;
     ev.preventDefault();
@@ -823,47 +1218,69 @@ ${note ? "Extra instruction from the owner: " + note : ""}`, { modelTier: "defau
     const data = Object.fromEntries(keys.map(k => [k, $("#cfg-" + k).value.trim()]));
     if (await put("config", "main", data)) toast("Setări salvate");
   });
-
   let qT; $("#q").addEventListener("input", (e) => { clearTimeout(qT); qT = setTimeout(() => { S.f.q = e.target.value; render(); }, 160); });
   $("#bell").addEventListener("click", () => { location.hash = "#alerts"; });
+  $("#aiFab").addEventListener("click", openAI);
 
   // ---------- render ----------
-  const VIEWS = { radar: viewRadar, targets: viewTargets, approvals: viewApprovals, pipeline: viewPipeline, alerts: viewAlerts, setup: viewSetup };
-  function current() { const h = location.hash.slice(1); return VIEWS[h] ? h : "radar"; }
+  const VIEWS = { radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
+  const current = () => { const h = location.hash.slice(1); return VIEWS[h] ? h : "radar"; };
   function render() {
     const v = current();
-    // keep unsaved edits in open drafts from being wiped by live updates
     const active = document.activeElement;
-    if (active && active.closest?.(".draft-body, #cfgForm") && render.lastView === v) { render.pending = true; return; }
+    if (active && active.closest?.(".draft-body, #cfgForm, .modal") && render.lastView === v) { render.pending = true; return; }
     render.lastView = v;
     $("#main").innerHTML = VIEWS[v]();
     document.querySelectorAll("#tabs a").forEach(a => a.setAttribute("aria-current", a.getAttribute("href") === "#" + v ? "page" : "false"));
     const unread = S.alerts.filter(a => !a.read).length;
     $("#bellBadge").hidden = !unread; $("#bellBadge").textContent = unread;
-    $("#c-radar").textContent = S.events.filter(e => daysTo(e.end || e.start) >= 0).length || "";
+    $("#c-radar").textContent = S.events.filter(live).length || "";
+    $("#c-countries").textContent = Object.keys(usedCountries()).length || "";
+    $("#c-contacts").textContent = S.contacts.length || "";
     $("#c-targets").textContent = S.orgs.length || "";
+    $("#c-signals").textContent = S.signals.length || "";
     $("#c-approvals").textContent = S.drafts.filter(d => d.status === "de_aprobat").length || "";
     $("#c-pipeline").textContent = dueFollowUps().length || "";
     $("#c-alerts").textContent = unread || "";
-    if (S.config?.company) $("#brandSub").textContent = `${S.config.company} · intelligence & outreach`;
+    if (S.config?.company) $("#brandSub").textContent = `${S.config.company} · intelligence & acces privat`;
+    if (!AI.busy && $("#aiLog") && !AI.turns.length) renderAI();
   }
   document.addEventListener("focusout", () => { if (render.pending) { render.pending = false; setTimeout(render, 0); } });
   window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
 
+  // ---------- arrival ----------
+  function setupArrival() {
+    const arr = $("#arrival");
+    let seen = false; try { seen = sessionStorage.getItem("perimetru.entered") === "1"; } catch (e) {}
+    if (seen) { arr.remove(); $("#aiFab").hidden = false; return; }
+    const tick = () => { try { const t = new Intl.DateTimeFormat("ro-RO", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Monaco" }).format(new Date()); $("#arrCoords").textContent = `Monaco · 43.7384° N · 7.4246° E · ${t} ora locală`; } catch (e) {} };
+    tick(); const iv = setInterval(tick, 30000);
+    const h = new Date().getHours(); const salut = h < 11 ? "Bună dimineața" : h < 18 ? "Bună ziua" : "Bună seara";
+    $("#arrGreet").textContent = `${salut}.`;
+    const enter = () => { try { sessionStorage.setItem("perimetru.entered", "1"); } catch (e) {} arr.classList.add("leaving"); $("#aiFab").hidden = false; clearInterval(iv); setTimeout(() => arr.remove(), 750); };
+    $("#enterBtn").onclick = enter;
+    arr.addEventListener("keydown", (e) => { if (e.key === "Enter") enter(); });
+    $("#enterBtn").focus();
+    setupArrival.greet = (name) => { if (name && document.contains(arr)) $("#arrGreet").textContent = `${salut}, ${name.split(" ")[0]}.`; };
+  }
+
   // ---------- boot ----------
+  setupArrival();
   render();
   (async () => {
-    try { db = await window.claude?.use?.("db"); } catch (e) { db = null; }
-    try { sample = await window.claude?.use?.("sample"); } catch (e) { sample = null; }
+    const use = async (n) => { try { return await window.claude?.use?.(n); } catch (e) { return null; } };
+    [db, sample, userCap] = await Promise.all([use("db"), use("sample"), use("user")]);
+    if (userCap?.me) { try { S.me = await userCap.me(); setupArrival.greet?.(S.me?.name); } catch (e) {} }
     S.dbOk = !!db;
-    if (!db) { S.ready = false; render(); return; }
-    const pending = new Set(["events", "orgs", "drafts", "alerts", "contacts"]);
-    const listen = (name) => db.collection(name).limit(1000).onSnapshot((snap) => {
+    if (!db) { render(); return; }
+    const cols = ["events", "orgs", "drafts", "alerts", "contacts", "signals", "requests"];
+    const pending = new Set(cols);
+    cols.forEach(name => db.collection(name).limit(1000).onSnapshot((snap) => {
       S[name] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       pending.delete(name); if (!pending.size) S.ready = true; render();
-    }, () => { pending.delete(name); if (!pending.size) S.ready = true; render(); });
-    ["events", "orgs", "drafts", "alerts", "contacts"].forEach(listen);
+    }, () => { pending.delete(name); if (!pending.size) S.ready = true; render(); }));
     db.doc("config/main").onSnapshot((s) => { S.config = s.exists ? s.data() : {}; render(); }, () => {});
+    db.doc("config/services").onSnapshot((s) => { S.services = s.exists ? (s.data().items || null) : null; render(); }, () => {});
   })();
 })();
 </script>
