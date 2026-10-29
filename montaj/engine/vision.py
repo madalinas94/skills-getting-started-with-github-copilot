@@ -13,6 +13,8 @@ from . import ff
 try:
     import cv2
     _CASCADE = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    if _CASCADE.empty():
+        _CASCADE = None
 except Exception:  # OpenCV missing or broken install
     cv2 = None
     _CASCADE = None
@@ -22,8 +24,15 @@ SCAN_W = 480
 MAX_SECONDS = 180
 
 
+def _mediapipe_ok() -> bool:
+    if not hasattr(_mediapipe_ok, "ok"):
+        from . import people
+        _mediapipe_ok.ok = people.available()
+    return _mediapipe_ok.ok
+
+
 def faces_available() -> bool:
-    return _CASCADE is not None and not _CASCADE.empty()
+    return _mediapipe_ok() or (_CASCADE is not None and not _CASCADE.empty())
 
 
 def _frames(src, media: dict):
@@ -80,6 +89,13 @@ def _shift(a: np.ndarray, b: np.ndarray):
 
 
 def _face(g: np.ndarray):
+    if _mediapipe_ok():  # MediaPipe BlazeFace: also finds turned and small faces
+        from . import people
+        return people.largest_face(np.dstack([g, g, g]))
+    return _face_haar(g)
+
+
+def _face_haar(g: np.ndarray):
     """Largest face as (cx, cy, size), normalised to the frame, or None."""
     found = _CASCADE.detectMultiScale(g, scaleFactor=1.08, minNeighbors=4, minSize=(24, 24))
     if len(found) == 0:
