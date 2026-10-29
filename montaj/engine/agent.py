@@ -42,6 +42,12 @@ a blurred copy.
 caption_style; do not copy the transcript into captions.
 - beat_fx adds flashes / zoom pulses / shake on the music's beats.
 - music.align_end makes the song end together with the video.
+- broll: while someone talks, cut away to another file that shows what they are talking about \
+(use the transcript to time it); the talking clip's sound keeps playing.
+- background: portrait blurs what is behind the person; replace puts them over another file.
+- tighten removes pauses and "ăăă" from speech; voice_enhance cleans the voice; emphasis_zoom \
+punches in on stressed words; sfx adds whooshes and pops. Turn them on when the brief asks or \
+when talking-head footage would clearly benefit.
 
 Editing judgement:
 - The user's rules come first. If they ask for something the footage can't give, do your best \
@@ -174,6 +180,13 @@ def brief(settings: dict, style: dict | None = None) -> str:
         idea = settings.get("voiceover_text") or "(write it yourself from what you see)"
         lines.append("VOICE-OVER: write narration lines in the user's language (about 2.5 words per second "
                      f"of screen time, leave room between lines). Script or idea from the user: {idea}")
+    extras = [name for key, name in (("tighten", "tighten=true (cut pauses and fillers)"),
+                                     ("voice_enhance", "voice_enhance=true"),
+                                     ("emphasis_zoom", "emphasis_zoom=true"), ("sfx", "sfx=true"),
+                                     ("auto_broll", "add B-roll over talking clips where it fits"))
+              if settings.get(key)]
+    if extras:
+        lines.append("The user switched on: " + "; ".join(extras) + ".")
     if settings.get("variant"):
         lines.append(f"VARIANT: {settings['variant']}")
     lines.append("USER RULES (follow these first):\n" + (settings.get("rules") or "(none given)"))
@@ -264,6 +277,46 @@ def template_copy(plan: EditPlan) -> SocialCopy:
         posts=[PostCopy(platform=p, caption=f"{plan.title} ✨", hashtags=tags)
                for p in ("TikTok", "Instagram Reels", "YouTube Shorts")],
         youtube_title=plan.title, best_time="Seara, între 19:00 și 21:00, când lumea e pe telefon.")
+
+
+SHORTS_SYSTEM = """You are a short-form video producer who turns long videos (podcasts, vlogs, \
+talks) into Shorts / Reels / TikToks. From the timestamped transcript and a few frames, pick the \
+moments that work on their own: a strong first sentence, one clear idea, an emotional or \
+surprising payoff. Each moment starts and ends on sentence boundaries. Score honestly."""
+
+
+def find_moments(transcript: list, frames: list, duration: float, count: int, settings: dict,
+                 api_key: str | None, model: str = DEFAULT_MODEL, effort: str = "medium"):
+    """transcript: [[start, end, text]]; frames: [(t, path)]. Returns shorts.Moments."""
+    from .shorts import Moments
+    content = []
+    for t, path in frames[:16]:
+        content.append({"type": "text", "text": f"Frame at {t:.0f}s"})
+        content.append(_image_block(Path(path)))
+    lines = "\n".join(f"[{s:.1f}-{e:.1f}] {text}" for s, e, text in transcript)
+    content.append({"type": "text", "text": f"VIDEO LENGTH: {duration:.0f}s\nTRANSCRIPT:\n{lines}\n\n"
+                    f"USER RULES: {settings.get('rules') or '-'}\n\nFind the {count} best moments, "
+                    "each 20-60 seconds, not overlapping, best first."})
+    return _parse(client_for(api_key), model, effort, [{"role": "user", "content": content}], Moments,
+                  system=SHORTS_SYSTEM)
+
+
+TRANSLATE_SYSTEM = """You translate the speech of a social video for dubbing. Translate meaning \
+and tone, not word by word; keep the speaker's personality, slang level and humour. Each line \
+will be spoken in the original line's time slot, so keep it about as long to say as the \
+original (shorter is better than longer). Translate on-screen texts too, keeping them short."""
+
+
+def translate(units: list, overlays: list, title: str, language: str, api_key: str | None,
+              model: str = DEFAULT_MODEL):
+    """Returns dub.Translation for one target language."""
+    from .dub import Translation
+    payload = {"target_language": language, "title": title,
+               "lines": [{"id": u["id"], "seconds": round(u["end"] - u["start"], 1), "text": u["text"]} for u in units],
+               "overlays": overlays}
+    content = [{"type": "text", "text": json.dumps(payload, ensure_ascii=False, indent=1)}]
+    return _parse(client_for(api_key), model, "low", [{"role": "user", "content": content}], Translation,
+                  system=TRANSLATE_SYSTEM)
 
 
 def describe_error(exc: Exception) -> str:

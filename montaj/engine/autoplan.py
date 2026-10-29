@@ -189,9 +189,38 @@ def build(media: list, analysis: dict, settings: dict, style: dict | None = None
                     caption_style=settings.get("caption_style") or style.get("captions", "none"),
                     beat_fx=(settings.get("beat_fx") or style.get("beat_fx", "none")) if music_media else "none",
                     beat_fx_every=style.get("beat_every", 2))
+    apply_switches(plan, settings, media, analysis)
     if settings.get("voiceover_text"):
         from .plan import total_length
         plan.voiceover = split_script(settings["voiceover_text"], total_length(plan))
+    return plan
+
+
+def apply_switches(plan: EditPlan, settings: dict, media: list, analysis: dict):
+    """The user's on/off switches always win, whoever made the plan."""
+    from .plan import Broll, clip_length
+    for key in ("tighten", "voice_enhance", "emphasis_zoom", "sfx"):
+        if settings.get(key):
+            setattr(plan, key, True)
+    if settings.get("background") in ("portrait",):
+        for c in plan.clips:
+            if (analysis.get(c.media_id) or {}).get("faces") and c.background == "none":
+                c.background = "portrait"
+    if settings.get("auto_broll") and not any(c.broll for c in plan.clips):
+        # no AI to match words to pictures: cut away every ~5 s of talking to other material
+        others = [m for m in media if m["kind"] in ("video", "image")]
+        k = 0
+        for c in plan.clips:
+            if not c.keep_audio or clip_length(c) < 5:
+                continue
+            pool = [m for m in others if m["id"] != c.media_id]
+            t = 2.5
+            while pool and t + 1.8 < clip_length(c):
+                b = pool[k % len(pool)]
+                c.broll.append(Broll(media_id=b["id"], at=round(t, 2), duration=1.8,
+                                     source_start=round(b["duration"] / 3, 2) if b["kind"] == "video" else 0))
+                k += 1
+                t += 5.0
     return plan
 
 
