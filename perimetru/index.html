@@ -322,6 +322,24 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
 .ai-form textarea { resize: none; min-height: 46px; max-height: 140px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; }
 .ai-form textarea:focus { outline: none; border-color: var(--gold); }
 
+.brief { display: grid; gap: 10px; }
+.act { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+.act .num { font-family: var(--f-display); font-size: 26px; color: var(--gold); text-align: center; font-variant-numeric: lining-nums; }
+.act .t { font-weight: 700; } .act .x { font-size: 13px; color: var(--muted); }
+@media (max-width: 600px) { .act { grid-template-columns: 30px minmax(0, 1fr); } .act > .row { grid-column: 2; } }
+.bars { display: grid; gap: 9px; }
+.bar { display: grid; grid-template-columns: minmax(90px, 200px) minmax(0, 1fr) 96px; gap: 12px; align-items: center; font-size: 13px; }
+.bar .track { height: 12px; position: relative; border-left: 1px solid var(--line); }
+.bar .fill { position: absolute; inset: 0 auto 0 0; background: var(--gold); border-radius: 0 4px 4px 0; min-width: 2px; }
+.bar .v { font-family: var(--f-mono); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.statgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 14px; }
+.intel { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 16px 18px; margin-bottom: 18px; display: grid; gap: 8px; }
+.check { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.check input[type=checkbox] { margin-top: 3px; }
+.logo-img { max-height: 34px; max-width: 130px; object-fit: contain; }
+.dossier h4 { margin: 18px 0 6px; font-family: var(--f-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); font-weight: 500; }
+.modal.wide { width: min(880px, 100%); }
+.lang { font: 600 11px var(--f-mono); letter-spacing: .06em; }
 @media (prefers-reduced-motion: no-preference) {
   .ev, .lead, .draft, .ct { animation: rise .35s ease both; }
   @keyframes rise { from { transform: translateY(6px); opacity: .6; } to { transform: none; opacity: 1; } }
@@ -385,6 +403,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
   </svg>
   <div class="veil"></div>
   <div class="copy">
+    <img id="arrLogo" class="logo-img" alt="" hidden style="max-height:52px;max-width:180px">
     <div class="coords" id="arrCoords">Monaco · 43.7384° N · 7.4246° E</div>
     <h1>PERIMETRU<em id="arrGreet">Bun venit.</em></h1>
     <p>Radarul global al protecției private: evenimente, oameni, acces. De pe Riviera, pentru orice colț al lumii.</p>
@@ -395,26 +414,34 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
 <header class="top">
   <div class="wrap">
     <div class="top-row">
-      <a class="brand" href="#radar" aria-label="Perimetru, acasă">
-        <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="15.5" fill="none" stroke="var(--gold)" stroke-width="1"/><circle cx="17" cy="17" r="10" fill="none" stroke="var(--gold)" stroke-width="1" stroke-dasharray="2 3"/><circle cx="17" cy="17" r="2.6" fill="var(--gold)"/><path d="M17 1.5v5M17 27.5v5M1.5 17h5M27.5 17h5" stroke="var(--gold)" stroke-width="1"/></svg>
+      <a class="brand" href="#today" aria-label="Perimetru, acasă">
+        <img id="brandLogo" class="logo-img" alt="" hidden>
+        <svg id="brandMark" width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="15.5" fill="none" stroke="var(--gold)" stroke-width="1"/><circle cx="17" cy="17" r="10" fill="none" stroke="var(--gold)" stroke-width="1" stroke-dasharray="2 3"/><circle cx="17" cy="17" r="2.6" fill="var(--gold)"/><path d="M17 1.5v5M17 27.5v5M1.5 17h5M27.5 17h5" stroke="var(--gold)" stroke-width="1"/></svg>
         <span style="min-width:0"><span class="brand-name">PERIMETRU</span><span class="brand-sub" id="brandSub">Intelligence · protecție · acces privat</span></span>
       </a>
       <label class="search" for="q"><svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="var(--muted)" stroke-width="1.5"/><path d="M11 11l3.5 3.5" stroke="var(--muted)" stroke-width="1.5"/></svg><input id="q" type="search" placeholder="Caută eveniment, țară, companie, persoană…" autocomplete="off"></label>
       <div class="top-actions">
+        <button class="icon-btn lang" id="langBtn" title="Limba interfeței / Interface language">EN</button>
         <button class="icon-btn" id="bell" aria-label="Notificări" title="Notificări"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a4.5 4.5 0 0 0-4.5 4.5v3L2 11.5h12L12.5 9V6A4.5 4.5 0 0 0 8 1.5zM6.2 13.2a1.9 1.9 0 0 0 3.6 0" fill="none" stroke="var(--ink)" stroke-width="1.3"/></svg><span class="badge" id="bellBadge" hidden>0</span></button>
       </div>
     </div>
     <nav class="tabs" id="tabs" aria-label="Secțiuni">
+      <a href="#today">Azi <span class="count" id="c-today"></span></a>
       <a href="#radar">Radar <span class="count" id="c-radar"></span></a>
       <a href="#countries">Țări <span class="count" id="c-countries"></span></a>
       <a href="#contacts">Contacte <span class="count" id="c-contacts"></span></a>
       <a href="#targets">Companii <span class="count" id="c-targets"></span></a>
-      <a href="#signals">Cereri &amp; semnale <span class="count" id="c-signals"></span></a>
+      <a href="#signals">Semnale <span class="count" id="c-signals"></span></a>
+      <a href="#inbound">Cereri primite <span class="count" id="c-inbound"></span></a>
       <a href="#approvals">De aprobat <span class="count" id="c-approvals"></span></a>
       <a href="#pipeline">Pipeline <span class="count" id="c-pipeline"></span></a>
-      <a href="#services">Servicii</a>
+      <a href="#missions">Misiuni <span class="count" id="c-missions"></span></a>
+      <a href="#partners">Parteneri <span class="count" id="c-partners"></span></a>
+      <a href="#content">Conținut <span class="count" id="c-content"></span></a>
+      <a href="#stats">Statistici <span class="count" id="c-stats"></span></a>
+      <a href="#services">Servicii <span class="count" id="c-services"></span></a>
       <a href="#alerts">Noutăți <span class="count" id="c-alerts"></span></a>
-      <a href="#setup">Setări</a>
+      <a href="#setup">Setări <span class="count" id="c-setup"></span></a>
     </nav>
   </div>
 </header>
@@ -424,6 +451,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
 <div id="aiLayer"></div>
 <div id="layer"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 (() => {
   // ---------- vocabulary ----------
@@ -470,16 +498,21 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
     { id: "access", kind: "Acces", name: "Acces la evenimente", desc: "Hospitality F1, gale, festivaluri, mese private.", partners: "" }
   ];
 
+  const CI_LEVEL = { 1: "Nivel 1 · precauții normale", 2: "Nivel 2 · prudență sporită", 3: "Nivel 3 · reconsiderați călătoria", 4: "Nivel 4 · nu călătoriți" };
+  const TEAM_ROLES = ["Proprietar", "Vânzări", "Operațiuni", "Doar vizualizare"];
+
   // ---------- state ----------
   const S = {
     events: [], orgs: [], drafts: [], alerts: [], contacts: [], signals: [], requests: [],
-    config: {}, services: null, me: null,
+    missions: [], partners: [], deals: [], team: [], posts: [], inbound: [], optouts: [], proposals: [], countryintel: [],
+    config: {}, services: null, pricing: {}, brand: {}, me: null, lang: "ro",
     ready: false, dbOk: null,
     f: { cat: "all", need: "all", region: "all", cc: "all", horizon: 400, type: "all", role: "all", sub: "de_aprobat", q: "" }
   };
   try { Object.assign(S.f, JSON.parse(localStorage.getItem("perimetru.f2") || "{}")); } catch (e) {}
   const saveF = () => { try { const { q, sub, ...rest } = S.f; localStorage.setItem("perimetru.f2", JSON.stringify(rest)); } catch (e) {} };
-  let db = null, sample = null, userCap = null;
+  try { S.lang = localStorage.getItem("perimetru.lang") === "en" ? "en" : "ro"; } catch (e) {}
+  let db = null, sample = null, userCap = null, assets = null, downloads = null;
 
   // ---------- helpers ----------
   const $ = (s, el = document) => el.querySelector(s);
@@ -642,7 +675,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
     const regionOrder = ["romania", "riviera", "alps", "europe", "gulf", "us", "asia", "africa"];
     const card = ([cc, evs]) => {
       const nx = [...evs].sort((a, b) => a.start.localeCompare(b.start))[0];
-      return `<button class="country" data-act="open-cc" data-id="${cc}" aria-pressed="${sel === cc}"><div class="top"><span class="nm">${esc(ccName(cc))}</span><span class="n">${evs.length}</span></div><span class="cc2">${cc}</span><span class="nx">Următorul: ${esc(fmtD(nx.start))} · ${esc(nx.title)}</span></button>`;
+      return `<button class="country" data-act="open-cc" data-id="${cc}" aria-pressed="${sel === cc}"><div class="top"><span class="nm">${esc(ccName(cc))}</span><span class="n">${evs.length}</span></div><span class="cc2">${cc}${(() => { const ci = S.countryintel.find(x => x.id === cc); return ci ? ` · nivel ${ci.level}` : ""; })()}</span><span class="nx">Următorul: ${esc(fmtD(nx.start))} · ${esc(nx.title)}</span></button>`;
     };
     const atlas = regionOrder.filter(r => byRegion[r]).map(r => `<div class="eyebrow region-h">${esc(REGIONS[r])}</div><div class="atlas">${byRegion[r].sort((a, b) => b[1].length - a[1].length).map(card).join("")}</div>`).join("");
     const evs = sel ? filteredEvents({ cc: sel, horizon: 400 }) : [];
@@ -653,7 +686,14 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
         <h1>${sel ? esc(ccName(sel)) : "Fiecare țară, cu evenimentele ei"}</h1>
         <p>${sel ? `${evs.length} evenimente în ${esc(ccName(sel))}${ctsHere.length ? ` și ${ctsHere.length} contacte locale` : ""}. Filtrează pe categorie sau pe tipul de protecție.` : "Alege o țară ca să vezi tot ce se întâmplă acolo, în ordinea datelor."}</p>
       </div>${sel ? `<button class="btn" data-act="open-cc" data-id="all">Toate țările</button>` : ""}</div>
-      ${!S.ready ? emptyLoading() : sel ? `${eventFilters({ showCountry: false })}${timeline(evs)}` : atlas || `<div class="empty"><h3>Încă nu sunt țări</h3></div>`}`;
+      ${!S.ready ? emptyLoading() : sel ? `${intelBlock(sel)}${eventFilters({ showCountry: false })}${timeline(evs)}` : atlas || `<div class="empty"><h3>Încă nu sunt țări</h3></div>`}`;
+  }
+
+  function intelBlock(cc) {
+    const ci = S.countryintel.find(x => x.id === cc);
+    if (!ci) return `<div class="intel"><span class="lbl">Situația de securitate</span><span class="note">Radarul completează analiza pentru această țară la următoarea rulare.</span></div>`;
+    const cls = { 1: "ok", 2: "info", 3: "warn", 4: "hot" }[ci.level] || "info";
+    return `<div class="intel"><div class="row"><span class="lbl">Situația de securitate</span><span class="pill ${cls}">${esc(CI_LEVEL[ci.level] || "")}</span><span class="note">actualizat ${esc(fmtD(ci.updated))}</span></div><div>${esc(ci.summary)}</div>${ci.salesAngle ? `<div class="ctx">${esc(ci.salesAngle)}</div>` : ""}<div class="sources">${(ci.sources || []).map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">↗ ${esc(x.label)}</a>`).join("")}</div></div>`;
   }
 
   function viewContacts() {
@@ -698,7 +738,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
         ${c.phone ? `<span class="mono">${esc(c.phone)}<button class="copy" data-act="copy-text" data-v="${esc(c.phone)}">copiază</button></span>` : ""}
       </div>
       <div class="ch"><div class="row">${status}<span class="tag">${esc(ROLE_CATS[c.roleCat] || "Contact")}</span></div>${c.source ? `<a class="note" href="${esc(c.source)}" target="_blank" rel="noopener" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">↗ sursa (${esc(fmtD(c.verified))})</a>` : ""}</div>
-      <div class="row">${c.email && o && !o.dnc ? `<button class="btn primary sm" data-act="draft-contact" data-id="${esc(c.id)}">Scrie e-mail</button>` : ""}${c.name ? `<a class="btn ghost sm" href="${li(`${c.name} ${o?.name || ""}`, "people")}" target="_blank" rel="noopener">LinkedIn</a>` : ""}</div>
+      <div class="row">${c.email && o && !o.dnc ? `<button class="btn primary sm" data-act="draft-contact" data-id="${esc(c.id)}">Scrie e-mail</button>` : ""}${c.name ? `<a class="btn ghost sm" href="${li(`${c.name} ${o?.name || ""}`, "people")}" target="_blank" rel="noopener">LinkedIn</a>` : ""}<button class="btn danger sm" data-act="gdpr-del" data-id="${esc(c.id)}">Șterge (GDPR)</button></div>
     </div>`;
   }
 
@@ -742,6 +782,9 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
         <select class="select" data-act="stage" data-id="${esc(o.id)}" aria-label="Etapă pentru ${esc(o.name)}">${stageOpts}</select>
         <button class="btn primary sm" data-act="draft-org" data-id="${esc(o.id)}" ${o.dnc ? "disabled" : ""}>Pregătește e-mail</button>
         <button class="btn ghost sm" data-act="new-contact" data-org="${esc(o.id)}">+ Contact</button>
+        ${S.team.length ? `<select class="select" data-act="owner" data-id="${esc(o.id)}" aria-label="Responsabil"><option value="">Fără responsabil</option>${S.team.map(t => `<option value="${esc(t.id)}" ${o.owner === t.id ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
+        <button class="btn sm" data-act="dossier" data-id="${esc(o.id)}">Dosar</button>
+        <button class="btn ghost sm" data-act="proposal-org" data-id="${esc(o.id)}">Ofertă</button>
         <button class="btn ghost sm" data-act="edit-org" data-id="${esc(o.id)}">Editează</button>
       </div>
     </article>`;
@@ -839,7 +882,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
       const items = S.orgs.filter(o => (o.status || "nou") === k).filter(o => matchesQ(o.name, o.hq));
       return `<div class="col"><h4><span>${v}</span><span>${items.length}</span></h4>${items.map(o => {
         const last = S.drafts.filter(d => d.orgId === o.id && d.sentAt).sort((a, b) => b.sentAt.localeCompare(a.sentAt))[0];
-        return `<div class="card"><div class="t">${esc(o.name)}</div><div class="s">${esc(ORG_TYPES[o.type] || "")}${last ? ` · ultimul e-mail ${esc(fmtD(last.sentAt))}` : ""}</div><select data-act="stage" data-id="${esc(o.id)}" aria-label="Etapă pentru ${esc(o.name)}">${STAGES.map(([sk, sv]) => `<option value="${sk}" ${k === sk ? "selected" : ""}>${sv}</option>`).join("")}</select></div>`;
+        return `<div class="card"><div class="t">${esc(o.name)}</div><div class="s">${esc(ORG_TYPES[o.type] || "")}${last ? ` · ultimul e-mail ${esc(fmtD(last.sentAt))}` : ""}${o.owner && S.team.find(t => t.id === o.owner) ? ` · ${esc(S.team.find(t => t.id === o.owner).name)}` : ""}</div><select data-act="stage" data-id="${esc(o.id)}" aria-label="Etapă pentru ${esc(o.name)}">${STAGES.map(([sk, sv]) => `<option value="${sk}" ${k === sk ? "selected" : ""}>${sv}</option>`).join("")}</select></div>`;
       }).join("")}</div>`;
     }).join("");
     return `
@@ -855,8 +898,8 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
     return `
       <div class="view-head"><div class="grow"><div class="eyebrow">Portofoliu · ce putem oferi</div><h1>Protecție și tot ce ține de lux, într-o singură ofertă</h1>
         <p>Pe lângă close protection: mașini, private jet, elicopter, hoteluri, yachturi, ceasuri și acces la evenimente, prin partenerii voștri. Ce scrieți aici folosește AI-ul când propune oferte integrate în e-mailuri.</p></div>
-        <button class="btn" data-act="edit-services">Editează serviciile și partenerii</button></div>
-      <div class="services">${services().map(s => `<div class="svc"><span class="k">${esc(s.kind)}</span><h3>${esc(s.name)}</h3><p>${esc(s.desc)}</p><div class="partners"><span class="lbl">Parteneri</span><br>${s.partners ? esc(s.partners) : `<span class="muted">Adaugă partenerii voștri</span>`}</div></div>`).join("")}</div>`;
+        <button class="btn" data-act="edit-services">Editează serviciile, partenerii și prețurile</button></div>
+      <div class="services">${services().map(s => `<div class="svc"><span class="k">${esc(s.kind)}</span><h3>${esc(s.name)}</h3><p>${esc(s.desc)}</p><div class="partners"><span class="lbl">Parteneri</span><br>${s.partners ? esc(s.partners) : `<span class="muted">Adaugă partenerii voștri</span>`}</div><div class="partners"><span class="lbl">Preț orientativ</span><br>${S.pricing[s.id]?.price ? `${eur(S.pricing[s.id].price)}${S.pricing[s.id].unit ? " / " + esc(S.pricing[s.id].unit) : ""}` : `<span class="muted">la cerere</span>`}</div></div>`).join("")}</div>`;
   }
 
   function viewAlerts() {
@@ -893,7 +936,437 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
         <li>Contactele sunt doar date de business publicate (site-ul companiei, comunicate, directoare). Nu inventăm adrese și nu colectăm numere personale ale persoanelor private.</li>
         <li>Fiecare e-mail are o frază de dezabonare; companiile marcate „nu contacta” nu mai primesc drafturi (GDPR).</li>
         <li>Monitorizăm evenimente, companii și cereri publice, nu deplasările persoanelor.</li>
-      </ul></div>`;
+      </ul></div>
+      <div class="panel"><h3>Brand</h3>
+        <div class="row">${S.brand?.logoUrl ? `<img src="${esc(S.brand.logoUrl)}" alt="Logo" class="logo-img" style="max-height:48px">` : `<span class="note">Niciun logo încă.</span>`}
+          ${assets ? `<label class="btn sm" for="brandFile">Încarcă logo (PNG sau JPG)</label><input id="brandFile" type="file" accept="image/png,image/jpeg" hidden>` : `<span class="note">Încărcarea e disponibilă doar pentru editori.</span>`}
+          <label class="row note" for="brandColor">Culoare accent <input id="brandColor" type="color" value="${esc(S.brand?.accent || "#D6BE91")}"></label>
+          ${S.brand?.accent ? `<button class="btn ghost sm" data-act="brand-reset">Culoarea implicită</button>` : ""}</div>
+        <p class="note" style="margin:8px 0 0">Logo-ul apare în antet, pe ecranul de intrare și în ofertele PDF.</p></div>
+      <div class="panel"><h3>Echipa</h3>
+        ${S.team.length ? `<div class="contacts">${S.team.map(t => `<div class="ct" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto"><div><div class="nm">${esc(t.name)}</div><div class="rl">${esc(t.role)}</div></div><div class="mono" style="overflow-wrap:anywhere">${esc(t.email || "")}</div><div class="row"><span class="tag">${S.orgs.filter(o => o.owner === t.id).length} companii</span><button class="btn ghost sm" data-act="del-member" data-id="${esc(t.id)}">Scoate</button></div></div>`).join("")}</div>` : `<p class="note" style="margin:0">Adaugă oamenii din echipă, apoi alege responsabilul pe fiecare companie.</p>`}
+        <form id="teamForm" class="row" style="margin-top:10px"><input class="select" style="border-radius:8px" id="tm-name" placeholder="Nume" required aria-label="Nume"><input class="select" style="border-radius:8px" id="tm-email" placeholder="E-mail" aria-label="E-mail"><select class="select" id="tm-role" aria-label="Rol">${TEAM_ROLES.map(r => `<option>${r}</option>`).join("")}</select><button class="btn sm" type="submit">Adaugă</button></form>
+        <p class="note" style="margin:8px 0 0">Cine poate deschide și edita aplicația se stabilește din butonul Share al paginii: Viewer doar citește, Editor poate aproba și modifica.</p></div>
+      <div class="panel"><h3>E-mail (Gmail)</h3><p class="note" style="margin:0">Gmail e instalat în contul claude.ai, dar conectarea nu e finalizată. După ce îl conectezi din Settings → Connectors pe claude.ai, legăm trimiterea după aprobare și citirea răspunsurilor. Până atunci, „Aprobă” deschide mesajul gata scris în Gmail sau Outlook.</p></div>
+      <div class="panel"><h3>Registru GDPR</h3>
+        <p class="note" style="margin:0 0 10px">${S.contacts.length} contacte, fiecare cu sursa notată · ${S.orgs.filter(o => o.dnc).length} companii „nu contacta” · ${S.optouts.length} dezabonări.</p>
+        ${S.optouts.length ? `<ul>${S.optouts.map(o => `<li>${esc(o.email || orgById(o.orgId)?.name || "—")} · ${esc(o.reason || "")} · ${esc(fmtD(o.date))}</li>`).join("")}</ul>` : ""}
+        <form id="optForm" class="row" style="margin-top:10px"><input class="select" style="border-radius:8px;flex:1;min-width:200px" id="op-email" type="email" placeholder="adresa care a cerut dezabonarea" required aria-label="Adresa dezabonată"><button class="btn sm" type="submit">Adaugă dezabonare</button><button class="btn sm" type="button" data-act="gdpr-export">Exportă registrul (CSV)</button></form>
+        <p class="note" style="margin:8px 0 0">Adresele dezabonate nu mai pot fi aprobate în niciun e-mail. Ștergerea unui contact la cerere se face din Contacte → Șterge (GDPR).</p></div>`;
+  }
+
+  // ---------- Azi (briefing) ----------
+  function todayActions() {
+    const acts = [];
+    dueFollowUps().forEach(d => { const o = orgById(d.orgId); acts.push({ w: 100, t: `Follow-up: ${o?.name || ""}`, x: `E-mailul din ${fmtD(d.sentAt)} n-a primit răspuns. Follow-up-ul e gata de scris.`, btn: ["followup", d.id, "Scrie follow-up"] }); });
+    S.inbound.filter(i => (i.status || "nou") === "nou").forEach(i => acts.push({ w: 99, t: `Cerere primită: ${i.name || i.company || "fără nume"}`, x: i.summary || i.need || "", go: "inbound", label: "Răspunde" }));
+    S.missions.filter(m => m.status !== "încheiată" && m.start && daysTo(m.start) >= 0 && daysTo(m.start) <= 14).forEach(m => { const open = (m.checklist || []).filter(c => !c.done).length; if (open) acts.push({ w: 97, t: `Misiune în ${daysTo(m.start)} zile: ${m.title}`, x: `${open} puncte de advance nebifate.`, btn: ["open-mission", m.id, "Deschide"] }); });
+    const appr = S.drafts.filter(d => d.status === "aprobat");
+    if (appr.length) acts.push({ w: 95, t: `${appr.length} e-mailuri aprobate, încă netrimise`, x: "Deschide-le în Gmail sau Outlook și apasă „Am trimis”.", go: "approvals", sub: "aprobat", label: "Trimite" });
+    const pend = S.drafts.filter(d => d.status === "de_aprobat");
+    if (pend.length) acts.push({ w: 90, t: `${pend.length} e-mailuri așteaptă aprobarea`, x: [...new Set(pend.map(d => orgById(d.orgId)?.name).filter(Boolean))].slice(0, 4).join(", "), go: "approvals", sub: "de_aprobat", label: "Aprobă" });
+    S.events.filter(live).forEach(e => {
+      const adv = daysTo(iso(addDays(parseD(e.start), -(e.advanceDays || 21))));
+      if (adv <= 7 && daysTo(e.start) > 0 && !S.drafts.some(d => d.eventId === e.id))
+        acts.push({ w: 80 - Math.max(adv, 0) + (e.tier === 1 ? 10 : 0), t: `Fereastra de advance: ${e.title}`, x: `${fmtD(e.start)} · ${e.city}, ${evCountry(e)}. ${adv <= 0 ? "Fereastra e deschisă" : `Se deschide în ${adv} zile`} și nu e niciun e-mail pregătit.`, btn: ["draft-event", e.id, "Pregătește outreach"] });
+    });
+    const newSig = S.signals.filter(s => s.found && daysTo(s.found) >= -3);
+    if (newSig.length) acts.push({ w: 70, t: `${newSig.length} semnale noi de cerere`, x: newSig.slice(0, 2).map(s => s.title).join(" · "), go: "signals", label: "Vezi" });
+    S.orgs.filter(o => (o.status || "nou") === "nou" && !o.dnc && (o.score || 0) >= 80 && S.contacts.some(c => c.orgId === o.id && c.email))
+      .forEach(o => acts.push({ w: 50 + (o.score || 0) / 10, t: `Țintă cu contact, încă necontactată: ${o.name}`, x: o.why, btn: ["draft-org", o.id, "Pregătește e-mail"] }));
+    return acts.sort((a, b) => b.w - a.w);
+  }
+  function viewToday() {
+    const acts = todayActions();
+    const h = new Date().getHours(), en = S.lang === "en", salut = h < 11 ? (en ? "Good morning" : "Bună dimineața") : h < 18 ? (en ? "Good afternoon" : "Bună ziua") : (en ? "Good evening" : "Bună seara");
+    const name = S.me?.name ? `, ${S.me.name.split(" ")[0]}` : "";
+    const next = S.events.filter(live).sort((a, b) => a.start.localeCompare(b.start)).slice(0, 6);
+    let dateStr = ""; try { dateStr = new Intl.DateTimeFormat(S.lang === "en" ? "en-GB" : "ro-RO", { weekday: "long", day: "numeric", month: "long" }).format(new Date()); } catch (e) {}
+    const btn = (a, i) => a.btn ? `<button class="btn ${i < 5 ? "primary" : ""} sm" data-act="${a.btn[0]}" data-id="${esc(a.btn[1])}">${esc(a.btn[2])}</button>` : `<button class="btn ${i < 5 ? "primary" : ""} sm" data-go="${a.go}" ${a.sub ? `data-subgo="${a.sub}"` : ""}>${esc(a.label)}</button>`;
+    return `
+      <div class="view-head"><div class="grow"><div class="eyebrow">${S.lang === "en" ? "Today" : "Azi"} · ${esc(dateStr)}</div><h1>${salut}${esc(name)}.</h1>
+        <p>Primele acțiuni ale zilei, în ordinea importanței, calculate din tot ce e în aplicație. Briefingul vine și pe telefon în fiecare dimineață.</p></div>
+        ${sample ? `<button class="btn" data-act="ai-brief">Briefing scris de AI</button>` : ""}</div>
+      <div id="aiBrief"></div>
+      ${!S.ready ? emptyLoading() : acts.length ? `<div class="brief">${acts.slice(0, 8).map((a, i) => `<div class="act"><div class="num">${i + 1}</div><div style="min-width:0"><div class="t">${esc(a.t)}</div><div class="x">${esc(a.x || "")}</div></div><div class="row">${btn(a, i)}</div></div>`).join("")}</div>` : `<div class="empty"><h3>Nimic urgent azi</h3><p>Bun moment pentru prospectare: deschide Companiile cu scor mare.</p></div>`}
+      <div class="eyebrow" style="margin:28px 0 10px">Următoarele evenimente</div>
+      <div class="brief">${next.map(e => `<div class="act"><div class="num" style="font-size:22px;line-height:1">${parseD(e.start).getDate()}<div class="mono muted" style="font-size:10px">${MON3[parseD(e.start).getMonth()]}</div></div><div style="min-width:0"><div class="t">${esc(e.title)}</div><div class="x">${esc(e.city)}, ${esc(evCountry(e))} · ${esc(CATS[catOf(e)] || "")}</div></div><div class="row"><button class="btn ghost sm" data-act="open-ev" data-id="${esc(e.id)}">Vezi</button></div></div>`).join("")}</div>`;
+  }
+  async function aiBrief() {
+    const box = $("#aiBrief"); if (!box || !sample) return;
+    box.innerHTML = `<div class="ctx" style="margin-bottom:16px">Scriu briefingul…</div>`;
+    const acts = todayActions().slice(0, 10).map(a => `- ${a.t}: ${a.x || ""}`).join("\n");
+    const ev = S.events.filter(e => live(e) && daysTo(e.start) <= 60).map(e => `- ${e.start} ${e.title} (${evCountry(e)}), advance de ${e.advanceDays || 21} zile`).join("\n");
+    const stages = STAGES.map(([k, v]) => `${v}: ${S.orgs.filter(o => (o.status || "nou") === k).length}`).join(", ");
+    try {
+      const { text } = await sample(`Ești consilierul comercial al unei firme de close protection și servicii private de lux. Scrie în ${S.lang === "en" ? "engleză" : "română"} un briefing de dimineață de maximum 140 de cuvinte: ce contează azi, în ce ordine, și o singură recomandare strategică pentru săptămâna asta. Fără introduceri. Folosește doar datele de mai jos.\n\nAcțiuni calculate:\n${acts}\n\nEvenimente în 60 de zile:\n${ev}\n\nPipeline: ${stages}. Drafturi de aprobat: ${S.drafts.filter(d => d.status === "de_aprobat").length}.`, { modelTier: "default", onText: ({ text }) => { box.innerHTML = `<div class="ctx" style="margin-bottom:16px">${md(text)}</div>`; } });
+      box.innerHTML = `<div class="ctx" style="margin-bottom:16px">${md(text)}</div>`;
+    } catch (err) { box.innerHTML = `<div class="note" style="margin-bottom:16px">${err?.code === "not_granted" ? "AI-ul are nevoie de acordul tău." : "Briefingul nu a putut fi scris acum."}</div>`; }
+  }
+
+  // ---------- Cereri primite ----------
+  const INB_STATUS = ["nou", "în lucru", "ofertă trimisă", "câștigat", "pierdut"];
+  function viewInbound() {
+    const list = [...S.inbound].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")).filter(i => matchesQ(i.name, i.company, i.summary, i.need, i.where));
+    return `
+      <div class="view-head"><div class="grow"><div class="eyebrow">Cereri primite</div><h1>Clienții care vin singuri</h1>
+        <p>Cereri de pe site, telefon, parteneri sau recomandări. Lipește e-mailul primit și AI-ul completează fișa: cine, ce, unde, când, buget. După conectarea Gmail, cererile din formularul site-ului pot intra aici automat.</p></div>
+        <button class="btn primary" data-act="new-inbound">+ Adaugă cerere</button></div>
+      ${!S.ready ? emptyLoading() : list.length ? `<div class="alerts" style="max-width:none">${list.map(i => `<div class="alert ${(i.status || "nou") === "nou" ? "unread" : ""}"><span class="dot"></span><div style="min-width:0"><div class="t">${esc(i.name || i.company || "Cerere")}${i.company && i.name ? ` · ${esc(i.company)}` : ""}</div><div class="x">${esc(i.summary || i.need || "")}</div><div class="mono muted" style="margin-top:4px">${esc([i.channel, i.where, i.when, i.budget].filter(Boolean).join(" · "))}${i.email ? ` · ${esc(i.email)}` : ""}${i.phone ? ` · ${esc(i.phone)}` : ""}</div></div>
+        <div class="row"><select class="select" data-act="inbound-status" data-id="${esc(i.id)}" aria-label="Stare">${INB_STATUS.map(s => `<option value="${s}" ${(i.status || "nou") === s ? "selected" : ""}>${s}</option>`).join("")}</select><button class="btn sm" data-act="inbound-proposal" data-id="${esc(i.id)}">Ofertă</button><button class="btn sm" data-act="inbound-mission" data-id="${esc(i.id)}">Misiune</button></div></div>`).join("")}</div>` : `<div class="empty"><h3>Nicio cerere încă</h3><p>Adaugă prima cerere sau lipește un e-mail primit.</p></div>`}`;
+  }
+  function openInbound() {
+    modal(`
+      <div class="eyebrow">Cerere nouă</div><h2>Adaugă o cerere primită</h2>
+      <div class="grid">
+        <div class="field"><label for="in-raw">Lipește e-mailul sau mesajul (opțional)</label><textarea id="in-raw" style="min-height:120px" placeholder="AI-ul extrage numele, compania, nevoia, locul, data și bugetul"></textarea></div>
+        <div class="row"><button class="btn" id="in-ai" type="button" ${sample ? "" : "disabled"}>Completează cu AI</button><span class="note" id="in-st"></span></div>
+        <form id="in-f" class="grid">
+          ${[["name", "Nume"], ["company", "Companie"], ["email", "E-mail"], ["phone", "Telefon"], ["need", "Ce cere (protecție, mașini, jet…)"], ["where", "Unde"], ["when", "Când"], ["budget", "Buget"], ["channel", "Canal (site, telefon, partener…)"]].map(([k, l]) => `<div class="field"><label for="in-${k}">${l}</label><input id="in-${k}"></div>`).join("")}
+          <div class="field"><label for="in-summary">Rezumat</label><textarea id="in-summary" style="min-height:70px"></textarea></div>
+          <div class="row"><button class="btn primary" type="submit">Salvează</button><button class="btn ghost" type="button" id="in-x">Renunță</button></div>
+        </form>
+      </div>`, (m) => {
+      $("#in-x", m).onclick = closeModal;
+      $("#in-ai", m).onclick = async () => {
+        const raw = $("#in-raw", m).value.trim(); if (!raw) return;
+        $("#in-st", m).textContent = "Citesc…";
+        try {
+          const r = await sample.json(`Extract a client enquiry for a close protection and luxury services company from this message. Return JSON with string fields: name, company, email, phone, need, where, when, budget, channel, summary (summary in Romanian, max 2 sentences). Use "" when unknown. Do not invent.\n\n${raw.slice(0, 6000)}`, { modelTier: "quick" });
+          ["name", "company", "email", "phone", "need", "where", "when", "budget", "channel", "summary"].forEach(k => { if (r?.[k]) $(`#in-${k}`, m).value = r[k]; });
+          $("#in-st", m).textContent = "Verifică și salvează.";
+        } catch (e) { $("#in-st", m).textContent = "AI indisponibil; completează manual."; }
+      };
+      $("#in-f", m).onsubmit = async (ev) => {
+        ev.preventDefault();
+        const data = Object.fromEntries(["name", "company", "email", "phone", "need", "where", "when", "budget", "channel", "summary"].map(k => [k, $(`#in-${k}`, m).value.trim()]));
+        data.status = "nou"; data.createdAt = new Date().toISOString();
+        if (await put("inbound", newId("in"), data)) { closeModal(); toast("Cerere salvată"); }
+      };
+    });
+  }
+
+  // ---------- Misiuni ----------
+  const DEFAULT_CHECK = ["Brief cu clientul: program, persoane, preferințe", "Evaluare de risc pentru destinație", "Advance: recunoaștere rute și locații", "Hoteluri și camere adiacente confirmate", "Transport: mașini, șoferi, rute alternative", "Legătura cu securitatea locației sau a organizatorului", "Spital și puncte de evacuare identificate", "Echipă alocată și briefing intern", "Comunicații și coduri stabilite", "Raport final către client"];
+  const MISSION_STATUS = ["planificată", "confirmată", "în desfășurare", "încheiată", "anulată"];
+  function viewMissions() {
+    const list = [...S.missions].sort((a, b) => (a.start || "9").localeCompare(b.start || "9")).filter(m => matchesQ(m.title, orgById(m.orgId)?.name, m.team));
+    return `
+      <div class="view-head"><div class="grow"><div class="eyebrow">Operațiuni</div><h1>Misiuni</h1>
+        <p>Pentru fiecare contract: client, eveniment, echipă, checklist de advance, rute, hoteluri, contacte locale și raportul final.</p></div>
+        <button class="btn primary" data-act="new-mission">+ Misiune nouă</button></div>
+      ${!S.ready ? emptyLoading() : list.length ? `<div class="leads">${list.map(m => { const done = (m.checklist || []).filter(c => c.done).length, all = (m.checklist || []).length;
+        return `<article class="lead" style="grid-template-columns:58px minmax(0,1fr) auto">${scoreRing(all ? Math.round(done * 100 / all) : 0)}<div style="min-width:0"><div class="eyebrow">${esc(m.status || "planificată")} · ${esc(m.start ? range(m.start, m.end || m.start) : "fără dată")}${m.cc ? ` · ${esc(ccName(m.cc))}` : ""}</div><h3>${esc(m.title)}</h3><p class="why">${esc([orgById(m.orgId)?.name, evById(m.eventId)?.title, m.team].filter(Boolean).join(" · "))}</p><div class="note">Advance: ${done} din ${all} puncte bifate</div></div><div class="row"><button class="btn primary sm" data-act="open-mission" data-id="${esc(m.id)}">Deschide</button></div></article>`; }).join("")}</div>` : `<div class="empty"><h3>Nicio misiune încă</h3><p>Creează una manual sau dintr-o cerere primită.</p></div>`}`;
+  }
+  function openMission(m, preset = {}) {
+    const isNew = !m;
+    m = m || { title: preset.title || "", orgId: preset.orgId || "", eventId: preset.eventId || "", start: "", end: "", cc: preset.cc || "", team: "", status: "planificată", hotels: "", routes: "", local: "", notes: preset.notes || "", report: "", checklist: DEFAULT_CHECK.map(t => ({ t, done: false })), inboundId: preset.inboundId || "" };
+    const orgOpts = `<option value="">—</option>` + [...S.orgs].sort((a, b) => a.name.localeCompare(b.name, "ro")).map(o => `<option value="${esc(o.id)}" ${o.id === m.orgId ? "selected" : ""}>${esc(o.name)}</option>`).join("");
+    const evOpts = `<option value="">—</option>` + S.events.filter(live).sort((a, b) => a.start.localeCompare(b.start)).map(e => `<option value="${esc(e.id)}" ${e.id === m.eventId ? "selected" : ""}>${esc(fmtD(e.start))} · ${esc(e.title)}</option>`).join("");
+    const ta = (k, l, h = 70) => `<div class="field"><label for="mi-${k}">${l}</label><textarea id="mi-${k}" style="min-height:${h}px">${esc(m[k] || "")}</textarea></div>`;
+    modal(`
+      <div class="eyebrow">${isNew ? "Misiune nouă" : "Misiune"}</div><h2>${esc(m.title || "Misiune nouă")}</h2>
+      <form id="mi" class="grid">
+        <div class="field"><label for="mi-title">Titlu</label><input id="mi-title" required value="${esc(m.title)}" placeholder="ex. Protecție familie, Monaco GP"></div>
+        <div class="settings" style="max-width:none">
+          <div class="field"><label for="mi-org">Client</label><select id="mi-org">${orgOpts}</select></div>
+          <div class="field"><label for="mi-ev">Eveniment</label><select id="mi-ev">${evOpts}</select></div>
+          <div class="field"><label for="mi-start">Început</label><input id="mi-start" type="date" value="${esc(m.start)}"></div>
+          <div class="field"><label for="mi-end">Sfârșit</label><input id="mi-end" type="date" value="${esc(m.end)}"></div>
+          <div class="field"><label for="mi-cc">Țară</label><select id="mi-cc"><option value="">—</option>${Object.entries(COUNTRIES).map(([k, v]) => `<option value="${k}" ${m.cc === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+          <div class="field"><label for="mi-status">Stare</label><select id="mi-status">${MISSION_STATUS.map(s => `<option ${m.status === s ? "selected" : ""}>${s}</option>`).join("")}</select></div>
+        </div>
+        <div class="field"><label for="mi-team">Echipă alocată</label><input id="mi-team" value="${esc(m.team)}" placeholder="nume, roluri"></div>
+        <div><div class="lbl" style="margin-bottom:4px">Checklist de advance</div>${(m.checklist || []).map((c, i) => `<label class="check"><input type="checkbox" data-ci="${i}" ${c.done ? "checked" : ""}><span>${esc(c.t)}</span></label>`).join("")}
+          <div class="row" style="margin-top:8px"><input id="mi-newcheck" class="select" style="flex:1;border-radius:8px" placeholder="Adaugă un punct"><button class="btn sm" type="button" id="mi-addcheck">Adaugă</button></div></div>
+        ${ta("hotels", "Hoteluri și cazare")}${ta("routes", "Rute și transport")}${ta("local", "Contacte locale (poliție, spital, securitatea locației)")}${ta("notes", "Note")}${ta("report", "Raport final către client", 120)}
+        <div class="row"><button class="btn primary" type="submit">Salvează</button>${sample ? `<button class="btn" type="button" id="mi-ai">Scrie raportul final cu AI</button>` : ""}<button class="btn ghost" type="button" id="mi-x">Închide</button>${isNew ? "" : `<span class="spacer" style="flex:1"></span><button class="btn danger" type="button" id="mi-del">Șterge</button>`}</div>
+      </form>`, (box) => {
+      box.classList.add("wide");
+      const collect = () => ({ ...m, id: undefined, title: $("#mi-title", box).value.trim(), orgId: $("#mi-org", box).value, eventId: $("#mi-ev", box).value, start: $("#mi-start", box).value, end: $("#mi-end", box).value, cc: $("#mi-cc", box).value, status: $("#mi-status", box).value, team: $("#mi-team", box).value.trim(), hotels: $("#mi-hotels", box).value, routes: $("#mi-routes", box).value, local: $("#mi-local", box).value, notes: $("#mi-notes", box).value, report: $("#mi-report", box).value, checklist: m.checklist.map((c, i) => ({ t: c.t, done: !!$(`[data-ci="${i}"]`, box)?.checked })), updatedAt: new Date().toISOString() });
+      $("#mi-x", box).onclick = closeModal;
+      $("#mi-addcheck", box).onclick = () => { const v = $("#mi-newcheck", box).value.trim(); if (!v) return; const cur = collect(); cur.checklist.push({ t: v, done: false }); closeModal(); openMission({ ...cur, id: m.id }); };
+      $("#mi-del", box) && ($("#mi-del", box).onclick = async () => { try { await db.collection("missions").doc(m.id).delete(); closeModal(); toast("Misiune ștearsă"); } catch (e) { toast("Nu s-a șters."); } });
+      $("#mi-ai", box) && ($("#mi-ai", box).onclick = async () => {
+        const c = collect(); $("#mi-report", box).value = "Scriu…";
+        try { const { text } = await sample(`Write a concise, professional final mission report (max 220 words) in ${S.lang === "en" ? "English" : "Romanian"} for a close protection client. Use only these notes, no invented incidents. Sections: Summary, Itinerary & logistics, Observations, Recommendations.\n\nMission: ${c.title}\nClient: ${orgById(c.orgId)?.name || ""}\nEvent: ${evById(c.eventId)?.title || ""}\nDates: ${c.start} - ${c.end}\nTeam: ${c.team}\nChecklist done: ${c.checklist.filter(x => x.done).map(x => x.t).join("; ")}\nHotels: ${c.hotels}\nRoutes: ${c.routes}\nNotes: ${c.notes}`, { modelTier: "default" }); $("#mi-report", box).value = text; }
+        catch (e) { $("#mi-report", box).value = c.report; toast("AI indisponibil acum."); }
+      });
+      $("#mi", box).onsubmit = async (ev) => { ev.preventDefault(); const data = collect(); delete data.id; if (!data.title) return; if (await put("missions", m.id || newId("mi"), data)) { if (data.inboundId) patch("inbound", data.inboundId, { status: "câștigat" }); closeModal(); toast("Misiune salvată"); } };
+    });
+  }
+
+  // ---------- Parteneri & comisioane ----------
+  const DEAL_STATUS = ["propus", "confirmat", "facturat", "comision încasat"];
+  const eur = (n) => `${Math.round(+n || 0).toLocaleString("ro-RO")} €`;
+  function viewPartners() {
+    const commission = (d) => (+d.value || 0) * (+d.commission || 0) / 100;
+    const rows = S.partners.map(p => { const ds = S.deals.filter(d => d.partnerId === p.id); return { p, n: ds.length, value: ds.reduce((s, d) => s + (+d.value || 0), 0), com: ds.reduce((s, d) => s + commission(d), 0) }; }).sort((a, b) => b.com - a.com);
+    const tot = S.deals.reduce((s, d) => s + commission(d), 0), cashed = S.deals.filter(d => d.status === "comision încasat").reduce((s, d) => s + commission(d), 0);
+    const bySvc = {}; S.deals.forEach(d => { bySvc[d.service || "Altele"] = (bySvc[d.service || "Altele"] || 0) + (+d.value || 0); });
+    const maxSvc = Math.max(1, ...Object.values(bySvc));
+    return `
+      <div class="view-head"><div class="grow"><div class="eyebrow">Parteneri & comisioane</div><h1>Ce aduce fiecare partener</h1>
+        <p>Partenerii de jet, elicopter, mașini, hoteluri, yachturi și ceasuri, comisionul vostru și fiecare vânzare. Vedeți ce ofertă combinată se vinde cel mai bine.</p></div>
+        <div class="row"><button class="btn" data-act="new-partner">+ Partener</button><button class="btn primary" data-act="new-deal">+ Vânzare</button></div></div>
+      <div class="kpis"><div class="kpi"><div class="n">${S.partners.length}</div><div class="l">parteneri</div></div><div class="kpi"><div class="n">${S.deals.length}</div><div class="l">vânzări înregistrate</div></div><div class="kpi gold"><div class="n">${eur(tot)}</div><div class="l">comision total</div></div><div class="kpi"><div class="n">${eur(cashed)}</div><div class="l">comision încasat</div></div></div>
+      ${!S.ready ? emptyLoading() : !S.partners.length ? `<div class="empty"><h3>Niciun partener încă</h3><p>Adaugă partenerii cu care lucrați și comisionul convenit.</p></div>` : `
+      <div class="statgrid">
+        <div class="panel" style="margin:0;max-width:none"><h3>Parteneri</h3><div class="contacts">${rows.map(r => `<div class="ct" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) auto"><div style="min-width:0"><div class="nm">${esc(r.p.name)}</div><div class="rl">${esc(r.p.service || "")} · comision ${esc(r.p.commission || 0)}%</div>${r.p.contact ? `<div class="mono muted" style="overflow-wrap:anywhere">${esc(r.p.contact)}</div>` : ""}</div><div class="ch"><span class="mono">${r.n} vânzări · ${eur(r.value)}</span><span class="mono" style="color:var(--gold)">${eur(r.com)} comision</span></div><div class="row"><button class="btn ghost sm" data-act="edit-partner" data-id="${esc(r.p.id)}">Editează</button></div></div>`).join("")}</div></div>
+        <div class="panel" style="margin:0;max-width:none"><h3>Valoare vândută pe serviciu</h3>${Object.keys(bySvc).length ? `<div class="bars">${Object.entries(bySvc).sort((a, b) => b[1] - a[1]).map(([k, v]) => barRow(k, v / maxSvc, eur(v))).join("")}</div>` : `<p class="note">Apare după prima vânzare.</p>`}</div>
+      </div>
+      <div class="eyebrow" style="margin:24px 0 10px">Vânzări</div>
+      ${S.deals.length ? `<div class="contacts">${[...S.deals].sort((a, b) => (b.date || "").localeCompare(a.date || "")).map(d => { const p = S.partners.find(x => x.id === d.partnerId); return `<div class="ct"><div style="min-width:0"><div class="nm">${esc(orgById(d.orgId)?.name || d.client || "Client")}</div><div class="rl">${esc(d.service || "")} · ${esc(p?.name || "")}</div></div><div class="ch"><span class="mono">${eur(d.value)} · ${esc(d.commission)}%</span><span class="mono" style="color:var(--gold)">${eur(commission(d))} comision</span></div><div class="ch"><span class="tag">${esc(d.status || "propus")}</span><span class="note">${esc(fmtD(d.date))}</span></div><div class="row"><button class="btn ghost sm" data-act="edit-deal" data-id="${esc(d.id)}">Editează</button></div></div>`; }).join("")}</div>` : `<div class="note">Nicio vânzare înregistrată.</div>`}`}`;
+  }
+  function openPartner(p) {
+    p = p || { name: "", service: services()[2]?.name || "", commission: 10, contact: "", notes: "" };
+    modal(`<div class="eyebrow">Partener</div><h2>${esc(p.name || "Partener nou")}</h2>
+      <form id="pa" class="grid">
+        <div class="field"><label for="pa-name">Nume</label><input id="pa-name" required value="${esc(p.name)}"></div>
+        <div class="field"><label for="pa-svc">Serviciu</label><select id="pa-svc">${services().map(s => `<option ${p.service === s.name ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></div>
+        <div class="field"><label for="pa-com">Comision (%)</label><input id="pa-com" type="number" min="0" max="100" step="0.5" value="${esc(p.commission)}"></div>
+        <div class="field"><label for="pa-ct">Contact</label><input id="pa-ct" value="${esc(p.contact)}" placeholder="persoană, e-mail, telefon"></div>
+        <div class="field"><label for="pa-notes">Note</label><textarea id="pa-notes" style="min-height:70px">${esc(p.notes)}</textarea></div>
+        <div class="row"><button class="btn primary" type="submit">Salvează</button><button class="btn ghost" type="button" id="pa-x">Renunță</button></div>
+      </form>`, (m) => {
+      $("#pa-x", m).onclick = closeModal;
+      $("#pa", m).onsubmit = async (ev) => { ev.preventDefault(); const data = { name: $("#pa-name", m).value.trim(), service: $("#pa-svc", m).value, commission: +$("#pa-com", m).value || 0, contact: $("#pa-ct", m).value.trim(), notes: $("#pa-notes", m).value }; if (data.name && await put("partners", p.id || newId("pa"), data)) { closeModal(); toast("Partener salvat"); } };
+    });
+  }
+  function openDeal(d) {
+    if (!S.partners.length) { toast("Adaugă întâi un partener."); return; }
+    d = d || { partnerId: S.partners[0].id, orgId: "", client: "", service: S.partners[0].service, value: "", commission: S.partners[0].commission, date: iso(today()), status: "propus" };
+    modal(`<div class="eyebrow">Vânzare</div><h2>${d.id ? "Editează vânzarea" : "Vânzare nouă"}</h2>
+      <form id="de" class="grid">
+        <div class="field"><label for="de-p">Partener</label><select id="de-p">${S.partners.map(p => `<option value="${esc(p.id)}" ${p.id === d.partnerId ? "selected" : ""}>${esc(p.name)} · ${esc(p.service)}</option>`).join("")}</select></div>
+        <div class="field"><label for="de-o">Client (companie)</label><select id="de-o"><option value="">—</option>${[...S.orgs].sort((a, b) => a.name.localeCompare(b.name, "ro")).map(o => `<option value="${esc(o.id)}" ${o.id === d.orgId ? "selected" : ""}>${esc(o.name)}</option>`).join("")}</select></div>
+        <div class="field"><label for="de-c">sau client privat</label><input id="de-c" value="${esc(d.client)}"></div>
+        <div class="field"><label for="de-v">Valoare (€)</label><input id="de-v" type="number" min="0" value="${esc(d.value)}"></div>
+        <div class="field"><label for="de-com">Comision (%)</label><input id="de-com" type="number" min="0" max="100" step="0.5" value="${esc(d.commission)}"></div>
+        <div class="field"><label for="de-d">Data</label><input id="de-d" type="date" value="${esc(d.date)}"></div>
+        <div class="field"><label for="de-s">Stare</label><select id="de-s">${DEAL_STATUS.map(s => `<option ${d.status === s ? "selected" : ""}>${s}</option>`).join("")}</select></div>
+        <div class="row"><button class="btn primary" type="submit">Salvează</button><button class="btn ghost" type="button" id="de-x">Renunță</button></div>
+      </form>`, (m) => {
+      $("#de-x", m).onclick = closeModal;
+      $("#de-p", m).onchange = () => { const p = S.partners.find(x => x.id === $("#de-p", m).value); if (p) $("#de-com", m).value = p.commission; };
+      $("#de", m).onsubmit = async (ev) => { ev.preventDefault(); const p = S.partners.find(x => x.id === $("#de-p", m).value); const data = { partnerId: p.id, service: p.service, orgId: $("#de-o", m).value, client: $("#de-c", m).value.trim(), value: +$("#de-v", m).value || 0, commission: +$("#de-com", m).value || 0, date: $("#de-d", m).value, status: $("#de-s", m).value }; if (await put("deals", d.id || newId("de"), data)) { closeModal(); toast("Vânzare salvată"); } };
+    });
+  }
+
+  // ---------- Conținut LinkedIn ----------
+  function viewContent() {
+    const list = [...S.posts].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    return `
+      <div class="view-head"><div class="grow"><div class="eyebrow">Conținut · LinkedIn</div><h1>Postări care aduc clienți singuri</h1>
+        <p>Drafturi pentru profilul fratelui tău, scrise pornind de la evenimentele din radar: expertiză, discreție, logistică de lux. Le copiați, le ajustați și le publicați pe LinkedIn.</p></div>
+        ${sample ? `<button class="btn primary" data-act="gen-posts">Generează 3 postări</button>` : ""}</div>
+      ${!S.ready ? emptyLoading() : list.length ? `<div class="drafts">${list.map(p => `<article class="draft"><div class="draft-head"><h3>${esc(p.topic || "Postare")}</h3><span class="pill ${p.status === "publicat" ? "ok" : "info"}">${esc(p.status || "draft")}</span><span class="mono muted" style="margin-left:auto">${esc(fmtD((p.createdAt || "").slice(0, 10)))}</span></div><div class="draft-body"><div class="field"><label for="po-${esc(p.id)}">Text</label><textarea id="po-${esc(p.id)}">${esc(p.text)}</textarea></div></div><div class="draft-foot"><button class="btn" data-act="copy-post" data-id="${esc(p.id)}">Copiază</button><a class="btn" href="https://www.linkedin.com/feed/?shareActive=true" target="_blank" rel="noopener">Deschide LinkedIn</a><button class="btn" data-act="save-post" data-id="${esc(p.id)}">Salvează</button><span class="spacer"></span>${p.status === "publicat" ? "" : `<button class="btn primary" data-act="post-done" data-id="${esc(p.id)}">Am publicat</button>`}<button class="btn danger" data-act="del-post" data-id="${esc(p.id)}">Șterge</button></div></article>`).join("")}</div>` : `<div class="empty"><h3>Nicio postare încă</h3><p>Apasă „Generează 3 postări”. Radarul propune și el postări noi la fiecare rulare.</p></div>`}`;
+  }
+  async function genPosts(btn) {
+    if (!sample) return;
+    btn.disabled = true; btn.textContent = "Scriu… (30–60 secunde)";
+    const evs = S.events.filter(e => live(e) && daysTo(e.start) <= 120).sort((a, b) => (a.tier || 3) - (b.tier || 3)).slice(0, 12).map(e => `- ${e.title}, ${range(e.start, e.end)}, ${e.city} (${evCountry(e)})`).join("\n");
+    const c = S.config || {};
+    try {
+      const r = await sample.json(`Write 3 LinkedIn posts for the managing director of ${c.company || "a close protection company based in Romania"} that also arranges luxury logistics through partners (${services().filter(s => s.id !== "cp").map(s => s.name).join(", ")}). Language: ${S.lang === "en" ? "English" : "English (international audience)"}. Each post 90-160 words, first-person, calm and senior, practical insight (advance work, discretion, travel logistics, event security), no client names, no fear-mongering, no hashtag spam (max 3 hashtags), no emojis. Anchor each post on one of these public events:\n${evs}\n${c.pitch ? "Differentiators: " + c.pitch : ""}\nReturn JSON {"posts":[{"topic": short Romanian title, "text": post}]}.`, { modelTier: "default" });
+      const posts = (r?.posts || []).slice(0, 3);
+      for (const p of posts) await put("posts", newId("po"), { topic: p.topic || "", text: p.text || "", status: "draft", createdAt: new Date().toISOString(), by: "ai" });
+      toast(posts.length ? "Postări pregătite" : "Nu am primit postări.");
+    } catch (err) { toast(err?.code === "rate_limited" ? "AI-ul e ocupat." : "Nu am putut genera acum."); }
+    btn.disabled = false; btn.textContent = "Generează 3 postări";
+  }
+
+  // ---------- Statistici ----------
+  const barRow = (label, frac, valueText, title) => `<div class="bar" title="${esc(title || `${label}: ${valueText}`)}"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(label)}</span><span class="track"><span class="fill" style="width:${Math.max(0, Math.min(1, frac)) * 100}%"></span></span><span class="v">${esc(valueText)}</span></div>`;
+  function viewStats() {
+    const sent = S.drafts.filter(d => d.sentAt && d.step !== 2);
+    const replied = sent.filter(d => d.repliedAt);
+    const group = (keyFn, labelFn) => {
+      const g = {}; sent.forEach(d => { const k = keyFn(d) || "—"; (g[k] ||= { n: 0, r: 0 }); g[k].n++; if (d.repliedAt) g[k].r++; });
+      const rows = Object.entries(g).sort((a, b) => b[1].n - a[1].n);
+      return rows.length ? `<div class="bars">${rows.map(([k, v]) => barRow(labelFn(k), v.r / v.n, `${v.r}/${v.n} · ${Math.round(v.r * 100 / v.n)}%`, `${labelFn(k)}: ${v.r} răspunsuri din ${v.n} e-mailuri`)).join("")}</div>` : `<p class="note">Apare după primele e-mailuri trimise.</p>`;
+    };
+    const funnel = STAGES.map(([k, v]) => [v, S.orgs.filter(o => (o.status || "nou") === k).length]);
+    const fmax = Math.max(1, ...funnel.map(f => f[1]));
+    const rate = sent.length ? Math.round(replied.length * 100 / sent.length) : 0;
+    const meetings = S.orgs.filter(o => ["intalnire", "client"].includes(o.status)).length;
+    const panel = (t, body) => `<div class="panel" style="margin:0;max-width:none"><h3>${t}</h3>${body}</div>`;
+    return `
+      <div class="view-head"><div class="grow"><div class="eyebrow">Statistici</div><h1>Ce funcționează</h1>
+        <p>Rata de răspuns pe tip de companie, țară, limbă și tipul ofertei. Insistați unde răspund cei mai mulți.</p></div></div>
+      <div class="kpis"><div class="kpi"><div class="n">${sent.length}</div><div class="l">e-mailuri trimise</div></div><div class="kpi gold"><div class="n">${rate}%</div><div class="l">rată de răspuns</div></div><div class="kpi"><div class="n">${meetings}</div><div class="l">întâlniri și clienți</div></div><div class="kpi"><div class="n">${S.orgs.filter(o => o.status === "client").length}</div><div class="l">clienți</div></div></div>
+      <div class="statgrid">
+        ${panel("Răspuns pe tip de companie", group(d => orgById(d.orgId)?.type, k => ORG_TYPES[k] || k))}
+        ${panel("Răspuns pe țară", group(d => orgById(d.orgId)?.cc, k => ccName(k)))}
+        ${panel("Răspuns pe limbă", group(d => d.lang, k => ({ en: "Engleză", ro: "Română", fr: "Franceză", it: "Italiană", de: "Germană", ar: "Arabă" }[k] || k)))}
+        ${panel("Răspuns pe tipul ofertei", group(d => d.offer || "cp", k => ({ cp: "Doar protecție", bundle: "Protecție + lux", lux: "Concierge de lux" }[k] || k)))}
+        ${panel("Pipeline", `<div class="bars">${funnel.map(([l, n]) => barRow(l, n / fmax, String(n))).join("")}</div>`)}
+      </div>`;
+  }
+
+  // ---------- Dosar companie ----------
+  function openDossier(oid) {
+    const o = orgById(oid); if (!o) return;
+    const cts = S.contacts.filter(c => c.orgId === oid), evs = S.events.filter(e => live(e) && (e.targets || []).includes(oid)).sort((a, b) => a.start.localeCompare(b.start));
+    const hist = S.drafts.filter(d => d.orgId === oid).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    const deals = S.deals.filter(d => d.orgId === oid), mis = S.missions.filter(m => m.orgId === oid);
+    const owner = S.team.find(t => t.id === o.owner);
+    modal(`
+      <div class="dossier">
+        <div class="eyebrow">Dosar · ${esc(ORG_TYPES[o.type] || o.type)} · ${esc(o.hq || "")}</div><h2>${esc(o.name)}</h2>
+        <div class="row" style="margin:6px 0"><span class="tag">${esc(STAGE_LABEL[o.status || "nou"])}</span><span class="tag">scor ${esc(o.score || 0)}</span>${owner ? `<span class="tag">responsabil: ${esc(owner.name)}</span>` : ""}${o.dnc ? `<span class="pill hot">nu contacta</span>` : ""}${o.website ? `<a href="${esc(o.website)}" target="_blank" rel="noopener">↗ site</a>` : ""}</div>
+        <p style="margin:8px 0 0">${esc(o.why)}</p>
+        <h4>Cine decide</h4>${cts.length ? cts.map(c => `<div>${esc(c.name || ROLE_CATS[c.roleCat] || "")}${c.name ? ` · ${esc(c.role)}` : ""}${c.email ? ` · <span class="mono">${esc(c.email)}</span>` : ""}${c.phone ? ` · <span class="mono">${esc(c.phone)}</span>` : ""}</div>`).join("") : `<div class="note">Niciun contact încă.</div>`}
+        ${(o.roles || []).length ? `<div class="rolelinks" style="margin-top:6px">${o.roles.map(r => `<a href="${li(r + " " + o.name, "people")}" target="_blank" rel="noopener">${esc(r)} ↗</a>`).join("")}</div>` : ""}
+        <h4>Evenimente legate</h4>${evs.length ? evs.map(e => `<div>${esc(fmtD(e.start))} · ${esc(e.title)} · ${esc(evCountry(e))}</div>`).join("") : `<div class="note">—</div>`}
+        <h4>Istoric</h4>${hist.length || deals.length || mis.length ? [...hist.map(d => `<div>${esc(fmtD((d.sentAt || d.createdAt || "").slice(0, 10)))} · e-mail ${esc({ de_aprobat: "în aprobare", aprobat: "aprobat", trimis: d.repliedAt ? "trimis, a răspuns" : "trimis", respins: "respins" }[d.status] || d.status)} · ${esc(fill(d.subject))}</div>`), ...deals.map(d => `<div>${esc(fmtD(d.date))} · vânzare ${esc(d.service)} · ${eur(d.value)}</div>`), ...mis.map(m => `<div>${esc(m.start ? fmtD(m.start) : "")} · misiune ${esc(m.title)} (${esc(m.status)})</div>`)].join("") : `<div class="note">Niciun contact anterior.</div>`}
+        <h4>Note interne</h4><div class="field"><textarea id="do-notes" style="min-height:80px" aria-label="Note interne">${esc(o.notes || "")}</textarea></div>
+        <h4>Pregătirea apelului</h4><div id="do-ai" class="note">${sample ? "Apasă „Pregătește apelul” pentru argumente, întrebări și obiecții probabile." : "AI indisponibil în această vizualizare."}</div>
+        <div class="row" style="margin-top:16px"><button class="btn primary" id="do-call" ${sample ? "" : "disabled"}>Pregătește apelul</button><button class="btn" id="do-mail" ${o.dnc ? "disabled" : ""}>Pregătește e-mail</button><button class="btn" id="do-prop">Ofertă PDF</button><button class="btn" id="do-save">Salvează notele</button><button class="btn ghost" id="do-x">Închide</button></div>
+      </div>`, (m) => {
+      m.classList.add("wide");
+      $("#do-x", m).onclick = closeModal;
+      $("#do-save", m).onclick = async () => { if (await patch("orgs", oid, { notes: $("#do-notes", m).value })) toast("Note salvate"); };
+      $("#do-mail", m).onclick = () => { closeModal(); openDraftComposer({ orgId: oid }); };
+      $("#do-prop", m).onclick = () => { closeModal(); openProposal({ orgId: oid }); };
+      $("#do-call", m).onclick = async () => {
+        const out = $("#do-ai", m); out.innerHTML = "<p>Pregătesc…</p>";
+        try {
+          const { text } = await sample(`Pregătește în ${S.lang === "en" ? "engleză" : "română"} un brief de apel de 2 minute pentru un director de firmă de close protection și servicii de lux care sună la ${o.name} (${ORG_TYPES[o.type]}, ${o.hq}). Structură: 1) Ce știm (2-3 puncte), 2) Unghiul de deschidere (o frază), 3) Trei întrebări bune, 4) Obiecții probabile și răspunsuri, 5) Ce cerem la final. Folosește doar datele de mai jos; nu inventa fapte despre companie.\n\nDe ce e țintă: ${o.why}\nEvenimente legate: ${evs.map(e => `${e.title} ${e.start} ${e.city}`).join("; ") || "—"}\nContacte: ${cts.map(c => `${c.name || ""} ${c.role}`).join("; ") || "—"}\nIstoric: ${hist.map(d => `${d.status} ${d.sentAt || ""}`).join("; ") || "niciun contact anterior"}\nNote: ${o.notes || "—"}\nServicii: ${services().map(s => s.name).join(", ")}`, { modelTier: "default", onText: ({ text }) => { out.innerHTML = md(text); } });
+          out.innerHTML = md(text);
+        } catch (err) { out.textContent = err?.code === "not_granted" ? "AI-ul are nevoie de acordul tău." : "Nu am putut pregăti acum."; }
+      };
+    });
+  }
+
+  // ---------- Ofertă PDF ----------
+  const PL = {
+    en: { title: "Proposal", for: "Prepared for", date: "Date", event: "Occasion", intro: "Thank you for considering us. Below is an indicative proposal combining discreet close protection with the private logistics your principals may need. Final pricing follows a short briefing on schedule, team size and locations.", svc: "Service", desc: "Scope", price: "Indicative price", total: "Indicative total", onreq: "on request", terms: "Indicative proposal, valid 30 days. Final quotation after briefing. All services are delivered with full confidentiality.", contact: "Contact" },
+    ro: { title: "Propunere", for: "Pentru", date: "Data", event: "Ocazia", intro: "Vă mulțumim pentru interes. Mai jos este o propunere orientativă care combină protecția apropiată discretă cu logistica privată de care ar putea avea nevoie principalii dumneavoastră. Prețul final urmează unui scurt briefing despre program, mărimea echipei și locații.", svc: "Serviciu", desc: "Ce include", price: "Preț orientativ", total: "Total orientativ", onreq: "la cerere", terms: "Propunere orientativă, valabilă 30 de zile. Ofertă finală după briefing. Toate serviciile sunt prestate cu confidențialitate deplină.", contact: "Contact" },
+    fr: { title: "Proposition", for: "Préparée pour", date: "Date", event: "Occasion", intro: "Merci de votre intérêt. Voici une proposition indicative associant une protection rapprochée discrète à la logistique privée dont vos mandants pourraient avoir besoin. Le prix final suit un court briefing sur le programme, l'équipe et les lieux.", svc: "Service", desc: "Périmètre", price: "Prix indicatif", total: "Total indicatif", onreq: "sur demande", terms: "Proposition indicative, valable 30 jours. Devis final après briefing. Tous les services sont assurés en toute confidentialité.", contact: "Contact" }
+  };
+  function openProposal({ orgId, eventId, inboundId } = {}) {
+    const inq = S.inbound.find(i => i.id === inboundId), o = orgById(orgId);
+    const linked = eventId || (o ? S.events.find(e => live(e) && (e.targets || []).includes(o.id))?.id : "");
+    const pr = S.pricing || {};
+    modal(`
+      <div class="eyebrow">Ofertă PDF</div><h2>Propunere pentru ${esc(o?.name || inq?.company || inq?.name || "client")}</h2>
+      <p class="muted" style="margin:0">Alege serviciile și prețurile orientative. PDF-ul folosește logo-ul și datele din Setări. Prețurile implicite se setează în Servicii.</p>
+      <form id="pp" class="grid">
+        <div class="field"><label for="pp-client">Client</label><input id="pp-client" value="${esc(o?.name || inq?.company || inq?.name || "")}"></div>
+        <div class="field"><label for="pp-ev">Ocazia</label><select id="pp-ev"><option value="">—</option>${S.events.filter(live).sort((a, b) => a.start.localeCompare(b.start)).map(e => `<option value="${esc(e.id)}" ${e.id === linked ? "selected" : ""}>${esc(fmtD(e.start))} · ${esc(e.title)}</option>`).join("")}</select></div>
+        <div class="field"><label for="pp-lang">Limba</label><select id="pp-lang"><option value="en">Engleză</option><option value="ro">Română</option><option value="fr">Franceză</option></select></div>
+        <div>${services().map((s, i) => `<div class="check" style="align-items:center;flex-wrap:wrap"><input type="checkbox" id="pp-s-${i}" ${["cp", "cars"].includes(s.id) ? "checked" : ""}><label for="pp-s-${i}" style="flex:1;min-width:160px">${esc(s.name)}</label><input class="select" style="width:120px;border-radius:8px" id="pp-p-${i}" type="number" min="0" placeholder="preț €" value="${esc(pr[s.id]?.price || "")}" aria-label="Preț ${esc(s.name)}"><input class="select" style="width:110px;border-radius:8px" id="pp-u-${i}" placeholder="unitate" value="${esc(pr[s.id]?.unit || "")}" aria-label="Unitate ${esc(s.name)}"><input class="select" style="width:70px;border-radius:8px" id="pp-q-${i}" type="number" min="1" value="1" aria-label="Cantitate ${esc(s.name)}"></div>`).join("")}</div>
+        <div class="field"><label for="pp-notes">Note pentru client (opțional)</label><textarea id="pp-notes" style="min-height:70px">${esc(inq?.need ? `${inq.need}${inq.where ? ", " + inq.where : ""}${inq.when ? ", " + inq.when : ""}` : "")}</textarea></div>
+        <div class="row"><button class="btn primary" type="submit">Descarcă PDF</button><button class="btn ghost" type="button" id="pp-x">Renunță</button><span class="note" id="pp-st"></span></div>
+      </form>`, (m) => {
+      m.classList.add("wide");
+      $("#pp-x", m).onclick = closeModal;
+      $("#pp", m).onsubmit = async (ev) => {
+        ev.preventDefault();
+        const items = services().map((s, i) => ({ s, on: $(`#pp-s-${i}`, m).checked, price: +$(`#pp-p-${i}`, m).value || 0, unit: $(`#pp-u-${i}`, m).value.trim(), qty: +$(`#pp-q-${i}`, m).value || 1 })).filter(x => x.on);
+        if (!items.length) { toast("Alege măcar un serviciu."); return; }
+        $("#pp-st", m).textContent = "Generez…";
+        const spec = { client: $("#pp-client", m).value.trim(), event: evById($("#pp-ev", m).value), lang: $("#pp-lang", m).value, notes: $("#pp-notes", m).value.trim(), items };
+        const ok = await buildProposalPDF(spec);
+        if (ok) { await put("proposals", newId("pr"), { orgId: orgId || "", inboundId: inboundId || "", client: spec.client, eventId: spec.event?.id || "", lang: spec.lang, items: items.map(x => ({ id: x.s.id, name: x.s.name, price: x.price, unit: x.unit, qty: x.qty })), createdAt: new Date().toISOString() }); if (inboundId) patch("inbound", inboundId, { status: "ofertă trimisă" }); closeModal(); }
+        else $("#pp-st", m).textContent = "";
+      };
+    });
+  }
+  async function imgData(url) {
+    try { const b = await (await fetch(url)).blob(); if (!/png|jpe?g/.test(b.type)) return null; const d = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(b); }); const im = new Image(); await new Promise((res, rej) => { im.onload = res; im.onerror = rej; im.src = d; }); return { d, w: im.naturalWidth, h: im.naturalHeight, f: /png/.test(b.type) ? "PNG" : "JPEG" }; } catch (e) { return null; }
+  }
+  async function buildProposalPDF(spec) {
+    if (!window.jspdf?.jsPDF) { toast("Generatorul PDF nu s-a încărcat. Reîncarcă pagina."); return false; }
+    if (!downloads) { toast("Descărcarea nu e disponibilă în această vizualizare."); return false; }
+    const L = PL[spec.lang] || PL.en, c = S.config || {}, b = S.brand || {};
+    const tr = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[„”“]/g, '"').replace(/[’‘]/g, "'").replace(/[–—]/g, "-").replace(/·/g, "-").replace(/€/g, "EUR");
+    const hex = (h) => { const m = /^#?([0-9a-f]{6})$/i.exec(h || ""); const n = parseInt(m ? m[1] : "D6BE91", 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+    const acc = hex(b.accent || "#D6BE91");
+    const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4" }); const W = 595, M = 56; let y;
+    doc.setFillColor(14, 17, 19); doc.rect(0, 0, W, 132, "F");
+    let tx = M; const logo = b.logoUrl ? await imgData(b.logoUrl) : null;
+    if (logo) { const h = 44, w = Math.min(140, logo.w * h / logo.h); doc.addImage(logo.d, logo.f, M, 30, w, h); tx = M; }
+    doc.setTextColor(...acc); doc.setFont("times", "normal"); doc.setFontSize(24); doc.text(tr(c.company || "Private Protection"), tx, logo ? 98 : 74);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(190, 186, 176); doc.text("CLOSE PROTECTION  -  PRIVATE AVIATION  -  CHAUFFEURED CARS  -  HOTELS & YACHTS", tx, logo ? 116 : 94, { charSpace: 0.6 });
+    y = 178; doc.setTextColor(30, 30, 30); doc.setFont("times", "normal"); doc.setFontSize(26); doc.text(tr(`${L.title}`), M, y);
+    y += 26; doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(90, 90, 90);
+    doc.text(tr(`${L.for}: ${spec.client || "-"}`), M, y); doc.text(tr(`${L.date}: ${fmtD(iso(today()))}`), W - M, y, { align: "right" });
+    if (spec.event) { y += 16; doc.text(tr(`${L.event}: ${spec.event.title}, ${range(spec.event.start, spec.event.end)} ${parseD(spec.event.start).getFullYear()}, ${spec.event.city}`), M, y); }
+    y += 26; doc.setTextColor(40, 40, 40); doc.setFontSize(10.5); const intro = doc.splitTextToSize(tr(L.intro), W - 2 * M); doc.text(intro, M, y); y += intro.length * 14 + 14;
+    doc.setDrawColor(...acc); doc.setLineWidth(1); doc.line(M, y, W - M, y); y += 18;
+    doc.setFontSize(8.5); doc.setTextColor(120, 120, 120); doc.text(tr(L.svc).toUpperCase(), M, y, { charSpace: 0.8 }); doc.text(tr(L.price).toUpperCase(), W - M, y, { align: "right", charSpace: 0.8 }); y += 14;
+    let total = 0, anyOnReq = false;
+    for (const it of spec.items) {
+      if (y > 720) { doc.addPage(); y = 64; }
+      const line = it.price ? it.price * it.qty : 0; total += line; if (!it.price) anyOnReq = true;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(25, 25, 25); doc.text(tr(it.s.name), M, y + 4);
+      doc.setFont("helvetica", "normal"); doc.text(tr(it.price ? `${(line).toLocaleString("en-GB")} EUR` : L.onreq), W - M, y + 4, { align: "right" });
+      doc.setFontSize(9.5); doc.setTextColor(100, 100, 100); const d = doc.splitTextToSize(tr(it.s.desc + (it.price ? `  (${it.qty} x ${it.price} EUR${it.unit ? " / " + it.unit : ""})` : "")), W - 2 * M - 140); doc.text(d, M, y + 18);
+      if (it.s.partners) { /* partners stay internal */ }
+      y += 18 + d.length * 12 + 12; doc.setDrawColor(225, 222, 215); doc.setLineWidth(0.5); doc.line(M, y - 6, W - M, y - 6);
+    }
+    y += 8; doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(25, 25, 25); doc.text(tr(L.total), M, y); doc.text(tr(total ? `${total.toLocaleString("en-GB")} EUR${anyOnReq ? " + " + L.onreq : ""}` : L.onreq), W - M, y, { align: "right" });
+    if (spec.notes) { y += 30; doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(60, 60, 60); const n = doc.splitTextToSize(tr(spec.notes), W - 2 * M); doc.text(n, M, y); y += n.length * 13; }
+    y = Math.max(y + 30, 700); if (y > 760) { doc.addPage(); y = 120; }
+    doc.setFontSize(9); doc.setTextColor(110, 110, 110); doc.text(doc.splitTextToSize(tr(L.terms), W - 2 * M), M, y);
+    doc.setFillColor(14, 17, 19); doc.rect(0, 800, W, 42, "F"); doc.setTextColor(...acc); doc.setFontSize(9);
+    doc.text(tr([c.sender, c.title, c.phone, c.website].filter(Boolean).join("   -   ") || L.contact), W / 2, 824, { align: "center" });
+    const name = `${tr(L.title)}-${tr(spec.client || "client").replace(/[^A-Za-z0-9]+/g, "-")}.pdf`;
+    try { await downloads.save({ filename: name, data: doc.output("arraybuffer") }); toast("PDF pregătit"); return true; }
+    catch (err) { toast(err?.code === "declined" ? "Descărcare anulată." : "Nu am putut salva PDF-ul."); return false; }
+  }
+
+  // ---------- GDPR ----------
+  function csv(rows) { return rows.map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n"); }
+  async function exportGDPR() {
+    if (!downloads) { toast("Descărcarea nu e disponibilă aici."); return; }
+    const rows = [["tip", "companie", "nume", "rol", "email", "telefon", "sursa", "status", "data"]];
+    S.contacts.forEach(c => rows.push(["contact", orgById(c.orgId)?.name, c.name, c.role, c.email, c.phone, c.source, c.status, c.verified]));
+    S.optouts.forEach(o => rows.push(["dezabonare", orgById(o.orgId)?.name || "", "", "", o.email || "", "", o.reason || "", "", o.date]));
+    S.orgs.filter(o => o.dnc).forEach(o => rows.push(["nu contacta", o.name, "", "", "", "", "", "", ""]));
+    try { await downloads.save({ filename: `registru-gdpr-${iso(today())}.csv`, data: "﻿" + csv(rows) }); toast("Registru exportat"); } catch (e) { toast("Export anulat."); }
+  }
+  const isOptedOut = (email) => !!email && S.optouts.some(o => o.email && o.email.toLowerCase() === email.toLowerCase());
+
+  // ---------- English interface (chrome only; research data stays as written) ----------
+  const EN = {
+    "Azi": "Today", "Radar": "Radar", "Țări": "Countries", "Contacte": "Contacts", "Companii": "Companies", "Semnale": "Signals", "Cereri primite": "Inbound", "De aprobat": "To approve", "Pipeline": "Pipeline", "Misiuni": "Missions", "Parteneri": "Partners", "Conținut": "Content", "Statistici": "Analytics", "Servicii": "Services", "Noutăți": "Updates", "Setări": "Settings",
+    "Unde vor fi principalii în următoarele luni": "Where principals will be in the coming months", "evenimente în 90 de zile": "events in the next 90 days", "cu fereastra de advance deschisă sau aproape": "with the advance window open or close", "țări acoperite": "countries covered", "e-mailuri așteaptă aprobarea": "emails awaiting approval",
+    "Categorie": "Category", "Toate": "All", "Resetează filtrele": "Reset filters", "Pregătește outreach": "Prepare outreach", "Cui scriem": "Who to write to", "confirmat": "confirmed", "de reconfirmat": "to reconfirm", "în desfășurare": "under way",
+    "Fiecare țară, cu evenimentele ei": "Every country, with its events", "Toate țările": "All countries", "Situația de securitate": "Security situation",
+    "Oamenii la care trebuie să ajungem": "The people we need to reach", "+ Adaugă contact": "+ Add contact", "Găsește decidenții pe LinkedIn": "Find decision-makers on LinkedIn", "Scrie e-mail": "Write email", "copiază": "copy", "verificat": "verified", "de verificat": "to verify", "fără e-mail public": "no public email", "Șterge (GDPR)": "Delete (GDPR)",
+    "Cine cumpără protecție și lux, în mod recurent": "Who buys protection and luxury, repeatedly", "+ Adaugă companie": "+ Add company", "Pregătește e-mail": "Prepare email", "+ Contact": "+ Contact", "Editează": "Edit", "Dosar": "Dossier", "Ofertă": "Proposal", "Contact": "Contact", "Decidenți (LinkedIn)": "Decision-makers (LinkedIn)", "Fără contact direct încă": "No direct contact yet", "Site oficial": "Official site",
+    "Cine caută protecție chiar acum": "Who is looking for protection right now", "Licitații & știri": "Tenders & news",
+    "Nimic nu pleacă fără aprobarea voastră": "Nothing goes out without your approval", "Aprobă": "Approve", "Mai scurt": "Shorter", "În engleză": "In English", "Adaugă oferta de lux": "Add the luxury offer", "Salvează": "Save", "Respinge": "Reject", "Deschide în Gmail": "Open in Gmail", "Deschide în Outlook": "Open in Outlook", "Copiază textul": "Copy text", "Am trimis": "I sent it", "A răspuns": "Replied", "Scrie follow-up": "Write follow-up", "Readu la aprobare": "Back to approval", "Aprobate, de trimis": "Approved, to send", "Trimise": "Sent", "Respinse": "Rejected", "Către": "To", "Subiect": "Subject", "Mesaj": "Message", "primul contact": "first contact", "follow-up": "follow-up",
+    "Cine a răspuns și cui îi scriem din nou": "Who replied and who we write to again", "Nou": "New", "În cercetare": "Researching", "Contactat": "Contacted", "Întâlnire": "Meeting", "Client": "Client", "Pierdut / pauză": "Lost / paused",
+    "Protecție și tot ce ține de lux, într-o singură ofertă": "Protection and everything luxury, in one offer", "Editează serviciile, partenerii și prețurile": "Edit services, partners and prices", "Parteneri": "Partners",
+    "Ce a găsit radarul": "What the radar found", "Marchează toate ca citite": "Mark all as read", "Deschide": "Open", "Citit": "Read",
+    "Identitatea din e-mailuri": "Identity used in emails", "Numele companiei": "Company name", "Cine semnează": "Signed by", "Funcția": "Title", "Baza de operare": "Home base", "Telefon": "Phone", "Site": "Website", "Semnătura completă": "Full signature", "Ce vă diferențiază (folosit de AI)": "What sets you apart (used by AI)", "Cum lucrează radarul": "How the radar works", "Brand": "Brand", "Echipa": "Team", "E-mail (Gmail)": "Email (Gmail)", "Registru GDPR": "GDPR register", "Adaugă": "Add", "Adaugă dezabonare": "Add unsubscribe", "Exportă registrul (CSV)": "Export register (CSV)", "Încarcă logo (PNG sau JPG)": "Upload logo (PNG or JPG)", "Culoare accent": "Accent colour", "Culoarea implicită": "Default colour",
+    "Clienții care vin singuri": "Clients who come to you", "+ Adaugă cerere": "+ Add enquiry", "Misiune": "Mission",
+    "+ Misiune nouă": "+ New mission", "+ Partener": "+ Partner", "+ Vânzare": "+ Sale", "Ce aduce fiecare partener": "What each partner brings", "parteneri": "partners", "vânzări înregistrate": "sales recorded", "comision total": "total commission", "comision încasat": "commission collected", "Vânzări": "Sales", "Valoare vândută pe serviciu": "Value sold per service",
+    "Postări care aduc clienți singuri": "Posts that bring clients to you", "Generează 3 postări": "Generate 3 posts", "Copiază": "Copy", "Deschide LinkedIn": "Open LinkedIn", "Am publicat": "Published", "Șterge": "Delete",
+    "Ce funcționează": "What works", "e-mailuri trimise": "emails sent", "rată de răspuns": "reply rate", "întâlniri și clienți": "meetings and clients", "clienți": "clients", "Răspuns pe tip de companie": "Reply rate by company type", "Răspuns pe țară": "Reply rate by country", "Răspuns pe limbă": "Reply rate by language", "Răspuns pe tipul ofertei": "Reply rate by offer type",
+    "Briefing scris de AI": "AI briefing", "Următoarele evenimente": "Upcoming events", "Vezi": "View", "Trimite": "Send", "Răspunde": "Reply", "Nimic urgent azi": "Nothing urgent today",
+    "Concierge AI": "Concierge AI", "Conversație nouă": "New conversation", "Intră": "Enter", "Accesul vine din contul tău claude.ai.": "Access comes from your claude.ai account.",
+    "Radarul global al protecției private: evenimente, oameni, acces. De pe Riviera, pentru orice colț al lumii.": "The global radar for private protection: events, people, access. From the Riviera, for every corner of the world.",
+    "Caută eveniment, țară, companie, persoană…": "Search event, country, company, person…", "Întreabă orice: evenimente, țări, contacte, strategie…": "Ask anything: events, countries, contacts, strategy…",
+    "Primele acțiuni ale zilei, în ordinea importanței, calculate din tot ce e în aplicație. Briefingul vine și pe telefon în fiecare dimineață.": "Today's first actions, in order of importance, computed from everything in the app. The briefing also arrives on your phone every morning.",
+    "Se încarcă datele…": "Loading data…", "Câteva secunde.": "A few seconds."
+  };
+  function translateDom(root) {
+    if (!root) return;
+    const toEn = S.lang === "en";
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let n; while ((n = w.nextNode())) {
+      if (toEn) { const k = n.nodeValue.trim(); if (k && EN[k] && !n.__ro) { n.__ro = n.nodeValue; n.nodeValue = n.nodeValue.replace(k, EN[k]); } }
+      else if (n.__ro) { n.nodeValue = n.__ro; delete n.__ro; }
+    }
+    root.querySelectorAll?.("[placeholder]").forEach(el => {
+      if (toEn) { const k = el.getAttribute("placeholder"); if (EN[k]) { el.dataset.phRo = k; el.setAttribute("placeholder", EN[k]); } }
+      else if (el.dataset.phRo) { el.setAttribute("placeholder", el.dataset.phRo); delete el.dataset.phRo; }
+    });
   }
 
   const emptyLoading = () => `<div class="empty"><h3>Se încarcă datele…</h3><p>${S.dbOk === false ? "Baza de date nu răspunde în această vizualizare. Deschide aplicația din contul claude.ai." : "Câteva secunde."}</p></div>`;
@@ -904,6 +1377,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
     L.innerHTML = `<div class="scrim" id="scrim"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`;
     $("#scrim").addEventListener("click", (ev) => { if (ev.target.id === "scrim") closeModal(); });
     onMount?.($(".modal", L));
+    translateDom(L);
     $(".modal input, .modal select, .modal textarea", L)?.focus();
   }
   const closeModal = () => { $("#layer").innerHTML = ""; };
@@ -1037,14 +1511,15 @@ ${note ? "Extra instruction from the owner: " + note : ""}`, { modelTier: "defau
     modal(`
       <div class="eyebrow">Portofoliu</div><h2>Servicii și parteneri</h2>
       <form id="se" class="grid">
-        ${list.map((s, i) => `<div class="field"><label for="se-p-${i}">${esc(s.name)} · parteneri</label><input id="se-p-${i}" value="${esc(s.partners || "")}" placeholder="ex. nume partener, oraș"><input id="se-d-${i}" value="${esc(s.desc)}" aria-label="Descriere ${esc(s.name)}" style="margin-top:6px"></div>`).join("")}
+        ${list.map((s, i) => `<div class="field"><label for="se-p-${i}">${esc(s.name)} · parteneri</label><input id="se-p-${i}" value="${esc(s.partners || "")}" placeholder="ex. nume partener, oraș"><input id="se-d-${i}" value="${esc(s.desc)}" aria-label="Descriere ${esc(s.name)}" style="margin-top:6px"><div class="row" style="margin-top:6px"><input id="se-pr-${i}" type="number" min="0" placeholder="preț orientativ €" value="${esc(S.pricing[s.id]?.price || "")}" aria-label="Preț ${esc(s.name)}" style="flex:1"><input id="se-un-${i}" placeholder="unitate (zi, oră, transfer)" value="${esc(S.pricing[s.id]?.unit || "")}" aria-label="Unitate ${esc(s.name)}" style="flex:1"></div></div>`).join("")}
         <div class="row"><button class="btn primary" type="submit">Salvează</button><button class="btn ghost" type="button" id="se-x">Renunță</button></div>
       </form>`, (m) => {
       $("#se-x", m).onclick = closeModal;
       $("#se", m).onsubmit = async (ev) => {
         ev.preventDefault();
         const items = list.map((s, i) => ({ ...s, partners: $(`#se-p-${i}`, m).value.trim(), desc: $(`#se-d-${i}`, m).value.trim() }));
-        if (await put("config", "services", { items })) { closeModal(); toast("Servicii salvate"); }
+        const pricing = Object.fromEntries(list.map((s, i) => [s.id, { price: +$(`#se-pr-${i}`, m).value || 0, unit: $(`#se-un-${i}`, m).value.trim() }]));
+        if (await put("config", "services", { items }) && await put("config", "pricing", pricing)) { closeModal(); toast("Servicii și prețuri salvate"); }
       };
     });
   }
@@ -1107,7 +1582,7 @@ ${note ? "Extra instruction from the owner: " + note : ""}`, { modelTier: "defau
     if ($("#aiIn")) $("#aiIn").value = "";
     AI.turns.push({ role: "user", content: text }); AI.busy = true; AI.ctl = new AbortController(); renderAI("");
     const cfg = S.config || {};
-    const RULES = `Ești Concierge AI din „Perimetru”, aplicația internă a unei companii de close protection și servicii private de lux (${cfg.company || "numele companiei nu e încă setat"}, baza: ${cfg.base || "București"}). Utilizatorul e proprietarul sau fratele lui. Răspunde în română, concis, ca un consilier senior: concret, cu nume, date și pași următori. Azi este ${iso(today())}.
+    const RULES = `Ești Concierge AI din „Perimetru”, aplicația internă a unei companii de close protection și servicii private de lux (${cfg.company || "numele companiei nu e încă setat"}, baza: ${cfg.base || "București"}). Utilizatorul e proprietarul sau fratele lui. Răspunde în ${S.lang === "en" ? "engleză" : "română"}, concis, ca un consilier senior: concret, cu nume, date și pași următori. Azi este ${iso(today())}.
 Ai unelte care citesc datele aplicației (evenimente, companii, contacte, pipeline) și una care creează drafturi de e-mail pentru aprobare. Folosește-le ori de câte ori întrebarea atinge aceste date; citează data, țara și sursa când dai un eveniment. Poți folosi și cunoștințele tale generale (industrie, strategie, piețe, protocol), dar spune clar ce vine din aplicație și ce e cunoaștere generală. Nu poți naviga pe internet: pentru informații noi sau recente folosește request_research și spune-i utilizatorului că radarul răspunde la următoarea rulare.
 Nu inventa contacte, adrese de e-mail, telefoane sau date. Nu urmări persoane private și nu căuta date personale (adrese de domiciliu, telefoane personale, deplasări). Contactele legitime sunt date de business publicate. Nu trimite niciun e-mail: drafturile merg la „De aprobat”.
 Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})` : "")).join("; ")}.`;
@@ -1132,13 +1607,41 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     const el = ev.target.closest("[data-act],[data-f],[data-go],[data-sub]");
     if (!el || el.closest(".ai-panel") && !el.dataset.act) return;
     if (el.dataset.f) { S.f[el.dataset.f] = el.dataset.v; saveF(); render(); return; }
-    if (el.dataset.go) { if (el.dataset.h) { S.f.horizon = +el.dataset.h; saveF(); } if (location.hash === "#" + el.dataset.go) render(); else location.hash = "#" + el.dataset.go; return; }
+    if (el.dataset.go) { if (el.dataset.subgo) S.f.sub = el.dataset.subgo; if (el.dataset.h) { S.f.horizon = +el.dataset.h; saveF(); } if (location.hash === "#" + el.dataset.go) render(); else location.hash = "#" + el.dataset.go; return; }
     if (el.dataset.sub) { S.f.sub = el.dataset.sub; render(); return; }
     const id = el.dataset.id, act = el.dataset.act;
     const d = S.drafts.find(x => x.id === id);
     const readEdits = () => ({ to: $(`#to-${id}`)?.value.trim() ?? d.to, subject: $(`#su-${id}`)?.value ?? d.subject, body: $(`#bo-${id}`)?.value ?? d.body });
     const goTo = (hash, anchor) => { closeAI(); if (location.hash === hash) render(); else location.hash = hash; requestAnimationFrame(() => setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "center" }), 30)); };
     switch (act) {
+      case "ai-brief": aiBrief(); break;
+      case "new-inbound": openInbound(); break;
+      case "inbound-proposal": openProposal({ inboundId: id }); break;
+      case "inbound-mission": { const q = S.inbound.find(x => x.id === id); openMission(null, { title: `${q?.need || "Misiune"}${q?.company || q?.name ? " · " + (q.company || q.name) : ""}`, notes: q?.summary || "", inboundId: id }); break; }
+      case "new-mission": openMission(null); break;
+      case "open-mission": openMission(S.missions.find(x => x.id === id)); break;
+      case "new-partner": openPartner(null); break;
+      case "edit-partner": openPartner(S.partners.find(x => x.id === id)); break;
+      case "new-deal": openDeal(null); break;
+      case "edit-deal": openDeal(S.deals.find(x => x.id === id)); break;
+      case "gen-posts": genPosts(el); break;
+      case "copy-post": { const t = $(`#po-${id}`)?.value || ""; try { await navigator.clipboard.writeText(t); toast("Copiat"); } catch (e) { $(`#po-${id}`)?.select(); toast("Selectat. Apasă Ctrl/Cmd+C."); } break; }
+      case "save-post": if (await patch("posts", id, { text: $(`#po-${id}`)?.value || "" })) toast("Salvat"); break;
+      case "post-done": if (await patch("posts", id, { status: "publicat", postedAt: iso(today()) })) toast("Marcat publicat"); break;
+      case "del-post": try { await db.collection("posts").doc(id).delete(); toast("Șters"); } catch (e) { toast("Nu s-a șters."); } break;
+      case "dossier": openDossier(id); break;
+      case "proposal-org": openProposal({ orgId: id }); break;
+      case "del-member": try { await db.collection("team").doc(id).delete(); toast("Scos din echipă"); } catch (e) { toast("Nu s-a șters."); } break;
+      case "brand-reset": if (await put("config", "brand", { ...S.brand, accent: "" })) toast("Culoarea implicită"); break;
+      case "gdpr-export": exportGDPR(); break;
+      case "gdpr-del": {
+        const c = S.contacts.find(x => x.id === id); if (!c) return;
+        modal(`<div class="eyebrow">GDPR</div><h2>Ștergi contactul?</h2><p>${esc(c.name || c.role)}${c.email ? ` · ${esc(c.email)}` : ""}. Contactul dispare definitiv din aplicație${c.email ? ", iar adresa intră pe lista de dezabonări ca să nu mai fie contactată" : ""}.</p><div class="row"><button class="btn danger" id="gd-y">Șterge definitiv</button><button class="btn ghost" id="gd-n">Renunță</button></div>`, (m) => {
+          $("#gd-n", m).onclick = closeModal;
+          $("#gd-y", m).onclick = async () => { try { await db.collection("contacts").doc(id).delete(); if (c.email) await put("optouts", newId("op"), { email: c.email, orgId: c.orgId, reason: "ștergere la cerere", date: iso(today()) }); closeModal(); toast("Contact șters"); } catch (e) { toast("Nu s-a șters."); } };
+        });
+        break;
+      }
       case "clear-f": Object.assign(S.f, { cat: "all", need: "all", region: "all", cc: "all" }); saveF(); render(); break;
       case "open-cc": S.f.cc = id; S.f.cat = "all"; S.f.need = "all"; S.f.region = "all"; saveF(); goTo("#countries"); window.scrollTo(0, 0); break;
       case "draft-event": openDraftComposer({ eventId: id }); break;
@@ -1157,6 +1660,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
         const e = readEdits();
         if (/\{\{(company|signature|sender)\}\}/.test(e.subject + e.body)) { toast("Completează Setările (numele companiei și semnătura) înainte de aprobare."); return; }
         if (!e.to) { toast("Completează adresa „Către” înainte de aprobare."); $(`#to-${id}`)?.focus(); return; }
+        if (isOptedOut(e.to)) { toast("Adresa aceasta s-a dezabonat. Nu poate fi contactată."); return; }
         if (await patch("drafts", id, { ...e, status: "aprobat", approvedAt: new Date().toISOString() })) { S.f.sub = "aprobat"; toast("Aprobat. Deschide-l în Gmail sau Outlook și trimite."); }
         break;
       }
@@ -1209,9 +1713,19 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     const el = ev.target;
     const map = { fRegion: "region", fHorizon: "horizon", fNeed: "need", fCc: "cc" };
     if (map[el.id]) { S.f[map[el.id]] = map[el.id] === "horizon" ? +el.value : el.value; saveF(); render(); }
+    else if (el.dataset?.act === "owner") { if (await patch("orgs", el.dataset.id, { owner: el.value })) toast("Responsabil salvat"); }
+    else if (el.dataset?.act === "inbound-status") { if (await patch("inbound", el.dataset.id, { status: el.value })) toast("Stare salvată"); }
+    else if (el.id === "brandColor") { if (await put("config", "brand", { ...S.brand, accent: el.value })) toast("Culoare salvată"); }
+    else if (el.id === "brandFile" && el.files?.[0]) {
+      const f = el.files[0]; if (f.size > 2e6) { toast("Logo-ul trebuie să fie sub 2 MB."); return; }
+      try { const a = await assets.upload(f); if (S.brand?.logoId && S.brand.logoId !== a.id) { try { await assets.delete(S.brand.logoId); } catch (e) {} } if (await put("config", "brand", { ...S.brand, logoId: a.id, logoUrl: a.url })) toast("Logo salvat"); }
+      catch (e) { toast("Nu am putut încărca logo-ul."); }
+    }
     else if (el.dataset?.act === "stage") { if (await patch("orgs", el.dataset.id, { status: el.value })) toast(`Mutat la „${STAGE_LABEL[el.value]}”`); }
   });
   document.addEventListener("submit", async (ev) => {
+    if (ev.target.id === "teamForm") { ev.preventDefault(); const name = $("#tm-name").value.trim(); if (name && await put("team", newId("tm"), { name, email: $("#tm-email").value.trim(), role: $("#tm-role").value })) toast("Adăugat în echipă"); return; }
+    if (ev.target.id === "optForm") { ev.preventDefault(); const email = $("#op-email").value.trim(); if (email && await put("optouts", newId("op"), { email, reason: "a cerut dezabonarea", date: iso(today()) })) toast("Dezabonare înregistrată"); return; }
     if (ev.target.id !== "cfgForm") return;
     ev.preventDefault();
     const keys = ["company", "sender", "title", "base", "phone", "website", "signature", "pitch"];
@@ -1221,10 +1735,11 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
   let qT; $("#q").addEventListener("input", (e) => { clearTimeout(qT); qT = setTimeout(() => { S.f.q = e.target.value; render(); }, 160); });
   $("#bell").addEventListener("click", () => { location.hash = "#alerts"; });
   $("#aiFab").addEventListener("click", openAI);
+  $("#langBtn").addEventListener("click", () => { S.lang = S.lang === "en" ? "ro" : "en"; try { localStorage.setItem("perimetru.lang", S.lang); } catch (e) {} document.documentElement.lang = S.lang; render(); translateDom(document.querySelector("header.top")); translateDom($("#arrival")); });
 
   // ---------- render ----------
-  const VIEWS = { radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
-  const current = () => { const h = location.hash.slice(1); return VIEWS[h] ? h : "radar"; };
+  const VIEWS = { today: viewToday, inbound: viewInbound, missions: viewMissions, partners: viewPartners, content: viewContent, stats: viewStats, radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
+  const current = () => { const h = location.hash.slice(1); return VIEWS[h] ? h : "today"; };
   function render() {
     const v = current();
     const active = document.activeElement;
@@ -1242,8 +1757,21 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     $("#c-approvals").textContent = S.drafts.filter(d => d.status === "de_aprobat").length || "";
     $("#c-pipeline").textContent = dueFollowUps().length || "";
     $("#c-alerts").textContent = unread || "";
+    $("#c-today").textContent = S.ready ? (todayActions().length || "") : "";
+    $("#c-inbound").textContent = S.inbound.filter(i => (i.status || "nou") === "nou").length || "";
+    $("#c-missions").textContent = S.missions.filter(m => !["încheiată", "anulată"].includes(m.status)).length || "";
+    $("#langBtn").textContent = S.lang === "en" ? "RO" : "EN";
+    applyBrand();
+    translateDom($("#main"));
     if (S.config?.company) $("#brandSub").textContent = `${S.config.company} · intelligence & acces privat`;
     if (!AI.busy && $("#aiLog") && !AI.turns.length) renderAI();
+  }
+  function applyBrand() {
+    const b = S.brand || {};
+    const root = document.documentElement.style;
+    if (b.accent) { root.setProperty("--gold", b.accent); root.setProperty("--gold-soft", b.accent + "22"); } else { root.removeProperty("--gold"); root.removeProperty("--gold-soft"); }
+    for (const id of ["brandLogo", "arrLogo"]) { const im = document.getElementById(id); if (!im) continue; if (b.logoUrl) { if (im.getAttribute("src") !== b.logoUrl) im.src = b.logoUrl; im.hidden = false; } else im.hidden = true; }
+    const mark = document.getElementById("brandMark"); if (mark) mark.style.display = b.logoUrl ? "none" : "";
   }
   document.addEventListener("focusout", () => { if (render.pending) { render.pending = false; setTimeout(render, 0); } });
   window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
@@ -1266,20 +1794,24 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
 
   // ---------- boot ----------
   setupArrival();
+  document.documentElement.lang = S.lang;
   render();
+  translateDom(document.querySelector("header.top")); translateDom($("#arrival"));
   (async () => {
     const use = async (n) => { try { return await window.claude?.use?.(n); } catch (e) { return null; } };
-    [db, sample, userCap] = await Promise.all([use("db"), use("sample"), use("user")]);
+    [db, sample, userCap, assets, downloads] = await Promise.all([use("db"), use("sample"), use("user"), use("assets"), use("downloads")]);
     if (userCap?.me) { try { S.me = await userCap.me(); setupArrival.greet?.(S.me?.name); } catch (e) {} }
     S.dbOk = !!db;
     if (!db) { render(); return; }
-    const cols = ["events", "orgs", "drafts", "alerts", "contacts", "signals", "requests"];
+    const cols = ["events", "orgs", "drafts", "alerts", "contacts", "signals", "requests", "missions", "partners", "deals", "team", "posts", "inbound", "optouts", "proposals", "countryintel"];
     const pending = new Set(cols);
     cols.forEach(name => db.collection(name).limit(1000).onSnapshot((snap) => {
       S[name] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       pending.delete(name); if (!pending.size) S.ready = true; render();
     }, () => { pending.delete(name); if (!pending.size) S.ready = true; render(); }));
     db.doc("config/main").onSnapshot((s) => { S.config = s.exists ? s.data() : {}; render(); }, () => {});
+    db.doc("config/pricing").onSnapshot((s) => { S.pricing = s.exists ? s.data() : {}; render(); }, () => {});
+    db.doc("config/brand").onSnapshot((s) => { S.brand = s.exists ? s.data() : {}; render(); }, () => {});
     db.doc("config/services").onSnapshot((s) => { S.services = s.exists ? (s.data().items || null) : null; render(); }, () => {});
   })();
 })();
