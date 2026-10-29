@@ -20,7 +20,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from engine import agent, analyze, autoplan, export, ff, presets, render, speech, styles, timing, validate
+from engine import (agent, analyze, autoplan, dub, export, ff, presets, render, shorts, speech, styles, thumb,
+                    timing, validate)
 from engine.plan import ASPECT_SIZE, EditPlan, timeline, total_length
 
 try:
@@ -56,7 +57,8 @@ _jobs: dict = {}
 
 def load_settings() -> dict:
     data = {"api_key": "", "model": agent.DEFAULT_MODEL, "effort": "medium",
-            "eleven_key": "", "eleven_voice": "", "whisper_model": "small"}
+            "eleven_key": "", "eleven_voice": "", "whisper_model": "small", "my_voice_id": "",
+            "my_voice_name": ""}
     if SETTINGS_FILE.exists():
         data.update(json.loads(SETTINGS_FILE.read_text(encoding="utf-8")))
     os.environ["MONTAJ_WHISPER_MODEL"] = data["whisper_model"]
@@ -104,7 +106,9 @@ def update(pid: str, fn):
 
 DEFAULT_SETTINGS = {"preset": presets.DEFAULT, "style_id": "", "aspect": "", "duration": 30, "rules": "",
                     "title": "", "outro": "", "caption_style": "", "beat_fx": "", "auto_color": True,
-                    "music_align": True, "self_review": True, "voiceover": False, "voiceover_text": ""}
+                    "music_align": True, "self_review": True, "voiceover": False, "voiceover_text": "",
+                    "tighten": False, "voice_enhance": False, "emphasis_zoom": False, "sfx": False,
+                    "auto_broll": False, "background": ""}
 
 
 def new_project(name: str) -> dict:
@@ -207,19 +211,26 @@ def make_plan(project: dict, settings: dict, use_ai: bool, style: dict) -> tuple
                                s["model"], s["effort"], style)
     else:
         plan = autoplan.build(material, project["analysis"], settings, style)
+    autoplan.apply_switches(plan, settings, [m for m in material if m["kind"] != "audio"], project["analysis"])
     plan, issues = validate.validate(plan, media_map(project), project["analysis"])
     if not plan.clips:
         raise RuntimeError("Planul nu are clipuri valide. " + " ".join(issues))
     return plan, issues
 
 
-def render_plan(project: dict, plan: EditPlan, out: Path, quality: str, step, lo: float, hi: float):
-    """Prepare extras (voice-over, captions, beats, faces) and render. Returns (info, issues)."""
-    d = pdir(project["id"])
+def voice_id() -> str | None:
     s = load_settings()
-    extras, issues = timing.prepare(plan, project["analysis"], d / "work", eleven_key(),
-                                    s.get("eleven_voice") or None,
-                                    lambda msg: step(lo, msg))
+    return s.get("my_voice_id") or s.get("eleven_voice") or None
+
+
+def render_plan(project: dict, plan: EditPlan, out: Path, quality: str, step, lo: float, hi: float,
+                override: dict | None = None):
+    """Prepare extras (voice-over, captions, beats, faces, masks, effects) and render.
+    override replaces parts of the extras (dubbing). Returns (info, issues)."""
+    d = pdir(project["id"])
+    extras, issues = timing.prepare(plan, project["analysis"], d / "work", eleven_key(), voice_id(),
+                                    lambda msg: step(lo, msg), media_map(project), d / "media")
+    extras.update(override or {})
     info = render.render(plan, media_map(project), d / "media", d / "work", out, quality,
                          lambda p, msg="": step(lo + (hi - lo) * p, msg or None), extras)
     return info, issues
@@ -288,6 +299,14 @@ def self_review(pid: str, step, lo: float, hi: float):
 
 # ----------------------------------------------------------------- API: app
 
+def people_ok() -> bool:
+    try:
+        from engine import people
+        return people.available()
+    except Exception:
+        return False
+
+
 @app.get("/api/status")
 def status():
     s = load_settings()
@@ -299,6 +318,9 @@ def status():
         "eleven_voice": s.get("eleven_voice", ""),
         "whisper": speech.available(), "whisper_model": s["whisper_model"],
         "faces": bool(vision and vision.faces_available()), "quality": vision is not None,
+        "people": people_ok(), "demucs": dub.demucs_available(),
+        "my_voice": s.get("my_voice_name") if s.get("my_voice_id") else "",
+        "languages": dub.LANGUAGES,
         "model": s["model"], "effort": s["effort"],
         "models": agent.MODELS,
         "presets": {k: {"label": v["label"], "aspect": v["aspect"], "duration": v["duration"],
@@ -363,7 +385,7 @@ def create_project(body: NameIn):
 def get_project(pid: str):
     project = load(pid)
     project["settings"] = {**DEFAULT_SETTINGS, **project["settings"]}
-    for key in ("variants", "review", "social"):
+    for key in ("variants", "review", "social", "shorts", "dubs"):
         project.setdefault(key, None if key != "variants" else [])
     project["running"] = running_job(pid)
     if project["plan"]:
@@ -471,6 +493,12 @@ class ProjectSettings(BaseModel):
     self_review: bool = True
     voiceover: bool = False
     voiceover_text: str = ""
+    tighten: bool = False
+    voice_enhance: bool = False
+    emphasis_zoom: bool = False
+    sfx: bool = False
+    auto_broll: bool = False
+    background: str = ""
 
 
 @app.put("/api/projects/{pid}/settings")
@@ -725,7 +753,7 @@ def export_final(pid: str, body: ExportIn):
         render.export_mp3(main_video, out / f"{base}.mp3")
         step(0.85, "Copertă JPG + PNG")
         render.export_cover(plan, media, d / "media", d / "work", out / f"{base}_coperta", quality)
-        step(0.88, "Fișiere pentru DaVinci Resolve / CapCut")
+        step(0.86, "Fișiere pentru DaVinci Resolve / CapCut")
         (out / f"{base}.fcpxml").write_text(export.fcpxml(plan, media, d / "media"), encoding="utf-8")
         (out / f"{base}.edl").write_text(export.edl(plan, media), encoding="utf-8")
         (out / f"{base}.srt").write_text(export.srt(plan), encoding="utf-8")
@@ -740,12 +768,210 @@ def export_final(pid: str, body: ExportIn):
                 step(None, f"Textele AI nu au mers ({agent.describe_error(exc)}); folosesc un șablon")
         copy = copy or agent.template_copy(plan)
         (out / "postare.txt").write_text(export.post_text(copy), encoding="utf-8")
+        step(0.96, "Thumbnail YouTube (te decupez, contur alb, text mare)")
+        try:
+            m, t = thumb.best_moment(plan, media, project["analysis"])
+            img = thumb.grab_frame(d / "media" / m["file"], t, m["kind"])
+            text = (plan.thumbnail.text if plan.thumbnail and plan.thumbnail.text else
+                    (copy.hooks[0] if copy.hooks else plan.title))
+            thumb.make(img, " ".join(text.split()[:6]), out / f"{base}_thumbnail")
+        except Exception as exc:
+            step(None, f"Thumbnail-ul nu a mers: {exc}")
         files = sorted(f"exports/{out.name}/{f.name}" for f in out.iterdir())
         update(pid, lambda p: (p["exports"].insert(0, {"folder": out.name, "quality": quality, "formats": formats,
                                                        "time": time.time(), "files": files}),
                                p.__setitem__("social", copy.model_dump())))
 
     return start_job(pid, "export", work)
+
+
+# ----------------------------------------------------------------- API: long video → Shorts
+
+class ShortsIn(BaseModel):
+    media_id: str
+    count: int = 5
+    mode: str = "ai"
+
+
+@app.post("/api/projects/{pid}/shorts")
+def make_shorts(pid: str, body: ShortsIn):
+    project = load(pid)
+    m = next((x for x in project["media"] if x["id"] == body.media_id and x["kind"] == "video"), None)
+    if not m:
+        raise HTTPException(400, "Alege un video lung din material.")
+    use_ai = body.mode == "ai" and bool(api_key())
+    count = max(1, min(10, body.count))
+
+    def work(step):
+        project = ensure_analysis(pid, step, 0.0, 0.15)
+        info = project["analysis"].get(m["id"]) or {}
+        sp = info.get("speech")
+        if not sp or not sp.get("segments"):
+            raise RuntimeError(info.get("speech_error") or "Nu am transcrierea video-ului. Shorts au nevoie de "
+                               "Whisper (pip install faster-whisper) și de un video în care se vorbește.")
+        d = pdir(pid)
+        if use_ai:
+            step(0.17, "Agentul citește tot video-ul și caută momentele virale")
+            frames = []
+            fdir = d / "work" / "shortframes"
+            fdir.mkdir(parents=True, exist_ok=True)
+            for k, t in enumerate(analyze.frame_times(m["duration"], 12)):
+                path = fdir / f"{m['id']}_{k}.jpg"
+                if not path.exists():
+                    analyze.extract_frame(d / "media" / m["file"], t, path)
+                frames.append((t, path))
+            s = load_settings()
+            moments = agent.find_moments(sp["segments"], frames, m["duration"], count, project["settings"],
+                                         api_key(), s["model"], s["effort"]).moments
+        else:
+            step(0.17, "Caut momentele cele mai dense (fără AI)")
+            moments = shorts.heuristic(sp, count)
+        moments = [x for x in moments if 0 <= x.start < x.end <= m["duration"] + 0.5][:count]
+        if not moments:
+            raise RuntimeError("Nu am găsit momente potrivite (video prea scurt sau fără vorbire).")
+        music = next((x for x in project["media"] if x["role"] == "music"), None)
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        out = d / "exports" / f"shorts_{stamp}"
+        out.mkdir(parents=True, exist_ok=True)
+        items = []
+        caption = project["settings"].get("caption_style") or "karaoke"
+        for k, mo in enumerate(sorted(moments, key=lambda x: -x.score)):
+            lo = 0.2 + 0.8 * k / len(moments)
+            hi = 0.2 + 0.8 * (k + 1) / len(moments)
+            step(lo, f"Short {k + 1}/{len(moments)}: „{mo.title}” (scor {mo.score})")
+            plan = shorts.to_plan(mo, m, project["analysis"], music, caption if caption != "none" else "karaoke")
+            plan, _issues = validate.validate(plan, media_map(project), project["analysis"])
+            video = out / f"short_{k + 1:02d}.mp4"
+            info_r, _ = render_plan(project, plan, video, "1080p", step, lo, hi - 0.03)
+            cover = None
+            try:
+                img = thumb.grab_frame(d / "media" / m["file"], mo.start + 1.0, "video")
+                cover = thumb.make(img, mo.hook, out / f"short_{k + 1:02d}")[1]
+            except Exception:
+                pass
+            tags = " ".join("#" + t.lstrip("#") for t in mo.hashtags)
+            (out / f"short_{k + 1:02d}.txt").write_text(f"{mo.title}\n\n{mo.caption}\n\n{tags}\n", encoding="utf-8")
+            items.append({**mo.model_dump(), "file": f"exports/{out.name}/{video.name}",
+                          "cover": f"exports/{out.name}/{cover.name}" if cover else None,
+                          "duration": info_r["duration"]})
+            update(pid, lambda p: p.__setitem__("shorts", {"media_id": m["id"], "time": time.time(),
+                                                            "items": list(items)}))
+
+    return start_job(pid, "shorts", work)
+
+
+# ----------------------------------------------------------------- API: dubbing & voice clone
+
+class DubIn(BaseModel):
+    languages: list[str]
+    mode: str = "voice"  # "voice" or "subtitles"
+    quality: str = "1080p"
+
+
+@app.post("/api/projects/{pid}/dub")
+def make_dub(pid: str, body: DubIn):
+    project = load(pid)
+    if not project["plan"]:
+        raise HTTPException(400, "Generează întâi un montaj.")
+    langs = [l for l in body.languages if l in dub.LANGUAGES][:8]
+    if not langs:
+        raise HTTPException(400, "Alege cel puțin o limbă.")
+    if not api_key():
+        raise HTTPException(400, "Traducerea are nevoie de cheia API Anthropic (Setări).")
+    subtitles_only = body.mode == "subtitles"
+    if not subtitles_only and not eleven_key():
+        raise HTTPException(400, "Dublajul cu voce are nevoie de cheia ElevenLabs (Setări). "
+                                 "Sau alege „Doar subtitrări traduse”.")
+    quality = body.quality if body.quality in render.QUALITY else "1080p"
+
+    def work(step):
+        project = ensure_analysis(pid, step, 0.0, 0.05)
+        d = pdir(pid)
+        plan = EditPlan.model_validate(project["plan"])
+        speech_units = dub.units(plan, project["analysis"])
+        if not speech_units:
+            raise RuntimeError("Nu am vorbire transcrisă în montaj. Dublajul are nevoie de clipuri cu voce "
+                               "păstrată și de Whisper.")
+        step(0.07, f"Traduc în {', '.join(dub.LANGUAGES[l] for l in langs)}")
+        overlays = dub.overlay_texts(plan)
+        s = load_settings()
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            translations = list(pool.map(lambda l: agent.translate(speech_units, overlays, plan.title,
+                                                                   dub.LANGUAGES[l], api_key(), s["model"]), langs))
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        base = re.sub(r"[^A-Za-z0-9-]+", "-", plan.title).strip("-")[:40] or "montaj"
+        out = d / "exports" / f"dublaj_{stamp}"
+        out.mkdir(parents=True, exist_ok=True)
+        results, all_issues = [], []
+        for k, (lang, tr) in enumerate(zip(langs, translations)):
+            lo = 0.15 + 0.85 * k / len(langs)
+            hi = 0.15 + 0.85 * (k + 1) / len(langs)
+            name = dub.LANGUAGES[lang]
+            step(lo, f"{name}: pregătesc vocea și subtitrările")
+            dplan, override, issues = dub.build(plan, speech_units, tr, d / "work", eleven_key(), voice_id(),
+                                                media_map(project), d / "media", lambda msg: step(lo, msg),
+                                                subtitles_only, name)
+            video = out / f"{base}_{lang.upper()}.mp4"
+            render_plan(project, dplan, video, quality, lambda pr=None, msg=None: step(pr, msg and f"{name}: {msg}"),
+                        lo + 0.05, hi, override)
+            words = override.get("words") or []
+            srt_plan = dplan.model_copy(deep=True)
+            if words:  # subtitles of the dubbed speech
+                from engine.plan import Caption
+                said = {line.id: line.text for line in tr.lines}
+                srt_plan.captions = [Caption(start=u["start"], end=u["end"] + 0.3, text=said[u["id"]])
+                                     for u in speech_units if u["id"] in said]
+            (out / f"{base}_{lang.upper()}.srt").write_text(export.srt(srt_plan), encoding="utf-8")
+            results.append({"lang": lang, "name": name, "file": f"exports/{out.name}/{video.name}",
+                            "srt": f"exports/{out.name}/{base}_{lang.upper()}.srt"})
+            all_issues += [i for i in issues if i not in all_issues]
+        update(pid, lambda p: p.__setitem__("dubs", {"time": time.time(), "mode": body.mode, "items": results,
+                                                      "issues": all_issues}))
+
+    return start_job(pid, "dub", work)
+
+
+class CloneIn(BaseModel):
+    project_id: str
+    consent: bool = False
+    name: str = "Vocea mea"
+
+
+@app.post("/api/voice/clone")
+def clone_my_voice(body: CloneIn):
+    if not body.consent:
+        raise HTTPException(400, "Confirmă că e vocea ta (sau că ai acordul persoanei).")
+    if not eleven_key():
+        raise HTTPException(400, "Clonarea vocii are nevoie de cheia ElevenLabs (Setări).")
+    pid = body.project_id
+
+    def work(step):
+        project = ensure_analysis(pid, step, 0.0, 0.4)
+        d = pdir(pid)
+        sources = []
+        for m in project["media"]:
+            sp = (project["analysis"].get(m["id"]) or {}).get("speech")
+            if m["kind"] == "video" and sp and sp.get("segments"):
+                sources.append((d / "media" / m["file"], sp["segments"]))
+        if not sources:
+            raise RuntimeError("Nu găsesc clipuri în care vorbești (am nevoie de Whisper și de 10+ secunde de voce).")
+        step(0.5, "Adun mostra de voce (max 90 de secunde, curățată de zgomot)")
+        sample = dub.voice_sample(sources, d / "work" / "voice_sample.mp3")
+        step(0.7, "Trimit mostra la ElevenLabs și creez vocea clonată")
+        vid = dub.clone_voice(sample, body.name.strip() or "Vocea mea", eleven_key())
+        s = load_settings()
+        s["my_voice_id"], s["my_voice_name"] = vid, body.name.strip() or "Vocea mea"
+        SETTINGS_FILE.write_text(json.dumps(s, indent=1), encoding="utf-8")
+
+    return start_job(pid, "clone", work)
+
+
+@app.delete("/api/voice/clone")
+def forget_my_voice():
+    s = load_settings()
+    s["my_voice_id"], s["my_voice_name"] = "", ""
+    SETTINGS_FILE.write_text(json.dumps(s, indent=1), encoding="utf-8")
+    return status()
 
 
 @app.get("/api/jobs/{jid}")
