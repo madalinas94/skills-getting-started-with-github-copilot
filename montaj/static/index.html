@@ -81,6 +81,15 @@
         <label class="toggle" title="Agentul se uită la draft, își dă o notă și se corectează singur"><input type="checkbox" id="selfReview" checked><span></span>Auto-verificare AI</label>
         <label class="toggle"><input type="checkbox" id="voiceover"><span></span>Voce off</label>
       </div>
+      <div class="pro-row">
+        <span class="small muted pro-title">Pentru vorbitori și creatori:</span>
+        <label class="toggle" title="Scoate pauzele, «ăăă» și repetările; jump cuts cu close-up alternativ"><input type="checkbox" id="tighten"><span></span>✂ Taie pauzele și „ăăă”</label>
+        <label class="toggle" title="Scoate zgomotul, adaugă claritate și compresie ca la studio"><input type="checkbox" id="voiceEnhance"><span></span>🎙 Voce de studio</label>
+        <label class="toggle" title="Punch-in când accentuezi un cuvânt"><input type="checkbox" id="emphasisZoom"><span></span>🔍 Zoom pe accente</label>
+        <label class="toggle" title="Whoosh la tranziții, pop/boom la texte"><input type="checkbox" id="sfx"><span></span>💥 Efecte sonore</label>
+        <label class="toggle" title="Când vorbești despre ceva, apare clipul cu acel lucru"><input type="checkbox" id="autoBroll"><span></span>🎞 B-roll automat</label>
+        <label class="toggle" title="Fundal blurat în spatele persoanei, ca mod portret"><input type="checkbox" id="portraitBg"><span></span>👤 Fundal portret</label>
+      </div>
       <label class="field" id="voiceBox" hidden>
         <span>Textul vocii off <span class="muted">(gol = îl scrie agentul; necesită cheie ElevenLabs)</span></span>
         <textarea id="voiceText" rows="3" placeholder="Ex: Weekendul ăsta am fugit de oraș. Trei zile, doi prieteni și cele mai frumoase apusuri din Bucegi."></textarea>
@@ -154,6 +163,19 @@
       </div>
     </section>
 
+    <!-- SHORTS -->
+    <section class="panel shorts-panel" id="shortsPanel">
+      <div class="panel-head"><h2>✂ Video lung → Shorts</h2>
+        <span class="muted small">podcast, vlog, live → clipuri verticale cu hook, subtitrări și scor de viralitate</span></div>
+      <div class="row wrap">
+        <label class="field inline"><span>Video-ul lung</span><select id="shortsSource"></select></label>
+        <label class="field inline" style="min-width:110px"><span>Câte Shorts</span>
+          <select id="shortsCount"><option>3</option><option selected>5</option><option>8</option><option>10</option></select></label>
+        <button class="primary big" id="shortsBtn">✂ Fă Shorts</button>
+      </div>
+      <div class="shorts-grid" id="shortsGrid"></div>
+    </section>
+
     <!-- EXPORT -->
     <section class="panel export" id="exportPanel" hidden>
       <div class="panel-head"><h2>4 · Export</h2></div>
@@ -174,6 +196,17 @@
         <b>FCPXML</b> și <b>EDL</b> pentru DaVinci Resolve (File → Import → Timeline) ·
         <b>SRT</b> cu textele (CapCut, YouTube) · <b>postare.txt</b> cu descrieri și hashtag-uri · planul în JSON.
         Formatele în plus sunt re-încadrate automat: cadrul urmărește fața.</p>
+      <div class="dub-box">
+        <h3>🌍 Dublaj în alte limbi</h3>
+        <p class="small muted">Vorbești în română, video-ul iese în engleză, franceză, italiană… cu vocea ta clonată și subtitrări traduse.</p>
+        <div class="langs" id="langs"></div>
+        <div class="row wrap">
+          <div class="segmented" id="dubMode"><button data-v="voice" class="on">🎙 Cu vocea mea</button><button data-v="subtitles">💬 Doar subtitrări traduse</button></div>
+          <button class="primary" id="dubBtn">🌍 Dublează</button>
+        </div>
+        <div class="voice-row small" id="voiceRow"></div>
+        <div id="dubs"></div>
+      </div>
       <div class="social" id="social" hidden></div>
       <div id="exports"></div>
     </section>
@@ -219,6 +252,12 @@
         <option value="small">small — recomandat pentru română</option><option value="medium">medium — precis, lent</option>
         <option value="large-v3">large-v3 — cel mai precis, foarte lent</option></select></label>
     <ul class="features small" id="features"></ul>
+    <div class="clone-box small">
+      <b>🎙 Vocea mea clonată</b> <span id="cloneState" class="muted"></span>
+      <label class="toggle" style="margin-top:6px"><input type="checkbox" id="cloneConsent"><span></span>E vocea mea (sau am acordul persoanei)</label>
+      <div class="row" style="margin-top:6px"><button type="button" class="secondary" id="cloneBtn">Clonează din clipurile proiectului</button>
+        <button type="button" class="ghost" id="forgetVoice">Uită vocea</button></div>
+    </div>
     <label class="field"><span>Efort (cât de atent gândește)</span>
       <select id="effort"><option value="low">Mic — rapid, ieftin</option><option value="medium">Mediu — recomandat</option>
         <option value="high">Mare</option><option value="xhigh">Foarte mare</option><option value="max">Maxim</option></select></label>

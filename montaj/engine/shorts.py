@@ -34,7 +34,7 @@ def _sentences(segments):
     return out
 
 
-def heuristic(speech: dict, count: int, min_len=20.0, max_len=55.0) -> List[Moment]:
+def heuristic(speech: dict, count: int, min_len=20.0, max_len=55.0, target=35.0) -> List[Moment]:
     """No AI: windows of whole sentences, scored by speech density, questions/exclamations
     and how strong the first sentence is."""
     sents = _sentences(speech.get("segments") or [])
@@ -43,7 +43,9 @@ def heuristic(speech: dict, count: int, min_len=20.0, max_len=55.0) -> List[Mome
     candidates = []
     for i in range(len(sents)):
         j = i
-        while j + 1 < len(sents) and sents[j + 1][1] - sents[i][0] <= max_len:
+        # grow sentence by sentence up to ~35 s (never past 55 s)
+        while (j + 1 < len(sents) and sents[j][1] - sents[i][0] < target
+               and sents[j + 1][1] - sents[i][0] <= max_len):
             j += 1
         start, end = sents[i][0], sents[j][1]
         if end - start < min_len:

@@ -64,6 +64,18 @@ direct în aplicație.
 | 11 | **Muzica potrivită** | Fiecare melodie primește BPM și energie (calm / mediu / energic). Se alege cea care se potrivește stilului, iar piesa e tăiată ca finalul ei să cadă pe finalul video-ului, fără să strice tăieturile pe beat. |
 | 12 | **Voce off** | Scrii textul sau îl lași pe agent să-l scrie. ElevenLabs îl citește (merge și în română), muzica scade sub voce, iar subtitrările urmează vocea. Necesită cheie ElevenLabs. |
 
+## Unelte de creator (v3)
+
+| Pachet | Ce face |
+|--------|---------|
+| 🌍 **Dublaj cu vocea ta** | Vorbești în română, video-ul iese în engleză, franceză, italiană, spaniolă, germană și încă 13 limbi. Claude traduce natural și potrivește lungimea frazelor. ElevenLabs citește traducerea **cu vocea ta clonată** (⚙ Setări → „Clonează din clipurile proiectului”). Fiecare replică e potrivită pe timpul ei, vocea originală e scoasă (Demucs, dacă e instalat) și primești MP4 + SRT pentru fiecare limbă. Există și varianta „Doar subtitrări traduse”, fără ElevenLabs. |
+| ✂ **Video lung → Shorts** | Dintr-un podcast sau vlog lung, agentul găsește cele mai bune momente (fraze întregi, hook puternic) și le face Shorts verticale. Fiecare are hook pe ecran, subtitrări karaoke, cadrul pe față, jump cuts, voce de studio, **scor de viralitate**, copertă și text pentru postare. |
+| 🎙 **Pauze, „ăăă” și voce de studio** | Scoate pauzele, sunetele de umplutură și repetările („eu eu”), cu close-up alternativ ca să nu se vadă săriturile. Vocea e curățată: zgomot, bâzâit, claritate, sibilante, compresie. |
+| 👤 **Fundal și thumbnail** | Mod portret (fundal blurat în spatele tău) sau fundal înlocuit cu orice poză sau clip, fără green screen. La export primești **thumbnail YouTube** cu tine decupat, contur alb, umbră și text mare galben/alb, plus varianta verticală. |
+| 🎞 **B-roll, zoom pe accente, efecte sonore** | Când vorbești despre ceva, apare clipul cu acel lucru (AI-ul potrivește transcrierea cu cadrele). Pe cuvintele accentuate cadrul face punch-in. Apar whoosh la tranziții și pop/boom la texte; sunetele sunt generate și incluse în aplicație. |
+
+Toate rulează local, cu excepția AI-ului (Claude) și a vocii (ElevenLabs). Modelele de decupare și de fețe (MediaPipe, ~0,5 MB) sunt deja în `assets/models`.
+
 ## Instalare (Windows)
 
 1. Instalează **Python 3.10+** de pe python.org (bifează „Add Python to PATH”).

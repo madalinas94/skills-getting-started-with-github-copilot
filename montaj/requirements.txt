@@ -4,7 +4,10 @@ python-multipart>=0.0.9
 anthropic>=2.3
 pydantic>=2.7
 numpy>=1.26
-# urmărirea feței (Haar cascades există doar în OpenCV 4.x)
-opencv-python-headless>=4.8,<5
-# subtitrări din vorbire; la prima folosire descarcă modelul Whisper (~0,5 GB pentru „small”)
+pillow>=10
+# decupare persoană, fețe, thumbnail (aduce și OpenCV); modelele sunt în assets/models
+mediapipe>=0.10.14
+# subtitrări din vorbire, Shorts, dublaj; la prima folosire descarcă modelul Whisper (~0,5 GB pentru „small”)
 faster-whisper>=1.0
+# Opțional, pentru dublaj cu separare curată a vocii de fundal (instalează și PyTorch, ~1 GB):
+#   pip install demucs

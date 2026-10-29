@@ -73,8 +73,12 @@ async function loadStatus() {
     feat(s.whisper, "Whisper instalat — subtitrări din vorbire", "Whisper lipsește — <code>pip install faster-whisper</code>"),
     feat(s.faces, "OpenCV instalat — urmărirea feței", "OpenCV lipsește — <code>pip install opencv-python-headless</code>"),
     feat(s.quality, "Verificare cadre tremurate / neclare / întunecate", "numpy lipsește — <code>pip install numpy</code>"),
-    feat(s.has_eleven, "ElevenLabs conectat — voce off", "Fără cheie ElevenLabs — vocea off e oprită"),
+    feat(s.has_eleven, "ElevenLabs conectat — voce off și dublaj", "Fără cheie ElevenLabs — vocea off și dublajul cu voce sunt oprite"),
+    feat(s.people, "MediaPipe — decupare fundal și thumbnail cu tine decupat", "MediaPipe lipsește — <code>pip install mediapipe</code>"),
+    feat(s.demucs, "Demucs — vocea originală separată curat la dublaj", "Demucs lipsește (opțional) — <code>pip install demucs</code>"),
   ].join("");
+  $("#cloneState").textContent = s.my_voice ? `— activă: „${s.my_voice}”` : "— încă nu e creată";
+  renderLangs();
   $("#keyHint").innerHTML = s.key_from_env
     ? "Folosesc cheia din variabila <code>ANTHROPIC_API_KEY</code>. Poți pune alta aici."
     : "Cheia se salvează doar local, în <code>montaj/workspace/settings.json</code>. Fără cheie merge doar montajul automat.";
@@ -138,6 +142,8 @@ function renderAll() {
   renderVariants();
   renderTimeline();
   renderExports();
+  renderShorts();
+  renderDubs();
 }
 
 // ------------------------------------------------------------------ media bin
@@ -281,6 +287,12 @@ function renderBrief() {
   $("#voiceover").checked = !!s.voiceover;
   $("#voiceText").value = s.voiceover_text || "";
   $("#voiceBox").hidden = !s.voiceover;
+  $("#tighten").checked = !!s.tighten;
+  $("#voiceEnhance").checked = !!s.voice_enhance;
+  $("#emphasisZoom").checked = !!s.emphasis_zoom;
+  $("#sfx").checked = !!s.sfx;
+  $("#autoBroll").checked = !!s.auto_broll;
+  $("#portraitBg").checked = s.background === "portrait";
   $$("#aspect button").forEach((b) => b.classList.toggle("on", b.dataset.v === (s.aspect || "")));
 }
 
@@ -292,6 +304,8 @@ function readBrief() {
     outro: $("#outro").value, auto_color: $("#autoColor").checked,
     caption_style: $("#captionStyle").value, beat_fx: $("#beatFx").value, music_align: $("#musicAlign").checked,
     self_review: $("#selfReview").checked, voiceover: $("#voiceover").checked, voiceover_text: $("#voiceText").value,
+    tighten: $("#tighten").checked, voice_enhance: $("#voiceEnhance").checked, emphasis_zoom: $("#emphasisZoom").checked,
+    sfx: $("#sfx").checked, auto_broll: $("#autoBroll").checked, background: $("#portraitBg").checked ? "portrait" : "",
   };
 }
 
@@ -324,7 +338,8 @@ $("#aspect").onclick = (e) => {
 };
 $("#duration").oninput = () => { $("#durationLabel").textContent = `${$("#duration").value}s`; saveBrief(); };
 ["#rules", "#title", "#outro", "#voiceText"].forEach((s) => $(s).addEventListener("input", () => saveBrief()));
-["#captionStyle", "#beatFx", "#autoColor", "#musicAlign", "#selfReview"].forEach((s) => $(s).addEventListener("change", () => saveBrief()));
+["#captionStyle", "#beatFx", "#autoColor", "#musicAlign", "#selfReview", "#tighten", "#voiceEnhance", "#emphasisZoom",
+  "#sfx", "#autoBroll", "#portraitBg"].forEach((s) => $(s).addEventListener("change", () => saveBrief()));
 $("#voiceover").addEventListener("change", () => {
   $("#voiceBox").hidden = !$("#voiceover").checked;
   if ($("#voiceover").checked && !state.status.has_eleven) toast("Pentru voce off pune cheia ElevenLabs în Setări ⚙", true);
@@ -348,7 +363,8 @@ $("#generateVariants").onclick = () => generate(state.status.has_key ? "ai" : "a
 // ------------------------------------------------------------------ jobs
 
 const JOB_KIND = { generate: "Montaj nou", revise: "Revizie", preview: "Previzualizare", export: "Export final",
-  analyze: "Analiza materialului", variants: "3 variante", review: "Auto-verificare" };
+  analyze: "Analiza materialului", variants: "3 variante", review: "Auto-verificare", shorts: "Shorts din video lung",
+  dub: "Dublaj", clone: "Clonarea vocii" };
 
 function watchJob(job, quiet = false) {
   state.job = job;
@@ -365,13 +381,17 @@ function watchJob(job, quiet = false) {
       setBusy(false);
       const kind = state.job.kind;
       const DONE = { export: "Export gata! Fișierele sunt mai jos.", analyze: "Am analizat materialul.",
-        variants: "Cele 3 variante sunt gata — alege una.", review: "Verificare terminată." };
+        variants: "Cele 3 variante sunt gata — alege una.", review: "Verificare terminată.",
+        shorts: "Shorts-urile sunt gata!", dub: "Dublajul e gata!", clone: "Vocea ta e clonată!" };
       if (state.job.status === "error") toast(state.job.error, true);
       else toast(DONE[kind] || "Gata! Uită-te la previzualizare.");
       await refresh();
       if (state.job.status !== "done" || kind === "analyze") { /* stay put */ }
       else if (kind === "export") $("#exportPanel").scrollIntoView({ behavior: "smooth" });
       else if (kind === "variants") $("#variantsPanel").scrollIntoView({ behavior: "smooth" });
+      else if (kind === "shorts") $("#shortsPanel").scrollIntoView({ behavior: "smooth" });
+      else if (kind === "dub") $("#dubs").scrollIntoView({ behavior: "smooth" });
+      else if (kind === "clone") { await loadStatus(); }
       else $("#stage").scrollIntoView({ behavior: "smooth" });
       if (state.job.status === "done") setTimeout(() => ($("#jobPanel").hidden = true), 2500);
     }
@@ -391,7 +411,8 @@ function renderJob() {
 }
 
 function setBusy(busy) {
-  ["#generateAi", "#generateAuto", "#generateVariants", "#exportBtn", "#undo", "#inspApply", "#reviewBtn", "#saveStyle"]
+  ["#generateAi", "#generateAuto", "#generateVariants", "#exportBtn", "#undo", "#inspApply", "#reviewBtn", "#saveStyle",
+    "#shortsBtn", "#dubBtn"]
     .forEach((s) => ($(s).disabled = busy));
   $("#chatForm button").disabled = busy;
 }
@@ -619,6 +640,15 @@ function overlayHtml(o, k) {
     <button class="ghost small" data-rm-ovl>Șterge textul</button></div>`;
 }
 
+const BG = { none: "Original", portrait: "Portret (blurat)", replace: "Înlocuit cu alt fișier" };
+const mediaOpts = (cur, exclude) => state.project.media.filter((m) => (m.kind === "video" || m.kind === "image") && m.id !== exclude)
+  .map((m) => `<option value="${m.id}" ${m.id === cur ? "selected" : ""}>${esc(m.name)}</option>`).join("");
+const brollHtml = (b) => `<div class="broll-item">
+  <label class="field"><span>Fișier</span><select data-b="media_id">${mediaOpts(b.media_id, state.editing && state.editing.media_id)}</select></label>
+  <label class="field"><span>La (s)</span><input type="number" step="0.1" min="0" data-b="at" value="${b.at}"></label>
+  <label class="field"><span>Durată</span><input type="number" step="0.1" min="0.5" data-b="duration" value="${b.duration}"></label>
+  <button class="ghost" data-rm-broll title="Șterge">✕</button></div>`;
+
 function openInspector(i) {
   state.sel = i;
   renderTimeline();
@@ -643,6 +673,14 @@ function openInspector(i) {
       <label class="field"><span>Tranziție de intrare</span><select name="transition_in">${opts(TRANS_RO, c.transition_in)}</select></label>
       <label class="field"><span>Durată tranziție (s)</span><input type="number" step="0.05" min="0.15" max="1.5" name="transition_duration" value="${c.transition_duration}"></label>
     </div>
+    <h4>Fundal</h4>
+    <div class="grid2">
+      <label class="field"><span>Fundalul din spatele persoanei</span><select name="background">${opts(BG, c.background || "none")}</select></label>
+      <label class="field"><span>Fundal nou (la „înlocuit”)</span><select name="background_media"><option value="">—</option>${mediaOpts(c.background_media, c.media_id)}</select></label>
+    </div>
+    <h4>B-roll peste clip <span class="muted">(sunetul clipului continuă)</span></h4>
+    <div id="brolls">${(c.broll || []).map(brollHtml).join("")}</div>
+    <button class="secondary" id="addBroll">＋ Adaugă B-roll</button>
     <h4>Lumină și culoare</h4>
     ${slider("color.brightness", "Luminozitate", -0.3, 0.3, 0.01, c.color.brightness)}
     ${slider("color.contrast", "Contrast", 0.6, 1.6, 0.01, c.color.contrast)}
@@ -678,16 +716,26 @@ $("#inspBody").addEventListener("click", (e) => {
     $("#ovls").insertAdjacentHTML("beforeend", overlayHtml(state.editing.overlays.at(-1), state.editing.overlays.length - 1));
   }
   if (e.target.matches("[data-rm-ovl]")) e.target.closest(".ovl").remove();
+  if (e.target.id === "addBroll") {
+    const other = state.project.media.find((m) => (m.kind === "video" || m.kind === "image") && m.id !== state.editing.media_id);
+    if (!other) return toast("Încarcă și alte clipuri sau poze pentru B-roll.", true);
+    $("#brolls").insertAdjacentHTML("beforeend", brollHtml({ media_id: other.id, at: 1, duration: 2, source_start: 0 }));
+  }
+  if (e.target.matches("[data-rm-broll]")) e.target.closest(".broll-item").remove();
 });
 
 function readInspector() {
   const c = state.editing;
   $$("#inspBody [name]").forEach((el) => {
-    if (el.closest(".ovl")) return;
+    if (el.closest(".ovl") || el.closest(".broll-item")) return;
     const val = el.type === "checkbox" ? el.checked : el.type === "number" || el.type === "range" ? +el.value : el.value;
     const [a, b] = el.name.split(".");
     if (b) c[a][b] = val; else c[a] = val;
   });
+  c.background_media = c.background_media || null;
+  c.broll = $$("#brolls .broll-item").map((box) => ({
+    media_id: $("[data-b=media_id]", box).value, at: +$("[data-b=at]", box).value,
+    duration: +$("[data-b=duration]", box).value, source_start: 0 }));
   c.overlays = $$("#ovls .ovl").map((box) => {
     const get = (n) => $(`[name=${n}]`, box);
     return { text: get("text").value, style: get("style").value, position: get("position").value, animation: get("animation").value,
@@ -724,7 +772,8 @@ $("#exportBtn").onclick = async () => {
 
 const FILE_LABEL = [[/_coperta\.jpg$/, "🖼 Copertă JPG"], [/_coperta\.png$/, "🖼 Copertă PNG"],
   [/_(\d+)x(\d+)\.mp4$/, (f) => `🎬 Video ${f.match(/_(\d+)x(\d+)\.mp4$/).slice(1).join(":")}`], [/\.mp4$/, "🎬 Video MP4"], [/\.mp3$/, "🎵 Audio MP3"],
-  [/postare\.txt$/, "✍ Texte pentru postare"],
+  [/postare\.txt$/, "✍ Texte pentru postare"], [/_thumbnail_youtube\.jpg$/, "🖼 Thumbnail YouTube"],
+  [/_thumbnail_vertical\.jpg$/, "🖼 Thumbnail vertical"],
   [/\.fcpxml$/, "🎛 DaVinci / FCPXML"], [/\.edl$/, "🎛 EDL"], [/\.srt$/, "💬 Subtitrări SRT"], [/_plan\.json$/, "{ } Plan JSON"]];
 
 function renderSocial() {
@@ -764,6 +813,94 @@ function renderExports() {
       <div class="files">${files}</div></div>`;
   }).join("");
 }
+
+// ------------------------------------------------------------------ shorts
+
+function renderShorts() {
+  const vids = state.project.media.filter((m) => m.kind === "video" && m.role === "material");
+  const cur = $("#shortsSource").value;
+  $("#shortsSource").innerHTML = vids.length
+    ? vids.map((m) => `<option value="${m.id}">${esc(m.name)} · ${fmt(m.duration)}</option>`).join("")
+    : `<option value="">(încarcă un video lung)</option>`;
+  if (cur && vids.find((m) => m.id === cur)) $("#shortsSource").value = cur;
+  else if (vids.length) $("#shortsSource").value = vids.reduce((a, b) => (b.duration > a.duration ? b : a)).id;
+  const sh = state.project.shorts;
+  $("#shortsGrid").innerHTML = sh && sh.items ? sh.items.map((x) => `<div class="short">
+      <video src="${file(x.file)}" controls playsinline preload="metadata" ${x.cover ? `poster="${file(x.cover)}"` : ""}></video>
+      <h4><span>${esc(x.title)}</span><span class="vscore" title="Scor de viralitate">🔥 ${x.score}</span></h4>
+      <p>${esc(x.why)}</p>
+      <p>${fmt(x.start)}–${fmt(x.end)} din original · ${fmt(x.duration)} după tăieri</p>
+      <div class="links"><a href="${file(x.file)}?download=true" download>⬇ MP4</a>
+        ${x.cover ? `<a href="${file(x.cover)}?download=true" download>🖼 Copertă</a>` : ""}
+        <a href="#" data-copy="${esc(x.caption + "\n\n" + x.hashtags.map((t) => "#" + t.replace(/^#/, "")).join(" "))}">✍ Copiază textul</a></div>
+    </div>`).join("") : "";
+}
+
+$("#shortsGrid").onclick = async (e) => {
+  const b = e.target.closest("[data-copy]");
+  if (!b) return;
+  e.preventDefault();
+  try { await navigator.clipboard.writeText(b.dataset.copy); toast("Copiat!"); } catch { toast("Nu pot copia automat.", true); }
+};
+$("#shortsBtn").onclick = async () => {
+  const media_id = $("#shortsSource").value;
+  if (!media_id) return toast("Încarcă întâi un video lung (podcast, vlog).", true);
+  try {
+    watchJob(await api(`/api/projects/${pid()}/shorts`, { method: "POST",
+      body: { media_id, count: +$("#shortsCount").value, mode: state.status.has_key ? "ai" : "auto" } }));
+  } catch (e) { toast(e.message, true); }
+};
+
+// ------------------------------------------------------------------ dubbing
+
+const DEFAULT_LANGS = ["en", "fr", "it", "es"];
+function renderLangs() {
+  if (!state.status || !state.status.languages) return;
+  const picked = new Set($$("#langs input:checked").map((i) => i.value));
+  const use = picked.size ? picked : new Set(DEFAULT_LANGS);
+  $("#langs").innerHTML = Object.entries(state.status.languages).filter(([k]) => k !== "ro").map(([k, name]) =>
+    `<label class="chip"><input type="checkbox" value="${k}" ${use.has(k) ? "checked" : ""}><span>${k.toUpperCase()} · ${esc(name)}</span></label>`).join("");
+  const s = state.status;
+  $("#voiceRow").innerHTML = !s.has_eleven ? "Pentru dublaj cu voce pune cheia ElevenLabs în ⚙ Setări."
+    : s.my_voice ? `Vocea folosită: <b>„${esc(s.my_voice)}” (clonată)</b>` : "Vocea folosită: una standard. Clonează-ți vocea din ⚙ Setări ca să sune ca tine.";
+}
+
+let dubMode = "voice";
+$("#dubMode").onclick = (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  dubMode = b.dataset.v;
+  $$("#dubMode button").forEach((x) => x.classList.toggle("on", x === b));
+};
+$("#dubBtn").onclick = async () => {
+  const languages = $$("#langs input:checked").map((i) => i.value);
+  if (!languages.length) return toast("Alege cel puțin o limbă.", true);
+  try { watchJob(await api(`/api/projects/${pid()}/dub`, { method: "POST", body: { languages, mode: dubMode, quality: state.quality } })); }
+  catch (e) { toast(e.message, true); if (/Setări/.test(e.message)) $("#openSettings").click(); }
+};
+
+function renderDubs() {
+  const d = state.project.dubs;
+  $("#dubs").innerHTML = d && d.items ? d.items.map((x) => `<div class="dub-item"><b>${x.lang.toUpperCase()}</b> ${esc(x.name)}
+      <a href="${file(x.file)}" target="_blank" rel="noopener">▶ Vezi</a>
+      <a href="${file(x.file)}?download=true" download>⬇ MP4</a>
+      <a href="${file(x.srt)}?download=true" download>💬 SRT</a></div>`).join("")
+      + (d.issues || []).map((t) => `<div class="small muted">⚙ ${esc(t)}</div>`).join("") : "";
+}
+
+$("#cloneBtn").onclick = async () => {
+  try {
+    const job = await api("/api/voice/clone", { method: "POST", body: { project_id: pid(), consent: $("#cloneConsent").checked } });
+    $("#settings").close();
+    watchJob(job);
+  } catch (e) { toast(e.message, true); }
+};
+$("#forgetVoice").onclick = async () => {
+  state.status = { ...state.status, ...(await api("/api/voice/clone", { method: "DELETE" })) };
+  $("#cloneState").textContent = "— încă nu e creată";
+  renderLangs();
+  toast("Am uitat vocea clonată (din aplicație).");
+};
 
 // ------------------------------------------------------------------ boot
 

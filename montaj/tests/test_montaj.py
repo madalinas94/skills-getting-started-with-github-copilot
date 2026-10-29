@@ -258,3 +258,87 @@ def test_review_and_copy_requests(library, monkeypatch, tmp_path):
     assert review.score == 6 and seen[0]["system"].startswith("You are a demanding")
     copy = agent.social_copy([(1.0, frame)], plan, {}, "t")
     assert "#vara" in export.post_text(copy)
+
+
+# ----------------------------------------------------------------- v3: creator tools
+
+from engine import dub, shorts, thumb, tighten  # noqa: E402
+
+
+def test_jump_cuts_remove_fillers_pauses_and_stumbles():
+    words = [[0.1, 0.5, "Salut"], [0.5, 0.9, "ăăă"], [0.9, 1.4, "prieteni!"],
+             [3.1, 3.5, "eu"], [3.6, 3.9, "eu"], [3.9, 4.4, "plec."]]
+    ranges = tighten.speech_ranges(words, 0, 5.5)
+    assert ranges[0] == (0.04, 0.5)            # stops before "ăăă"
+    assert ranges[1][0] == 0.9                 # restarts after it
+    assert ranges[2][0] >= 3.5                 # first "eu" (stumble) dropped, 1.5 s pause gone
+    assert tighten.sound_ranges([(1.0, 2.5)], 0, 4) == [(0, 1.12), (2.44, 4)]
+
+
+def test_tighten_splits_clip_and_keeps_overlays():
+    plan = EditPlan.model_validate({"title": "t", "summary": "s", "tighten": True, "clips": [
+        {"media_id": "m1", "start": 0, "end": 6, "keep_audio": True,
+         "overlays": [{"text": "a", "start": 0.2}, {"text": "b", "start": 3.7}]}]})
+    an = {"m1": {"speech": {"words": [[0.2, 1.0, "unu"], [3.5, 4.2, "doi"]]}}}
+    out, removed = tighten.apply(plan, {"m1": {"kind": "video"}}, an)
+    assert len(out.clips) == 2 and removed > 2
+    assert [o.text for o in out.clips[0].overlays] == ["a"] and [o.text for o in out.clips[1].overlays] == ["b"]
+    assert out.clips[1].motion == "close_up"
+    again, removed2 = tighten.apply(out, {"m1": {"kind": "video"}}, an)
+    assert len(again.clips) == 2 and removed2 == 0   # already tightened pieces are left alone
+
+
+def test_shorts_heuristic_picks_whole_sentences():
+    segs, t = [], 0.0
+    for i in range(30):
+        text = f"Propoziția numărul {i} are câteva cuvinte în plus" + ("!" if i % 5 == 0 else ".")
+        segs.append([round(t, 1), round(t + 3.5, 1), text])
+        t += 4.0
+    moments = shorts.heuristic({"segments": segs}, 3)
+    assert len(moments) == 3
+    starts = {s[0] for s in segs}
+    for m in moments:
+        assert m.start in starts and 20 <= m.end - m.start <= 55
+    for a in moments:
+        for b in moments:
+            assert a is b or a.end <= b.start or b.end <= a.start
+
+
+def test_dub_units_and_subtitle_mode(tmp_path):
+    plan = EditPlan.model_validate({"title": "Vara", "summary": "s", "clips": [
+        {"media_id": "m1", "start": 0, "end": 8, "keep_audio": True, "overlays": [{"text": "Salut"}]}]})
+    an = {"m1": {"speech": {"words": [[0.2, 0.6, "Bună"], [0.6, 1.0, "ziua."], [2.5, 3.0, "Mergem"], [3.0, 3.4, "acum!"]]}}}
+    units = dub.units(plan, an)
+    assert [u["text"] for u in units] == ["Bună ziua.", "Mergem acum!"]
+    tr = dub.Translation(lines=[dub.Line(id=0, text="Good morning."), dub.Line(id=1, text="Let's go!")],
+                         overlays=[dub.Line(id=0, text="Hello")], title="Summer")
+    out, extras, _ = dub.build(plan, units, tr, tmp_path, None, None, {}, tmp_path, subtitles_only=True)
+    assert out.title == "Summer" and out.clips[0].overlays[0].text == "Hello"
+    assert [c.text for c in out.captions] == ["Good morning.", "Let's go!"]
+    with pytest.raises(Exception):  # voice dubbing without an ElevenLabs key
+        dub.build(plan, units, tr, tmp_path, None, None, {}, tmp_path)
+
+
+def test_thumbnail_without_person(library, tmp_path):
+    d, _media, _by, _an = library
+    img = thumb.grab_frame(d / "wide.mp4", 1.0, "video")
+    yt, vt = thumb.make(img, "Nu o să-ți vină să crezi", tmp_path / "t")
+    from PIL import Image
+    assert Image.open(yt).size == (1280, 720) and Image.open(vt).size == (1080, 1920)
+
+
+def test_creator_render_portrait_broll_sfx_emphasis(library, tmp_path):
+    d, _media, by_id, an = library
+    plan = EditPlan.model_validate({"title": "t", "summary": "s", "aspect": "9:16", "sfx": True,
+                                    "emphasis_zoom": True, "voice_enhance": True, "clips": [
+        {"media_id": "m3", "start": 0, "end": 2, "background": "portrait",
+         "overlays": [{"text": "Wow", "style": "big_word", "start": 0.2}]},
+        {"media_id": "m1", "start": 0, "end": 4, "keep_audio": True, "transition_in": "dissolve",
+         "broll": [{"media_id": "m2", "at": 1.0, "duration": 1.5}]}]})
+    plan, _ = validate.validate(plan, by_id, an)
+    extras, _ = timing.prepare(plan, an, tmp_path / "work", media=by_id, media_dir=d)
+    assert extras["sfx"] and any("whoosh" in s["file"] for s in extras["sfx"])
+    extras["emphasis"] = [[2.5, 3.4]]
+    out = tmp_path / "creator.mp4"
+    render.render(plan, by_id, d, tmp_path / "work", out, "preview", extras=extras)
+    assert ff.probe(out)["duration"] == pytest.approx(total_length(plan), abs=0.15)
