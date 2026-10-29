@@ -654,7 +654,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
         <div class="eyebrow">${esc(CATS[catOf(e)] || catOf(e))} · ${opCode(e)}</div>
         <h3 class="ev-title">${esc(e.title)}</h3>
         <div class="ev-where">${esc([e.venue, e.city, evCountry(e)].filter(Boolean).join(" · "))}</div>
-        <p class="ev-angle">${esc(e.angle)}</p>
+        <p class="ev-angle">${esc(S.lang === "en" && e.angle_en ? e.angle_en : e.angle)}</p>
         ${needs ? `<div class="ev-targets">${needs}</div>` : ""}
         ${targets ? `<div class="ev-targets"><span class="eyebrow">Cui scriem</span>${targets}</div>` : ""}
       </div>
