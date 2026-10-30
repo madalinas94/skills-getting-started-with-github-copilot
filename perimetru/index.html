@@ -523,12 +523,12 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
   // ---------- state ----------
   const S = {
     events: [], orgs: [], drafts: [], alerts: [], contacts: [], signals: [], requests: [],
-    opps: [], referrals: [], photos: [], missions: [], partners: [], deals: [], scanqueue: [], uhnwi: [], team: [], posts: [], inbound: [], optouts: [], proposals: [], countryintel: [],
+    opps: [], referrals: [], photos: [], celebs: [], missions: [], partners: [], deals: [], scanqueue: [], uhnwi: [], team: [], posts: [], inbound: [], optouts: [], proposals: [], countryintel: [],
     config: {}, services: null, pricing: {}, brand: {}, me: null, lang: "ro",
     ready: false, dbOk: null,
     lux: { cc: "all", type: "all", sel: [] },
     pplCc: "", uh: { cc: "all", min: 0 },
-    f: { cat: "all", need: "all", region: "all", cc: "all", horizon: 400, type: "all", role: "all", sub: "de_aprobat", q: "", okind: "all", occ: "all", mapLayer: "events" }
+    f: { cat: "all", need: "all", region: "all", cc: "all", horizon: 400, type: "all", role: "all", sub: "de_aprobat", q: "", okind: "all", occ: "all", mapLayer: "events", ccat: "all", ccc: "all" }
   };
   try { Object.assign(S.f, JSON.parse(localStorage.getItem("perimetru.f2") || "{}")); } catch (e) {}
   const saveF = () => { try { const { q, sub, ...rest } = S.f; localStorage.setItem("perimetru.f2", JSON.stringify(rest)); } catch (e) {} };
@@ -1284,6 +1284,47 @@ Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, 
     btn.disabled = false; btn.textContent = "Pregătește săptămâna";
   }
 
+  // ---------- Vedete: cine sunt și cine îi reprezintă ----------
+  const CELEB_CATS = { singer: "Cântăreți & DJ", actor: "Actori & Hollywood", footballer: "Fotbaliști", athlete: "Sportivi", influencer: "Influenceri & creatori", business: "Oameni de business", personality: "Personalități" };
+  const REP_ROLES = { agency: "Agenție", management: "Management", pr: "PR / publicist", label: "Casă de discuri", club: "Club", company: "Companie / birou", booking: "Booking" };
+  const CELEB_SCANS = [
+    ["singer", "Global pop, rap, rock, Latin and K-pop stars and top DJs touring Europe and the Gulf in 2026-2027"],
+    ["actor", "Hollywood and European film/TV stars who attend Cannes, Venice, Berlinale, BAFTA, Oscars and major galas"],
+    ["footballer", "Top football players and coaches at Europe's and the Saudi Pro League's biggest clubs"],
+    ["athlete", "Top F1 drivers, tennis players, boxers/MMA fighters, golfers and Olympians"],
+    ["influencer", "Creators and influencers with the largest followings (YouTube, Instagram, TikTok, Twitch) in Europe, the Gulf and the US"],
+    ["business", "Founders and CEOs with high public profiles who attend Davos, Milken, FII, Web Summit and luxury events (business representation only: company press office, executive office, speaker agency)"],
+    ["personality", "International TV personalities, models, chefs and public figures in the luxury and gala circuit"]
+  ];
+  function viewCelebs() {
+    const f = S.f;
+    const all = S.celebs.filter(c => matchesQ(c.name, c.knownFor, ...(c.reps || []).map(r => r.name)));
+    const list = all.filter(c => (f.ccat === "all" || c.category === f.ccat) && (f.ccc === "all" || c.cc === f.ccc)).sort((a, b) => (b.score || 0) - (a.score || 0) || (a.name || "").localeCompare(b.name || "", "ro"));
+    const ccs = [...new Set(S.celebs.map(c => c.cc).filter(Boolean))].sort((a, b) => ccName(a).localeCompare(ccName(b), "ro"));
+    const chips = [["all", "Toate"], ...Object.entries(CELEB_CATS)].map(([k, v]) => `<button data-act="ccat" data-id="${k}" aria-pressed="${f.ccat === k}">${v} <span class="mono muted">${k === "all" ? S.celebs.length : S.celebs.filter(c => c.category === k).length}</span></button>`).join("");
+    const queued = S.scanqueue.filter(q => q.kind === "celebs" && q.status !== "gata").length;
+    const rep = (r, c, i) => `<div style="padding:8px 0;border-top:1px solid var(--line)"><div><b>${esc(r.name || "")}</b> <span class="tag">${esc(REP_ROLES[r.role] || r.role || "")}</span>${r.contactName ? ` · ${esc(r.contactName)}${r.contactRole ? ", " + esc(r.contactRole) : ""}` : ""}</div>
+      <div class="ch" style="margin-top:4px">${r.email ? `<span class="mono">${esc(r.email)}<button class="copy" data-act="copy-text" data-v="${esc(r.email)}">copiază</button></span>` : `<span class="note">fără e-mail public</span>`}${r.phone ? `<span class="mono">${esc(r.phone)}<button class="copy" data-act="copy-text" data-v="${esc(r.phone)}">copiază</button>${waBtn(r.phone, r.contactName)}</span>` : ""}${r.source ? `<a class="note" href="${esc(r.source)}" target="_blank" rel="noopener">↗ sursa</a>` : ""}</div>
+      ${r.email ? `<button class="btn sm primary" style="margin-top:6px" data-act="celeb-draft" data-id="${esc(c.id)}" data-i="${i}">Scrie reprezentanților</button>` : ""}</div>`;
+    return `
+      <div class="view-head"><div class="grow"><div class="eyebrow">Vedete</div><h1>Cine sunt și cine îi reprezintă</h1>
+        <p>Cântăreți, actori, fotbaliști, sportivi, influenceri, oameni de business și personalități internaționale, fiecare cu agenția, managementul sau biroul care decide pentru ei. Scrieți reprezentanților, niciodată vedetei direct: așa se lucrează în industrie și așa ajungeți la un parteneriat.</p></div>
+        ${mcp ? `<button class="btn primary" data-act="celeb-scan">${queued ? `${queued} scanări în coadă` : "Caută vedete și reprezentanți"}</button>` : ""}</div>
+      <div class="subtabs" role="group" aria-label="Categorie">${chips}</div>
+      ${ccs.length > 1 ? `<div class="row" style="margin:10px 0"><select class="select" id="celebCc" aria-label="Țara"><option value="all">Toate țările</option>${ccs.map(c => `<option value="${c}" ${f.ccc === c ? "selected" : ""}>${esc(ccName(c))}</option>`).join("")}</select></div>` : ""}
+      ${!S.ready ? emptyLoading() : list.length ? `<div class="drafts">${list.map(c => `<article class="draft" id="cb-${esc(c.id)}"><div class="draft-head"><h3>${esc(c.name)}</h3><span class="pill info">${esc(CELEB_CATS[c.category] || c.category || "")}</span>${c.cc ? `<span class="tag">${esc(ccName(c.cc))}</span>` : ""}</div>
+        <div class="draft-body">${c.knownFor ? `<p style="margin:0 0 6px">${esc(c.knownFor)}</p>` : ""}${c.why ? `<p class="note" style="margin:0 0 6px">${esc(c.why)}</p>` : ""}
+        <div class="eyebrow" style="margin:8px 0 2px">Cine îl reprezintă</div>${(c.reps || []).length ? c.reps.map((r, i) => rep(r, c, i)).join("") : `<p class="note">Încă nu am găsit reprezentarea publică.</p>`}
+        ${(c.sources || []).length ? `<p class="note" style="margin:8px 0 0">Surse: ${c.sources.slice(0, 3).map(x => `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.label || "sursă")}</a>`).join(" · ")}</p>` : ""}</div></article>`).join("")}</div>` : `<div class="empty"><h3>Nicio vedetă încă</h3><p>Apăsați „Caută vedete și reprezentanți”: scanerul ia pe rând fiecare categorie și adaugă doar reprezentarea publicată de agenții, case de discuri, cluburi sau presă.</p></div>`}`;
+  }
+  async function celebDraft(c, r) {
+    const first = (r.contactName || "").split(" ")[0];
+    const body = `Dear ${first || r.name + " team"},\n\nI'm writing from {{company}}, a UK-headquartered close protection company whose teams have worked the Cannes and Venice film festivals and the amfAR, Better World Fund and Global Gift galas.\n\nWe would welcome a partnership with your team for ${c.name}: discreet close protection and secure transport for appearances, tours and travel in Europe and the Gulf, together with yachts, luxury cars, exclusive venues and private travel arranged through one point of contact, always coordinated with your existing team.\n\nWould you be open to a short call to see where we could be useful in the coming season?\n\nKind regards,\n{{signature}}\n\nIf you'd rather not hear from us again, reply "stop" and we'll remove you.`;
+    if (await put("drafts", newId("dr"), { celebId: c.id, orgId: r.orgId || "", to: r.email, subject: `Protection and private logistics for ${c.name}`, body, lang: "en", offer: "bundle", status: "de_aprobat", step: 1, kind: "vedetă", rationale: `Reprezentarea lui ${c.name}: ${r.name}${r.contactName ? " (" + r.contactName + ")" : ""}. Sursa: ${r.source || "—"}`, createdAt: new Date().toISOString(), by: "app" })) {
+      S.f.sub = "de_aprobat"; location.hash = "#approvals"; toast("E-mailul e în „De aprobat”");
+    }
+  }
+
   // ---------- Hartă: d3 + Natural Earth, loaded only when the map is opened ----------
   const MAP_LAYERS = {
     events: ["Evenimente (12 luni)", () => S.events.filter(live).map(e => e.cc)],
@@ -1654,7 +1695,7 @@ Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, 
 
   // ---------- English interface (chrome only; research data stays as written) ----------
   const EN = {
-    "Azi": "Today", "Oameni": "People", "Acțiuni": "Actions", "Evenimente": "Events", "Sezoane": "Seasons", "Hartă": "Map", "Toate companiile": "All companies", "Director lux": "Luxury directory", "Oportunități": "Opportunities", "Recomandări": "Referrals", "UHNWI": "UHNWI", "Radar": "Radar", "Țări": "Countries", "Contacte": "Contacts", "Companii": "Companies", "Semnale": "Signals", "Cereri primite": "Inbound", "De aprobat": "To approve", "Pipeline": "Pipeline", "Misiuni": "Missions", "Parteneri": "Partners", "Conținut": "Content", "Statistici": "Analytics", "Servicii": "Services", "Noutăți": "Updates", "Setări": "Settings",
+    "Azi": "Today", "Oameni": "People", "Acțiuni": "Actions", "Evenimente": "Events", "Sezoane": "Seasons", "Hartă": "Map", "Toate companiile": "All companies", "Director lux": "Luxury directory", "Oportunități": "Opportunities", "Recomandări": "Referrals", "Vedete": "Celebrities", "UHNWI": "UHNWI", "Radar": "Radar", "Țări": "Countries", "Contacte": "Contacts", "Companii": "Companies", "Semnale": "Signals", "Cereri primite": "Inbound", "De aprobat": "To approve", "Pipeline": "Pipeline", "Misiuni": "Missions", "Parteneri": "Partners", "Conținut": "Content", "Statistici": "Analytics", "Servicii": "Services", "Noutăți": "Updates", "Setări": "Settings",
     "Unde vor fi principalii în următoarele luni": "Where principals will be in the coming months", "evenimente în 90 de zile": "events in the next 90 days", "cu fereastra de advance deschisă sau aproape": "with the advance window open or close", "țări acoperite": "countries covered", "e-mailuri așteaptă aprobarea": "emails awaiting approval",
     "Categorie": "Category", "Toate": "All", "Resetează filtrele": "Reset filters", "Pregătește outreach": "Prepare outreach", "Cui scriem": "Who to write to", "confirmat": "confirmed", "de reconfirmat": "to reconfirm", "în desfășurare": "under way",
     "Fiecare țară, cu evenimentele ei": "Every country, with its events", "Toate țările lumii": "Every country in the world", "Director lux": "Luxury directory", "Cei mai bogați oameni, țară cu țară": "The wealthiest people, country by country", "Tot ce e lux, țară cu țară": "Everything luxury, country by country", "Colaborare": "Partnership", "Persoane foarte bogate (UHNWI)": "Ultra-high-net-worth individuals", "Scanează regiunea": "Scan region", "Toate țările": "All countries", "Situația de securitate": "Security situation",
@@ -2100,6 +2141,9 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
       }
       case "okind": S.f.okind = id; render(); break;
       case "map-layer": S.f.mapLayer = id; render(); break;
+      case "ccat": S.f.ccat = id; render(); break;
+      case "celeb-draft": { const c = S.celebs.find(x => x.id === id); const r = c?.reps?.[+el.dataset.i]; if (c && r) celebDraft(c, r); break; }
+      case "celeb-scan": { const have = new Set(S.scanqueue.filter(q => q.kind === "celebs").map(q => q.category)); const items = CELEB_SCANS.filter(([k]) => !have.has(k)).map(([k, focus]) => ({ kind: "celebs", category: k, ccs: [], label: `Vedete: ${CELEB_CATS[k]}`, focus, priority: 1 })); if (items.length) await enqueueScan(items); else toast("Scanările de vedete sunt deja în coadă."); break; }
       case "export-ics": exportCalendar(); break;
       case "lib-del": { const ph = S.photos.find(x => x.id === id); if (ph && confirm("Ștergi poza din bibliotecă?")) { try { if (ph.assetId && assets) await assets.delete(ph.assetId); } catch (e) {} try { await db.collection("photos").doc(id).delete(); toast("Șters"); } catch (e) { toast("Nu s-a șters."); } } break; }
       case "season-scan": { const se = SEASONS.find(x => x.id === id); if (se) await enqueueScan([{ kind: "circuit", ccs: se.ccs, label: `Sezon: ${se.name}`, focus: se.focus, seasonId: se.id, priority: 0 }]); break; }
@@ -2213,6 +2257,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
       return;
     }
     if (el.id === "oppCc") { S.f.occ = el.value; render(); return; }
+    if (el.id === "celebCc") { S.f.ccc = el.value; render(); return; }
     if (el.dataset?.act === "lib-upload" && el.files?.length && assets) {
       let n = 0; for (const f of el.files) { if (f.size > 8e6) continue; try { const a = await assets.upload(f); if (await put("photos", newId("ph"), { url: a.url, assetId: a.id, caption: f.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " "), createdAt: new Date().toISOString() })) n++; } catch (e) {} }
       toast(n ? `${n} ${n === 1 ? "poză încărcată" : "poze încărcate"}` : "Nu am putut încărca pozele (max. 8 MB fiecare)."); return;
@@ -2256,14 +2301,14 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
   const NAV = [
     ["today", "Azi", [["today", "Acțiuni", true], ["alerts", "Noutăți", true]]],
     ["radar", "Radar", [["radar", "Evenimente", true], ["seasons", "Sezoane", true], ["map", "Hartă"], ["countries", "Țări", true]]],
-    ["people", "Oameni", [["contacts", "Contacte", true], ["uhnwi", "UHNWI", true], ["referrals", "Recomandări", true]]],
+    ["people", "Oameni", [["contacts", "Contacte", true], ["celebs", "Vedete", true], ["uhnwi", "UHNWI", true], ["referrals", "Recomandări", true]]],
     ["companies", "Companii", [["targets", "Toate companiile", true], ["luxury", "Director lux", true], ["signals", "Semnale", true]]],
     ["opps", "Oportunități", [["opps", "Oportunități", true]]],
     ["outreach", "Outreach", [["approvals", "De aprobat", true], ["pipeline", "Pipeline", true], ["content", "LinkedIn", true], ["stats", "Statistici"]]],
     ["setup", "Setări", [["setup", "Setări"], ["services", "Servicii"]]]
   ];
   const groupOf = (v) => NAV.find(([, , views]) => views.some(([vk]) => vk === v)) || NAV[0];
-  const VIEWS = { map: viewMap, seasons: viewSeasons, referrals: viewReferrals, opps: viewOpps, content: viewContent, uhnwi: viewUhnwi, luxury: viewLuxury, today: viewToday, stats: viewStats, radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
+  const VIEWS = { celebs: viewCelebs, map: viewMap, seasons: viewSeasons, referrals: viewReferrals, opps: viewOpps, content: viewContent, uhnwi: viewUhnwi, luxury: viewLuxury, today: viewToday, stats: viewStats, radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
   const current = () => { const h = location.hash.slice(1); return VIEWS[h] ? h : "today"; };
   function render() {
     const v = current();
@@ -2276,7 +2321,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     const n = {
       today: S.ready ? todayActions().length : 0, alerts: unread, radar: S.events.filter(live).length, seasons: seasonsNow().filter(x => x.phase === "outreach").length,
       countries: Object.keys(usedCountries()).length, contacts: S.contacts.length, uhnwi: S.uhnwi.length, referrals: refsDue().length, targets: S.orgs.length,
-      luxury: S.orgs.filter(o => LUX_TYPES.has(o.type)).length, signals: S.signals.length, opps: S.opps.filter(o => (o.stage || "nou") === "nou").length,
+      celebs: S.celebs.length, luxury: S.orgs.filter(o => LUX_TYPES.has(o.type)).length, signals: S.signals.length, opps: S.opps.filter(o => (o.stage || "nou") === "nou").length,
       approvals: S.drafts.filter(d => d.status === "de_aprobat").length, pipeline: dueFollowUps().length, content: postsDue().length
     };
     const cnt = (x) => x ? `<span class="count">${x}</span>` : "";
@@ -2335,7 +2380,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     if (userCap?.me) { try { S.me = await userCap.me(); setupArrival.greet?.(S.me?.name); } catch (e) {} }
     S.dbOk = !!db;
     if (!db) { render(); return; }
-    const cols = ["opps", "referrals", "photos", "events", "orgs", "drafts", "alerts", "contacts", "signals", "requests", "scanqueue", "uhnwi", "missions", "partners", "deals", "team", "posts", "inbound", "optouts", "proposals", "countryintel"];
+    const cols = ["opps", "referrals", "photos", "celebs", "events", "orgs", "drafts", "alerts", "contacts", "signals", "requests", "scanqueue", "uhnwi", "missions", "partners", "deals", "team", "posts", "inbound", "optouts", "proposals", "countryintel"];
     const pending = new Set(cols);
     cols.forEach(name => db.collection(name).limit(1000).onSnapshot((snap) => {
       S[name] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
