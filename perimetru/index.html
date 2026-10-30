@@ -434,6 +434,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
       <a href="#uhnwi">UHNWI <span class="count" id="c-uhnwi"></span></a>
       <a href="#luxury">Director lux <span class="count" id="c-luxury"></span></a>
       <a href="#targets">Companii <span class="count" id="c-targets"></span></a>
+      <a href="#opps">Oportunități <span class="count" id="c-opps"></span></a>
       <a href="#signals">Semnale <span class="count" id="c-signals"></span></a>
       <a href="#approvals">De aprobat <span class="count" id="c-approvals"></span></a>
       <a href="#pipeline">Pipeline <span class="count" id="c-pipeline"></span></a>
@@ -486,6 +487,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
   let REGION_NAMES = null; try { REGION_NAMES = new Intl.DisplayNames(["ro"], { type: "region" }); } catch (e) {}
   const RESEARCH_TRIGGER = "trig_01A73TQym1Ch7v7SiNDUMgpe";
   const SCANNER_TRIGGER = "trig_01AWyo56WK3GVWtwhajd8mVn";
+  const OPPS_TRIGGER = "trig_01VJPKrhqdbiq6ei7GtnSX18";
   const ORG_TYPES = {
     family_office: "Family office", mfo: "Multi-family office & bancă privată", jet: "Aviație privată & charter", travel: "Travel & lifestyle management",
     talent: "Agenții de talent & PR", label: "Case de discuri & management", promoter: "Organizatori turnee & festivaluri", organizer: "Organizatori evenimente & forumuri",
@@ -527,12 +529,12 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
   // ---------- state ----------
   const S = {
     events: [], orgs: [], drafts: [], alerts: [], contacts: [], signals: [], requests: [],
-    missions: [], partners: [], deals: [], scanqueue: [], uhnwi: [], team: [], posts: [], inbound: [], optouts: [], proposals: [], countryintel: [],
+    opps: [], missions: [], partners: [], deals: [], scanqueue: [], uhnwi: [], team: [], posts: [], inbound: [], optouts: [], proposals: [], countryintel: [],
     config: {}, services: null, pricing: {}, brand: {}, me: null, lang: "ro",
     ready: false, dbOk: null,
     lux: { cc: "all", type: "all", sel: [] },
     pplCc: "", uh: { cc: "all", min: 0 },
-    f: { cat: "all", need: "all", region: "all", cc: "all", horizon: 400, type: "all", role: "all", sub: "de_aprobat", q: "" }
+    f: { cat: "all", need: "all", region: "all", cc: "all", horizon: 400, type: "all", role: "all", sub: "de_aprobat", q: "", okind: "all", occ: "all" }
   };
   try { Object.assign(S.f, JSON.parse(localStorage.getItem("perimetru.f2") || "{}")); } catch (e) {}
   const saveF = () => { try { const { q, sub, ...rest } = S.f; localStorage.setItem("perimetru.f2", JSON.stringify(rest)); } catch (e) {} };
@@ -1007,6 +1009,10 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
         acts.push({ w: 80 - Math.max(adv, 0) + (e.tier === 1 ? 10 : 0), t: `Fereastra de advance: ${e.title}`, x: `${fmtD(e.start)} · ${e.city}, ${evCountry(e)}. ${adv <= 0 ? "Fereastra e deschisă" : `Se deschide în ${adv} zile`} și nu e niciun e-mail pregătit.`, btn: ["draft-event", e.id, "Pregătește outreach"] });
     });
     postsDue().slice(0, 1).forEach(p => acts.push({ w: 92, t: daysTo(p.scheduledFor) < 0 ? "Postare LinkedIn întârziată" : "Postarea LinkedIn de azi", x: `${p.topic || "Postare"} · ${CHANNEL[p.channel] || CHANNEL.personal}`, go: "content", label: "Publică" }));
+    const oppsSoon = S.opps.filter(o => (o.stage || "nou") === "nou" && o.deadline && daysTo(o.deadline) >= 0 && daysTo(o.deadline) <= 7);
+    if (oppsSoon.length) acts.push({ w: 88, t: `${oppsSoon.length} oportunități expiră în 7 zile`, x: oppsSoon.slice(0, 3).map(o => `${o.title} (${fmtD(o.deadline)})`).join(" · "), go: "opps", label: "Vezi" });
+    const oppsNew = S.opps.filter(o => (o.stage || "nou") === "nou" && o.found && daysTo(o.found.slice(0, 10)) >= -2);
+    if (oppsNew.length) acts.push({ w: 72, t: `${oppsNew.length} oportunități noi`, x: oppsNew.slice(0, 3).map(o => o.title).join(" · "), go: "opps", label: "Vezi" });
     const newSig = S.signals.filter(s => s.found && daysTo(s.found) >= -3);
     if (newSig.length) acts.push({ w: 70, t: `${newSig.length} semnale noi de cerere`, x: newSig.slice(0, 2).map(s => s.title).join(" · "), go: "signals", label: "Vezi" });
     S.orgs.filter(o => (o.status || "nou") === "nou" && !o.dnc && (o.score || 0) >= 80 && S.contacts.some(c => c.orgId === o.id && c.email))
@@ -1263,6 +1269,58 @@ Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, 
       toast(posts.length ? "Săptămâna e pregătită" : "Nu am primit postări.");
     } catch (err) { toast(err?.code === "rate_limited" ? "AI-ul e ocupat." : "Nu am putut genera acum."); }
     btn.disabled = false; btn.textContent = "Pregătește săptămâna";
+  }
+
+  // ---------- Oportunități: joburi, licitații, colaborări temporare ----------
+  const OPP_KINDS = { job: "Joburi CP", yacht: "Yachturi", tender: "Licitații", subcontract: "Colaborări temporare", network: "Târguri & rețele" };
+  const OPP_STAGES = [["nou", "Nou"], ["aplicat", "Am aplicat / ofertat"], ["discutie", "În discuție"], ["castigat", "Câștigat"], ["ignorat", "Ignorat"], ["expirat", "Expirat"]];
+  const OPP_SOURCES = [
+    ["Joburi", [["Tiger Recruitment · CP", "https://tiger-recruitment.com/looking-for-a-job/close-protection-jobs/"], ["Silent Professionals", "https://silentprofessionals.org/"], ["Close Protection World", "https://www.closeprotectionworld.com/"], ["LinkedIn Jobs · close protection", liJobs("close protection officer")], ["LinkedIn Jobs · executive protection", liJobs("executive protection family office")], ["GulfTalent", "https://www.gulftalent.com/"], ["Bayt", "https://www.bayt.com/"]]],
+    ["Yachturi", [["Yotspot", "https://www.yotspot.com/"]]],
+    ["Licitații", [["TED (UE)", "https://ted.europa.eu/"], ["Find a Tender (UK)", "https://www.find-tender.service.gov.uk/Search"], ["Contracts Finder (UK)", "https://www.contractsfinder.service.gov.uk/Search"], ["UNGM (ONU)", "https://www.ungm.org/Public/Notice"], ["SEAP / SICAP (RO)", "https://www.e-licitatie.ro/"]]]
+  ];
+  function viewOpps() {
+    const f = S.f, open = (o) => !["ignorat", "expirat"].includes(o.stage || "nou");
+    const base = S.opps.filter(o => matchesQ(o.title, o.org, o.summary, o.city, ccName(o.cc)));
+    const list = base.filter(o => (f.okind === "all" || o.kind === f.okind) && (f.occ === "all" || o.cc === f.occ) && (f.okind === "closed" ? !open(o) : open(o)))
+      .sort((a, b) => (a.deadline || "9999").localeCompare(b.deadline || "9999") || (b.found || "").localeCompare(a.found || ""));
+    const ccs = [...new Set(S.opps.map(o => o.cc).filter(Boolean))].sort((a, b) => ccName(a).localeCompare(ccName(b), "ro"));
+    const chips = [["all", "Toate"], ...Object.entries(OPP_KINDS), ["closed", "Închise"]].map(([k, v]) => `<button data-act="okind" data-id="${k}" aria-pressed="${f.okind === k}">${v} <span class="mono muted">${k === "all" ? S.opps.filter(open).length : k === "closed" ? S.opps.filter(o => !open(o)).length : S.opps.filter(o => o.kind === k && open(o)).length}</span></button>`).join("");
+    const soon = S.opps.filter(o => open(o) && o.deadline && daysTo(o.deadline) >= 0 && daysTo(o.deadline) <= 7).length;
+    const card = (o) => {
+      const id = esc(o.id), dl = o.deadline ? daysTo(o.deadline) : null;
+      return `<article class="draft"><div class="draft-head"><h3>${esc(o.title)}</h3><span class="pill info">${esc(OPP_KINDS[o.kind] || o.kind || "")}</span>${o.confidence === "verificat" ? `<span class="pill ok">verificat</span>` : `<span class="pill warn">de verificat</span>`}${dl !== null ? `<span class="pill ${dl <= 7 ? "warn" : ""}">${dl < 0 ? "termen trecut" : "termen " + esc(fmtD(o.deadline))}</span>` : ""}</div>
+        <div class="draft-body">
+          <p style="margin:0 0 6px"><b>${esc(o.org || "Angajator nedezvăluit")}</b> · ${esc([o.city, ccName(o.cc)].filter(Boolean).join(", "))}${o.pay ? ` · <span class="mono">${esc(o.pay)}</span>` : ""}${o.posted ? ` · <span class="muted">publicat ${esc(fmtD(o.posted))}</span>` : ""}</p>
+          ${o.summary ? `<p style="margin:0 0 6px">${esc(o.summary)}</p>` : ""}
+          ${o.contactEmail ? `<p class="mono" style="margin:0 0 6px">${esc(o.contactEmail)}</p>` : ""}
+          <div class="row"><select class="select" data-act="opp-stage" data-id="${id}" aria-label="Stadiu">${OPP_STAGES.map(([k, v]) => `<option value="${k}" ${(o.stage || "nou") === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+        </div>
+        <div class="draft-foot">${o.url ? `<a class="btn" href="${esc(o.url)}" target="_blank" rel="noopener">Deschide sursa${o.sourceLabel ? " · " + esc(o.sourceLabel) : ""}</a>` : ""}<span class="spacer"></span><button class="btn primary" data-act="opp-draft" data-id="${id}">${o.kind === "tender" ? "Pregătește manifestarea de interes" : "Pregătește răspunsul"}</button></div></article>`;
+    };
+    return `
+      <div class="view-head"><div class="grow"><div class="eyebrow">Oportunități</div><h1>Unde cineva plătește deja pentru protecție</h1>
+        <p>Joburi de close protection, posturi pe yachturi, licitații publice, colaborări temporare pe sezon și târguri unde vă întâlniți cumpărătorii. Scanerul caută din două în două zile, doar anunțuri deschise și cu sursă. Voi decideți unde aplicați.</p></div>
+        <div class="row">${mcp ? `<button class="btn primary" data-act="opp-scan">Caută acum</button>` : ""}</div></div>
+      <div class="kpis"><div class="kpi"><div class="n">${S.opps.filter(o => (o.stage || "nou") === "nou").length}</div><div class="l">noi, neevaluate</div></div><div class="kpi gold"><div class="n">${soon}</div><div class="l">expiră în 7 zile</div></div><div class="kpi"><div class="n">${S.opps.filter(o => ["aplicat", "discutie"].includes(o.stage)).length}</div><div class="l">în lucru</div></div><div class="kpi"><div class="n">${S.opps.filter(o => o.stage === "castigat").length}</div><div class="l">câștigate</div></div></div>
+      <div class="subtabs" role="group" aria-label="Tip">${chips}</div>
+      ${ccs.length > 1 ? `<div class="row" style="margin:10px 0"><select class="select" id="oppCc" aria-label="Țara"><option value="all">Toate țările</option>${ccs.map(c => `<option value="${c}" ${f.occ === c ? "selected" : ""}>${esc(ccName(c))}</option>`).join("")}</select></div>` : ""}
+      ${!S.ready ? emptyLoading() : list.length ? `<div class="drafts">${list.map(card).join("")}</div>` : `<div class="empty"><h3>Nimic aici încă</h3><p>Scanerul rulează din două în două zile. Poți apăsa „Caută acum” sau poți căuta direct în sursele de mai jos.</p></div>`}
+      <div class="panel" style="margin-top:20px"><h3>Sursele urmărite</h3>${OPP_SOURCES.map(([g, l]) => `<p style="margin:6px 0"><b>${g}:</b> ${l.map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join(" · ")}</p>`).join("")}</div>`;
+  }
+  async function oppDraft(o) {
+    const c = S.config || {};
+    const isTender = o.kind === "tender", isJob = ["job", "yacht"].includes(o.kind);
+    const body = isTender
+      ? `Dear Sir or Madam,\n\nWe write regarding "${o.title}"${o.org ? ` published by ${o.org}` : ""}. {{company}} would like to register its interest and request the full tender documents and clarification timetable.\n\nWe are a UK-headquartered close protection company operating across Europe, the Middle East and worldwide, with internationally licensed officers, multilingual teams (English, Arabic, French, Russian, Romanian), risk assessment, event security management and secure transportation.\n\nPlease let us know the correct procedure and point of contact for submitting our bid.\n\nKind regards,\n{{signature}}`
+      : isJob
+      ? `Dear Hiring Team,\n\nWe noticed your listing "${o.title}"${o.org ? ` with ${o.org}` : ""}. {{company}} is a UK-headquartered close protection company with officers trained in Israel, Poland and the USA, multilingual (English, Arabic, French, Russian, Romanian) and experienced with UHNW families, royal households and high-profile events such as the Cannes and Venice film festivals.\n\nWe can propose a vetted officer or a full team for this role, on a permanent, rotational or temporary basis, and can also cover secure transportation with elite drivers.\n\nWould you be open to a short call to discuss your requirements?\n\nKind regards,\n{{signature}}`
+      : `Dear team,\n\nRegarding "${o.title}"${o.org ? ` (${o.org})` : ""}: {{company}} can provide close protection officers, event security management and chauffeured luxury transport for the period you need, with full discretion and 24/7 coordination.\n\nOur teams have worked the Cannes and Venice film festivals and the amfAR, Better World Fund and Global Gift galas, and we operate across Europe, the Middle East and worldwide.\n\nCould we arrange a short call to understand the dates, team size and locations?\n\nKind regards,\n{{signature}}`;
+    const id = newId("dr");
+    if (await put("drafts", id, { oppId: o.id, orgId: "", to: o.contactEmail || "", subject: isTender ? `Expression of interest: ${o.title}` : `${o.title}: ${c.company || "close protection"}`, body, lang: "en", status: "de_aprobat", step: 1, rationale: `Oportunitate: ${OPP_KINDS[o.kind] || ""} · ${o.org || ""} · ${ccName(o.cc)}. ${o.contactEmail ? "" : "Anunțul nu are e-mail public: aplicați prin link-ul sursei sau completați adresa."}`, createdAt: new Date().toISOString(), by: "app" })) {
+      if ((o.stage || "nou") === "nou") await patch("opps", o.id, { stage: "aplicat" });
+      S.f.sub = "de_aprobat"; location.hash = "#approvals"; toast("Răspuns pregătit în „De aprobat”");
+    }
   }
 
   // ---------- Statistici ----------
@@ -1856,6 +1914,9 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
         for (const [k, f] of [["i", "impressions"], ["r", "reactions"], ["m", "comments"]]) if (v(k) !== undefined) upd[f] = +v(k) || 0;
         if (await patch("posts", id, upd)) toast("Salvat"); break;
       }
+      case "okind": S.f.okind = id; render(); break;
+      case "opp-draft": { const o = S.opps.find(x => x.id === id); if (o) oppDraft(o); break; }
+      case "opp-scan": { if (!mcp) break; el.disabled = true; try { await mcp.callTool("Claude Code Remote", "fire_trigger", { trigger_id: OPPS_TRIGGER, text: "Run requested from the app." }); toast("Scanerul a pornit. Rezultatele apar aici în 10–20 de minute."); } catch (e) { toast("Nu am putut porni scanerul acum."); } el.disabled = false; break; }
       case "copy-fc": { const t = $(`#po-f-${id}`)?.value || S.posts.find(x => x.id === id)?.firstComment || ""; try { await navigator.clipboard.writeText(t); toast("Comentariu copiat"); } catch (e) { toast("Nu am putut copia."); } break; }
       case "post-done": { const url = (prompt("Link-ul postării (opțional, ca să o găsiți mai târziu):") || "").trim(); if (await patch("posts", id, { status: "publicat", postedAt: iso(today()), text: $(`#po-${id}`)?.value || "", ...(url ? { url } : {}) })) toast("Marcat publicat. Treceți reacțiile peste 2–3 zile."); break; }
       case "del-post": try { await db.collection("posts").doc(id).delete(); toast("Șters"); } catch (e) { toast("Nu s-a șters."); } break;
@@ -1934,6 +1995,9 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
         else if (l.view === "country") { S.f.cc = l.id; goTo("#countries"); }
         else if (l.view === "contacts") goTo("#contacts");
         else if (l.view === "signals") goTo("#signals");
+        else if (l.view === "opps") goTo("#opps");
+        else if (l.view === "content") goTo("#content");
+        else if (l.view === "today") goTo("#today");
         else if (l.view === "approvals") { S.f.sub = "de_aprobat"; goTo("#approvals"); }
         break;
       }
@@ -1947,6 +2011,8 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
       try { const a = await assets.upload(f); if (await patch("posts", el.dataset.id, { imageUrl: a.url, imageId: a.id })) toast("Foto atașată"); } catch (e) { toast("Nu am putut încărca fotografia."); }
       return;
     }
+    if (el.id === "oppCc") { S.f.occ = el.value; render(); return; }
+    if (el.dataset?.act === "opp-stage") { if (await patch("opps", el.dataset.id, { stage: el.value })) toast("Stadiu salvat"); return; }
     if (el.id === "uhCc") { S.uh.cc = el.value; render(); return; }
     if (el.id === "uhMin") { S.uh.min = +el.value; render(); return; }
     if (el.id === "pplCc") { S.pplCc = el.value; render(); return; }
@@ -1978,7 +2044,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
   $("#langBtn").addEventListener("click", () => { S.lang = S.lang === "en" ? "ro" : "en"; try { localStorage.setItem("perimetru.lang", S.lang); } catch (e) {} document.documentElement.lang = S.lang; render(); translateDom(document.querySelector("header.top")); translateDom($("#arrival")); });
 
   // ---------- render ----------
-  const VIEWS = { content: viewContent, uhnwi: viewUhnwi, luxury: viewLuxury, today: viewToday, stats: viewStats, radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
+  const VIEWS = { opps: viewOpps, content: viewContent, uhnwi: viewUhnwi, luxury: viewLuxury, today: viewToday, stats: viewStats, radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
   const current = () => { const h = location.hash.slice(1); return VIEWS[h] ? h : "today"; };
   function render() {
     const v = current();
@@ -1998,6 +2064,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     $("#c-signals").textContent = S.signals.length || "";
     $("#c-approvals").textContent = S.drafts.filter(d => d.status === "de_aprobat").length || "";
     $("#c-pipeline").textContent = dueFollowUps().length || "";
+    $("#c-opps").textContent = S.opps.filter(o => (o.stage || "nou") === "nou").length || "";
     $("#c-content").textContent = postsDue().length || "";
     $("#c-alerts").textContent = unread || "";
     $("#c-today").textContent = S.ready ? (todayActions().length || "") : "";
@@ -2048,7 +2115,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     if (userCap?.me) { try { S.me = await userCap.me(); setupArrival.greet?.(S.me?.name); } catch (e) {} }
     S.dbOk = !!db;
     if (!db) { render(); return; }
-    const cols = ["events", "orgs", "drafts", "alerts", "contacts", "signals", "requests", "scanqueue", "uhnwi", "missions", "partners", "deals", "team", "posts", "inbound", "optouts", "proposals", "countryintel"];
+    const cols = ["opps", "events", "orgs", "drafts", "alerts", "contacts", "signals", "requests", "scanqueue", "uhnwi", "missions", "partners", "deals", "team", "posts", "inbound", "optouts", "proposals", "countryintel"];
     const pending = new Set(cols);
     cols.forEach(name => db.collection(name).limit(1000).onSnapshot((snap) => {
       S[name] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
