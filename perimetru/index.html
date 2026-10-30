@@ -430,6 +430,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
       <a href="#radar">Radar <span class="count" id="c-radar"></span></a>
       <a href="#countries">Țări <span class="count" id="c-countries"></span></a>
       <a href="#contacts">Contacte <span class="count" id="c-contacts"></span></a>
+      <a href="#uhnwi">UHNWI <span class="count" id="c-uhnwi"></span></a>
       <a href="#luxury">Director lux <span class="count" id="c-luxury"></span></a>
       <a href="#targets">Companii <span class="count" id="c-targets"></span></a>
       <a href="#signals">Semnale <span class="count" id="c-signals"></span></a>
@@ -486,10 +487,11 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
   const REGION_OF = {}; Object.entries(WORLD).forEach(([r, l]) => l.split(" ").forEach(cc => { REGION_OF[cc] = r; }));
   let REGION_NAMES = null; try { REGION_NAMES = new Intl.DisplayNames(["ro"], { type: "region" }); } catch (e) {}
   const RESEARCH_TRIGGER = "trig_01A73TQym1Ch7v7SiNDUMgpe";
+  const SCANNER_TRIGGER = "trig_01AWyo56WK3GVWtwhajd8mVn";
   const ORG_TYPES = {
     family_office: "Family office", mfo: "Multi-family office & bancă privată", jet: "Aviație privată & charter", travel: "Travel & lifestyle management",
     talent: "Agenții de talent & PR", label: "Case de discuri & management", promoter: "Organizatori turnee & festivaluri", organizer: "Organizatori evenimente & forumuri",
-    hospitality: "Hoteluri, vile & yachting", network: "Rețele de acces (PA, concierge, family office)", forum: "Organizatori forumuri", luxury_brand: "Branduri de lux", staffing: "Agenții de personal privat (PA, estate, household)", association: "Asociații profesionale (PA, butleri, family office)",
+    hospitality: "Hoteluri, vile & yachting", network: "Rețele de acces (PA, concierge, family office)", forum: "Organizatori forumuri", luxury_brand: "Branduri de lux", staffing: "Agenții de personal privat (PA, estate, household)", holding: "Holding / birou corporativ", foundation: "Fundație", association: "Asociații profesionale (PA, butleri, family office)",
     hotel: "Hoteluri 5★ și palate", venue: "Locații exclusiviste & cluburi private", yacht: "Yachting: charter, brokeraj, șantiere", heli: "Elicoptere", cars: "Mașini exclusiviste", fashion: "Modă & marochinărie", jewellery: "Bijuterii & ceasuri", lifestyle: "Lifestyle & concierge"
   };
   const ROLE_CATS = {
@@ -527,11 +529,11 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
   // ---------- state ----------
   const S = {
     events: [], orgs: [], drafts: [], alerts: [], contacts: [], signals: [], requests: [],
-    missions: [], partners: [], deals: [], scanqueue: [], team: [], posts: [], inbound: [], optouts: [], proposals: [], countryintel: [],
+    missions: [], partners: [], deals: [], scanqueue: [], uhnwi: [], team: [], posts: [], inbound: [], optouts: [], proposals: [], countryintel: [],
     config: {}, services: null, pricing: {}, brand: {}, me: null, lang: "ro",
     ready: false, dbOk: null,
     lux: { cc: "all", type: "all", sel: [] },
-    pplCc: "",
+    pplCc: "", uh: { cc: "all", min: 0 },
     f: { cat: "all", need: "all", region: "all", cc: "all", horizon: 400, type: "all", role: "all", sub: "de_aprobat", q: "" }
   };
   try { Object.assign(S.f, JSON.parse(localStorage.getItem("perimetru.f2") || "{}")); } catch (e) {}
@@ -1373,7 +1375,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
     "Azi": "Today", "Radar": "Radar", "Țări": "Countries", "Contacte": "Contacts", "Companii": "Companies", "Semnale": "Signals", "Cereri primite": "Inbound", "De aprobat": "To approve", "Pipeline": "Pipeline", "Misiuni": "Missions", "Parteneri": "Partners", "Conținut": "Content", "Statistici": "Analytics", "Servicii": "Services", "Noutăți": "Updates", "Setări": "Settings",
     "Unde vor fi principalii în următoarele luni": "Where principals will be in the coming months", "evenimente în 90 de zile": "events in the next 90 days", "cu fereastra de advance deschisă sau aproape": "with the advance window open or close", "țări acoperite": "countries covered", "e-mailuri așteaptă aprobarea": "emails awaiting approval",
     "Categorie": "Category", "Toate": "All", "Resetează filtrele": "Reset filters", "Pregătește outreach": "Prepare outreach", "Cui scriem": "Who to write to", "confirmat": "confirmed", "de reconfirmat": "to reconfirm", "în desfășurare": "under way",
-    "Fiecare țară, cu evenimentele ei": "Every country, with its events", "Toate țările lumii": "Every country in the world", "Director lux": "Luxury directory", "Tot ce e lux, țară cu țară": "Everything luxury, country by country", "Colaborare": "Partnership", "Persoane foarte bogate (UHNWI)": "Ultra-high-net-worth individuals", "Scanează regiunea": "Scan region", "Toate țările": "All countries", "Situația de securitate": "Security situation",
+    "Fiecare țară, cu evenimentele ei": "Every country, with its events", "Toate țările lumii": "Every country in the world", "Director lux": "Luxury directory", "Cei mai bogați oameni, țară cu țară": "The wealthiest people, country by country", "Tot ce e lux, țară cu țară": "Everything luxury, country by country", "Colaborare": "Partnership", "Persoane foarte bogate (UHNWI)": "Ultra-high-net-worth individuals", "Scanează regiunea": "Scan region", "Toate țările": "All countries", "Situația de securitate": "Security situation",
     "Oamenii la care trebuie să ajungem": "The people we need to reach", "+ Adaugă contact": "+ Add contact", "Găsește decidenții pe LinkedIn": "Find decision-makers on LinkedIn", "Scrie e-mail": "Write email", "copiază": "copy", "verificat": "verified", "de verificat": "to verify", "fără e-mail public": "no public email", "Șterge (GDPR)": "Delete (GDPR)",
     "Cine cumpără protecție și lux, în mod recurent": "Who buys protection and luxury, repeatedly", "+ Adaugă companie": "+ Add company", "Pregătește e-mail": "Prepare email", "+ Contact": "+ Contact", "Editează": "Edit", "Dosar": "Dossier", "Ofertă": "Proposal", "Contact": "Contact", "Decidenți (LinkedIn)": "Decision-makers (LinkedIn)", "Fără contact direct încă": "No direct contact yet", "Site oficial": "Official site",
     "Cine caută protecție chiar acum": "Who is looking for protection right now", "Licitații & știri": "Tenders & news",
@@ -1584,7 +1586,7 @@ ${note ? "Extra instruction from the owner: " + note : ""}`, { modelTier: "defau
     if (!n) return;
     let fired = false;
     const running = S.scanqueue.some(q => q.status === "în lucru" && daysTo((q.startedAt || "").slice(0, 10)) >= 0);
-    if (mcp && !running) { try { await mcp.callTool("Claude Code Remote", "fire_trigger", { trigger_id: RESEARCH_TRIGGER, text: "QUEUE" }); fired = true; } catch (e) {} }
+    if (mcp && !running) { try { await mcp.callTool("Claude Code Remote", "fire_trigger", { trigger_id: SCANNER_TRIGGER, text: "QUEUE" }); fired = true; } catch (e) {} }
     toast(`${n} ${n === 1 ? "scanare adăugată" : "scanări adăugate"} în coadă${fired ? "; prima pornește acum" : "; rulează automat, pe rând"}.`);
   }
   async function scanCountries(ccs, label, kinds = ["sweep", "directory"]) {
@@ -1616,13 +1618,42 @@ ${note ? "Extra instruction from the owner: " + note : ""}`, { modelTier: "defau
       <div class="view-head"><div class="grow"><div class="eyebrow">Director lux · ${all.length} adrese în ${ccs.length} țări</div><h1>Tot ce e lux, țară cu țară</h1>
         <p>Family offices, bănci private, hoteluri 5★ și palate, locații exclusiviste, private jet, yachting, elicoptere, mașini exclusiviste, modă, marochinărie, bijuterii și ceasuri, cu adresă, telefon, e-mail și persoana de contact, așa cum le publică firmele. Bifezi și trimiți propuneri de colaborare la aprobare.</p></div>
         <div class="row">${L.cc !== "all" ? `<button class="btn" data-act="lux-scan" data-id="${esc(L.cc)}">Scanează luxul în ${esc(ccName(L.cc))}</button>` : `<button class="btn" data-act="lux-scan-all">Scanează toată lumea (coadă)</button>`}</div></div>
-      ${queue.length ? `<div class="ctx" style="margin-bottom:16px">Coada de scanare: ${done} gata · ${queue.length} rămase. Rulează pe rând, automat, ca să nu se epuizeze limita contului. Urmează: ${esc(queue.slice(0, 4).map(q => q.kind === "directory" ? `Director lux: ${ccName((q.ccs || [])[0])}` : q.kind === "people" ? `Roluri private office: ${ccName((q.ccs || [])[0])}` : q.label).join(" · "))}${queue.length > 4 ? " …" : ""}</div>` : ""}
+      ${queue.length ? `<div class="ctx" style="margin-bottom:16px">Coada de scanare: ${done} gata · ${queue.length} rămase. Rulează pe rând, automat, ca să nu se epuizeze limita contului. Urmează: ${esc(queue.slice(0, 4).map(q => q.kind === "directory" ? `Director lux: ${ccName((q.ccs || [])[0])}` : q.kind === "people" ? `Roluri private office: ${ccName((q.ccs || [])[0])}` : q.kind === "uhnwi" ? `UHNWI: ${ccName((q.ccs || [])[0])}` : q.label).join(" · "))}${queue.length > 4 ? " …" : ""}</div>` : ""}
       <div class="filters"><select class="select" id="luxCc" aria-label="Țară"><option value="all">Toate țările (${all.length})</option>${ccs.map(cc => `<option value="${cc}" ${L.cc === cc ? "selected" : ""}>${esc(ccName(cc))} (${all.filter(o => o.cc === cc).length})</option>`).join("")}</select>
         ${sel.size ? `<button class="btn primary sm" data-act="lux-bulk">Propune colaborare (${sel.size})</button><button class="btn ghost sm" data-act="lux-clear">Deselectează</button>` : `<button class="btn ghost sm" data-act="lux-all">Selectează tot ce are e-mail</button>`}</div>
       <div class="filters">${typeChips}</div>
       <div class="panel" style="margin:0 0 16px;max-width:none"><h3>Persoane foarte bogate (UHNWI)</h3><p class="note" style="margin:0">Nu colectăm date personale despre persoane private: ar încălca GDPR și ar compromite discreția pe care o vindeți. Le abordați prin family office-ul, banca privată, concierge-ul, hotelul și organizatorii din acest director: acolo sunt oamenii care decid pentru ei.</p></div>
       ${!S.ready ? emptyLoading() : list.length ? `<div class="contacts">${list.slice(0, 400).map(row).join("")}</div>${list.length > 400 ? `<p class="note">Primele 400 din ${list.length}. Filtrează pe țară sau categorie.</p>` : ""}` : `<div class="empty"><h3>Încă nimic aici</h3><p>Apasă „Scanează luxul” pentru această țară; rezultatele intră automat.</p></div>`}`;
   }
+  // ---------- UHNWI ----------
+  // Public wealth-list facts only (name, wealth, its source, company, country), and the
+  // business routes to reach them: family office, holding, foundation. No private contact data.
+  function viewUhnwi() {
+    const U = S.uh;
+    const all = S.uhnwi;
+    const ccs = [...new Set(all.map(p => p.cc).filter(Boolean))].sort((a, b) => ccName(a).localeCompare(ccName(b), "ro"));
+    const list = all.filter(p => U.cc === "all" || p.cc === U.cc).filter(p => (+p.netWorthBn || 0) >= U.min)
+      .filter(p => matchesQ(p.name, p.company, p.wealthSource, p.familyOffice, ccName(p.cc))).sort((a, b) => (+b.netWorthBn || 0) - (+a.netWorthBn || 0));
+    const routes = (p) => (p.routes || []).map(id => orgById(id)).filter(Boolean);
+    const card = (p) => { const r = routes(p); const reach = r.find(o => !o.dnc && (o.email || S.contacts.some(c => c.orgId === o.id && c.email)));
+      return `<article class="lead" style="grid-template-columns:70px minmax(0,1.2fr) minmax(0,1fr) auto">
+        <div style="text-align:center"><div style="font-family:var(--f-display);font-size:26px;color:var(--gold);line-height:1">${p.netWorthBn ? esc((+p.netWorthBn).toLocaleString("ro-RO", { maximumFractionDigits: 1 })) : "—"}</div><div class="mono muted" style="font-size:10px">mld USD</div></div>
+        <div style="min-width:0"><div class="eyebrow">${esc(ccName(p.cc))}${p.wealthSource ? ` · ${esc(p.wealthSource)}` : ""}</div><h3>${esc(p.name)}</h3>
+          <p class="why">${esc([p.company, p.publicRole].filter(Boolean).join(" · "))}</p>
+          ${p.netWorthSource ? `<a class="note" href="${esc(p.netWorthSource.url)}" target="_blank" rel="noopener">↗ ${esc(p.netWorthSource.label)}${p.netWorthSource.date ? `, ${esc(p.netWorthSource.date)}` : ""}</a>` : ""}</div>
+        <div class="meta"><div class="lbl">Cum ajungem la el</div>${r.length ? r.map(o => `<div><button class="tag" data-act="dossier" data-id="${esc(o.id)}">${esc(o.name)}</button> <span class="note">${esc(ORG_TYPES[o.type] || "")}</span>${o.email ? `<br><span class="mono">${esc(o.email)}</span>` : ""}${o.phone ? `<br><span class="mono">${esc(o.phone)}</span>` : ""}</div>`).join("") : `<span class="note">${esc(p.familyOffice || "Încă fără family office sau holding identificat")}</span>`}</div>
+        <div class="lead-actions">${reach ? `<button class="btn primary sm" data-act="draft-org" data-id="${esc(reach.id)}">Abordare prin ${esc(ORG_TYPES[reach.type] === "Family office" ? "family office" : "birou")}</button>` : ""}<a class="btn ghost sm" href="${li(`"${p.name}" family office`, "people")}" target="_blank" rel="noopener">Oamenii lui pe LinkedIn</a></div>
+      </article>`; };
+    return `
+      <div class="view-head"><div class="grow"><div class="eyebrow">UHNWI · ${all.length} persoane în ${ccs.length} țări</div><h1>Cei mai bogați oameni, țară cu țară</h1>
+        <p>Din listele publice de avere (Forbes, Bloomberg, Sunday Times Rich List, topurile naționale): averea și sursa ei, compania și, mai ales, căile prin care ajungeți la ei: family office-ul, holdingul și fundația lor, cu contactele de business. Abordarea se face mereu prin aceste birouri, nu direct la persoană.</p></div>
+        <div class="row">${U.cc !== "all" ? `<button class="btn" data-act="uh-scan" data-id="${esc(U.cc)}">Scanează ${esc(ccName(U.cc))}</button>` : `<button class="btn" data-act="uh-scan-all">Scanează toată lumea (coadă)</button>`}</div></div>
+      <div class="filters"><select class="select" id="uhCc" aria-label="Țară"><option value="all">Toate țările (${all.length})</option>${ccs.map(cc => `<option value="${cc}" ${U.cc === cc ? "selected" : ""}>${esc(ccName(cc))} (${all.filter(p => p.cc === cc).length})</option>`).join("")}</select>
+        <select class="select" id="uhMin" aria-label="Avere minimă">${[[0, "Orice avere"], [1, "peste 1 mld"], [5, "peste 5 mld"], [20, "peste 20 mld"]].map(([v, l]) => `<option value="${v}" ${+U.min === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+      <p class="note" style="margin:0 0 14px">Stocăm doar ce e deja public în topurile de avere și în registrele firmelor. Nu stocăm adrese de domiciliu, telefoane personale, membri ai familiei sau deplasări.</p>
+      ${!S.ready ? emptyLoading() : list.length ? `<div class="leads">${list.slice(0, 300).map(card).join("")}</div>` : `<div class="empty"><h3>Încă nimic aici</h3><p>Scanarea UHNWI e în coadă; rezultatele intră automat, țară cu țară.</p></div>`}`;
+  }
+
   function partnershipDraft(o, lang = "en") {
     const kind = ORG_TYPES[o.type] || "";
     const en = {
@@ -1703,6 +1734,8 @@ ${note ? "Extra instruction from the owner: " + note : ""}`, { modelTier: "defau
       execute: async (i) => { const r = await launchResearch(String(i.question).slice(0, 800)); if (!r) throw new Error("could not save request"); AI.pending.push(r.id); saveAI(); return r.fired ? "Web research started now in the background; the answer arrives in this chat and in Noutăți in about 5-15 minutes." : "Saved; it will be researched at the next scheduled radar run (within two days). Tell the user this."; } },
     { name: "scan_countries", description: "Start a broad web sweep for events, organisations and contacts in one or more countries (ISO-2 codes). Use when the user wants coverage of a country or region.", inputSchema: { type: "object", properties: { country_codes: { type: "array", items: { type: "string" } }, label: { type: "string" } }, required: ["country_codes"] },
       execute: async (i) => { const ccs = (i.country_codes || []).map(x => String(x).toUpperCase()).filter(Boolean); if (!ccs.length) throw new Error("no countries"); await scanCountries(ccs, String(i.label || ccs.join(", "))); return "Added to the scan queue (events + luxury directory). The queue runs one scan at a time in the background; results appear in Țări and Director lux as each finishes."; } },
+    { name: "find_uhnwi", description: "Search the UHNWI list (public wealth-list facts) with each person's business routes: family office, holding, foundation and their business contacts.", inputSchema: { type: "object", properties: { query: { type: "string" }, country_code: { type: "string" }, min_net_worth_bn: { type: "number" } } },
+      execute: (i) => { const q = String(i.query || "").toLowerCase(); return S.uhnwi.filter(p => !i.country_code || p.cc === String(i.country_code).toUpperCase()).filter(p => !i.min_net_worth_bn || (+p.netWorthBn || 0) >= +i.min_net_worth_bn).filter(p => !q || [p.name, p.company, p.wealthSource].join(" ").toLowerCase().includes(q)).sort((a, b) => (+b.netWorthBn || 0) - (+a.netWorthBn || 0)).slice(0, 40).map(p => ({ name: p.name, country: ccName(p.cc), net_worth_bn_usd: p.netWorthBn, wealth_source: p.wealthSource, company: p.company, routes: (p.routes || []).map(id => orgById(id)).filter(Boolean).map(o => ({ id: o.id, name: o.name, type: ORG_TYPES[o.type], email: o.email || "", phone: o.phone || "" })) })); } },
     { name: "find_luxury", description: "Search the luxury directory: family offices, private banks, 5-star hotels, exclusive venues, private jet, yachting, helicopters, exclusive cars, fashion, jewellery/watches, lifestyle. Returns name, category, city, country, address, email, phone, contact person, website.", inputSchema: { type: "object", properties: { query: { type: "string" }, country_code: { type: "string" }, category: { type: "string", enum: LUX_CATS.map(x => x[0]) } } },
       execute: (i) => { const q = String(i.query || "").toLowerCase(); return S.orgs.filter(o => LUX_TYPES.has(o.type)).filter(o => !i.country_code || o.cc === String(i.country_code).toUpperCase()).filter(o => !i.category || o.type === i.category).filter(o => !q || [o.name, o.city, o.address, o.why].join(" ").toLowerCase().includes(q)).slice(0, 40).map(o => ({ id: o.id, name: o.name, category: ORG_TYPES[o.type], city: o.city, country: ccName(o.cc), address: o.address, email: o.email || S.contacts.find(c => c.orgId === o.id && c.email)?.email || "", phone: o.phone || "", contact: o.contactName ? `${o.contactName} (${o.contactRole || ""})` : "", website: o.website, tier: o.tier })); } }
   ];
@@ -1750,6 +1783,8 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
       case "lux-scan": scanCountries([id], ccName(id), ["directory"]); break;
       case "lux-scan-all": { const have = new Set(S.orgs.filter(o => LUX_TYPES.has(o.type)).map(o => o.cc)); const queued = new Set(S.scanqueue.filter(q => q.kind === "directory" && q.status !== "gata").flatMap(q => q.ccs || [])); const order = ["RO", "MC", "FR", "CH", "AE", "GB", "IT", "ES", "US", "DE", "AT", "GR", "PT", "SA", "QA", "TR", "HR", "ME", "CY", "MT", ...Object.keys(REGION_OF)]; const todo = [...new Set(order)].filter(cc => !have.has(cc) && !queued.has(cc)); if (!todo.length) { toast("Toate țările sunt deja în coadă sau scanate."); break; } await enqueueScan(todo.map((cc, k) => ({ kind: "directory", ccs: [cc], label: `Director lux: ${ccName(cc)}`, priority: k < 20 ? 2 : 6 }))); break; }
       case "lux-one": luxDrafts([id]); break;
+      case "uh-scan": await enqueueScan([{ kind: "uhnwi", ccs: [id], label: `UHNWI: ${ccName(id)}`, priority: 1 }]); break;
+      case "uh-scan-all": { const have = new Set(S.uhnwi.map(p => p.cc)); const queued = new Set(S.scanqueue.filter(q => q.kind === "uhnwi" && q.status !== "gata").flatMap(q => q.ccs || [])); const order = ["RO", "MC", "CH", "GB", "AE", "US", "FR", "IT", "DE", "ES", "SA", "QA", "IN", "CN", "HK", "SG", "RU", "BR", "MX", "CA", "AU", "JP", "KR", "TR", "IL", "SE", "NL", "BE", "AT", "GR", "CY", "PT"]; const todo = order.filter(cc => !have.has(cc) && !queued.has(cc)); await enqueueScan(todo.map((cc, k) => ({ kind: "uhnwi", ccs: [cc], label: `UHNWI: ${ccName(cc)}`, priority: k < 8 ? 1 : 3 }))); break; }
       case "scan-people": { const ccs = S.pplCc ? [S.pplCc] : ["GB", "CH", "MC", "AE", "US", "FR", "RO"]; await enqueueScan(ccs.map(cc => ({ kind: "people", ccs: [cc], label: `Roluri private office: ${ccName(cc)}`, priority: 1 }))); break; }
       case "lux-bulk": luxDrafts([...S.lux.sel]); break;
       case "lux-clear": S.lux.sel = []; render(); break;
@@ -1852,6 +1887,8 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
   document.addEventListener("change", async (ev) => {
     const el = ev.target;
     const map = { fRegion: "region", fHorizon: "horizon", fNeed: "need", fCc: "cc" };
+    if (el.id === "uhCc") { S.uh.cc = el.value; render(); return; }
+    if (el.id === "uhMin") { S.uh.min = +el.value; render(); return; }
     if (el.id === "pplCc") { S.pplCc = el.value; render(); return; }
     if (el.id === "luxCc") { S.lux.cc = el.value; S.lux.sel = []; render(); return; }
     if (el.dataset?.luxsel) { const set = new Set(S.lux.sel); el.checked ? set.add(el.dataset.luxsel) : set.delete(el.dataset.luxsel); S.lux.sel = [...set]; render(); return; }
@@ -1881,7 +1918,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
   $("#langBtn").addEventListener("click", () => { S.lang = S.lang === "en" ? "ro" : "en"; try { localStorage.setItem("perimetru.lang", S.lang); } catch (e) {} document.documentElement.lang = S.lang; render(); translateDom(document.querySelector("header.top")); translateDom($("#arrival")); });
 
   // ---------- render ----------
-  const VIEWS = { luxury: viewLuxury, today: viewToday, inbound: viewInbound, missions: viewMissions, partners: viewPartners, content: viewContent, stats: viewStats, radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
+  const VIEWS = { uhnwi: viewUhnwi, luxury: viewLuxury, today: viewToday, inbound: viewInbound, missions: viewMissions, partners: viewPartners, content: viewContent, stats: viewStats, radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
   const current = () => { const h = location.hash.slice(1); return VIEWS[h] ? h : "today"; };
   function render() {
     const v = current();
@@ -1896,6 +1933,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     $("#c-countries").textContent = Object.keys(usedCountries()).length || "";
     $("#c-contacts").textContent = S.contacts.length || "";
     $("#c-targets").textContent = S.orgs.length || "";
+    $("#c-uhnwi").textContent = S.uhnwi.length || "";
     $("#c-luxury").textContent = S.orgs.filter(o => LUX_TYPES.has(o.type)).length || "";
     $("#c-signals").textContent = S.signals.length || "";
     $("#c-approvals").textContent = S.drafts.filter(d => d.status === "de_aprobat").length || "";
@@ -1951,7 +1989,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     if (userCap?.me) { try { S.me = await userCap.me(); setupArrival.greet?.(S.me?.name); } catch (e) {} }
     S.dbOk = !!db;
     if (!db) { render(); return; }
-    const cols = ["events", "orgs", "drafts", "alerts", "contacts", "signals", "requests", "scanqueue", "missions", "partners", "deals", "team", "posts", "inbound", "optouts", "proposals", "countryintel"];
+    const cols = ["events", "orgs", "drafts", "alerts", "contacts", "signals", "requests", "scanqueue", "uhnwi", "missions", "partners", "deals", "team", "posts", "inbound", "optouts", "proposals", "countryintel"];
     const pending = new Set(cols);
     cols.forEach(name => db.collection(name).limit(1000).onSnapshot((snap) => {
       S[name] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
