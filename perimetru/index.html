@@ -895,6 +895,8 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
       <button class="btn primary" data-act="approve" data-id="${d.id}">Aprobă</button>
       <button class="btn" data-act="ai-rewrite" data-id="${d.id}" data-mode="scurt">Mai scurt</button>
       <button class="btn" data-act="ai-rewrite" data-id="${d.id}" data-mode="en">În engleză</button>
+      ${(() => { const o = orgById(d.orgId), lg = langFor(o), gulf = ["AE", "SA", "QA", "KW", "BH", "OM"].includes(o?.cc); return lg !== "en" && lg !== d.lang ? `<button class="btn" data-act="ai-rewrite" data-id="${d.id}" data-mode="lang:${lg}">În ${LANG_RO[lg]}</button>` : gulf && d.lang !== "ar" ? `<button class="btn" data-act="ai-rewrite" data-id="${d.id}" data-mode="lang:ar">În arabă</button>` : ""; })()}
+      <button class="btn" data-act="draft-pdf" data-id="${d.id}">Ofertă PDF</button>
       <button class="btn" data-act="ai-rewrite" data-id="${d.id}" data-mode="lux">Adaugă oferta de lux</button>
       <button class="btn" data-act="save-draft" data-id="${d.id}">Salvează</button>
       <span class="spacer"></span><button class="btn danger" data-act="reject" data-id="${d.id}">Respinge</button>`;
@@ -1603,12 +1605,30 @@ Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, 
   }
 
   // ---------- Ofertă PDF ----------
+  const LANG_NAMES = { en: "English", ro: "Romanian", fr: "French", it: "Italian", de: "German", es: "Spanish", ar: "Arabic" };
+  const LANG_RO = { en: "engleză", ro: "română", fr: "franceză", it: "italiană", de: "germană", es: "spaniolă", ar: "arabă" };
+  // the client's own language, from the organisation's country (Gulf stays English by default; Arabic is one click away)
+  function langFor(o) {
+    const cc = o?.cc || "", city = (o?.city || o?.hq || "").toLowerCase();
+    if (["RO", "MD"].includes(cc)) return "ro";
+    if (["FR", "MC", "LU"].includes(cc) || (cc === "BE" && !/antwerp|gent|ghent/.test(city)) || (cc === "CH" && /gen[eè]v|lausanne|montreux|neuch|fribourg|sion|verbier|crans/.test(city))) return "fr";
+    if (["IT", "SM", "VA"].includes(cc) || (cc === "CH" && /lugano|locarno|ascona/.test(city))) return "it";
+    if (["DE", "AT", "LI", "CH"].includes(cc)) return "de";
+    if (["ES", "MX", "AR", "CO", "CL", "PE"].includes(cc)) return "es";
+    return "en";
+  }
+  const langOpts = (sel) => Object.keys(LANG_RO).map(k => `<option value="${k}" ${k === sel ? "selected" : ""}>${LANG_RO[k][0].toUpperCase() + LANG_RO[k].slice(1)}</option>`).join("");
   const PL = {
     en: { title: "Proposal", for: "Prepared for", date: "Date", event: "Occasion", intro: "Thank you for considering us. Below is an indicative proposal combining discreet close protection with the private logistics your principals may need. Final pricing follows a short briefing on schedule, team size and locations.", svc: "Service", desc: "Scope", price: "Indicative price", total: "Indicative total", onreq: "on request", terms: "Indicative proposal, valid 30 days. Final quotation after briefing. All services are delivered with full confidentiality.", contact: "Contact" },
     ro: { title: "Propunere", for: "Pentru", date: "Data", event: "Ocazia", intro: "Vă mulțumim pentru interes. Mai jos este o propunere orientativă care combină protecția apropiată discretă cu logistica privată de care ar putea avea nevoie principalii dumneavoastră. Prețul final urmează unui scurt briefing despre program, mărimea echipei și locații.", svc: "Serviciu", desc: "Ce include", price: "Preț orientativ", total: "Total orientativ", onreq: "la cerere", terms: "Propunere orientativă, valabilă 30 de zile. Ofertă finală după briefing. Toate serviciile sunt prestate cu confidențialitate deplină.", contact: "Contact" },
-    fr: { title: "Proposition", for: "Préparée pour", date: "Date", event: "Occasion", intro: "Merci de votre intérêt. Voici une proposition indicative associant une protection rapprochée discrète à la logistique privée dont vos mandants pourraient avoir besoin. Le prix final suit un court briefing sur le programme, l'équipe et les lieux.", svc: "Service", desc: "Périmètre", price: "Prix indicatif", total: "Total indicatif", onreq: "sur demande", terms: "Proposition indicative, valable 30 jours. Devis final après briefing. Tous les services sont assurés en toute confidentialité.", contact: "Contact" }
+    fr: { title: "Proposition", for: "Préparée pour", date: "Date", event: "Occasion", intro: "Merci de votre intérêt. Voici une proposition indicative associant une protection rapprochée discrète à la logistique privée dont vos mandants pourraient avoir besoin. Le prix final suit un court briefing sur le programme, l'équipe et les lieux.", svc: "Service", desc: "Périmètre", price: "Prix indicatif", total: "Total indicatif", onreq: "sur demande", terms: "Proposition indicative, valable 30 jours. Devis final après briefing. Tous les services sont assurés en toute confidentialité.", contact: "Contact", why: "Pourquoi nous", cred: "Siège au Royaume-Uni, équipes en Europe, au Moyen-Orient et dans le monde. Festivals de Cannes et de Venise, galas amfAR, Better World Fund et Global Gift, événements à St. Moritz, mariages de luxe et soirées sur yacht. Un seul interlocuteur, 24h/24, en toute confidentialité.", pers: "Pour vous" },
+    it: { title: "Proposta", for: "Preparata per", date: "Data", event: "Occasione", intro: "Grazie per l'interesse. Di seguito una proposta indicativa che unisce una protezione ravvicinata discreta alla logistica privata di cui i vostri ospiti potrebbero aver bisogno. Il prezzo finale segue un breve briefing su programma, squadra e luoghi.", svc: "Servizio", desc: "Contenuto", price: "Prezzo indicativo", total: "Totale indicativo", onreq: "su richiesta", terms: "Proposta indicativa, valida 30 giorni. Preventivo finale dopo il briefing. Tutti i servizi sono erogati con la massima riservatezza.", contact: "Contatto", why: "Perché noi", cred: "Sede nel Regno Unito, squadre in Europa, Medio Oriente e nel mondo. Festival di Cannes e Venezia, gala amfAR, Better World Fund e Global Gift, eventi a St. Moritz, matrimoni di lusso e feste in yacht. Un unico referente, 24/7, con totale riservatezza.", pers: "Per voi" },
+    de: { title: "Angebot", for: "Erstellt für", date: "Datum", event: "Anlass", intro: "Vielen Dank für Ihr Interesse. Nachfolgend ein unverbindliches Angebot, das diskreten Personenschutz mit der privaten Logistik verbindet, die Ihre Gäste benötigen könnten. Der endgültige Preis folgt nach einem kurzen Briefing zu Ablauf, Teamgröße und Orten.", svc: "Leistung", desc: "Umfang", price: "Richtpreis", total: "Richtsumme", onreq: "auf Anfrage", terms: "Unverbindliches Angebot, 30 Tage gültig. Endgültiges Angebot nach Briefing. Alle Leistungen werden streng vertraulich erbracht.", contact: "Kontakt", why: "Warum wir", cred: "Hauptsitz im Vereinigten Königreich, Teams in Europa, im Nahen Osten und weltweit. Filmfestspiele Cannes und Venedig, Galas von amfAR, Better World Fund und Global Gift, Events in St. Moritz, Luxushochzeiten und Yacht-Events. Ein Ansprechpartner, rund um die Uhr, absolut vertraulich.", pers: "Für Sie" },
+    es: { title: "Propuesta", for: "Preparada para", date: "Fecha", event: "Ocasión", intro: "Gracias por su interés. A continuación, una propuesta orientativa que combina protección cercana discreta con la logística privada que sus invitados puedan necesitar. El precio final sigue a un breve briefing sobre agenda, equipo y lugares.", svc: "Servicio", desc: "Alcance", price: "Precio orientativo", total: "Total orientativo", onreq: "a consultar", terms: "Propuesta orientativa, válida 30 días. Presupuesto final tras el briefing. Todos los servicios se prestan con total confidencialidad.", contact: "Contacto", why: "Por qué nosotros", cred: "Sede en el Reino Unido, equipos en Europa, Oriente Medio y todo el mundo. Festivales de Cannes y Venecia, galas de amfAR, Better World Fund y Global Gift, eventos en St. Moritz, bodas de lujo y fiestas en yate. Un único interlocutor, 24/7, con total confidencialidad.", pers: "Para ustedes" }
   };
-  function openProposal({ orgId, eventId, inboundId } = {}) {
+  PL.en.why = "Why us"; PL.en.cred = "Headquartered in the UK, with teams across Europe, the Middle East and worldwide. Cannes and Venice film festivals, the amfAR, Better World Fund and Global Gift galas, St. Moritz events, luxury weddings and yacht parties. One point of contact, 24/7, in complete confidentiality."; PL.en.pers = "For you";
+  PL.ro.why = "De ce noi"; PL.ro.cred = "Sediul în Regatul Unit, echipe în Europa, Orientul Mijlociu și în toată lumea. Festivalurile de film de la Cannes și Veneția, galele amfAR, Better World Fund și Global Gift, evenimente la St. Moritz, nunți de lux și petreceri pe yacht. Un singur punct de contact, 24/7, cu discreție totală."; PL.ro.pers = "Pentru dumneavoastră";
+  function openProposal({ orgId, eventId, inboundId, lang } = {}) {
     const inq = S.inbound.find(i => i.id === inboundId), o = orgById(orgId);
     const linked = eventId || (o ? S.events.find(e => live(e) && (e.targets || []).includes(o.id))?.id : "");
     const pr = S.pricing || {};
@@ -1618,19 +1638,30 @@ Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, 
       <form id="pp" class="grid">
         <div class="field"><label for="pp-client">Client</label><input id="pp-client" value="${esc(o?.name || inq?.company || inq?.name || "")}"></div>
         <div class="field"><label for="pp-ev">Ocazia</label><select id="pp-ev"><option value="">—</option>${S.events.filter(live).sort((a, b) => a.start.localeCompare(b.start)).map(e => `<option value="${esc(e.id)}" ${e.id === linked ? "selected" : ""}>${esc(fmtD(e.start))} · ${esc(e.title)}</option>`).join("")}</select></div>
-        <div class="field"><label for="pp-lang">Limba</label><select id="pp-lang"><option value="en">Engleză</option><option value="ro">Română</option><option value="fr">Franceză</option></select></div>
+        <div class="field"><label for="pp-lang">Limba</label><select id="pp-lang">${["en", "ro", "fr", "it", "de", "es"].map(k => `<option value="${k}" ${k === (lang || langFor(o)) ? "selected" : ""}>${LANG_RO[k][0].toUpperCase() + LANG_RO[k].slice(1)}</option>`).join("")}</select><span class="note">Arabă: PDF-ul rămâne în engleză (fontul PDF nu are litere arabe); e-mailul poate fi în arabă.</span></div>
+        <div class="field"><label for="pp-pers">Paragraf personalizat pentru client</label><textarea id="pp-pers" style="min-height:80px" placeholder="2–3 fraze despre ce înseamnă concret pentru ei. Apasă „Scrie cu AI” sau scrie tu."></textarea><div class="row" style="margin-top:6px"><button class="btn ghost sm" type="button" id="pp-ai">Scrie cu AI</button></div></div>
         <div>${services().map((s, i) => `<div class="check" style="align-items:center;flex-wrap:wrap"><input type="checkbox" id="pp-s-${i}" ${["cp", "cars"].includes(s.id) ? "checked" : ""}><label for="pp-s-${i}" style="flex:1;min-width:160px">${esc(s.name)}</label><input class="select" style="width:120px;border-radius:8px" id="pp-p-${i}" type="number" min="0" placeholder="preț €" value="${esc(pr[s.id]?.price || "")}" aria-label="Preț ${esc(s.name)}"><input class="select" style="width:110px;border-radius:8px" id="pp-u-${i}" placeholder="unitate" value="${esc(pr[s.id]?.unit || "")}" aria-label="Unitate ${esc(s.name)}"><input class="select" style="width:70px;border-radius:8px" id="pp-q-${i}" type="number" min="1" value="1" aria-label="Cantitate ${esc(s.name)}"></div>`).join("")}</div>
         <div class="field"><label for="pp-notes">Note pentru client (opțional)</label><textarea id="pp-notes" style="min-height:70px">${esc(inq?.need ? `${inq.need}${inq.where ? ", " + inq.where : ""}${inq.when ? ", " + inq.when : ""}` : "")}</textarea></div>
         <div class="row"><button class="btn primary" type="submit">Descarcă PDF</button><button class="btn ghost" type="button" id="pp-x">Renunță</button><span class="note" id="pp-st"></span></div>
       </form>`, (m) => {
       m.classList.add("wide");
       $("#pp-x", m).onclick = closeModal;
+      $("#pp-ai", m).onclick = async () => {
+        if (!sample) { toast("AI indisponibil în această vizualizare."); return; }
+        const b = $("#pp-ai", m); b.disabled = true; b.textContent = "Scriu…";
+        const ev = evById($("#pp-ev", m).value), lg = $("#pp-lang", m).value;
+        try {
+          const { text } = await sample(`Write 2-3 sentences (max 70 words) in ${LANG_NAMES[lg]} for a proposal from a UK-headquartered close protection and private luxury services company to ${$("#pp-client", m).value || "the client"}. Say concretely what we would take care of for them. Use only these facts; invent nothing about the client.\nClient type: ${o ? ORG_TYPES[o.type] || o.type : "private client"}; location: ${o ? [o.city || o.hq, o.cc].filter(Boolean).join(", ") : ""}; why relevant (internal note, may be Romanian): ${o?.why || inq?.need || ""}.\n${ev ? `Occasion: ${ev.title}, ${range(ev.start, ev.end)} ${parseD(ev.start).getFullYear()}, ${ev.city}.` : ""}\nNo greeting, no sign-off, plain text.`, { modelTier: "default" });
+          $("#pp-pers", m).value = text.trim();
+        } catch (err) { toast(err?.code === "rate_limited" ? "AI-ul e ocupat, încearcă peste un minut." : "Nu am putut scrie acum."); }
+        b.disabled = false; b.textContent = "Scrie cu AI";
+      };
       $("#pp", m).onsubmit = async (ev) => {
         ev.preventDefault();
         const items = services().map((s, i) => ({ s, on: $(`#pp-s-${i}`, m).checked, price: +$(`#pp-p-${i}`, m).value || 0, unit: $(`#pp-u-${i}`, m).value.trim(), qty: +$(`#pp-q-${i}`, m).value || 1 })).filter(x => x.on);
         if (!items.length) { toast("Alege măcar un serviciu."); return; }
         $("#pp-st", m).textContent = "Generez…";
-        const spec = { client: $("#pp-client", m).value.trim(), event: evById($("#pp-ev", m).value), lang: $("#pp-lang", m).value, notes: $("#pp-notes", m).value.trim(), items };
+        const spec = { client: $("#pp-client", m).value.trim(), event: evById($("#pp-ev", m).value), lang: $("#pp-lang", m).value, notes: $("#pp-notes", m).value.trim(), pers: $("#pp-pers", m).value.trim(), items };
         const ok = await buildProposalPDF(spec);
         if (ok) { await put("proposals", newId("pr"), { orgId: orgId || "", inboundId: inboundId || "", client: spec.client, eventId: spec.event?.id || "", lang: spec.lang, items: items.map(x => ({ id: x.s.id, name: x.s.name, price: x.price, unit: x.unit, qty: x.qty })), createdAt: new Date().toISOString() }); if (inboundId) patch("inbound", inboundId, { status: "ofertă trimisă" }); closeModal(); }
         else $("#pp-st", m).textContent = "";
@@ -1651,13 +1682,16 @@ Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, 
     doc.setFillColor(14, 17, 19); doc.rect(0, 0, W, 132, "F");
     let tx = M; const logo = b.logoUrl ? await imgData(b.logoUrl) : null;
     if (logo) { const h = 44, w = Math.min(140, logo.w * h / logo.h); doc.addImage(logo.d, logo.f, M, 30, w, h); tx = M; }
-    doc.setTextColor(...acc); doc.setFont("times", "normal"); doc.setFontSize(24); doc.text(tr(c.company || "Private Protection"), tx, logo ? 98 : 74);
+    doc.setTextColor(...acc); doc.setFont("times", "normal"); doc.setFontSize(24); doc.text(tr(c.company || "Platinum CPO"), tx, logo ? 98 : 74);
     doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(190, 186, 176); doc.text("CLOSE PROTECTION  -  PRIVATE AVIATION  -  CHAUFFEURED CARS  -  HOTELS & YACHTS", tx, logo ? 116 : 94, { charSpace: 0.6 });
     y = 178; doc.setTextColor(30, 30, 30); doc.setFont("times", "normal"); doc.setFontSize(26); doc.text(tr(`${L.title}`), M, y);
     y += 26; doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(90, 90, 90);
     doc.text(tr(`${L.for}: ${spec.client || "-"}`), M, y); doc.text(tr(`${L.date}: ${fmtD(iso(today()))}`), W - M, y, { align: "right" });
     if (spec.event) { y += 16; doc.text(tr(`${L.event}: ${spec.event.title}, ${range(spec.event.start, spec.event.end)} ${parseD(spec.event.start).getFullYear()}, ${spec.event.city}`), M, y); }
     y += 26; doc.setTextColor(40, 40, 40); doc.setFontSize(10.5); const intro = doc.splitTextToSize(tr(L.intro), W - 2 * M); doc.text(intro, M, y); y += intro.length * 14 + 14;
+    const block = (head, body) => { doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...acc); doc.text(tr(head).toUpperCase(), M, y, { charSpace: 0.8 }); y += 14; doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(40, 40, 40); const t = doc.splitTextToSize(tr(body), W - 2 * M); doc.text(t, M, y); y += t.length * 14 + 12; };
+    if (spec.pers) block(L.pers, spec.pers);
+    block(L.why, L.cred);
     doc.setDrawColor(...acc); doc.setLineWidth(1); doc.line(M, y, W - M, y); y += 18;
     doc.setFontSize(8.5); doc.setTextColor(120, 120, 120); doc.text(tr(L.svc).toUpperCase(), M, y, { charSpace: 0.8 }); doc.text(tr(L.price).toUpperCase(), W - M, y, { align: "right", charSpace: 0.8 }); y += 14;
     let total = 0, anyOnReq = false;
@@ -1761,11 +1795,11 @@ Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, 
         <div class="field"><label for="dc-ct">Persoană</label><select id="dc-ct">${ctOpts(orgId || orgs[0]?.id)}</select></div>
         <div class="field"><label for="dc-ev">Eveniment-ancoră</label><select id="dc-ev"><option value="">Fără eveniment (prezentare generală)</option>${evOpts.map(x => `<option value="${esc(x.id)}" ${x.id === eventId ? "selected" : ""}>${esc(fmtD(x.start))} · ${esc(x.title)} (${esc(x.cc || "")})</option>`).join("")}</select></div>
         <div class="field"><label for="dc-offer">Ce oferim în mesaj</label><select id="dc-offer"><option value="cp">Doar protecție</option><option value="bundle">Protecție + lux (yacht, mașini, produse de lux, locuri exclusiviste)</option><option value="lux">Doar lux: yacht, mașini, produse, locuri exclusiviste (protecția discret)</option></select></div>
-        <div class="field"><label for="dc-lang">Limba</label><select id="dc-lang"><option value="en">Engleză</option><option value="ro">Română</option><option value="fr">Franceză</option><option value="it">Italiană</option><option value="de">Germană</option><option value="ar">Arabă</option></select></div>
+        <div class="field"><label for="dc-lang">Limba</label><select id="dc-lang">${langOpts(langFor(orgById(orgId) || orgs[0]))}</select></div>
         <div class="field"><label for="dc-note">Indicații (opțional)</label><input id="dc-note" placeholder="ex. menționează echipa vorbitoare de franceză"></div>
         <div class="row"><button class="btn primary" id="dc-go">Scrie draftul</button><button class="btn ghost" id="dc-tpl">Șablon fără AI</button><button class="btn ghost" id="dc-x">Renunță</button><span class="note" id="dc-st"></span></div>
       </div>`, (m) => {
-      const sync = () => { const oid = $("#dc-org", m).value; $("#dc-ct", m).innerHTML = ctOpts(oid); if (!eventId) { const linked = S.events.filter(live).find(x => (x.targets || []).includes(oid)); $("#dc-ev", m).value = linked ? linked.id : ""; } };
+      const sync = () => { const oid = $("#dc-org", m).value; $("#dc-ct", m).innerHTML = ctOpts(oid); $("#dc-lang", m).value = langFor(orgById(oid)); if (!eventId) { const linked = S.events.filter(live).find(x => (x.targets || []).includes(oid)); $("#dc-ev", m).value = linked ? linked.id : ""; } };
       $("#dc-org", m).onchange = sync; if (!contactId) sync();
       $("#dc-x", m).onclick = closeModal;
       const args = () => ({ orgId: $("#dc-org", m).value, contactId: $("#dc-ct", m).value, eventId: $("#dc-ev", m).value, lang: $("#dc-lang", m).value, offer: $("#dc-offer", m).value, note: $("#dc-note", m).value });
@@ -2167,6 +2201,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
       case "del-post": try { await db.collection("posts").doc(id).delete(); toast("Șters"); } catch (e) { toast("Nu s-a șters."); } break;
       case "dossier": openDossier(id); break;
       case "proposal-org": openProposal({ orgId: id }); break;
+      case "draft-pdf": { const d = S.drafts.find(x => x.id === id); if (d) openProposal({ orgId: d.orgId, eventId: d.eventId, lang: ["en", "ro", "fr", "it", "de", "es"].includes(d.lang) ? d.lang : "en" }); break; }
       case "del-member": try { await db.collection("team").doc(id).delete(); toast("Scos din echipă"); } catch (e) { toast("Nu s-a șters."); } break;
       case "brand-reset": if (await put("config", "brand", { ...S.brand, accent: "" })) toast("Culoarea implicită"); break;
       case "gdpr-export": exportGDPR(); break;
@@ -2223,9 +2258,10 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
       case "ai-rewrite": {
         if (!sample) { toast("AI indisponibil în această vizualizare."); return; }
         const e = readEdits(), mode = el.dataset.mode; el.disabled = true; el.textContent = "Scriu…";
-        const instr = mode === "en" ? "Translate it into polished British English." : mode === "lux" ? `Add one or two sentences offering, through partners, luxury logistics: ${services().filter(s => s.id !== "cp").map(s => s.name).join(", ")}. Keep it discreet and under 180 words.` : "Make it shorter (max 110 words) while keeping the event reference, the call-to-action and the opt-out line.";
+        const tl = mode.startsWith("lang:") ? mode.slice(5) : mode === "en" ? "en" : "";
+        const instr = tl === "ar" ? "Translate it into polished Modern Standard Arabic suitable for a senior Gulf business reader (formal, respectful), keeping names, brands and placeholders in Latin script." : tl && tl !== "en" ? `Translate it into polished, natural business ${LANG_NAMES[tl]}, with the formal register usual for a first contact.` : mode === "en" ? "Translate it into polished British English." : mode === "lux" ? `Add one or two sentences offering, through partners, luxury logistics: ${services().filter(s => s.id !== "cp").map(s => s.name).join(", ")}. Keep it discreet and under 180 words.` : "Make it shorter (max 110 words) while keeping the event reference, the call-to-action and the opt-out line.";
         try { const res = await sample.json(`Rewrite this B2B email for a close protection and luxury services company. ${instr} Keep the placeholders {{signature}} and {{company}} if present. Do not add facts. Return JSON {"subject": string, "body": string}.\n\nSubject: ${e.subject}\n\n${e.body}`, { modelTier: "quick" });
-          if (res?.subject && res?.body) { await patch("drafts", id, { ...e, subject: res.subject, body: res.body, lang: mode === "en" ? "en" : d.lang }); toast("Rescris"); } }
+          if (res?.subject && res?.body) { await patch("drafts", id, { ...e, subject: res.subject, body: res.body, lang: tl || d.lang }); toast("Rescris"); } }
         catch (err) { toast(err?.code === "rate_limited" ? "AI-ul e ocupat, încearcă peste un minut." : "Nu am putut rescrie acum."); }
         el.disabled = false; break;
       }
