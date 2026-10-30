@@ -48,6 +48,9 @@ def header(W: int, H: int) -> str:
         style("big_word", FONT_BOLD, 0.15, YELLOW, max(3, s // 110), max(1, s // 200), back="&H90000000"),
         style("karaoke", FONT_BOLD, 0.062, WHITE, max(3, s // 130), max(1, s // 300), back="&H80000000"),
         style("bold_caption", FONT_BOLD, 0.075, WHITE, max(3, s // 110), max(1, s // 250), back="&H80000000"),
+        style("hormozi", FONT_BOLD, 0.078, WHITE, max(4, s // 90), max(2, s // 200), back="&H90000000"),
+        style("mrbeast", FONT_BOLD, 0.115, WHITE, max(6, s // 60), max(3, s // 120), back="&H90000000"),
+        style("aliabdaal", FONT_TEXT, 0.05, WHITE, max(3, s // 110), 0, border_style=3, back="&H8C1A1A1A"),
         "",
         "[Events]",
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
@@ -146,7 +149,109 @@ def caption_events(words, style: str, W: int, H: int) -> list:
     return out
 
 
-def build(plan: EditPlan, W: int, H: int, words=None) -> str | None:
+GREEN = "&H0097DC3D"
+RED = "&H004D4DFF"
+PALETTE = [YELLOW, GREEN, RED]
+
+
+def _plain(word: str) -> str:
+    import unicodedata
+    w = unicodedata.normalize("NFKD", word.lower())
+    return "".join(c for c in w if c.isalnum() and not unicodedata.combining(c))
+
+
+def is_key(word: str, emphasis=()) -> bool:
+    """Words worth colouring: long words, numbers, exclamations, stressed words."""
+    p = _plain(word)
+    return len(p) >= 7 or any(c.isdigit() for c in p) or word.rstrip().endswith("!") or word in emphasis
+
+
+def caption_y(style: str, W: int, H: int) -> int:
+    vertical = H > W
+    if style in ("hormozi", "mrbeast", "bold"):
+        return int(H * (0.66 if vertical else 0.84))
+    return anchor("caption", "bottom", W, H)[2]
+
+
+def viral_events(words, style: str, W: int, H: int, emphasis=()) -> list:
+    """Creator caption styles. hormozi: 2-3 uppercase words, key words in colour, pop on every
+    line. mrbeast: 1-2 huge words, slightly tilted. aliabdaal: calm sentence on a soft box,
+    the spoken word highlighted."""
+    import random
+    rnd = random.Random(7)
+    vertical = H > W
+    x, y = W // 2, caption_y(style, W, H)
+    size = {"hormozi": 3, "mrbeast": 2, "aliabdaal": 7 if not vertical else 5}[style]
+    lines, cur = [], []
+    for w in words:
+        if cur and (len(cur) >= size or w[0] - cur[-1][1] > 0.5 or cur[-1][2].rstrip()[-1:] in ".!?"):
+            lines.append(cur)
+            cur = []
+        cur.append(w)
+    if cur:
+        lines.append(cur)
+    out, colour_i = [], 0
+    for line in lines:
+        start, end = line[0][0], max(line[-1][1], line[0][0] + 0.3)
+        if style == "aliabdaal":
+            toks = [clean(w[2]) for w in line]
+            for i, w in enumerate(line):
+                s = w[0]
+                e = line[i + 1][0] if i + 1 < len(line) else end
+                parts = [f"{{\\c{YELLOW}}}{t}{{\\c{WHITE}}}" if j == i else t for j, t in enumerate(toks)]
+                fade = "\\fad(120,0)" if i == 0 else ""
+                out.append(f"Dialogue: 1,{_ts(s)},{_ts(max(e, s + 0.05))},aliabdaal,,0,0,0,,"
+                           f"{{\\an2\\pos({x},{y}){fade}}}" + " ".join(parts))
+            continue
+        toks = []
+        for w in line:
+            t = clean(w[2]).upper()
+            if is_key(w[2], emphasis):
+                t = f"{{\\c{PALETTE[colour_i % len(PALETTE)]}}}{t}{{\\c{WHITE}}}"
+                colour_i += 1
+            toks.append(t)
+        tilt = f"\\frz{rnd.uniform(-4, 4):.1f}" if style == "mrbeast" else ""
+        pop = "\\fscx70\\fscy70\\t(0,110,\\fscx108\\fscy108)\\t(110,190,\\fscx100\\fscy100)"
+        out.append(f"Dialogue: 1,{_ts(start)},{_ts(end)},{style},,0,0,0,,{{\\an2\\pos({x},{y}){tilt}{pop}}}" + " ".join(toks))
+    return out
+
+
+EMOJI_DIR = Path(__file__).resolve().parent.parent / "assets" / "emoji"
+
+
+def _emoji_index():
+    import json
+    if not hasattr(_emoji_index, "idx"):
+        data = json.loads((EMOJI_DIR / "keywords.json").read_text(encoding="utf-8")) if (EMOJI_DIR / "keywords.json").exists() else {}
+        _emoji_index.idx = [(kw, code) for code, kws in data.items() for kw in kws]
+    return _emoji_index.idx
+
+
+def emoji_for(word: str):
+    p = _plain(word)
+    if len(p) < 3:
+        return None
+    for kw, code in _emoji_index():
+        if p == kw or (len(kw) >= 4 and p.startswith(kw)):
+            return EMOJI_DIR / f"{code}.png"
+    return None
+
+
+def emoji_cues(words, style: str, W: int, H: int):
+    """Emoji that pop in above the captions when a matching word is said (max one per 2.5 s)."""
+    size = int(min(W, H) * 0.14)
+    y = caption_y(style, W, H) - int(min(W, H) * 0.12) - size
+    out, last = [], -9.0
+    for s, e, w in words:
+        f = emoji_for(w)
+        if f and f.exists() and s - last >= 2.5:
+            out.append({"file": str(f), "start": round(s, 3), "end": round(max(e, s + 1.0), 3),
+                        "x": (W - size) // 2, "y": max(0, y), "size": size})
+            last = s
+    return out
+
+
+def build(plan: EditPlan, W: int, H: int, words=None, emphasis=()) -> str | None:
     """ASS document for the whole edit, or None when there is no text at all."""
     texts = []
     for clip, start, length in timeline(plan):
@@ -155,15 +260,17 @@ def build(plan: EditPlan, W: int, H: int, words=None) -> str | None:
     for c in plan.captions:
         texts.append((Overlay(text=c.text, style="caption", position="bottom", animation="fade"), c.start, c.end))
     events = overlay_events(texts, W, H)
-    if words and plan.caption_style != "none":
+    if words and plan.caption_style in ("hormozi", "mrbeast", "aliabdaal"):
+        events += viral_events(words, plan.caption_style, W, H, emphasis)
+    elif words and plan.caption_style != "none":
         events += caption_events(words, plan.caption_style, W, H)
     if not events:
         return None
     return header(W, H) + "\n" + "\n".join(events) + "\n"
 
 
-def write(plan: EditPlan, W: int, H: int, dest: Path, words=None) -> bool:
-    doc = build(plan, W, H, words)
+def write(plan: EditPlan, W: int, H: int, dest: Path, words=None, emphasis=()) -> bool:
+    doc = build(plan, W, H, words, emphasis)
     if doc is None:
         return False
     dest.write_text(doc, encoding="utf-8")

@@ -472,10 +472,25 @@ def _join(plan, media, media_dir, segs, workdir, out_path, W, H, fps, quality, e
     vf = emphasis_filters(extras.get("emphasis"), W, H)
     vf += beat_filters(plan.beat_fx, extras.get("beat"), plan.beat_fx_every, W, H, total)
     ass_name = f"{out_path.stem}.ass"
-    if subs.write(plan, W, H, workdir / ass_name, extras.get("words")):
+    if subs.write(plan, W, H, workdir / ass_name, extras.get("words"), extras.get("key_words") or ()):
         vf.append(f"ass={ass_name}:fontsdir=.")
     final_v = "[vout]"
-    fc.append(f"{cur_v}" + ",".join(vf + ["format=yuv420p"]) + final_v)
+    cues = subs.emoji_cues(extras.get("words") or [], plan.caption_style, W, H) if plan.emoji else []
+    fc.append(f"{cur_v}" + ",".join(vf + ["format=yuv420p"]) + ("[vtxt]" if cues else final_v))
+    if cues:  # emoji pop in above the captions
+        prev = "[vtxt]"
+        for k, c in enumerate(cues[:30]):
+            d = c["end"] - c["start"]
+            args += ["-loop", "1", "-t", f"{d:.3f}", "-i", c["file"]]
+            sz = c["size"]
+            fc.append(f"[{n_in}:v]format=rgba,scale=w='trunc({sz}*(0.5+0.5*min(1\\,t/0.14))/2)*2':h=-2:eval=frame,"
+                      f"fade=t=in:st=0:d=0.1:alpha=1,fade=t=out:st={max(0, d - 0.15):.3f}:d=0.15:alpha=1,"
+                      f"setpts=PTS-STARTPTS+{c['start']:.3f}/TB[em{k}]")
+            out_l = final_v if k == min(len(cues), 30) - 1 else f"[ve{k}]"
+            fc.append(f"{prev}[em{k}]overlay=x='{W // 2}-w/2':y='{c['y'] + sz}-h':eof_action=pass:"
+                      f"enable='between(t,{c['start']:.3f},{c['end']:.3f})'{out_l}")
+            prev = out_l
+            n_in += 1
 
     voice = cur_a
     if extras.get("mute"):  # dubbing without separated stems: duck the original speech

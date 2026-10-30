@@ -17,7 +17,7 @@ Fit = Literal["fill", "track", "blur_bg", "fit"]
 TextStyle = Literal["title", "caption", "lower_third", "label", "big_word"]
 Position = Literal["top", "center", "bottom", "lower_third"]
 Animation = Literal["fade", "pop", "slide_up", "typewriter", "zoom_out", "none"]
-CaptionStyle = Literal["none", "karaoke", "bold", "clean"]
+CaptionStyle = Literal["none", "karaoke", "bold", "clean", "hormozi", "mrbeast", "aliabdaal"]
 BeatFx = Literal["none", "flash", "zoom", "shake", "mix"]
 
 ASPECT_SIZE = {"9:16": (1080, 1920), "16:9": (1920, 1080), "1:1": (1080, 1080), "4:5": (1080, 1350)}
@@ -114,7 +114,10 @@ class EditPlan(BaseModel):
                                     description="Extra subtitles on the final timeline. Leave empty: speech in "
                                     "clips is transcribed and captioned automatically")
     caption_style: CaptionStyle = Field("none", description="Look of the automatic word-by-word captions: "
-                                        "karaoke = active word highlighted, bold = big uppercase, clean = plain")
+                                        "karaoke = active word highlighted, bold = big uppercase, clean = plain, hormozi = punchy "
+                                        "uppercase with coloured key words, mrbeast = huge 1-2 words, tilted, "
+                                        "aliabdaal = calm sentence on a soft box")
+    emoji: bool = Field(False, description="Animated emoji above the captions on key words")
     beat_fx: BeatFx = Field("none", description="Effect on music beats: flash, zoom pulse, shake, or mix")
     beat_fx_every: int = Field(2, description="1 = every beat, 2 = every second beat, 4 = once per bar")
     voiceover: List[VoiceLine] = Field(default_factory=list,

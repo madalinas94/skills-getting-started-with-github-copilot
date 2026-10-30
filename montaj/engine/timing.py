@@ -71,6 +71,15 @@ def voiceover(plan: EditPlan, workdir: Path, api_key: str | None, voice: str | N
 SFX_DIR = Path(__file__).resolve().parent.parent / "assets" / "sfx"
 
 
+def stressed_words(plan: EditPlan, analysis: dict) -> set:
+    out = set()
+    for clip in plan.clips:
+        sp = (analysis.get(clip.media_id) or {}).get("speech") or {}
+        words = sp.get("words") or []
+        out |= {words[i][2] for i in sp.get("stressed") or [] if i < len(words)}
+    return out
+
+
 def emphasis_moments(plan: EditPlan, analysis: dict):
     """Timeline [start, end] of stressed words in clips that keep their sound."""
     out = []
@@ -146,6 +155,7 @@ def prepare(plan: EditPlan, analysis: dict, workdir: Path, eleven_key=None, voic
     extras = {"beat": beat_grid(plan, analysis), "words": words, "voice": tracks, "faces": faces}
     if plan.emphasis_zoom:
         extras["emphasis"] = emphasis_moments(plan, analysis)
+    extras["key_words"] = stressed_words(plan, analysis)
     if plan.sfx:
         extras["sfx"] = sfx_cues(plan)
     if media is not None and media_dir is not None:
