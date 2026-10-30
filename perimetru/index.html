@@ -434,12 +434,8 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
       <a href="#luxury">Director lux <span class="count" id="c-luxury"></span></a>
       <a href="#targets">Companii <span class="count" id="c-targets"></span></a>
       <a href="#signals">Semnale <span class="count" id="c-signals"></span></a>
-      <a href="#inbound">Cereri primite <span class="count" id="c-inbound"></span></a>
       <a href="#approvals">De aprobat <span class="count" id="c-approvals"></span></a>
       <a href="#pipeline">Pipeline <span class="count" id="c-pipeline"></span></a>
-      <a href="#missions">Misiuni <span class="count" id="c-missions"></span></a>
-      <a href="#partners">Parteneri <span class="count" id="c-partners"></span></a>
-      <a href="#content">Conținut <span class="count" id="c-content"></span></a>
       <a href="#stats">Statistici <span class="count" id="c-stats"></span></a>
       <a href="#services">Servicii <span class="count" id="c-services"></span></a>
       <a href="#alerts">Noutăți <span class="count" id="c-alerts"></span></a>
@@ -999,8 +995,6 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
   function todayActions() {
     const acts = [];
     dueFollowUps().forEach(d => { const o = orgById(d.orgId); acts.push({ w: 100, t: `Follow-up: ${o?.name || ""}`, x: `E-mailul din ${fmtD(d.sentAt)} n-a primit răspuns. Follow-up-ul e gata de scris.`, btn: ["followup", d.id, "Scrie follow-up"] }); });
-    S.inbound.filter(i => (i.status || "nou") === "nou").forEach(i => acts.push({ w: 99, t: `Cerere primită: ${i.name || i.company || "fără nume"}`, x: i.summary || i.need || "", go: "inbound", label: "Răspunde" }));
-    S.missions.filter(m => m.status !== "încheiată" && m.start && daysTo(m.start) >= 0 && daysTo(m.start) <= 14).forEach(m => { const open = (m.checklist || []).filter(c => !c.done).length; if (open) acts.push({ w: 97, t: `Misiune în ${daysTo(m.start)} zile: ${m.title}`, x: `${open} puncte de advance nebifate.`, btn: ["open-mission", m.id, "Deschide"] }); });
     const appr = S.drafts.filter(d => d.status === "aprobat");
     if (appr.length) acts.push({ w: 95, t: `${appr.length} e-mailuri aprobate, încă netrimise`, x: "Deschide-le în Gmail sau Outlook și apasă „Am trimis”.", go: "approvals", sub: "aprobat", label: "Trimite" });
     const pend = S.drafts.filter(d => d.status === "de_aprobat");
@@ -1918,7 +1912,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
   $("#langBtn").addEventListener("click", () => { S.lang = S.lang === "en" ? "ro" : "en"; try { localStorage.setItem("perimetru.lang", S.lang); } catch (e) {} document.documentElement.lang = S.lang; render(); translateDom(document.querySelector("header.top")); translateDom($("#arrival")); });
 
   // ---------- render ----------
-  const VIEWS = { uhnwi: viewUhnwi, luxury: viewLuxury, today: viewToday, inbound: viewInbound, missions: viewMissions, partners: viewPartners, content: viewContent, stats: viewStats, radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
+  const VIEWS = { uhnwi: viewUhnwi, luxury: viewLuxury, today: viewToday, stats: viewStats, radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
   const current = () => { const h = location.hash.slice(1); return VIEWS[h] ? h : "today"; };
   function render() {
     const v = current();
@@ -1940,8 +1934,6 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     $("#c-pipeline").textContent = dueFollowUps().length || "";
     $("#c-alerts").textContent = unread || "";
     $("#c-today").textContent = S.ready ? (todayActions().length || "") : "";
-    $("#c-inbound").textContent = S.inbound.filter(i => (i.status || "nou") === "nou").length || "";
-    $("#c-missions").textContent = S.missions.filter(m => !["încheiată", "anulată"].includes(m.status)).length || "";
     $("#langBtn").textContent = S.lang === "en" ? "RO" : "EN";
     applyBrand();
     translateDom($("#main"));
