@@ -192,6 +192,11 @@ def brief(settings: dict, style: dict | None = None) -> str:
               if settings.get(key)]
     if extras:
         lines.append("The user switched on: " + "; ".join(extras) + ".")
+    ins = settings.get("insights")
+    if ins:
+        lines.append("WHAT WORKS WITH THIS CREATOR'S AUDIENCE (from their analytics): " + json.dumps(
+            {k: ins.get(k) for k in ("summary", "do", "dont", "best_length", "hook_tips") if ins.get(k)},
+            ensure_ascii=False))
     if settings.get("variant"):
         lines.append(f"VARIANT: {settings['variant']}")
     lines.append("USER RULES (follow these first):\n" + (settings.get("rules") or "(none given)"))
@@ -322,6 +327,26 @@ def translate(units: list, overlays: list, title: str, language: str, api_key: s
     content = [{"type": "text", "text": json.dumps(payload, ensure_ascii=False, indent=1)}]
     return _parse(client_for(api_key), model, "low", [{"role": "user", "content": content}], Translation,
                   system=TRANSLATE_SYSTEM)
+
+
+class Insights(BaseModel):
+    summary: str = Field(description="2-3 sentences in Romanian: what this audience rewards")
+    do: List[str] = Field(description="Concrete things to keep doing (Romanian)")
+    dont: List[str] = Field(description="Concrete things to stop doing (Romanian)")
+    best_length: str = Field(description="Ideal video length for this channel, e.g. '35-45 s'")
+    hook_tips: List[str] = Field(description="Hook patterns that worked, with examples from the titles")
+
+
+INSIGHTS_SYSTEM = """You are a YouTube / short-form growth analyst. From a creator's own video \
+statistics (views, average view duration and percentage, retention curves where available) \
+find what their audience rewards: topics, title/hook patterns, length, pacing. Be specific to \
+this data; no generic advice."""
+
+
+def channel_insights(videos: list, api_key: str | None, model: str = DEFAULT_MODEL) -> Insights:
+    content = [{"type": "text", "text": json.dumps(videos[:40], ensure_ascii=False, indent=1)}]
+    return _parse(client_for(api_key), model, "medium", [{"role": "user", "content": content}], Insights,
+                  system=INSIGHTS_SYSTEM, max_tokens=6000)
 
 
 def describe_error(exc: Exception) -> str:

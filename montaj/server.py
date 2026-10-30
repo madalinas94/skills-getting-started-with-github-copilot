@@ -20,8 +20,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from engine import (agent, analyze, autoplan, dub, export, ff, gpu, multicam, presets, render, shorts, speech, stock,
-                    styles, textedit, thumb, timing, validate)
+from engine import (agent, analyze, autoplan, dub, export, ff, gpu, multicam, presets, publish, render, shorts,
+                    speech, stock, styles, textedit, thumb, timing, validate)
 from engine.plan import ASPECT_SIZE, EditPlan, timeline, total_length
 
 try:
@@ -80,7 +80,7 @@ def load_settings() -> dict:
     data = {"api_key": "", "model": agent.DEFAULT_MODEL, "effort": "medium",
             "eleven_key": "", "eleven_voice": "", "whisper_model": "small", "my_voice_id": "",
             "my_voice_name": "", "pexels_key": "", "pixabay_key": "", "gpu": "auto", "phone_access": False,
-            "access_token": ""}
+            "access_token": "", "yt_client_id": "", "yt_client_secret": "", "yt_refresh": ""}
     if SETTINGS_FILE.exists():
         data.update(json.loads(SETTINGS_FILE.read_text(encoding="utf-8")))
     os.environ["MONTAJ_WHISPER_MODEL"] = data["whisper_model"]
@@ -151,6 +151,13 @@ def new_project(name: str) -> dict:
 
 def media_map(project: dict, roles=("material", "music")) -> dict:
     return {m["id"]: m for m in project["media"] if m["role"] in roles}
+
+
+INSIGHTS_FILE = WORKSPACE / "insights.json"
+
+
+def insights() -> dict:
+    return json.loads(INSIGHTS_FILE.read_text(encoding="utf-8")) if INSIGHTS_FILE.exists() else {}
 
 
 def style_of(project: dict) -> dict:
@@ -230,8 +237,8 @@ def make_plan(project: dict, settings: dict, use_ai: bool, style: dict) -> tuple
     if use_ai:
         s = load_settings()
         visible = [m for m in project["media"] if m["role"] in ("material", "music", "example")]
-        plan = agent.plan_edit(visible, project["analysis"], d / "frames", settings, api_key(),
-                               s["model"], s["effort"], style)
+        plan = agent.plan_edit(visible, project["analysis"], d / "frames", {**settings, "insights": insights()},
+                               api_key(), s["model"], s["effort"], style)
     else:
         plan = autoplan.build(material, project["analysis"], settings, style)
     autoplan.apply_switches(plan, settings, [m for m in material if m["kind"] != "audio"], project["analysis"])
@@ -422,6 +429,8 @@ def status():
         "gpu": s.get("gpu", "auto"), "encoder": gpu.LABELS.get(render.ENCODER, render.ENCODER),
         "has_pexels": bool(s.get("pexels_key")), "has_pixabay": bool(s.get("pixabay_key")),
         "phone": phone_info(s),
+        "youtube": {"client": bool(s.get("yt_client_id")), "connected": bool(s.get("yt_refresh"))},
+        "insights": insights(),
         "languages": dub.LANGUAGES,
         "model": s["model"], "effort": s["effort"],
         "models": agent.MODELS,
@@ -500,7 +509,7 @@ def create_project(body: NameIn):
 def get_project(pid: str):
     project = load(pid)
     project["settings"] = {**DEFAULT_SETTINGS, **project["settings"]}
-    for key in ("variants", "review", "social", "shorts", "dubs", "batch", "multicam"):
+    for key in ("variants", "review", "social", "shorts", "dubs", "batch", "multicam", "published"):
         project.setdefault(key, None if key != "variants" else [])
     project["running"] = running_job(pid)
     if project["plan"]:
@@ -1128,6 +1137,143 @@ def text_cut(pid: str, body: TextCutIn):
     plan, issues = validate.validate(plan, media_map(project), project["analysis"])
     set_plan(pid, plan, issues, f"Editare prin text ({n} cuvinte tăiate)")
     return {"job": start_job(pid, "preview", lambda step: render_preview(pid, step, 0.0))}
+
+
+# ----------------------------------------------------------------- API: YouTube & insights
+
+def _save(s: dict):
+    WORKSPACE.mkdir(parents=True, exist_ok=True)
+    SETTINGS_FILE.write_text(json.dumps(s, indent=1), encoding="utf-8")
+
+
+class YtClientIn(BaseModel):
+    client_id: str
+    client_secret: str
+
+
+@app.post("/api/youtube/client")
+def yt_client(body: YtClientIn):
+    s = load_settings()
+    s["yt_client_id"], s["yt_client_secret"] = body.client_id.strip(), body.client_secret.strip()
+    _save(s)
+    return status()
+
+
+def _redirect_uri() -> str:
+    return f"http://127.0.0.1:{PORT}/oauth/youtube"
+
+
+@app.get("/api/youtube/connect")
+def yt_connect():
+    from fastapi.responses import RedirectResponse
+    s = load_settings()
+    if not s.get("yt_client_id"):
+        raise HTTPException(400, "Pune întâi Client ID și Client secret de la Google (Setări → YouTube).")
+    s["yt_state"] = uuid.uuid4().hex
+    _save(s)
+    return RedirectResponse(publish.auth_url(s["yt_client_id"], _redirect_uri(), s["yt_state"]))
+
+
+@app.get("/oauth/youtube")
+def yt_callback(code: str = "", state: str = "", error: str = ""):
+    from fastapi.responses import HTMLResponse
+    s = load_settings()
+    if error or not code or state != s.get("yt_state"):
+        return HTMLResponse(f"<h2>Conectarea YouTube nu a mers.</h2><p>{error or 'Cerere invalidă.'}</p>", 400)
+    tok = publish.exchange_code(s["yt_client_id"], s["yt_client_secret"], code, _redirect_uri())
+    s["yt_refresh"] = tok.get("refresh_token") or s.get("yt_refresh", "")
+    _save(s)
+    return HTMLResponse("<h2>✅ YouTube conectat.</h2><p>Poți închide fereastra și te întoarce în Montaj.</p>")
+
+
+@app.delete("/api/youtube/connect")
+def yt_disconnect():
+    s = load_settings()
+    s["yt_refresh"] = ""
+    _save(s)
+    return status()
+
+
+def _yt_token() -> str:
+    s = load_settings()
+    if not s.get("yt_refresh"):
+        raise HTTPException(400, "Conectează întâi contul YouTube (Setări → YouTube).")
+    return publish.access_token(s["yt_client_id"], s["yt_client_secret"], s["yt_refresh"])
+
+
+class YtUploadIn(BaseModel):
+    file: str            # project-relative path of the MP4 (from an export)
+    title: str
+    description: str = ""
+    tags: list[str] = []
+    publish_at: str = ""  # local "YYYY-MM-DDTHH:MM"; empty = now (with privacy)
+    privacy: str = "public"
+    thumbnail: str = ""
+
+
+@app.post("/api/projects/{pid}/publish/youtube")
+def yt_upload(pid: str, body: YtUploadIn):
+    d = pdir(pid).resolve()
+    video = (d / body.file).resolve()
+    if d not in video.parents or not video.exists():
+        raise HTTPException(400, "Fișierul video nu există.")
+    thumb_path = (d / body.thumbnail).resolve() if body.thumbnail else None
+    when = None
+    if body.publish_at:
+        try:
+            when = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.mktime(time.strptime(body.publish_at, "%Y-%m-%dT%H:%M"))))
+        except ValueError:
+            raise HTTPException(400, "Data programării nu e validă.")
+    token = _yt_token()
+
+    def work(step):
+        step(0.02, "Încarc pe YouTube" + (f" (programat {body.publish_at.replace('T', ' ')})" if when else ""))
+        vid = publish.upload(token, video, body.title, body.description, body.tags, when,
+                             body.privacy if body.privacy in ("public", "unlisted", "private") else "public",
+                             thumb_path, lambda p: step(0.02 + 0.95 * p, None))
+        update(pid, lambda p: p.setdefault("published", []).insert(0, {
+            "platform": "YouTube", "id": vid, "url": f"https://youtu.be/{vid}", "title": body.title,
+            "scheduled": body.publish_at, "time": time.time()}))
+
+    return start_job(pid, "publish", work)
+
+
+def _make_insights(videos: list) -> dict:
+    if api_key():
+        try:
+            return agent.channel_insights(videos, api_key(), load_settings()["model"]).model_dump()
+        except Exception:
+            pass
+    return publish.basic_insights(videos)
+
+
+@app.post("/api/insights/youtube")
+def insights_from_youtube(project_id: str = ""):
+    token = _yt_token()
+
+    def work(step):
+        step(0.1, "Citesc statisticile canalului (ultimele 90 de zile)")
+        videos = publish.channel_stats(token)
+        step(0.6, f"Analizez ce a mers în {len(videos)} video-uri")
+        publish.save_insights(INSIGHTS_FILE, {**_make_insights(videos), "videos": len(videos), "source": "YouTube"})
+
+    return start_job(project_id or "insights", "insights", work)
+
+
+@app.post("/api/insights/csv")
+async def insights_from_csv(file: UploadFile = File(...)):
+    videos = publish.parse_studio_csv(await file.read())
+    if not videos:
+        raise HTTPException(400, "Nu recunosc fișierul. Exportă din YouTube Studio → Analytics → Mod avansat → Export (CSV).")
+    data = {**_make_insights(videos), "videos": len(videos), "source": "CSV YouTube Studio"}
+    publish.save_insights(INSIGHTS_FILE, data)
+    return data
+
+
+@app.delete("/api/insights")
+def forget_insights():
+    INSIGHTS_FILE.unlink(missing_ok=True)
+    return status()
 
 
 # ----------------------------------------------------------------- API: batch
