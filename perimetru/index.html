@@ -523,7 +523,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
   // ---------- state ----------
   const S = {
     events: [], orgs: [], drafts: [], alerts: [], contacts: [], signals: [], requests: [],
-    opps: [], referrals: [], photos: [], celebs: [], missions: [], partners: [], deals: [], scanqueue: [], uhnwi: [], team: [], posts: [], inbound: [], optouts: [], proposals: [], countryintel: [],
+    opps: [], referrals: [], photos: [], celebs: [], missions: [], partners: [], deals: [], scanqueue: [], uhnwi: [], team: [], posts: [], inbound: [], optouts: [], proposals: [], countryintel: [], seo: [],
     config: {}, services: null, pricing: {}, brand: {}, me: null, lang: "ro",
     ready: false, dbOk: null,
     lux: { cc: "all", type: "all", sel: [] },
@@ -908,6 +908,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
       <button class="btn" data-act="ai-rewrite" data-id="${d.id}" data-mode="en">În engleză</button>
       ${(() => { const o = orgById(d.orgId), lg = langFor(o), gulf = ["AE", "SA", "QA", "KW", "BH", "OM"].includes(o?.cc); return lg !== "en" && lg !== d.lang ? `<button class="btn" data-act="ai-rewrite" data-id="${d.id}" data-mode="lang:${lg}">În ${LANG_RO[lg]}</button>` : gulf && d.lang !== "ar" ? `<button class="btn" data-act="ai-rewrite" data-id="${d.id}" data-mode="lang:ar">În arabă</button>` : ""; })()}
       <button class="btn" data-act="draft-pdf" data-id="${d.id}">Ofertă PDF</button>
+      <button class="btn" data-act="ai-rewrite" data-id="${d.id}" data-mode="guide">Oferă ghidul</button>
       <button class="btn" data-act="ai-rewrite" data-id="${d.id}" data-mode="lux">Adaugă oferta de lux</button>
       <button class="btn" data-act="save-draft" data-id="${d.id}">Salvează</button>
       <span class="spacer"></span><button class="btn danger" data-act="reject" data-id="${d.id}">Respinge</button>`;
@@ -2212,6 +2213,8 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
       case "del-post": try { await db.collection("posts").doc(id).delete(); toast("Șters"); } catch (e) { toast("Nu s-a șters."); } break;
       case "dossier": openDossier(id); break;
       case "proposal-org": openProposal({ orgId: id }); break;
+      case "guide-pdf": { const g = GUIDES.find(x => x.id === id); if (g) { el.disabled = true; await buildGuidePDF(g); el.disabled = false; } break; }
+      case "seo-task": { const cur = S.seo.find(x => x.id === "checklist")?.done || {}; await put("seo", "checklist", { done: { ...cur, [id]: el.checked }, updatedAt: new Date().toISOString() }); break; }
       case "draft-pdf": { const d = S.drafts.find(x => x.id === id); if (d) openProposal({ orgId: d.orgId, eventId: d.eventId, lang: ["en", "ro", "fr", "it", "de", "es"].includes(d.lang) ? d.lang : "en" }); break; }
       case "del-member": try { await db.collection("team").doc(id).delete(); toast("Scos din echipă"); } catch (e) { toast("Nu s-a șters."); } break;
       case "brand-reset": if (await put("config", "brand", { ...S.brand, accent: "" })) toast("Culoarea implicită"); break;
@@ -2270,7 +2273,8 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
         if (!sample) { toast("AI indisponibil în această vizualizare."); return; }
         const e = readEdits(), mode = el.dataset.mode; el.disabled = true; el.textContent = "Scriu…";
         const tl = mode.startsWith("lang:") ? mode.slice(5) : mode === "en" ? "en" : "";
-        const instr = tl === "ar" ? "Translate it into polished Modern Standard Arabic suitable for a senior Gulf business reader (formal, respectful), keeping names, brands and placeholders in Latin script." : tl && tl !== "en" ? `Translate it into polished, natural business ${LANG_NAMES[tl]}, with the formal register usual for a first contact.` : mode === "en" ? "Translate it into polished British English." : mode === "lux" ? `Add one or two sentences offering, through partners, luxury logistics: ${services().filter(s => s.id !== "cp").map(s => s.name).join(", ")}. Keep it discreet and under 180 words.` : "Make it shorter (max 110 words) while keeping the event reference, the call-to-action and the opt-out line.";
+        const gd = mode === "guide" ? guideFor(orgById(d.orgId)) : null;
+        const instr = gd ? `Rewrite the call to action: instead of asking for a call, offer to send our short free guide "${gd.title}: ${gd.sub}" (a practical PDF checklist), asking them to simply reply "yes" to receive it. Keep it under 150 words, keep the opening and the opt-out line, and keep the email's current language.` : tl === "ar" ? "Translate it into polished Modern Standard Arabic suitable for a senior Gulf business reader (formal, respectful), keeping names, brands and placeholders in Latin script." : tl && tl !== "en" ? `Translate it into polished, natural business ${LANG_NAMES[tl]}, with the formal register usual for a first contact.` : mode === "en" ? "Translate it into polished British English." : mode === "lux" ? `Add one or two sentences offering, through partners, luxury logistics: ${services().filter(s => s.id !== "cp").map(s => s.name).join(", ")}. Keep it discreet and under 180 words.` : "Make it shorter (max 110 words) while keeping the event reference, the call-to-action and the opt-out line.";
         try { const res = await sample.json(`Rewrite this B2B email for a close protection and luxury services company. ${instr} Keep the placeholders {{signature}} and {{company}} if present. Do not add facts. Return JSON {"subject": string, "body": string}.\n\nSubject: ${e.subject}\n\n${e.body}`, { modelTier: "quick" });
           if (res?.subject && res?.body) { await patch("drafts", id, { ...e, subject: res.subject, body: res.body, lang: tl || d.lang }); toast("Rescris"); } }
         catch (err) { toast(err?.code === "rate_limited" ? "AI-ul e ocupat, încearcă peste un minut." : "Nu am putut rescrie acum."); }
@@ -2351,11 +2355,108 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     ["people", "Oameni", [["contacts", "Contacte", true], ["celebs", "Vedete", true], ["uhnwi", "UHNWI", true], ["referrals", "Recomandări", true]]],
     ["companies", "Companii", [["targets", "Toate companiile", true], ["luxury", "Director lux", true], ["signals", "Semnale", true]]],
     ["opps", "Oportunități", [["opps", "Oportunități", true]]],
-    ["outreach", "Outreach", [["approvals", "De aprobat", true], ["pipeline", "Pipeline", true], ["content", "LinkedIn", true], ["stats", "Statistici"]]],
+    ["outreach", "Outreach", [["approvals", "De aprobat", true], ["pipeline", "Pipeline", true], ["content", "LinkedIn", true], ["marketing", "Marketing"], ["stats", "Statistici"]]],
     ["setup", "Setări", [["setup", "Setări"], ["services", "Servicii"]]]
   ];
+  // ---------- free guides (lead magnets) and Google visibility ----------
+  const GUIDES = [
+    { id: "founders", file: "Personal-security-after-the-announcement", for: "fondatori după o finanțare, lansare sau exit; crypto și Web3", types: ["crypto", "startup", "corporate", "family_office", "mfo", "holding"],
+      title: "After the announcement", sub: "Personal security for founders after a funding round, launch or exit",
+      intro: "A funding round, a token launch or an exit puts a founder's name, face and new wealth in the news within hours. Interviews, conference stages and social posts follow. This short guide lists the practical steps we recommend in the first weeks after a public announcement. None of them is expensive; together they remove most of the easy opportunities.",
+      sections: [
+        ["Why the moment matters", ["Public funding and exit news is read by everyone, not only by investors.", "Crypto holders in particular have been targeted in physical coercion attempts (so-called wrench attacks) reported in the international press.", "Most incidents start with information that was easy to find: a home address, a routine, a live location."]],
+        ["The first 72 hours: your digital footprint", ["Check company registries: where the law allows, use a service address instead of your home address for filings.", "Review your recent posts and those of family members for home, school, car registration, routines or live locations.", "Separate public and private: a public email and phone number for press and inbound, private ones shared only with people you know.", "Turn on hardware-key or app-based two-factor authentication for email, exchanges, banking and social accounts.", "Ask your mobile carrier for a port-out PIN or SIM lock to reduce SIM-swap risk."]],
+        ["If you hold digital assets", ["Never discuss personal holdings in public, on podcasts or in interviews.", "Use custody or multi-signature arrangements so that no single person can be forced to move funds.", "Keep conference and social personas free of anything that links to personal wallets."]],
+        ["Home and routine", ["Vary routes and timings for the regular parts of the week.", "Have deliveries go to the office or a managed address.", "Review alarms, cameras and who holds keys and codes, including household staff and contractors."]],
+        ["Travel and conferences", ["Book travel and hotels through the company or an assistant; ask for rooms away from public areas.", "Use a vetted driver for airport and hotel transfers in cities you do not know.", "Remove conference badges when you leave the venue; check who organises side events before you attend.", "Post about a place after you have left it, not while you are there."]],
+        ["Launch events and the office", ["Keep a guest list and a door policy for launch parties and investor events.", "Brief the team on handling press and unexpected visitors.", "Agree who speaks to the media and what is never disclosed (homes, family, holdings, travel)."]],
+        ["When to bring in professionals", ["You receive threats, are doxxed, or notice someone taking an unusual interest.", "You attend high-profile events or travel to cities you do not know.", "A liquidity event, an exit or a major listing is about to become public."]]
+      ] },
+    { id: "season", file: "Event-season-checklist", for: "family offices, asistenți, hoteluri, organizatori, agenții de talente, mărci de lux", types: [],
+      title: "Event season checklist", sub: "Cannes, Monaco, St. Moritz and the Gulf: what principals and their teams should arrange, and when",
+      intro: "The high-profile events of the year bring together principals, press and crowds in small towns with limited cars, rooms and roads. Most problems we see come from late planning, not from danger. This checklist is written for principals, their assistants and family offices.",
+      sections: [
+        ["8 to 12 weeks before", ["Book cars and drivers early: during Cannes, the Monaco Grand Prix and the Alpine holidays, good vehicles and experienced drivers run out first.", "Confirm the hotel, villa or yacht and review access: entrances, floors, who else is staying, where cars can stop.", "Collect the invitations, credentials and guest lists you will need, with names spelled as on passports.", "Decide who on the team is the single point of contact for logistics and security."]],
+        ["2 to 4 weeks before", ["Advance visit or call for each venue: arrival and departure points, holding rooms, back-of-house routes.", "Plan main and alternative routes, including road closures and traffic restrictions published by the organisers.", "Note the nearest hospital and pharmacy for each location; keep medical information for the principal with one trusted person.", "Agree a communication plan: who calls whom, and how, if plans change."]],
+        ["On the ground", ["Arrivals and departures are the most exposed moments: keep them short and pre-arranged with the driver.", "On red carpets and at galas, agree in advance where the team waits and how the principal leaves early if needed.", "Yacht tender transfers: confirm the tender, the crew and the landing point; avoid waiting on public quays.", "Watches and jewellery attract opportunistic theft in crowded resorts: keep valuables you do not need in the safe.", "Keep phones charged and location sharing limited to the team."]],
+        ["Local notes", ["Cannes: traffic on the Croisette is slow; allow extra time and use pre-agreed drop-off points.", "Monaco Grand Prix: roads close for sessions; plan moves around the timetable and consider the heliport for transfers.", "St. Moritz and Gstaad: snow and ice slow everything; helicopter transfers depend on weather, so keep a road alternative.", "Gulf: use providers licensed locally, respect local laws and customs, and plan for heat during outdoor events."]],
+        ["Afterwards", ["Debrief with the team: what worked, what to book earlier next year.", "Keep the contacts that performed well; good drivers and venues are rebooked a year ahead."]]
+      ] }
+  ];
+  const guideFor = (o) => GUIDES.find(g => g.types.includes(o?.type)) || GUIDES[1];
+  async function buildGuidePDF(g) {
+    if (!window.jspdf?.jsPDF) { toast("Generatorul PDF nu s-a încărcat. Reîncarcă pagina."); return false; }
+    if (!downloads) { toast("Descărcarea nu e disponibilă în această vizualizare."); return false; }
+    const c = S.config || {}, b = S.brand || {};
+    const tr = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[„”“]/g, '"').replace(/[’‘]/g, "'").replace(/[–—]/g, "-").replace(/…/g, "...");
+    const hex = (h) => { const m = /^#?([0-9a-f]{6})$/i.exec(h || ""); const n = parseInt(m ? m[1] : "F0C23A", 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+    const acc = hex(b.accent || "#F0C23A");
+    const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4" }); const W = 595, M = 56; let y;
+    const footer = () => { doc.setFillColor(5, 5, 6); doc.rect(0, 806, W, 36, "F"); doc.setTextColor(...acc); doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.text(tr([c.company || "Platinum Close Protection", c.phone, c.website].filter(Boolean).join("   -   ")), W / 2, 827, { align: "center" }); };
+    doc.setFillColor(5, 5, 6); doc.rect(0, 0, W, 190, "F");
+    doc.setTextColor(...acc); doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.text(tr((c.company || "Platinum Close Protection").toUpperCase() + "   -   THERE... ALWAYS"), M, 54, { charSpace: 1 });
+    doc.setTextColor(236, 233, 226); doc.setFont("times", "normal"); doc.setFontSize(30); doc.text(tr(g.title), M, 104);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(11.5); doc.setTextColor(200, 196, 186); doc.text(doc.splitTextToSize(tr(g.sub), W - 2 * M), M, 132);
+    y = 230; doc.setTextColor(40, 40, 40); doc.setFontSize(11); const intro = doc.splitTextToSize(tr(g.intro), W - 2 * M); doc.text(intro, M, y); y += intro.length * 15 + 16;
+    for (const [head, items] of g.sections) {
+      if (y > 700) { footer(); doc.addPage(); y = 70; }
+      doc.setDrawColor(...acc); doc.setLineWidth(1); doc.line(M, y, M + 40, y); y += 18;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(12.5); doc.setTextColor(20, 20, 20); doc.text(tr(head), M, y); y += 18;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(55, 55, 55);
+      for (const it of items) {
+        const lines = doc.splitTextToSize(tr(it), W - 2 * M - 16);
+        if (y + lines.length * 14 > 780) { footer(); doc.addPage(); y = 70; doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(55, 55, 55); }
+        doc.setFillColor(...acc); doc.circle(M + 3, y - 3.5, 2, "F"); doc.text(lines, M + 16, y); y += lines.length * 14 + 6;
+      }
+      y += 10;
+    }
+    if (y > 690) { footer(); doc.addPage(); y = 70; }
+    doc.setFillColor(246, 243, 236); doc.rect(M - 14, y, W - 2 * M + 28, 84, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(20, 20, 20); doc.text(tr("Need a second pair of eyes?"), M, y + 24);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(60, 60, 60);
+    doc.text(doc.splitTextToSize(tr(`${c.company || "Platinum Close Protection"} provides discreet close protection, secure transfers and private logistics across the UK, Europe, the Middle East and worldwide. ${[c.phone, (c.signature || "").match(/[\w.+-]+@[\w.-]+/)?.[0], c.website].filter(Boolean).join("  -  ")}`), W - 2 * M), M, y + 42);
+    footer();
+    try { await downloads.save({ filename: `${g.file}.pdf`, data: doc.output("arraybuffer") }); toast("Ghid descărcat"); return true; }
+    catch (err) { toast(err?.code === "declined" ? "Descărcare anulată." : "Nu am putut salva PDF-ul."); return false; }
+  }
+
+  const SEO_TASKS = [
+    ["gbp-london", "Profil Google Business pentru Londra (adresa biroului, categoria „Security service”, program, fotografii fără clienți)"],
+    ["gbp-dubai", "Profil Google Business pentru Dubai, dacă aveți adresă acolo"],
+    ["gbp-other", "Profil Google Business pentru fiecare alt oraș unde aveți adresă reală (Monaco, București)"],
+    ["pages-city", "Pe site: o pagină pentru fiecare oraș (Londra, Dubai, Monaco, Cannes, Paris, Geneva, St. Moritz, București), cu serviciile de acolo"],
+    ["pages-event", "Pe site: o pagină pentru fiecare eveniment mare (Cannes, Monaco GP, Davos, Art Basel, Royal Ascot), publicată cu 2–3 luni înainte"],
+    ["pages-lang", "Paginile principale și în arabă, franceză și română"],
+    ["reviews", "Cereți recenzii pe Google clienților mulțumiți (fără nume dacă nu vor) după fiecare misiune"],
+    ["directories", "Listări în directoarele profesionale unde sunteți eligibili (asociații de profil, camere de comerț, directoare de furnizori pentru family offices)"],
+    ["guides-site", "Puneți ghidurile gratuite pe site, cu formular de descărcare: aduc contacte care vă caută ei"],
+    ["linkedin-company", "Pagina de companie LinkedIn completă, cu link spre site și spre ghiduri"]
+  ];
+  function viewMarketing() {
+    const done = S.seo.find(x => x.id === "checklist")?.done || {};
+    const weeks = S.seo.filter(x => x.id.startsWith("wk-")).sort((a, b) => b.id.localeCompare(a.id));
+    const last = weeks[0];
+    const pct = Math.round(100 * SEO_TASKS.filter(([k]) => done[k]).length / SEO_TASKS.length);
+    return `
+      <div class="view-head"><div class="grow">
+        <div class="eyebrow">Marketing</div>
+        <h1>Ghiduri gratuite și vizibilitate pe Google</h1>
+        <p>Ghidurile se oferă în primul e-mail în locul unei oferte: sunt mai ușor de acceptat și vă poziționează ca experți. Vizibilitatea aduce clienții care vă caută ei pe voi.</p>
+      </div></div>
+      <div class="eyebrow" style="margin-bottom:10px">Ghiduri PDF (în engleză, în stilul Platinum)</div>
+      <div class="services">${GUIDES.map(g => `<div class="panel"><h3>${esc(g.title)}</h3><p class="note" style="margin:0 0 6px">${esc(g.sub)}</p><p class="note" style="margin:0 0 10px">Pentru: ${esc(g.for)} · ${g.sections.length} capitole</p><button class="btn primary sm" data-act="guide-pdf" data-id="${g.id}">Descarcă PDF</button></div>`).join("")}</div>
+      <p class="note">La „De aprobat”, butonul „Oferă ghidul” rescrie e-mailul ca să ofere ghidul potrivit în loc de o întâlnire. Atașați PDF-ul când trimiteți sau trimiteți-l celor care răspund „da”.</p>
+      <div class="eyebrow" style="margin:22px 0 10px">Vizibilitate pe Google · ${pct}% din pași făcuți</div>
+      <div class="panel">${SEO_TASKS.map(([k, t]) => `<label class="check" style="align-items:flex-start"><input type="checkbox" data-act="seo-task" data-id="${k}" ${done[k] ? "checked" : ""}><span>${esc(t)}</span></label>`).join("")}</div>
+      <div class="eyebrow" style="margin:22px 0 10px">Verificarea săptămânală (luni dimineața)</div>
+      ${!last ? `<div class="empty"><h3>Prima verificare vine luni</h3><p>În fiecare săptămână căutăm „close protection” și „bodyguard” în orașele voastre și notăm dacă apare ${esc((S.config || {}).website || "site-ul vostru")} și cine apare în locul vostru.</p></div>` :
+      `<div class="panel"><p class="note" style="margin:0 0 10px">${esc(fmtD(last.date))} · apăreți la ${(last.results || []).filter(r => r.found).length} din ${(last.results || []).length} căutări${weeks[1] ? ` (săptămâna trecută: ${(weeks[1].results || []).filter(r => r.found).length})` : ""}</p>
+        <div class="contacts">${(last.results || []).map(r => `<div class="ct" style="grid-template-columns:minmax(0,1.2fr) auto minmax(0,1.5fr)"><div class="nm">${esc(r.q)}</div><div>${r.found ? `<span class="pill ok">apare${r.rank ? " #" + esc(r.rank) : ""}</span>` : `<span class="pill warn">nu apare</span>`}</div><div class="note">${esc((r.top || []).slice(0, 3).join(" · "))}</div></div>`).join("")}</div>
+        ${last.advice ? `<p class="note" style="margin:10px 0 0">${esc(last.advice)}</p>` : ""}</div>`}`;
+  }
+
   const groupOf = (v) => NAV.find(([, , views]) => views.some(([vk]) => vk === v)) || NAV[0];
-  const VIEWS = { celebs: viewCelebs, map: viewMap, seasons: viewSeasons, referrals: viewReferrals, opps: viewOpps, content: viewContent, uhnwi: viewUhnwi, luxury: viewLuxury, today: viewToday, stats: viewStats, radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
+  const VIEWS = { marketing: viewMarketing, celebs: viewCelebs, map: viewMap, seasons: viewSeasons, referrals: viewReferrals, opps: viewOpps, content: viewContent, uhnwi: viewUhnwi, luxury: viewLuxury, today: viewToday, stats: viewStats, radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
   const current = () => { const h = location.hash.slice(1); return VIEWS[h] ? h : "today"; };
   function render() {
     const v = current();
@@ -2427,7 +2528,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     if (userCap?.me) { try { S.me = await userCap.me(); setupArrival.greet?.(S.me?.name); } catch (e) {} }
     S.dbOk = !!db;
     if (!db) { render(); return; }
-    const cols = ["opps", "referrals", "photos", "celebs", "events", "orgs", "drafts", "alerts", "contacts", "signals", "requests", "scanqueue", "uhnwi", "missions", "partners", "deals", "team", "posts", "inbound", "optouts", "proposals", "countryintel"];
+    const cols = ["opps", "referrals", "photos", "celebs", "events", "orgs", "drafts", "alerts", "contacts", "signals", "requests", "scanqueue", "uhnwi", "missions", "partners", "deals", "team", "posts", "inbound", "optouts", "proposals", "countryintel", "seo"];
     const pending = new Set(cols);
     cols.forEach(name => db.collection(name).limit(1000).onSnapshot((snap) => {
       S[name] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
