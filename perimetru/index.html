@@ -489,14 +489,20 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
   const ORG_TYPES = {
     family_office: "Family office", mfo: "Multi-family office & bancă privată", jet: "Aviație privată & charter", travel: "Travel & lifestyle management",
     talent: "Agenții de talent & PR", label: "Case de discuri & management", promoter: "Organizatori turnee & festivaluri", organizer: "Organizatori evenimente & forumuri",
-    hospitality: "Hoteluri, vile & yachting", network: "Rețele de acces (PA, concierge, family office)", forum: "Organizatori forumuri", luxury_brand: "Branduri de lux",
+    hospitality: "Hoteluri, vile & yachting", network: "Rețele de acces (PA, concierge, family office)", forum: "Organizatori forumuri", luxury_brand: "Branduri de lux", staffing: "Agenții de personal privat (PA, estate, household)", association: "Asociații profesionale (PA, butleri, family office)",
     hotel: "Hoteluri 5★ și palate", venue: "Locații exclusiviste & cluburi private", yacht: "Yachting: charter, brokeraj, șantiere", heli: "Elicoptere", cars: "Mașini exclusiviste", fashion: "Modă & marochinărie", jewellery: "Bijuterii & ceasuri", lifestyle: "Lifestyle & concierge"
   };
   const ROLE_CATS = {
-    chief_of_staff: "Chief of Staff / Private office", pa: "PA / Executive Assistant", family_office: "Family office", organizer: "Organizator eveniment",
+    chief_of_staff: "Chief of Staff / Private office", pa: "PA / Executive Assistant", family_office: "Family office", fo_exec: "Family office CEO / Director", estate: "Estate, household & residences", lifestyle: "Lifestyle manager", staffing: "Agenție de personal privat", organizer: "Organizator eveniment",
     concierge: "Concierge / hotel", broker: "Broker charter (yacht / jet)", management: "Management artist / tour", partnerships: "Parteneriate & sponsorizări", press: "Presă & comunicare", general: "Contact general"
   };
-  const LUX_CATS = [["family_office", "Family offices"], ["mfo", "Multi-family offices & bănci private"], ["hotel", "Hoteluri 5★ și palate"], ["venue", "Locații exclusiviste"], ["jet", "Private jet"], ["yacht", "Yachting"], ["heli", "Elicoptere"], ["cars", "Mașini exclusiviste"], ["fashion", "Modă & marochinărie"], ["jewellery", "Bijuterii & ceasuri"], ["lifestyle", "Lifestyle & concierge"], ["hospitality", "Ospitalitate (altele)"], ["luxury_brand", "Branduri de lux (altele)"]];
+  const PEOPLE_ROLES = [
+    ["Personal Assistant", "Rezervă transport, hoteluri, protecție"], ["Executive Assistant", "Agenda directorului și a familiei"], ["Chief of Staff", "Coordonează tot private office-ul"],
+    ["Family Office Director", "Decide furnizorii familiei"], ["Family Office CEO", "Cumpărătorul strategic"], ["Estate Manager", "Reședințe, personal, securitate"],
+    ["Household Manager", "Casa și personalul zilnic"], ["Private Office Manager", "Monaco, Londra, Geneva, Dubai"], ["Head of Private Staff", "Echipa de personal privat"],
+    ["Lifestyle Manager", "Călătorii, evenimente, experiențe"], ["Director of Residences", "Mai multe reședințe, mai multe țări"], ["Private PA", "Asistentul personal al principalului"]
+  ];
+  const LUX_CATS = [["family_office", "Family offices"], ["mfo", "Multi-family offices & bănci private"], ["hotel", "Hoteluri 5★ și palate"], ["venue", "Locații exclusiviste"], ["jet", "Private jet"], ["yacht", "Yachting"], ["heli", "Elicoptere"], ["cars", "Mașini exclusiviste"], ["fashion", "Modă & marochinărie"], ["jewellery", "Bijuterii & ceasuri"], ["lifestyle", "Lifestyle & concierge"], ["staffing", "Agenții de personal privat"], ["association", "Asociații PA, butleri, family office"], ["hospitality", "Ospitalitate (altele)"], ["luxury_brand", "Branduri de lux (altele)"]];
   const LUX_TYPES = new Set(LUX_CATS.map(x => x[0]));
   const STAGES = [["nou", "Nou"], ["cercetare", "În cercetare"], ["contactat", "Contactat"], ["raspuns", "A răspuns"], ["intalnire", "Întâlnire"], ["client", "Client"], ["pierdut", "Pierdut / pauză"]];
   const STAGE_LABEL = Object.fromEntries(STAGES);
@@ -525,6 +531,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
     config: {}, services: null, pricing: {}, brand: {}, me: null, lang: "ro",
     ready: false, dbOk: null,
     lux: { cc: "all", type: "all", sel: [] },
+    pplCc: "",
     f: { cat: "all", need: "all", region: "all", cc: "all", horizon: 400, type: "all", role: "all", sub: "de_aprobat", q: "" }
   };
   try { Object.assign(S.f, JSON.parse(localStorage.getItem("perimetru.f2") || "{}")); } catch (e) {}
@@ -747,7 +754,12 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
         <h1>Oamenii la care trebuie să ajungem</h1>
         <p>Contacte de business publicate de companii și organizatori: e-mail, telefon, persoană și rol, fiecare cu sursa. Cele marcate „de verificat” vin din surse secundare; confirmă-le înainte de primul mesaj. Pentru PA și Chief of Staff, căutările de mai jos deschid LinkedIn direct pe rolul potrivit.</p>
       </div><button class="btn" data-act="new-contact">+ Adaugă contact</button></div>
-      <div class="eyebrow" style="margin-bottom:10px">Găsește decidenții pe LinkedIn</div>
+      <div class="panel" style="margin:0 0 18px;max-width:none"><h3>Oamenii din jurul principalului</h3>
+        <p class="note" style="margin:0 0 10px">Alege rolul și țara: căutarea se deschide direct în LinkedIn-ul vostru. Directorii și CEO-ii de family office, Chief of Staff și Private Office Manager publicați de firme intră automat în agendă, prin scanare. PA, Estate Manager și Household Manager lucrează de obicei în case private și rar au date publice: la ei ajungeți prin LinkedIn, prin agențiile care îi plasează și prin asociațiile lor, toate în Director lux.</p>
+        <div class="filters"><select class="select" id="pplCc" aria-label="Țara">${["", "RO", "MC", "FR", "CH", "GB", "AE", "IT", "ES", "US", "DE", "AT", "GR", "PT", "SA", "QA", "LU", "NL", "BE", "SG", "HK"].map(cc => `<option value="${cc}" ${S.pplCc === cc ? "selected" : ""}>${cc ? esc(ccName(cc)) : "Orice țară"}</option>`).join("")}</select>
+          <button class="btn sm" data-act="scan-people">Scanează rolurile publicate${S.pplCc ? " în " + esc(ccName(S.pplCc)) : ""}</button></div>
+        <div class="find" style="margin:0">${PEOPLE_ROLES.map(([r, hint]) => `<a href="${li(`"${r}"${S.pplCc ? " " + ccName(S.pplCc) : ""}`, "people")}" target="_blank" rel="noopener"><b>${esc(r)} ↗</b><span>${esc(hint)}</span></a>`).join("")}</div></div>
+      <div class="eyebrow" style="margin-bottom:10px">Alți decidenți pe LinkedIn</div>
       <div class="find">${finders}</div>
       <div class="filters">${chips}</div>
       ${!S.ready ? emptyLoading() : list.length === 0 ? `<div class="empty"><h3>Niciun contact pe acest filtru</h3><p>Radarul adaugă contacte noi la fiecare rulare; poți adăuga și tu.</p></div>` :
@@ -1604,7 +1616,7 @@ ${note ? "Extra instruction from the owner: " + note : ""}`, { modelTier: "defau
       <div class="view-head"><div class="grow"><div class="eyebrow">Director lux · ${all.length} adrese în ${ccs.length} țări</div><h1>Tot ce e lux, țară cu țară</h1>
         <p>Family offices, bănci private, hoteluri 5★ și palate, locații exclusiviste, private jet, yachting, elicoptere, mașini exclusiviste, modă, marochinărie, bijuterii și ceasuri, cu adresă, telefon, e-mail și persoana de contact, așa cum le publică firmele. Bifezi și trimiți propuneri de colaborare la aprobare.</p></div>
         <div class="row">${L.cc !== "all" ? `<button class="btn" data-act="lux-scan" data-id="${esc(L.cc)}">Scanează luxul în ${esc(ccName(L.cc))}</button>` : `<button class="btn" data-act="lux-scan-all">Scanează toată lumea (coadă)</button>`}</div></div>
-      ${queue.length ? `<div class="ctx" style="margin-bottom:16px">Coada de scanare: ${done} gata · ${queue.length} rămase. Rulează pe rând, automat, ca să nu se epuizeze limita contului. Urmează: ${esc(queue.slice(0, 4).map(q => q.kind === "directory" ? `Director lux: ${ccName((q.ccs || [])[0])}` : q.label).join(" · "))}${queue.length > 4 ? " …" : ""}</div>` : ""}
+      ${queue.length ? `<div class="ctx" style="margin-bottom:16px">Coada de scanare: ${done} gata · ${queue.length} rămase. Rulează pe rând, automat, ca să nu se epuizeze limita contului. Urmează: ${esc(queue.slice(0, 4).map(q => q.kind === "directory" ? `Director lux: ${ccName((q.ccs || [])[0])}` : q.kind === "people" ? `Roluri private office: ${ccName((q.ccs || [])[0])}` : q.label).join(" · "))}${queue.length > 4 ? " …" : ""}</div>` : ""}
       <div class="filters"><select class="select" id="luxCc" aria-label="Țară"><option value="all">Toate țările (${all.length})</option>${ccs.map(cc => `<option value="${cc}" ${L.cc === cc ? "selected" : ""}>${esc(ccName(cc))} (${all.filter(o => o.cc === cc).length})</option>`).join("")}</select>
         ${sel.size ? `<button class="btn primary sm" data-act="lux-bulk">Propune colaborare (${sel.size})</button><button class="btn ghost sm" data-act="lux-clear">Deselectează</button>` : `<button class="btn ghost sm" data-act="lux-all">Selectează tot ce are e-mail</button>`}</div>
       <div class="filters">${typeChips}</div>
@@ -1738,6 +1750,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
       case "lux-scan": scanCountries([id], ccName(id), ["directory"]); break;
       case "lux-scan-all": { const have = new Set(S.orgs.filter(o => LUX_TYPES.has(o.type)).map(o => o.cc)); const queued = new Set(S.scanqueue.filter(q => q.kind === "directory" && q.status !== "gata").flatMap(q => q.ccs || [])); const order = ["RO", "MC", "FR", "CH", "AE", "GB", "IT", "ES", "US", "DE", "AT", "GR", "PT", "SA", "QA", "TR", "HR", "ME", "CY", "MT", ...Object.keys(REGION_OF)]; const todo = [...new Set(order)].filter(cc => !have.has(cc) && !queued.has(cc)); if (!todo.length) { toast("Toate țările sunt deja în coadă sau scanate."); break; } await enqueueScan(todo.map((cc, k) => ({ kind: "directory", ccs: [cc], label: `Director lux: ${ccName(cc)}`, priority: k < 20 ? 2 : 6 }))); break; }
       case "lux-one": luxDrafts([id]); break;
+      case "scan-people": { const ccs = S.pplCc ? [S.pplCc] : ["GB", "CH", "MC", "AE", "US", "FR", "RO"]; await enqueueScan(ccs.map(cc => ({ kind: "people", ccs: [cc], label: `Roluri private office: ${ccName(cc)}`, priority: 1 }))); break; }
       case "lux-bulk": luxDrafts([...S.lux.sel]); break;
       case "lux-clear": S.lux.sel = []; render(); break;
       case "lux-all": S.lux.sel = S.orgs.filter(o => LUX_TYPES.has(o.type) && !o.dnc && (S.lux.cc === "all" || o.cc === S.lux.cc) && (S.lux.type === "all" || o.type === S.lux.type) && (o.email || S.contacts.some(c => c.orgId === o.id && c.email))).map(o => o.id); render(); break;
@@ -1839,6 +1852,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
   document.addEventListener("change", async (ev) => {
     const el = ev.target;
     const map = { fRegion: "region", fHorizon: "horizon", fNeed: "need", fCc: "cc" };
+    if (el.id === "pplCc") { S.pplCc = el.value; render(); return; }
     if (el.id === "luxCc") { S.lux.cc = el.value; S.lux.sel = []; render(); return; }
     if (el.dataset?.luxsel) { const set = new Set(S.lux.sel); el.checked ? set.add(el.dataset.luxsel) : set.delete(el.dataset.luxsel); S.lux.sel = [...set]; render(); return; }
     if (map[el.id]) { S.f[map[el.id]] = map[el.id] === "horizon" ? +el.value : el.value; saveF(); render(); }
