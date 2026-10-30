@@ -589,6 +589,10 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
     ["Runde de finanțare", '"we raised" OR "announcing our" (seed OR "series a" OR "series b") (crypto OR web3)'],
     ["Evenimente crypto", 'Token2049 OR "Bitcoin 2027" OR Consensus OR "Paris Blockchain Week" (side event OR dinner OR party)']
   ];
+  // hostile-environment countries: work there only with special preparation, local licensed partners and insurance
+  const HIGH_RISK = new Set(["IQ", "LY", "MZ", "NG", "CD", "AF", "YE", "SD", "SS", "SO", "ML", "SY", "HT", "VE"]);
+  const isRisk = (o) => !!o && (o.risk === "ridicat" || HIGH_RISK.has(o.cc));
+  const riskPill = (o) => isRisk(o) ? `<span class="pill hot" title="${esc(o.riskNote || "Zonă de risc ridicat: necesită pregătire specială, parteneri locali licențiați și asigurare dedicată")}">zonă de risc ridicat</span>` : "";
   const xUrl = (h) => !h ? "" : /^https?:/.test(h) ? h : `https://x.com/${String(h).replace(/^@/, "")}`;
   const salesNav = (kw) => `https://www.linkedin.com/sales/search/people?keywords=${encodeURIComponent(kw)}`;
   // LinkedIn connection notes stay under the 300-character limit
@@ -790,7 +794,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
     const o = orgById(c.orgId);
     const status = c.status === "verificat" ? `<span class="pill ok">verificat</span>` : `<span class="pill warn">de verificat</span>`;
     return `<div class="ct" id="ct-${esc(c.id)}">
-      <div style="min-width:0"><div class="nm">${esc(c.name || c.role)}</div><div class="rl">${esc(c.name ? c.role : ROLE_CATS[c.roleCat] || "")}${o ? ` · <button class="tag" data-act="open-org" data-id="${esc(o.id)}">${esc(o.name)}</button>` : ""}</div></div>
+      <div style="min-width:0"><div class="nm">${esc(c.name || c.role)}</div><div class="rl">${esc(c.name ? c.role : ROLE_CATS[c.roleCat] || "")}${o ? ` · <button class="tag" data-act="open-org" data-id="${esc(o.id)}">${esc(o.name)}</button>` : ""}</div>${riskPill(o)}</div>
       <div class="ch">
         ${c.email ? `<span class="mono">${esc(c.email)}<button class="copy" data-act="copy-text" data-v="${esc(c.email)}">copiază</button>${c.emailVia ? `<span class="tag">${esc(c.emailVia)}</span>` : ""}</span>` : `<span class="note">fără e-mail public</span>`}
         ${c.phone ? `<span class="mono">${esc(c.phone)}<button class="copy" data-act="copy-text" data-v="${esc(c.phone)}">copiază</button>${waBtn(c.phone, c.name)}</span>` : ""}
@@ -824,7 +828,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
       <div style="min-width:0">
         <div class="eyebrow">${esc(ORG_TYPES[o.type] || o.type)} · ${esc(o.hq || "")}</div>
         <h3>${esc(o.name)}</h3>
-        ${o.dnc ? `<span class="pill hot">nu contacta</span>` : ""}
+        ${o.dnc ? `<span class="pill hot">nu contacta</span>` : ""}${riskPill(o)}
         <p class="why">${esc(o.why)}</p>
         ${evs.length ? `<div class="ev-targets">${evs.slice(0, 4).map(e => `<button class="tag" data-act="open-ev" data-id="${esc(e.id)}">${esc(fmtD(e.start))} · ${esc(e.title)}</button>`).join("")}</div>` : ""}
       </div>
@@ -1590,7 +1594,7 @@ Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, 
     const owner = S.team.find(t => t.id === o.owner);
     modal(`
       <div class="dossier">
-        <div class="eyebrow">Dosar · ${esc(ORG_TYPES[o.type] || o.type)} · ${esc(o.hq || "")}</div><h2>${esc(o.name)}</h2>
+        <div class="eyebrow">Dosar · ${esc(ORG_TYPES[o.type] || o.type)} · ${esc(o.hq || "")}</div><h2>${esc(o.name)}</h2>${riskPill(o)}
         <div class="row" style="margin:6px 0"><span class="tag">${esc(STAGE_LABEL[o.status || "nou"])}</span><span class="tag">scor ${esc(o.score || 0)}</span>${owner ? `<span class="tag">responsabil: ${esc(owner.name)}</span>` : ""}${o.dnc ? `<span class="pill hot">nu contacta</span>` : ""}${o.website ? `<a href="${esc(o.website)}" target="_blank" rel="noopener">↗ site</a>` : ""}</div>
         <p style="margin:8px 0 0">${esc(o.why)}</p>
         <h4>Cine decide</h4>${cts.length ? cts.map(c => `<div>${esc(c.name || ROLE_CATS[c.roleCat] || "")}${c.name ? ` · ${esc(c.role)}` : ""}${c.email ? ` · <span class="mono">${esc(c.email)}</span>` : ""}${c.phone ? ` · <span class="mono">${esc(c.phone)}</span>` : ""}</div>`).join("") : `<div class="note">Niciun contact încă.</div>`}
