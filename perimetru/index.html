@@ -121,6 +121,9 @@ nav.tabs a { flex: none; padding: 7px 13px; border-radius: 999px; color: var(--m
 nav.tabs a:hover { color: var(--ink); text-decoration: none; background: var(--surface); }
 nav.tabs a[aria-current="page"] { color: var(--gold-ink); background: var(--gold); }
 nav.tabs .count { font-family: var(--f-mono); font-size: 11px; opacity: .8; }
+nav.subnav { padding-top: 0; }
+nav.subnav a { font-size: 12.5px; padding: 5px 11px; }
+nav.subnav a[aria-current="page"] { color: var(--ink); background: var(--surface-2); }
 @media (max-width: 720px) { .search { display: none; } .brand-sub { display: none; } }
 
 main { padding-block: 28px 110px; }
@@ -426,27 +429,8 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
         <button class="icon-btn" id="bell" aria-label="Notificări" title="Notificări"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a4.5 4.5 0 0 0-4.5 4.5v3L2 11.5h12L12.5 9V6A4.5 4.5 0 0 0 8 1.5zM6.2 13.2a1.9 1.9 0 0 0 3.6 0" fill="none" stroke="var(--ink)" stroke-width="1.3"/></svg><span class="badge" id="bellBadge" hidden>0</span></button>
       </div>
     </div>
-    <nav class="tabs" id="tabs" aria-label="Secțiuni">
-      <a href="#today">Azi <span class="count" id="c-today"></span></a>
-      <a href="#radar">Radar <span class="count" id="c-radar"></span></a>
-      <a href="#countries">Țări <span class="count" id="c-countries"></span></a>
-      <a href="#contacts">Contacte <span class="count" id="c-contacts"></span></a>
-      <a href="#uhnwi">UHNWI <span class="count" id="c-uhnwi"></span></a>
-      <a href="#luxury">Director lux <span class="count" id="c-luxury"></span></a>
-      <a href="#targets">Companii <span class="count" id="c-targets"></span></a>
-      <a href="#map">Hartă</a>
-      <a href="#seasons">Sezoane <span class="count" id="c-seasons"></span></a>
-      <a href="#opps">Oportunități <span class="count" id="c-opps"></span></a>
-      <a href="#signals">Semnale <span class="count" id="c-signals"></span></a>
-      <a href="#referrals">Recomandări <span class="count" id="c-referrals"></span></a>
-      <a href="#approvals">De aprobat <span class="count" id="c-approvals"></span></a>
-      <a href="#pipeline">Pipeline <span class="count" id="c-pipeline"></span></a>
-      <a href="#content">Conținut <span class="count" id="c-content"></span></a>
-      <a href="#stats">Statistici <span class="count" id="c-stats"></span></a>
-      <a href="#services">Servicii <span class="count" id="c-services"></span></a>
-      <a href="#alerts">Noutăți <span class="count" id="c-alerts"></span></a>
-      <a href="#setup">Setări <span class="count" id="c-setup"></span></a>
-    </nav>
+    <nav class="tabs" id="tabs" aria-label="Secțiuni"></nav>
+    <nav class="tabs subnav" id="subnav" aria-label="Subsecțiuni" hidden></nav>
   </div>
 </header>
 
@@ -1665,7 +1649,7 @@ Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, 
 
   // ---------- English interface (chrome only; research data stays as written) ----------
   const EN = {
-    "Azi": "Today", "Radar": "Radar", "Țări": "Countries", "Contacte": "Contacts", "Companii": "Companies", "Semnale": "Signals", "Cereri primite": "Inbound", "De aprobat": "To approve", "Pipeline": "Pipeline", "Misiuni": "Missions", "Parteneri": "Partners", "Conținut": "Content", "Statistici": "Analytics", "Servicii": "Services", "Noutăți": "Updates", "Setări": "Settings",
+    "Azi": "Today", "Oameni": "People", "Acțiuni": "Actions", "Evenimente": "Events", "Sezoane": "Seasons", "Hartă": "Map", "Toate companiile": "All companies", "Director lux": "Luxury directory", "Oportunități": "Opportunities", "Recomandări": "Referrals", "UHNWI": "UHNWI", "Radar": "Radar", "Țări": "Countries", "Contacte": "Contacts", "Companii": "Companies", "Semnale": "Signals", "Cereri primite": "Inbound", "De aprobat": "To approve", "Pipeline": "Pipeline", "Misiuni": "Missions", "Parteneri": "Partners", "Conținut": "Content", "Statistici": "Analytics", "Servicii": "Services", "Noutăți": "Updates", "Setări": "Settings",
     "Unde vor fi principalii în următoarele luni": "Where principals will be in the coming months", "evenimente în 90 de zile": "events in the next 90 days", "cu fereastra de advance deschisă sau aproape": "with the advance window open or close", "țări acoperite": "countries covered", "e-mailuri așteaptă aprobarea": "emails awaiting approval",
     "Categorie": "Category", "Toate": "All", "Resetează filtrele": "Reset filters", "Pregătește outreach": "Prepare outreach", "Cui scriem": "Who to write to", "confirmat": "confirmed", "de reconfirmat": "to reconfirm", "în desfășurare": "under way",
     "Fiecare țară, cu evenimentele ei": "Every country, with its events", "Toate țările lumii": "Every country in the world", "Director lux": "Luxury directory", "Cei mai bogați oameni, țară cu țară": "The wealthiest people, country by country", "Tot ce e lux, țară cu țară": "Everything luxury, country by country", "Colaborare": "Partnership", "Persoane foarte bogate (UHNWI)": "Ultra-high-net-worth individuals", "Scanează regiunea": "Scan region", "Toate țările": "All countries", "Situația de securitate": "Security situation",
@@ -2263,6 +2247,17 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
   $("#langBtn").addEventListener("click", () => { S.lang = S.lang === "en" ? "ro" : "en"; try { localStorage.setItem("perimetru.lang", S.lang); } catch (e) {} document.documentElement.lang = S.lang; render(); translateDom(document.querySelector("header.top")); translateDom($("#arrival")); });
 
   // ---------- render ----------
+  // seven groups instead of twenty tabs; each view still has its own #hash
+  const NAV = [
+    ["today", "Azi", [["today", "Acțiuni", true], ["alerts", "Noutăți", true]]],
+    ["radar", "Radar", [["radar", "Evenimente", true], ["seasons", "Sezoane", true], ["map", "Hartă"], ["countries", "Țări", true]]],
+    ["people", "Oameni", [["contacts", "Contacte", true], ["uhnwi", "UHNWI", true], ["referrals", "Recomandări", true]]],
+    ["companies", "Companii", [["targets", "Toate companiile", true], ["luxury", "Director lux", true], ["signals", "Semnale", true]]],
+    ["opps", "Oportunități", [["opps", "Oportunități", true]]],
+    ["outreach", "Outreach", [["approvals", "De aprobat", true], ["pipeline", "Pipeline", true], ["content", "LinkedIn", true], ["stats", "Statistici"]]],
+    ["setup", "Setări", [["setup", "Setări"], ["services", "Servicii"]]]
+  ];
+  const groupOf = (v) => NAV.find(([, , views]) => views.some(([vk]) => vk === v)) || NAV[0];
   const VIEWS = { map: viewMap, seasons: viewSeasons, referrals: viewReferrals, opps: viewOpps, content: viewContent, uhnwi: viewUhnwi, luxury: viewLuxury, today: viewToday, stats: viewStats, radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
   const current = () => { const h = location.hash.slice(1); return VIEWS[h] ? h : "today"; };
   function render() {
@@ -2271,24 +2266,23 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     if (active && active.closest?.(".draft-body, #cfgForm, .modal") && render.lastView === v) { render.pending = true; return; }
     render.lastView = v;
     $("#main").innerHTML = VIEWS[v]();
-    document.querySelectorAll("#tabs a").forEach(a => a.setAttribute("aria-current", a.getAttribute("href") === "#" + v ? "page" : "false"));
     const unread = S.alerts.filter(a => !a.read).length;
     $("#bellBadge").hidden = !unread; $("#bellBadge").textContent = unread;
-    $("#c-radar").textContent = S.events.filter(live).length || "";
-    $("#c-countries").textContent = Object.keys(usedCountries()).length || "";
-    $("#c-contacts").textContent = S.contacts.length || "";
-    $("#c-targets").textContent = S.orgs.length || "";
-    $("#c-uhnwi").textContent = S.uhnwi.length || "";
-    $("#c-luxury").textContent = S.orgs.filter(o => LUX_TYPES.has(o.type)).length || "";
-    $("#c-signals").textContent = S.signals.length || "";
-    $("#c-approvals").textContent = S.drafts.filter(d => d.status === "de_aprobat").length || "";
-    $("#c-pipeline").textContent = dueFollowUps().length || "";
-    $("#c-seasons").textContent = seasonsNow().filter(x => x.phase === "outreach").length || "";
-    $("#c-referrals").textContent = refsDue().length || "";
-    $("#c-opps").textContent = S.opps.filter(o => (o.stage || "nou") === "nou").length || "";
-    $("#c-content").textContent = postsDue().length || "";
-    $("#c-alerts").textContent = unread || "";
-    $("#c-today").textContent = S.ready ? (todayActions().length || "") : "";
+    const n = {
+      today: S.ready ? todayActions().length : 0, alerts: unread, radar: S.events.filter(live).length, seasons: seasonsNow().filter(x => x.phase === "outreach").length,
+      countries: Object.keys(usedCountries()).length, contacts: S.contacts.length, uhnwi: S.uhnwi.length, referrals: refsDue().length, targets: S.orgs.length,
+      luxury: S.orgs.filter(o => LUX_TYPES.has(o.type)).length, signals: S.signals.length, opps: S.opps.filter(o => (o.stage || "nou") === "nou").length,
+      approvals: S.drafts.filter(d => d.status === "de_aprobat").length, pipeline: dueFollowUps().length, content: postsDue().length
+    };
+    const cnt = (x) => x ? `<span class="count">${x}</span>` : "";
+    // the group badge shows only what needs action, not totals
+    const groupBadge = { today: n.today, radar: n.seasons, people: n.referrals, opps: n.opps, outreach: n.approvals + n.pipeline + n.content };
+    const g = groupOf(v);
+    $("#tabs").innerHTML = NAV.map(([k, label, views]) => `<a href="#${views[0][0]}" ${k === g[0] ? 'aria-current="page"' : ""}>${label} ${cnt(groupBadge[k])}</a>`).join("");
+    const sub = $("#subnav"); sub.hidden = g[2].length < 2;
+    sub.innerHTML = g[2].length < 2 ? "" : g[2].map(([vk, label, showCount]) => `<a href="#${vk}" ${vk === v ? 'aria-current="page"' : ""}>${label} ${showCount ? cnt(n[vk]) : ""}</a>`).join("");
+    if (S.lang === "en") { translateDom($("#tabs")); translateDom(sub); }
+    { const nav = $("#tabs"), act = nav.querySelector("[aria-current=page]"); if (act && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = act.offsetLeft - (nav.clientWidth - act.offsetWidth) / 2; }
     $("#langBtn").textContent = S.lang === "en" ? "RO" : "EN";
     applyBrand();
     translateDom($("#main"));
