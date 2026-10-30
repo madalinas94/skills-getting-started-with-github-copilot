@@ -20,8 +20,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from engine import (agent, analyze, autoplan, dub, export, ff, presets, render, shorts, speech, styles, thumb,
-                    timing, validate)
+from engine import (agent, analyze, autoplan, dub, export, ff, presets, render, shorts, speech, styles, textedit,
+                    thumb, timing, validate)
 from engine.plan import ASPECT_SIZE, EditPlan, timeline, total_length
 
 try:
@@ -972,6 +972,36 @@ def forget_my_voice():
     s["my_voice_id"], s["my_voice_name"] = "", ""
     SETTINGS_FILE.write_text(json.dumps(s, indent=1), encoding="utf-8")
     return status()
+
+
+# ----------------------------------------------------------------- API: edit by text
+
+@app.get("/api/projects/{pid}/transcript")
+def get_transcript(pid: str):
+    project = load(pid)
+    if not project["plan"]:
+        return {"clips": []}
+    return {"clips": textedit.transcript(EditPlan.model_validate(project["plan"]), project["analysis"])}
+
+
+class TextCutIn(BaseModel):
+    cuts: list[dict]
+
+
+@app.post("/api/projects/{pid}/textcut")
+def text_cut(pid: str, body: TextCutIn):
+    project = load(pid)
+    if not project["plan"]:
+        raise HTTPException(400, "Generează întâi un montaj.")
+    if not body.cuts:
+        raise HTTPException(400, "Marchează întâi cuvintele de tăiat.")
+    try:
+        plan, n = textedit.cut(EditPlan.model_validate(project["plan"]), project["analysis"], body.cuts)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    plan, issues = validate.validate(plan, media_map(project), project["analysis"])
+    set_plan(pid, plan, issues, f"Editare prin text ({n} cuvinte tăiate)")
+    return {"job": start_job(pid, "preview", lambda step: render_preview(pid, step, 0.0))}
 
 
 @app.get("/api/jobs/{jid}")
