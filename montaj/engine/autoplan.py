@@ -199,13 +199,28 @@ def build(media: list, analysis: dict, settings: dict, style: dict | None = None
 def apply_switches(plan: EditPlan, settings: dict, media: list, analysis: dict):
     """The user's on/off switches always win, whoever made the plan."""
     from .plan import Broll, clip_length
-    for key in ("tighten", "voice_enhance", "emphasis_zoom", "sfx"):
+    for key in ("tighten", "voice_enhance", "emphasis_zoom", "sfx", "emoji"):
         if settings.get(key):
             setattr(plan, key, True)
     if settings.get("background") in ("portrait",):
         for c in plan.clips:
             if (analysis.get(c.media_id) or {}).get("faces") and c.background == "none":
                 c.background = "portrait"
+    if settings.get("auto_broll") and settings.get("stock_broll") and not any(c.broll for c in plan.clips):
+        # cut away to free stock footage of what is being said ("stock:<query>" is downloaded later)
+        from .stock import queries_from_words
+        for c in plan.clips:
+            if not c.keep_audio or clip_length(c) < 4:
+                continue
+            words = [w for w in ((analysis.get(c.media_id) or {}).get("speech") or {}).get("words") or []
+                     if c.start <= w[0] < c.end]
+            t = 2.0
+            while t + 1.8 < clip_length(c):
+                window = [w for w in words if c.start + t * c.speed - 2 <= w[0] < c.start + t * c.speed + 2]
+                q = queries_from_words(window, 1)
+                if q:
+                    c.broll.append(Broll(media_id=f"stock:{q[0]}", at=round(t, 2), duration=1.8))
+                t += 5.0
     if settings.get("auto_broll") and not any(c.broll for c in plan.clips):
         # no AI to match words to pictures: cut away every ~5 s of talking to other material
         others = [m for m in media if m["kind"] in ("video", "image")]

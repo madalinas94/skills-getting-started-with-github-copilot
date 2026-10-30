@@ -45,6 +45,9 @@ caption_style; do not copy the transcript into captions.
 - broll: while someone talks, cut away to another file that shows what they are talking about \
 (use the transcript to time it); the talking clip's sound keeps playing.
 - background: portrait blurs what is behind the person; replace puts them over another file.
+- When the user allows stock footage and nothing in the media list shows what is being said, a \
+B-roll may use media_id "stock:<short English search query>" (e.g. "stock:city night traffic"); \
+the app downloads a free clip from Pexels/Pixabay.
 - tighten removes pauses and "ăăă" from speech; voice_enhance cleans the voice; emphasis_zoom \
 punches in on stressed words; sfx adds whooshes and pops. Turn them on when the brief asks or \
 when talking-head footage would clearly benefit.
@@ -183,7 +186,9 @@ def brief(settings: dict, style: dict | None = None) -> str:
     extras = [name for key, name in (("tighten", "tighten=true (cut pauses and fillers)"),
                                      ("voice_enhance", "voice_enhance=true"),
                                      ("emphasis_zoom", "emphasis_zoom=true"), ("sfx", "sfx=true"),
-                                     ("auto_broll", "add B-roll over talking clips where it fits"))
+                                     ("auto_broll", "add B-roll over talking clips where it fits"),
+                                     ("stock_broll", "stock footage allowed for B-roll (stock:<query>)"),
+                                     ("emoji", "emoji=true"))
               if settings.get(key)]
     if extras:
         lines.append("The user switched on: " + "; ".join(extras) + ".")

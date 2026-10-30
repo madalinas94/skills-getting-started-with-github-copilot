@@ -12,13 +12,15 @@ import shutil
 import textwrap
 from pathlib import Path
 
-from . import ff, subs
+from . import ff, gpu, subs
 from .tighten import VOICE_CHAIN
 from .plan import ASPECT_SIZE, Clip, EditPlan, Overlay, clip_length, timeline, transition_len
 
 FONT_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
 FONT_BOLD = "InterDisplay-ExtraBold.otf"
 FONT_TEXT = "Inter-SemiBold.otf"
+
+ENCODER = "libx264"  # set by the app from Settings → GPU (gpu.detect())
 
 QUALITY = {
     # short side in px, x264 preset, crf, audio bitrate
@@ -355,7 +357,7 @@ def render_segment(clip: Clip, m: dict, src: Path, dest: Path, W: int, H: int, f
 
     args += ["-filter_complex", ";".join(vf), "-map", "[v]", "-map", "[a]",
              "-t", f"{L:.3f}", "-r", str(fps),
-             "-c:v", "libx264", "-preset", preset, "-crf", str(crf), "-pix_fmt", "yuv420p",
+             *gpu.args(ENCODER, preset, crf), "-pix_fmt", "yuv420p",
              "-c:a", "aac", "-b:a", abr, "-ar", "48000", "-ac", "2", dest.name]
     ff.run(args, cwd=workdir)
 
@@ -668,7 +670,7 @@ def _join(plan, media, media_dir, segs, workdir, out_path, W, H, fps, quality, e
     tmp = out_path.with_suffix(".part.mp4")
     args += ["-filter_complex", ";".join(fc), "-map", final_v, "-map", "[aout]",
              "-t", f"{total:.3f}", "-r", str(fps),
-             "-c:v", "libx264", "-preset", preset, "-crf", str(crf), "-pix_fmt", "yuv420p",
+             *gpu.args(ENCODER, preset, crf), "-pix_fmt", "yuv420p",
              "-c:a", "aac", "-b:a", abr, "-ar", "48000", "-movflags", "+faststart",
              str(tmp.resolve())]
     out_path.parent.mkdir(parents=True, exist_ok=True)

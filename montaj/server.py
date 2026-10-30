@@ -20,8 +20,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from engine import (agent, analyze, autoplan, dub, export, ff, multicam, presets, render, shorts, speech, styles,
-                    textedit, thumb, timing, validate)
+from engine import (agent, analyze, autoplan, dub, export, ff, gpu, multicam, presets, render, shorts, speech, stock,
+                    styles, textedit, thumb, timing, validate)
 from engine.plan import ASPECT_SIZE, EditPlan, timeline, total_length
 
 try:
@@ -49,6 +49,27 @@ VARIANTS = [
 ]
 
 app = FastAPI(title="Montaj")
+PORT = int(os.environ.get("MONTAJ_PORT", "8765"))
+SERVING_LAN = False
+
+
+@app.middleware("http")
+async def phone_guard(request, call_next):
+    """Requests from other devices (phone on the Wi-Fi) need the access code from the QR link."""
+    from fastapi.responses import PlainTextResponse, RedirectResponse
+    host = request.client.host if request.client else ""
+    if host in ("127.0.0.1", "::1", "localhost", "testclient"):
+        return await call_next(request)
+    token = load_settings().get("access_token")
+    if not token:
+        return PlainTextResponse("Accesul de pe alte dispozitive e oprit (Setări → Telefon).", status_code=403)
+    if request.query_params.get("t") == token:
+        resp = RedirectResponse(str(request.url.remove_query_params("t")))
+        resp.set_cookie("montaj_t", token, max_age=60 * 60 * 24 * 30, httponly=True, samesite="lax")
+        return resp
+    if request.cookies.get("montaj_t") != token:
+        return PlainTextResponse("Scanează codul QR din Setări ca să deschizi Montaj pe telefon.", status_code=403)
+    return await call_next(request)
 _lock = threading.RLock()
 _jobs: dict = {}
 
@@ -58,10 +79,12 @@ _jobs: dict = {}
 def load_settings() -> dict:
     data = {"api_key": "", "model": agent.DEFAULT_MODEL, "effort": "medium",
             "eleven_key": "", "eleven_voice": "", "whisper_model": "small", "my_voice_id": "",
-            "my_voice_name": ""}
+            "my_voice_name": "", "pexels_key": "", "pixabay_key": "", "gpu": "auto", "phone_access": False,
+            "access_token": ""}
     if SETTINGS_FILE.exists():
         data.update(json.loads(SETTINGS_FILE.read_text(encoding="utf-8")))
     os.environ["MONTAJ_WHISPER_MODEL"] = data["whisper_model"]
+    render.ENCODER = gpu.detect() if data.get("gpu", "auto") == "auto" else "libx264"
     return data
 
 
@@ -108,7 +131,7 @@ DEFAULT_SETTINGS = {"preset": presets.DEFAULT, "style_id": "", "aspect": "", "du
                     "title": "", "outro": "", "caption_style": "", "beat_fx": "", "auto_color": True,
                     "music_align": True, "self_review": True, "voiceover": False, "voiceover_text": "",
                     "tighten": False, "voice_enhance": False, "emphasis_zoom": False, "sfx": False,
-                    "auto_broll": False, "background": "", "lut_file": ""}
+                    "auto_broll": False, "background": "", "lut_file": "", "emoji": False, "stock_broll": False}
 
 
 def new_project(name: str) -> dict:
@@ -212,10 +235,58 @@ def make_plan(project: dict, settings: dict, use_ai: bool, style: dict) -> tuple
     else:
         plan = autoplan.build(material, project["analysis"], settings, style)
     autoplan.apply_switches(plan, settings, [m for m in material if m["kind"] != "audio"], project["analysis"])
+    stock_issues = resolve_stock(project["id"], plan)
+    project = load(project["id"])
     plan, issues = validate.validate(plan, media_map(project), project["analysis"])
+    issues = stock_issues + issues
     if not plan.clips:
         raise RuntimeError("Planul nu are clipuri valide. " + " ".join(issues))
     return plan, issues
+
+
+def resolve_stock(pid: str, plan: EditPlan) -> list:
+    """Download the stock clips the plan asks for ("stock:<query>") and add them as media."""
+    wanted = {b.media_id[6:] for c in plan.clips for b in c.broll if b.media_id.startswith("stock:")}
+    if not wanted:
+        return []
+    s = load_settings()
+    d = pdir(pid)
+    issues, done = [], dict(load(pid).get("stock") or {})
+    for q in sorted(wanted):
+        if q in done:
+            continue
+        try:
+            got = stock.fetch(q, plan.aspect, d / "media", s.get("pexels_key") or None, s.get("pixabay_key") or None)
+        except Exception as exc:
+            issues.append(f"B-roll de pe internet („{q}”): {exc}")
+            got = None
+        if not got:
+            continue
+        info = ff.probe(got["path"])
+        mid = "m" + uuid.uuid4().hex[:6]
+        m = {"id": mid, "name": f"{got['credit'].split(' — ')[0]}: {q}", "file": got["path"].name, "role": "material",
+             **info, "thumb": None, "stock_credit": got["credit"]}
+        try:
+            analyze.thumbnail(m, got["path"], d / "thumbs" / f"{mid}.jpg")
+            m["thumb"] = f"thumbs/{mid}.jpg"
+        except ff.FFmpegError:
+            pass
+        an = analyze.analyze(m, got["path"], d / "frames", 2, deep=False, transcribe=False)
+        update(pid, lambda p: (p["media"].append(m), p["analysis"].__setitem__(mid, an),
+                               p.setdefault("stock", {}).__setitem__(q, mid)))
+        done[q] = mid
+    for c in plan.clips:
+        keep = []
+        for b in c.broll:
+            if b.media_id.startswith("stock:"):
+                if b.media_id[6:] not in done:
+                    continue
+                b.media_id = done[b.media_id[6:]]
+            keep.append(b)
+        c.broll = keep
+    if done:
+        issues.append(f"Am adus {len(done)} clipuri B-roll gratuite de pe internet (creditele sunt în export).")
+    return issues
 
 
 def voice_id() -> str | None:
@@ -304,6 +375,29 @@ def self_review(pid: str, step, lo: float, hi: float):
 
 # ----------------------------------------------------------------- API: app
 
+def lan_ip() -> str:
+    import socket
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("10.255.255.255", 1))  # no packet is sent; picks the LAN interface
+            return sock.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+
+
+def phone_info(s: dict) -> dict:
+    """Address (with access code) and QR code for opening the app from a phone on the same Wi-Fi."""
+    if not s.get("phone_access"):
+        return {"enabled": False}
+    url = f"http://{lan_ip()}:{PORT}/?t={s.get('access_token', '')}"
+    try:
+        import segno
+        qr = segno.make(url, error="m").svg_inline(scale=5, dark="#111", light="#fff")
+    except ImportError:
+        qr = ""
+    return {"enabled": True, "url": url, "qr": qr, "active": SERVING_LAN}
+
+
 def people_ok() -> bool:
     try:
         from engine import people
@@ -325,6 +419,9 @@ def status():
         "faces": bool(vision and vision.faces_available()), "quality": vision is not None,
         "people": people_ok(), "demucs": dub.demucs_available(),
         "my_voice": s.get("my_voice_name") if s.get("my_voice_id") else "",
+        "gpu": s.get("gpu", "auto"), "encoder": gpu.LABELS.get(render.ENCODER, render.ENCODER),
+        "has_pexels": bool(s.get("pexels_key")), "has_pixabay": bool(s.get("pixabay_key")),
+        "phone": phone_info(s),
         "languages": dub.LANGUAGES,
         "model": s["model"], "effort": s["effort"],
         "models": agent.MODELS,
@@ -335,6 +432,10 @@ def status():
 
 
 class SettingsIn(BaseModel):
+    pexels_key: str | None = None
+    pixabay_key: str | None = None
+    gpu: str | None = None
+    phone_access: bool | None = None
     api_key: str | None = None
     model: str | None = None
     effort: str | None = None
@@ -356,6 +457,15 @@ def save_settings(body: SettingsIn):
         s["model"] = body.model
     if body.effort in ("low", "medium", "high", "xhigh", "max"):
         s["effort"] = body.effort
+    for k in ("pexels_key", "pixabay_key"):
+        if getattr(body, k) is not None:
+            s[k] = getattr(body, k).strip()
+    if body.gpu in ("auto", "off"):
+        s["gpu"] = body.gpu
+    if body.phone_access is not None:
+        s["phone_access"] = body.phone_access
+        if body.phone_access and not s.get("access_token"):
+            s["access_token"] = uuid.uuid4().hex[:10]
     if body.whisper_model in ("tiny", "base", "small", "medium", "large-v3"):
         s["whisper_model"] = body.whisper_model
     WORKSPACE.mkdir(parents=True, exist_ok=True)
@@ -390,7 +500,7 @@ def create_project(body: NameIn):
 def get_project(pid: str):
     project = load(pid)
     project["settings"] = {**DEFAULT_SETTINGS, **project["settings"]}
-    for key in ("variants", "review", "social", "shorts", "dubs"):
+    for key in ("variants", "review", "social", "shorts", "dubs", "batch", "multicam"):
         project.setdefault(key, None if key != "variants" else [])
     project["running"] = running_job(pid)
     if project["plan"]:
@@ -505,6 +615,8 @@ class ProjectSettings(BaseModel):
     auto_broll: bool = False
     background: str = ""
     lut_file: str = ""
+    emoji: bool = False
+    stock_broll: bool = False
 
 
 @app.put("/api/projects/{pid}/settings")
@@ -764,6 +876,11 @@ def export_final(pid: str, body: ExportIn):
         (out / f"{base}.edl").write_text(export.edl(plan, media), encoding="utf-8")
         (out / f"{base}.srt").write_text(export.srt(plan), encoding="utf-8")
         (out / f"{base}_plan.json").write_text(plan.model_dump_json(indent=1), encoding="utf-8")
+        used = {c.media_id for c in plan.clips} | {b.media_id for c in plan.clips for b in c.broll}
+        credits = [m["stock_credit"] for m in project["media"] if m["id"] in used and m.get("stock_credit")]
+        if credits:
+            (out / "credite_b-roll.txt").write_text("B-roll gratuit folosit în acest video:\n" +
+                                                   "\n".join(f"• {c}" for c in credits) + "\n", encoding="utf-8")
         lut = project["settings"].get("lut_file")
         if lut and (d / "luts" / lut).exists():  # the look, ready for DaVinci Resolve
             shutil.copy(d / "luts" / lut, out / f"{base}_look.cube")
@@ -1013,6 +1130,55 @@ def text_cut(pid: str, body: TextCutIn):
     return {"job": start_job(pid, "preview", lambda step: render_preview(pid, step, 0.0))}
 
 
+# ----------------------------------------------------------------- API: batch
+
+class BatchIn(BaseModel):
+    media_ids: list[str]
+    mode: str = "auto"
+    quality: str = "1080p"
+
+
+@app.post("/api/projects/{pid}/batch")
+def make_batch(pid: str, body: BatchIn):
+    project = load(pid)
+    vids = [m for m in project["media"] if m["id"] in body.media_ids and m["kind"] in ("video", "image")]
+    if not vids:
+        raise HTTPException(400, "Bifează video-urile pe care să le montez.")
+    use_ai = body.mode == "ai" and bool(api_key())
+    quality = body.quality if body.quality in render.QUALITY else "1080p"
+
+    def work(step):
+        project = ensure_analysis(pid, step, 0.0, 0.15)
+        d = pdir(pid)
+        out = d / "exports" / f"lot_{time.strftime('%Y%m%d-%H%M%S')}"
+        out.mkdir(parents=True, exist_ok=True)
+        music = [m for m in project["media"] if m["role"] == "music"]
+        style = style_of(project)
+        items = []
+        for k, v in enumerate(vids):
+            lo, hi = 0.15 + 0.85 * k / len(vids), 0.15 + 0.85 * (k + 1) / len(vids)
+            step(lo, f"Video {k + 1}/{len(vids)}: {v['name']}")
+            single = {**project, "media": [v] + music}
+            try:
+                plan, _issues = make_plan(single, {**project["settings"], "title": project["settings"].get("title")
+                                                   or Path(v["name"]).stem}, use_ai, style)
+                base = re.sub(r"[^A-Za-z0-9-]+", "-", Path(v["name"]).stem).strip("-")[:40] or f"video{k + 1}"
+                video = out / f"{k + 1:02d}_{base}.mp4"
+                render_plan(load(pid), plan, video, quality, step, lo, hi - 0.02)
+                try:
+                    m, t = thumb.best_moment(plan, media_map(load(pid)), project["analysis"])
+                    thumb.make(thumb.grab_frame(d / "media" / m["file"], t, m["kind"]),
+                               " ".join(plan.title.split()[:5]), out / f"{k + 1:02d}_{base}")
+                except Exception:
+                    pass
+                items.append({"name": v["name"], "file": f"exports/{out.name}/{video.name}", "ok": True})
+            except Exception as exc:
+                items.append({"name": v["name"], "error": agent.describe_error(exc), "ok": False})
+            update(pid, lambda p: p.__setitem__("batch", {"time": time.time(), "items": list(items)}))
+
+    return start_job(pid, "batch", work)
+
+
 # ----------------------------------------------------------------- API: multicam podcast
 
 class MulticamIn(BaseModel):
@@ -1135,9 +1301,13 @@ app.mount("/", StaticFiles(directory=ROOT / "static", html=True), name="static")
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.environ.get("MONTAJ_PORT", "8765"))
+    port = PORT
+    lan = load_settings().get("phone_access") or os.environ.get("MONTAJ_LAN") == "1"
+    SERVING_LAN = bool(lan)
+    if lan:
+        print(f"Montaj e disponibil și pe telefon: deschide Setări → Telefon și scanează codul QR.")
     if not ff.available():
         print("ATENȚIE: ffmpeg nu e instalat sau nu e în PATH. Aplicația pornește, dar nu poate randa.")
     if os.environ.get("MONTAJ_NO_BROWSER") != "1":
         threading.Timer(1.2, lambda: webbrowser.open(f"http://127.0.0.1:{port}")).start()
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+    uvicorn.run(app, host="0.0.0.0" if lan else "127.0.0.1", port=port, log_level="warning")
