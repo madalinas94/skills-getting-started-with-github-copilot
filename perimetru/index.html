@@ -436,6 +436,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
       <a href="#targets">Companii <span class="count" id="c-targets"></span></a>
       <a href="#opps">Oportunități <span class="count" id="c-opps"></span></a>
       <a href="#signals">Semnale <span class="count" id="c-signals"></span></a>
+      <a href="#referrals">Recomandări <span class="count" id="c-referrals"></span></a>
       <a href="#approvals">De aprobat <span class="count" id="c-approvals"></span></a>
       <a href="#pipeline">Pipeline <span class="count" id="c-pipeline"></span></a>
       <a href="#content">Conținut <span class="count" id="c-content"></span></a>
@@ -492,7 +493,8 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
     family_office: "Family office", mfo: "Multi-family office & bancă privată", jet: "Aviație privată & charter", travel: "Travel & lifestyle management",
     talent: "Agenții de talent & PR", label: "Case de discuri & management", promoter: "Organizatori turnee & festivaluri", organizer: "Organizatori evenimente & forumuri",
     hospitality: "Hoteluri, vile & yachting", network: "Rețele de acces (PA, concierge, family office)", forum: "Organizatori forumuri", luxury_brand: "Branduri de lux", staffing: "Agenții de personal privat (PA, estate, household)", holding: "Holding / birou corporativ", foundation: "Fundație", association: "Asociații profesionale (PA, butleri, family office)",
-    hotel: "Hoteluri 5★ și palate", venue: "Locații exclusiviste & cluburi private", yacht: "Yachting: charter, brokeraj, șantiere", heli: "Elicoptere", cars: "Mașini exclusiviste", fashion: "Modă & marochinărie", jewellery: "Bijuterii & ceasuri", lifestyle: "Lifestyle & concierge"
+    hotel: "Hoteluri 5★ și palate", venue: "Locații exclusiviste & cluburi private", yacht: "Yachting: charter, brokeraj, șantiere", heli: "Elicoptere", cars: "Mașini exclusiviste", fashion: "Modă & marochinărie", jewellery: "Bijuterii & ceasuri", lifestyle: "Lifestyle & concierge",
+    wedding: "Wedding planners de lux", villas: "Vile & reședințe private (închiriere)", art: "Case de licitații & galerii", advisory: "Avocați & consultanți relocare UHNW", clinic: "Clinici & medici privați de top"
   };
   const ROLE_CATS = {
     chief_of_staff: "Chief of Staff / Private office", pa: "PA / Executive Assistant", family_office: "Family office", fo_exec: "Family office CEO / Director", estate: "Estate, household & residences", lifestyle: "Lifestyle manager", staffing: "Agenție de personal privat", organizer: "Organizator eveniment",
@@ -504,7 +506,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
     ["Household Manager", "Casa și personalul zilnic"], ["Private Office Manager", "Monaco, Londra, Geneva, Dubai"], ["Head of Private Staff", "Echipa de personal privat"],
     ["Lifestyle Manager", "Călătorii, evenimente, experiențe"], ["Director of Residences", "Mai multe reședințe, mai multe țări"], ["Private PA", "Asistentul personal al principalului"]
   ];
-  const LUX_CATS = [["family_office", "Family offices"], ["mfo", "Multi-family offices & bănci private"], ["hotel", "Hoteluri 5★ și palate"], ["venue", "Locații exclusiviste"], ["jet", "Private jet"], ["yacht", "Yachting"], ["heli", "Elicoptere"], ["cars", "Mașini exclusiviste"], ["fashion", "Modă & marochinărie"], ["jewellery", "Bijuterii & ceasuri"], ["lifestyle", "Lifestyle & concierge"], ["staffing", "Agenții de personal privat"], ["association", "Asociații PA, butleri, family office"], ["hospitality", "Ospitalitate (altele)"], ["luxury_brand", "Branduri de lux (altele)"]];
+  const LUX_CATS = [["family_office", "Family offices"], ["mfo", "Multi-family offices & bănci private"], ["hotel", "Hoteluri 5★ și palate"], ["venue", "Locații exclusiviste"], ["jet", "Private jet"], ["yacht", "Yachting"], ["heli", "Elicoptere"], ["cars", "Mașini exclusiviste"], ["fashion", "Modă & marochinărie"], ["jewellery", "Bijuterii & ceasuri"], ["lifestyle", "Lifestyle & concierge"], ["wedding", "Wedding planners de lux"], ["villas", "Vile & reședințe private"], ["art", "Licitații & galerii"], ["advisory", "Relocare & consultanți UHNW"], ["clinic", "Clinici private de top"], ["staffing", "Agenții de personal privat"], ["association", "Asociații PA, butleri, family office"], ["hospitality", "Ospitalitate (altele)"], ["luxury_brand", "Branduri de lux (altele)"]];
   const LUX_TYPES = new Set(LUX_CATS.map(x => x[0]));
   const STAGES = [["nou", "Nou"], ["cercetare", "În cercetare"], ["contactat", "Contactat"], ["raspuns", "A răspuns"], ["intalnire", "Întâlnire"], ["client", "Client"], ["pierdut", "Pierdut / pauză"]];
   const STAGE_LABEL = Object.fromEntries(STAGES);
@@ -529,7 +531,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
   // ---------- state ----------
   const S = {
     events: [], orgs: [], drafts: [], alerts: [], contacts: [], signals: [], requests: [],
-    opps: [], missions: [], partners: [], deals: [], scanqueue: [], uhnwi: [], team: [], posts: [], inbound: [], optouts: [], proposals: [], countryintel: [],
+    opps: [], referrals: [], missions: [], partners: [], deals: [], scanqueue: [], uhnwi: [], team: [], posts: [], inbound: [], optouts: [], proposals: [], countryintel: [],
     config: {}, services: null, pricing: {}, brand: {}, me: null, lang: "ro",
     ready: false, dbOk: null,
     lux: { cc: "all", type: "all", sel: [] },
@@ -582,6 +584,13 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
   const opCode = (e) => { const d = parseD(e.start); return `OP-${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, "0")}-${(e.cc || "XX")}`; };
   const matchesQ = (...parts) => { const q = S.f.q.trim().toLowerCase(); if (!q) return true; return parts.join(" ").toLowerCase().includes(q); };
   const li = (kw, type = "content") => `https://www.linkedin.com/search/results/${type}/?keywords=${encodeURIComponent(kw)}`;
+  const salesNav = (kw) => `https://www.linkedin.com/sales/search/people?keywords=${encodeURIComponent(kw)}`;
+  // LinkedIn connection notes stay under the 300-character limit
+  const CONNECT_NOTES = {
+    fo: "Hello {name}, I lead {company}, a UK-based close protection and private services firm working across Europe and the Gulf. We support family offices with discreet security, travel logistics and luxury arrangements. Happy to connect and be a useful contact.",
+    pa: "Hello {name}, I run {company}. When your principal travels or attends events, we take care of discreet protection, cars, yachts and access in one call. Happy to connect in case it's ever useful.",
+    ev: "Hello {name}, I lead {company}; our teams have worked Cannes, Venice and the amfAR galas. Always glad to support organisers with VIP security and chauffeured transport. Happy to connect."
+  };
   const liJobs = (kw) => `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(kw)}`;
   const services = () => (S.services && S.services.length ? S.services : DEFAULT_SERVICES);
 
@@ -760,7 +769,10 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
         <p class="note" style="margin:0 0 10px">Alege rolul și țara: căutarea se deschide direct în LinkedIn-ul vostru. Directorii și CEO-ii de family office, Chief of Staff și Private Office Manager publicați de firme intră automat în agendă, prin scanare. PA, Estate Manager și Household Manager lucrează de obicei în case private și rar au date publice: la ei ajungeți prin LinkedIn, prin agențiile care îi plasează și prin asociațiile lor, toate în Director lux.</p>
         <div class="filters"><select class="select" id="pplCc" aria-label="Țara">${["", "RO", "MC", "FR", "CH", "GB", "AE", "IT", "ES", "US", "DE", "AT", "GR", "PT", "SA", "QA", "LU", "NL", "BE", "SG", "HK"].map(cc => `<option value="${cc}" ${S.pplCc === cc ? "selected" : ""}>${cc ? esc(ccName(cc)) : "Orice țară"}</option>`).join("")}</select>
           <button class="btn sm" data-act="scan-people">Scanează rolurile publicate${S.pplCc ? " în " + esc(ccName(S.pplCc)) : ""}</button></div>
-        <div class="find" style="margin:0">${PEOPLE_ROLES.map(([r, hint]) => `<a href="${li(`"${r}"${S.pplCc ? " " + ccName(S.pplCc) : ""}`, "people")}" target="_blank" rel="noopener"><b>${esc(r)} ↗</b><span>${esc(hint)}</span></a>`).join("")}</div></div>
+        <div class="find" style="margin:0">${PEOPLE_ROLES.map(([r, hint]) => `<a href="${li(`"${r}"${S.pplCc ? " " + ccName(S.pplCc) : ""}`, "people")}" target="_blank" rel="noopener"><b>${esc(r)} ↗</b><span>${esc(hint)}</span></a>`).join("")}</div>
+        <div class="eyebrow" style="margin:14px 0 8px">Sales Navigator (dacă aveți abonament)</div>
+        <div class="find" style="margin:0">${PEOPLE_ROLES.slice(0, 6).map(([r]) => `<a href="${salesNav(`"${r}" ${["Personal Assistant", "Executive Assistant", "Private PA"].includes(r) ? "family office OR private office" : ""}${S.pplCc ? " " + ccName(S.pplCc) : ""}`)}" target="_blank" rel="noopener"><b>${esc(r)} ↗</b><span>Sales Navigator</span></a>`).join("")}</div>
+        <div class="row" style="margin-top:10px"><button class="btn sm" data-act="copy-note" data-id="fo">Copiază nota de conectare: family office</button><button class="btn sm" data-act="copy-note" data-id="pa">Copiază nota: PA / EA</button><button class="btn sm" data-act="copy-note" data-id="ev">Copiază nota: organizator evenimente</button></div></div>
       <div class="eyebrow" style="margin-bottom:10px">Alți decidenți pe LinkedIn</div>
       <div class="find">${finders}</div>
       <div class="filters">${chips}</div>
@@ -988,6 +1000,8 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
         <form id="teamForm" class="row" style="margin-top:10px"><input class="select" style="border-radius:8px" id="tm-name" placeholder="Nume" required aria-label="Nume"><input class="select" style="border-radius:8px" id="tm-email" placeholder="E-mail" aria-label="E-mail"><select class="select" id="tm-role" aria-label="Rol">${TEAM_ROLES.map(r => `<option>${r}</option>`).join("")}</select><button class="btn sm" type="submit">Adaugă</button></form>
         <p class="note" style="margin:8px 0 0">Cine poate deschide și edita aplicația se stabilește din butonul Share al paginii: Viewer doar citește, Editor poate aproba și modifica.</p></div>
       <div class="panel"><h3>E-mail (Gmail)</h3><p class="note" style="margin:0">Gmail e instalat în contul claude.ai, dar conectarea nu e finalizată. După ce îl conectezi din Settings → Connectors pe claude.ai, legăm trimiterea după aprobare și citirea răspunsurilor. Până atunci, „Aprobă” deschide mesajul gata scris în Gmail sau Outlook.</p></div>
+      <div class="panel"><h3>Integrări pentru scanere</h3><p class="note" style="margin:0">Scanerele folosesc automat două servicii dacă le dați cheile. Cheile se pun în setările mediului cloud <b>29102026</b> (rotița ⚙ → Environment variables), nu în aplicație, ca să nu le vadă nimeni altcineva:</p>
+        <ul class="note" style="margin:8px 0 0;padding-left:18px;line-height:1.7"><li><b>COMPANIES_HOUSE_API_KEY</b>: directorii oficiali ai firmelor din Regatul Unit. Cheie gratuită pe developer.company-information.service.gov.uk. Fără cheie, scanerul citește paginile publice ale registrului.</li><li><b>HUNTER_API_KEY</b>: e-mailurile publicate pe site-urile firmelor și verificarea adreselor (hunter.io, plan plătit). Folosim doar adrese cu sursă publică.</li></ul></div>
       <div class="panel"><h3>Registru GDPR</h3>
         <p class="note" style="margin:0 0 10px">${S.contacts.length} contacte, fiecare cu sursa notată · ${S.orgs.filter(o => o.dnc).length} companii „nu contacta” · ${S.optouts.length} dezabonări.</p>
         ${S.optouts.length ? `<ul>${S.optouts.map(o => `<li>${esc(o.email || orgById(o.orgId)?.name || "—")} · ${esc(o.reason || "")} · ${esc(fmtD(o.date))}</li>`).join("")}</ul>` : ""}
@@ -1009,6 +1023,8 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
         acts.push({ w: 80 - Math.max(adv, 0) + (e.tier === 1 ? 10 : 0), t: `Fereastra de advance: ${e.title}`, x: `${fmtD(e.start)} · ${e.city}, ${evCountry(e)}. ${adv <= 0 ? "Fereastra e deschisă" : `Se deschide în ${adv} zile`} și nu e niciun e-mail pregătit.`, btn: ["draft-event", e.id, "Pregătește outreach"] });
     });
     postsDue().slice(0, 1).forEach(p => acts.push({ w: 92, t: daysTo(p.scheduledFor) < 0 ? "Postare LinkedIn întârziată" : "Postarea LinkedIn de azi", x: `${p.topic || "Postare"} · ${CHANNEL[p.channel] || CHANNEL.personal}`, go: "content", label: "Publică" }));
+    const rd = refsDue();
+    if (rd.length) acts.push({ w: 86, t: `Cereți o recomandare: ${rd.slice(0, 2).map(r => r.name).join(", ")}${rd.length > 2 ? ` și încă ${rd.length - 2}` : ""}`, x: "Oamenii care v-au văzut lucrând sunt cea mai bună sursă de clienți noi.", go: "referrals", label: "Vezi" });
     const oppsSoon = S.opps.filter(o => (o.stage || "nou") === "nou" && o.deadline && daysTo(o.deadline) >= 0 && daysTo(o.deadline) <= 7);
     if (oppsSoon.length) acts.push({ w: 88, t: `${oppsSoon.length} oportunități expiră în 7 zile`, x: oppsSoon.slice(0, 3).map(o => `${o.title} (${fmtD(o.deadline)})`).join(" · "), go: "opps", label: "Vezi" });
     const oppsNew = S.opps.filter(o => (o.stage || "nou") === "nou" && o.found && daysTo(o.found.slice(0, 10)) >= -2);
@@ -1269,6 +1285,32 @@ Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, 
       toast(posts.length ? "Săptămâna e pregătită" : "Nu am primit postări.");
     } catch (err) { toast(err?.code === "rate_limited" ? "AI-ul e ocupat." : "Nu am putut genera acum."); }
     btn.disabled = false; btn.textContent = "Pregătește săptămâna";
+  }
+
+  // ---------- Recomandări: cine ne poate trimite clienți ----------
+  const REF_REL = { client: "Client", partener: "Partener", organizator: "Organizator eveniment", prieten: "Relație personală" };
+  const refsDue = () => S.referrals.filter(r => !r.nextAsk || daysTo(r.nextAsk) <= 0);
+  function viewReferrals() {
+    const list = [...S.referrals].filter(r => matchesQ(r.name, r.org, r.notes)).sort((a, b) => (a.nextAsk || "").localeCompare(b.nextAsk || ""));
+    const won = S.referrals.reduce((n, r) => n + (+r.clientsReferred || 0), 0);
+    return `
+      <div class="view-head"><div class="grow"><div class="eyebrow">Recomandări</div><h1>Clienții buni vin prin oameni care v-au văzut lucrând</h1>
+        <p>Clienți mulțumiți, organizatori, parteneri și prieteni ai casei. Aplicația vă reamintește la fiecare 90 de zile să cereți o recomandare și pregătește mesajul. După fiecare misiune reușită, adăugați clientul aici.</p></div></div>
+      <div class="kpis"><div class="kpi"><div class="n">${S.referrals.length}</div><div class="l">oameni care vă pot recomanda</div></div><div class="kpi gold"><div class="n">${refsDue().length}</div><div class="l">de contactat acum</div></div><div class="kpi"><div class="n">${won}</div><div class="l">clienți aduși prin recomandare</div></div></div>
+      <form id="refForm" class="panel" style="max-width:none;margin-bottom:18px"><h3>Adaugă</h3>
+        <div class="row"><input class="select" style="border-radius:8px;flex:1" id="rf-name" placeholder="Nume persoană" required aria-label="Nume"><input class="select" style="border-radius:8px;flex:1" id="rf-org" placeholder="Organizație" aria-label="Organizație"><input class="select" style="border-radius:8px;flex:1" id="rf-email" placeholder="E-mail" aria-label="E-mail"><select class="select" id="rf-rel" aria-label="Relație">${Object.entries(REF_REL).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
+        <div class="row" style="margin-top:8px"><input class="select" style="border-radius:8px;flex:1" id="rf-notes" placeholder="Ce ați făcut împreună (ex. Social Impact Gala, Cannes 2025)" aria-label="Note"><button class="btn primary">Adaugă</button></div></form>
+      ${!S.ready ? emptyLoading() : list.length ? `<div class="contacts">${list.map(r => `<div class="ct" style="grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) auto"><div style="min-width:0"><div class="nm">${esc(r.name)}${r.org ? ` · <span class="muted">${esc(r.org)}</span>` : ""}</div><div class="rl">${esc(REF_REL[r.rel] || r.rel || "")}${r.notes ? " · " + esc(r.notes) : ""}</div></div>
+        <div style="min-width:0"><div class="mono" style="overflow-wrap:anywhere">${esc(r.email || "")}</div><div class="rl">${r.lastAsk ? `ultima cerere ${esc(fmtD(r.lastAsk))}` : "încă necerut"} · ${r.nextAsk && daysTo(r.nextAsk) > 0 ? `următoarea ${esc(fmtD(r.nextAsk))}` : `<b>de cerut acum</b>`}</div></div>
+        <div class="row"><button class="btn sm primary" data-act="ref-draft" data-id="${esc(r.id)}">Scrie mesajul</button><button class="btn sm" data-act="ref-asked" data-id="${esc(r.id)}">Am cerut</button><button class="btn sm danger" data-act="ref-del" data-id="${esc(r.id)}" aria-label="Șterge">×</button></div></div>`).join("")}</div>` : `<div class="empty"><h3>Nimeni încă</h3><p>Adăugați clienții și organizatorii cu care ați lucrat.</p></div>`}`;
+  }
+  async function refDraft(r) {
+    const first = (r.name || "").split(" ")[0];
+    const body = `Dear ${first || "friend"},\n\nI hope all is well. ${r.notes ? `It was a pleasure working with you on ${r.notes}. ` : "It was a pleasure working with you. "}We are now building our calendar for the coming season and would be grateful for a small favour: if you know anyone, a family, an executive, an artist or an event organiser, who could use discreet protection, chauffeured cars, yachts or exclusive access, would you be happy to introduce us or pass on our details?\n\nAny introduction is handled with complete discretion, and we would of course be glad to return the favour.\n\nWith warm regards,\n{{signature}}`;
+    if (await put("drafts", newId("dr"), { refId: r.id, orgId: r.orgId || "", to: r.email || "", subject: "A small favour", body, lang: "en", status: "de_aprobat", step: 1, kind: "recomandare", rationale: `Cerere de recomandare către ${r.name}${r.org ? " (" + r.org + ")" : ""}.`, createdAt: new Date().toISOString(), by: "app" })) {
+      await patch("referrals", r.id, { lastAsk: iso(today()), nextAsk: iso(addDays(today(), 90)) });
+      S.f.sub = "de_aprobat"; location.hash = "#approvals"; toast("Mesajul e în „De aprobat”");
+    }
   }
 
   // ---------- Oportunități: joburi, licitații, colaborări temporare ----------
@@ -1928,6 +1970,10 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
         if (await patch("posts", id, upd)) toast("Salvat"); break;
       }
       case "okind": S.f.okind = id; render(); break;
+      case "copy-note": { const t = (CONNECT_NOTES[id] || "").replaceAll("{company}", S.config?.company || "our company").replaceAll("{name}", ""); try { await navigator.clipboard.writeText(t.replace("Hello , ", "Hello, ")); toast("Notă copiată. Adaugă numele persoanei."); } catch (e) { toast("Nu am putut copia."); } break; }
+      case "ref-asked": { if (await patch("referrals", id, { lastAsk: iso(today()), nextAsk: iso(addDays(today(), 90)) })) toast("Notat. Vă reamintesc peste 90 de zile."); break; }
+      case "ref-draft": { const r = S.referrals.find(x => x.id === id); if (r) refDraft(r); break; }
+      case "ref-del": { if (confirm("Ștergi această persoană din recomandări?")) { try { await db.collection("referrals").doc(id).delete(); toast("Șters"); } catch (e) { toast("Nu s-a șters."); } } break; }
       case "opp-new": {
         const url = (prompt("Link-ul anunțului:") || "").trim(); if (!url) break;
         const title = (prompt("Titlul (ex. Close Protection Officer, Dubai):") || "").trim() || url;
@@ -2051,6 +2097,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     else if (el.dataset?.act === "stage") { if (await patch("orgs", el.dataset.id, { status: el.value })) toast(`Mutat la „${STAGE_LABEL[el.value]}”`); }
   });
   document.addEventListener("submit", async (ev) => {
+    if (ev.target.id === "refForm") { ev.preventDefault(); const name = $("#rf-name").value.trim(); if (name && await put("referrals", newId("rf"), { name, org: $("#rf-org").value.trim(), email: $("#rf-email").value.trim(), rel: $("#rf-rel").value, notes: $("#rf-notes").value.trim(), nextAsk: iso(today()), createdAt: new Date().toISOString() })) toast("Adăugat"); return; }
     if (ev.target.id === "teamForm") { ev.preventDefault(); const name = $("#tm-name").value.trim(); if (name && await put("team", newId("tm"), { name, email: $("#tm-email").value.trim(), role: $("#tm-role").value })) toast("Adăugat în echipă"); return; }
     if (ev.target.id === "optForm") { ev.preventDefault(); const email = $("#op-email").value.trim(); if (email && await put("optouts", newId("op"), { email, reason: "a cerut dezabonarea", date: iso(today()) })) toast("Dezabonare înregistrată"); return; }
     if (ev.target.id !== "cfgForm") return;
@@ -2065,7 +2112,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
   $("#langBtn").addEventListener("click", () => { S.lang = S.lang === "en" ? "ro" : "en"; try { localStorage.setItem("perimetru.lang", S.lang); } catch (e) {} document.documentElement.lang = S.lang; render(); translateDom(document.querySelector("header.top")); translateDom($("#arrival")); });
 
   // ---------- render ----------
-  const VIEWS = { opps: viewOpps, content: viewContent, uhnwi: viewUhnwi, luxury: viewLuxury, today: viewToday, stats: viewStats, radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
+  const VIEWS = { referrals: viewReferrals, opps: viewOpps, content: viewContent, uhnwi: viewUhnwi, luxury: viewLuxury, today: viewToday, stats: viewStats, radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
   const current = () => { const h = location.hash.slice(1); return VIEWS[h] ? h : "today"; };
   function render() {
     const v = current();
@@ -2085,6 +2132,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     $("#c-signals").textContent = S.signals.length || "";
     $("#c-approvals").textContent = S.drafts.filter(d => d.status === "de_aprobat").length || "";
     $("#c-pipeline").textContent = dueFollowUps().length || "";
+    $("#c-referrals").textContent = refsDue().length || "";
     $("#c-opps").textContent = S.opps.filter(o => (o.stage || "nou") === "nou").length || "";
     $("#c-content").textContent = postsDue().length || "";
     $("#c-alerts").textContent = unread || "";
@@ -2136,7 +2184,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     if (userCap?.me) { try { S.me = await userCap.me(); setupArrival.greet?.(S.me?.name); } catch (e) {} }
     S.dbOk = !!db;
     if (!db) { render(); return; }
-    const cols = ["opps", "events", "orgs", "drafts", "alerts", "contacts", "signals", "requests", "scanqueue", "uhnwi", "missions", "partners", "deals", "team", "posts", "inbound", "optouts", "proposals", "countryintel"];
+    const cols = ["opps", "referrals", "events", "orgs", "drafts", "alerts", "contacts", "signals", "requests", "scanqueue", "uhnwi", "missions", "partners", "deals", "team", "posts", "inbound", "optouts", "proposals", "countryintel"];
     const pending = new Set(cols);
     cols.forEach(name => db.collection(name).limit(1000).onSnapshot((snap) => {
       S[name] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
