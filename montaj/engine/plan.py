@@ -43,6 +43,15 @@ class Overlay(BaseModel):
 
 
 Background = Literal["none", "portrait", "replace"]
+Enhance = Literal["denoise", "sharpen", "stabilize"]
+
+
+class Pip(BaseModel):
+    media_id: str = Field(description="Webcam / facecam video shown in a corner bubble")
+    offset: float = Field(0.0, description="Facecam time = main clip time + offset (to sync the recordings)")
+    position: Literal["bottom_right", "bottom_left", "top_right", "top_left"] = "bottom_right"
+    size: float = Field(0.3, description="Bubble diameter as a fraction of the frame's short side, 0.2..0.45")
+    shape: Literal["circle", "rounded"] = "circle"
 
 
 class Broll(BaseModel):
@@ -73,6 +82,12 @@ class Clip(BaseModel):
     background: Background = Field("none", description="portrait = blur everything behind the person, "
                                    "replace = put the person over background_media")
     background_media: Optional[str] = Field(None, description="id of a photo/video used when background=replace")
+    enhance: List[Enhance] = Field(default_factory=list, description="denoise for dark/noisy footage, sharpen for "
+                                   "soft footage, stabilize for shaky footage")
+    beauty: float = Field(0.0, description="0..1 skin smoothing and soft glow on faces; 0 = off")
+    pip: Optional[Pip] = Field(None, description="Facecam bubble over this clip (screen recordings, tutorials)")
+    split_with: Optional[str] = Field(None, description="Second camera shown in a top/bottom split screen")
+    split_offset: float = Field(0.0, description="Second camera time = this clip's time + split_offset")
     reason: str = Field("", description="One short sentence: why this shot, here")
 
 
@@ -118,6 +133,7 @@ class EditPlan(BaseModel):
                                         "uppercase with coloured key words, mrbeast = huge 1-2 words, tilted, "
                                         "aliabdaal = calm sentence on a soft box")
     emoji: bool = Field(False, description="Animated emoji above the captions on key words")
+    lut: Optional[str] = Field(None, description="Colour LUT file name made by the app; leave empty")
     beat_fx: BeatFx = Field("none", description="Effect on music beats: flash, zoom pulse, shake, or mix")
     beat_fx_every: int = Field(2, description="1 = every beat, 2 = every second beat, 4 = once per bar")
     voiceover: List[VoiceLine] = Field(default_factory=list,

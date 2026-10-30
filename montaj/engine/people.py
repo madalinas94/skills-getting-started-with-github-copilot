@@ -118,3 +118,53 @@ def mask_video(src: Path, media: dict, start: float, duration: float, dest: Path
         raise ff.FFmpegError("Nu am putut crea masca pentru decuparea persoanei.")
     tmp.replace(dest)
     return dest
+
+
+def skin_mask_video(src: Path, media: dict, start: float, duration: float, dest: Path) -> Path:
+    """Grey mask of facial skin (face area × skin colour), for the beauty filter, cached."""
+    import cv2
+    if dest.exists():
+        return dest
+    w, h = _size(media, MASK_W)
+    read = [ff.binary("ffmpeg"), "-hide_banner", "-nostdin", "-v", "error"]
+    if media["kind"] == "image":
+        read += ["-i", str(src), "-frames:v", "1"]
+    else:
+        read += ["-ss", f"{start:.3f}", "-t", f"{duration:.3f}", "-i", str(src), "-r", str(MASK_FPS)]
+    read += ["-an", "-vf", f"scale={w}:{h},format=rgb24", "-f", "rawvideo", "-"]
+    tmp = dest.with_suffix(".tmp.mkv")
+    write = subprocess.Popen([ff.binary("ffmpeg"), "-hide_banner", "-nostdin", "-v", "error", "-y",
+                              "-f", "rawvideo", "-pix_fmt", "gray", "-s", f"{w}x{h}", "-r", str(MASK_FPS),
+                              "-i", "-", "-c:v", "ffv1", str(tmp)], stdin=subprocess.PIPE)
+    reader = subprocess.Popen(read, stdout=subprocess.PIPE)
+    size = w * h * 3
+    prev, face = None, None
+    try:
+        while True:
+            raw = reader.stdout.read(size)
+            if len(raw) < size:
+                break
+            rgb = np.frombuffer(raw, np.uint8).reshape(h, w, 3)
+            found = largest_face(rgb)
+            face = found or face  # hold the last face through a missed detection
+            m = np.zeros((h, w), np.float32)
+            if face:
+                cx, cy, fw = face
+                ellipse = np.zeros((h, w), np.uint8)
+                cv2.ellipse(ellipse, (int(cx * w), int(cy * h)), (int(fw * w * 0.62), int(fw * w * 0.85)),
+                            0, 0, 360, 255, -1)
+                ycc = cv2.cvtColor(rgb, cv2.COLOR_RGB2YCrCb)
+                skin = cv2.inRange(ycc, (40, 133, 77), (255, 178, 133))
+                m = cv2.GaussianBlur((ellipse & skin).astype(np.float32) / 255, (0, 0), 3)
+            m = m if prev is None else 0.6 * m + 0.4 * prev
+            prev = m
+            write.stdin.write((np.clip(m, 0, 1) * 255).astype(np.uint8).tobytes())
+    finally:
+        reader.stdout.close()
+        reader.wait()
+        write.stdin.close()
+        write.wait()
+    if write.returncode != 0 or not tmp.exists():
+        raise ff.FFmpegError("Nu am putut crea masca pentru filtrul beauty.")
+    tmp.replace(dest)
+    return dest

@@ -257,8 +257,25 @@ def render_segment(clip: Clip, m: dict, src: Path, dest: Path, W: int, H: int, f
     silence = add_input("-f", "lavfi", "-t", f"{L + 0.5:.3f}", "-i", "anullsrc=r=48000:cl=stereo")
 
     retime = f"setpts=(PTS-STARTPTS)/{clip.speed:.4f},fps={fps}"
-    vf = [f"[{main}:v]{retime},format=yuv420p[raw]"]
+    pre = []
+    if "denoise" in clip.enhance:
+        pre.append("hqdn3d=3:2.5:6:5")
+    if "stabilize" in clip.enhance and m["kind"] == "video":
+        pre += stabilize_filters(src, clip, workdir, dest.stem)
+    vf = [f"[{main}:v]{retime},format=yuv420p{',' + ','.join(pre) if pre else ''}[raw]"]
     base = "[raw]"
+
+    # Beauty: smooth and lift only facial skin (mask from face detection × skin colour)
+    if clip.beauty > 0.01 and opts.get("skin"):
+        SW, SH = _source_size(m)
+        sk = add_input(*(["-stream_loop", "-1", "-t", f"{L + 0.5:.3f}"] if m["kind"] == "image" else []),
+                       "-i", opts["skin"])
+        amount = min(1.0, clip.beauty)
+        vf.append(f"[{sk}:v]{retime},scale={SW}:{SH},format=gray,lutyuv=y=val*{amount:.2f}[skin]")
+        vf.append(f"{base}scale={SW}:{SH},setsar=1,split=2[bo][bs]")
+        vf.append(f"[bs]gblur=sigma={2 + 4 * amount:.1f},eq=brightness={0.035 * amount:.3f}:saturation=0.97,"
+                  f"format=yuva420p[bsm];[bsm][skin]alphamerge[bsa];[bo][bsa]overlay=0:0,format=yuv420p[beauty]")
+        base = "[beauty]"
 
     # Person cut-out: composite at source size, before framing, so every later step
     # (crop, face tracking, Ken Burns, grade) treats person + background as one picture.
@@ -281,9 +298,23 @@ def render_segment(clip: Clip, m: dict, src: Path, dest: Path, W: int, H: int, f
         vf.append("[bgv][fg]overlay=0:0:shortest=0,format=yuv420p[comp]")
         base = "[comp]"
 
-    vf.append(fit_filter(clip.fit if clip.fit != "track" or track else "fill", W, H, src=base,
-                         track=track, clip=clip, L=L))
+    if clip.split_with and opts.get("split"):
+        # two cameras stacked: this one on top, the other below, each framed on its face
+        s_path, s_media, s_track = opts["split"]
+        si = add_input("-ss", f"{max(0, clip.start + clip.split_offset):.3f}", "-t", f"{clip.end - clip.start:.3f}",
+                       "-i", s_path)
+        half = H // 2 // 2 * 2
+        vf.append(f"[{si}:v]{retime},format=yuv420p[sraw]")
+        vf.append(fit_filter("track" if track else "fill", W, half, src=base, out="[top]", track=track, clip=clip, L=L))
+        vf.append(fit_filter("track" if s_track else "fill", W, H - half, src="[sraw]", out="[bot]",
+                             track=s_track, clip=clip.model_copy(update={"start": clip.start + clip.split_offset}), L=L))
+        vf.append(f"[top][bot]vstack=inputs=2,setsar=1[vfit]")
+    else:
+        vf.append(fit_filter(clip.fit if clip.fit != "track" or track else "fill", W, H, src=base,
+                             track=track, clip=clip, L=L))
     chain = motion_filter(clip.motion, W, H, L) + color_filters(clip)
+    if "sharpen" in clip.enhance:
+        chain.append("unsharp=5:5:0.9:3:3:0.3")
     chain += ["tpad=stop_mode=clone:stop_duration=1", "setsar=1", "format=yuv420p"]
     vf.append("[vfit]" + ",".join(chain) + "[v0]")
 
@@ -304,6 +335,8 @@ def render_segment(clip: Clip, m: dict, src: Path, dest: Path, W: int, H: int, f
                   f"format=yuv420p[br{k}]")
         vf.append(f"{cur}[br{k}]overlay=0:0:eof_action=pass:enable='between(t,{b.at:.3f},{b.at + dur:.3f})'[vb{k}]")
         cur = f"[vb{k}]"
+    if clip.pip and opts.get("pip"):
+        cur = _pip(vf, add_input, clip, opts["pip"], cur, W, H, L, fps, retime, workdir)
     vf.append(f"{cur}null[v]")
 
     if clip.keep_audio and m.get("has_audio") and m["kind"] == "video":
@@ -329,6 +362,70 @@ def render_segment(clip: Clip, m: dict, src: Path, dest: Path, W: int, H: int, f
 
 # ----------------------------------------------------------------- whole edit
 
+def _has_filter(name: str) -> bool:
+    if not hasattr(_has_filter, "names"):
+        import subprocess
+        out = subprocess.run([ff.binary("ffmpeg"), "-hide_banner", "-filters"], capture_output=True, text=True).stdout
+        _has_filter.names = {line.split()[1] for line in out.splitlines() if len(line.split()) > 2}
+    return name in _has_filter.names
+
+
+def stabilize_filters(src, clip: Clip, workdir: Path, stem: str) -> list:
+    """vid.stab two-pass when ffmpeg has it (smooth, like a gimbal), deshake otherwise."""
+    if _has_filter("vidstabdetect"):
+        trf = f"{stem}.trf"
+        ff.run(["-ss", f"{clip.start:.3f}", "-t", f"{clip.end - clip.start:.3f}", "-i", src,
+                "-vf", f"vidstabdetect=shakiness=6:accuracy=12:result={trf}", "-f", "null", "-"], cwd=workdir)
+        return [f"vidstabtransform=input={trf}:smoothing=18:zoom=4:optzoom=0", "unsharp=5:5:0.6:3:3:0.3"]
+    return ["deshake=rx=24:ry=24:edge=mirror", "scale=iw*1.05:ih*1.05", "crop=iw/1.05:ih/1.05"]
+
+
+def _bubble_masks(size: int, shape: str, workdir: Path):
+    """Alpha mask and white ring PNGs for the facecam bubble."""
+    from PIL import Image, ImageDraw
+    mask_p, ring_p = workdir / f"pip_{shape}_{size}_m.png", workdir / f"pip_{shape}_{size}_r.png"
+    if not mask_p.exists():
+        big = size * 4
+        m = Image.new("L", (big, big), 0)
+        r = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+        dm, dr = ImageDraw.Draw(m), ImageDraw.Draw(r)
+        ring = max(8, big // 40)
+        if shape == "circle":
+            dm.ellipse((ring, ring, big - ring, big - ring), fill=255)
+            dr.ellipse((ring // 2, ring // 2, big - ring // 2, big - ring // 2), outline=(255, 255, 255, 255), width=ring)
+        else:
+            rad = big // 6
+            dm.rounded_rectangle((ring, ring, big - ring, big - ring), rad, fill=255)
+            dr.rounded_rectangle((ring // 2, ring // 2, big - ring // 2, big - ring // 2), rad,
+                                 outline=(255, 255, 255, 255), width=ring)
+        m.resize((size, size), Image.LANCZOS).save(mask_p)
+        r.resize((size, size), Image.LANCZOS).save(ring_p)
+    return mask_p.name, ring_p.name
+
+
+def _pip(vf, add_input, clip: Clip, pip_opts, cur: str, W: int, H: int, L: float, fps: int, retime: str,
+         workdir: Path) -> str:
+    path, face = pip_opts
+    p = clip.pip
+    size = int(min(W, H) * max(0.15, min(0.5, p.size))) // 2 * 2
+    margin = int(min(W, H) * 0.04)
+    x = margin if "left" in p.position else W - size - margin
+    y = margin if "top" in p.position else H - size - int(H * (0.2 if H > W else 0.05)) - margin
+    mask, ring = _bubble_masks(size, p.shape, workdir)
+    ci = add_input("-ss", f"{max(0, clip.start + p.offset):.3f}", "-t", f"{clip.end - clip.start:.3f}", "-i", path)
+    mi = add_input("-loop", "1", "-t", f"{L + 0.5:.3f}", "-i", mask)
+    ri = add_input("-loop", "1", "-t", f"{L + 0.5:.3f}", "-i", ring)
+    cx, cy = face or (0.5, 0.4)
+    # square crop centred on the face, a little headroom above it
+    crop = (f"crop='min(iw,ih)*0.8':'min(iw,ih)*0.8':"
+            f"'clip({cx:.3f}*iw-min(iw,ih)*0.4,0,iw-min(iw,ih)*0.8)':'clip({cy:.3f}*ih-min(iw,ih)*0.35,0,ih-min(iw,ih)*0.8)'")
+    vf.append(f"[{ci}:v]{retime},{crop},scale={size}:{size},setsar=1,format=yuva420p[cam]")
+    vf.append(f"[{mi}:v]format=gray,setsar=1[cmask];[cam][cmask]alphamerge[camc]")
+    vf.append(f"{cur}[camc]overlay={x}:{y}:eof_action=pass[pv1]")
+    vf.append(f"[{ri}:v]format=rgba[ring];[pv1][ring]overlay={x}:{y}:shortest=0[pv2]")
+    return "[pv2]"
+
+
 def mask_key(clip: Clip) -> str:
     return f"{clip.media_id}:{clip.start:.3f}:{clip.end:.3f}"
 
@@ -350,6 +447,21 @@ def _segment_opts(clip: Clip, plan: EditPlan, media: dict, media_dir: Path, extr
             brolls.append((b, str(media_dir / bm["file"]), bm))
     if brolls:
         opts["broll"] = brolls
+    skin = (extras.get("skins") or {}).get(mask_key(clip))
+    if clip.beauty > 0.01 and skin:
+        opts["skin"] = str(skin)
+    if clip.pip:
+        pm = media.get(clip.pip.media_id)
+        if pm and pm["kind"] == "video":
+            track = (extras.get("faces_all") or {}).get(clip.pip.media_id) or []
+            face = None
+            if track:
+                face = (sum(t[1] for t in track) / len(track), sum(t[2] for t in track) / len(track))
+            opts["pip"] = (str(media_dir / pm["file"]), face)
+    if clip.split_with:
+        sm = media.get(clip.split_with)
+        if sm and sm["kind"] == "video":
+            opts["split"] = (str(media_dir / sm["file"]), sm, (extras.get("faces_all") or {}).get(clip.split_with))
     audio = (extras.get("bg_audio") or {}).get(clip.media_id)
     if audio:
         opts["audio"] = str(audio)
@@ -377,9 +489,12 @@ def render(plan: EditPlan, media: dict, media_dir: Path, workdir: Path, out_path
     n = len(plan.clips)
     for i, clip in enumerate(plan.clips):
         m = media[clip.media_id]
-        track = (extras.get("faces") or {}).get(clip.media_id) if clip.fit == "track" else None
+        track = ((extras.get("faces") or {}).get(clip.media_id) or (extras.get("faces_all") or {}).get(clip.media_id)
+                 if clip.fit == "track" or clip.split_with else None)
         opts = _segment_opts(clip, plan, media, media_dir, extras)
-        key_opts = {k: (v if k != "broll" else [(b.model_dump(), p) for b, p, _m in v]) for k, v in opts.items()}
+        key_opts = {k: (v if k not in ("broll", "split") else
+                        ([(b.model_dump(), p) for b, p, _m in v] if k == "broll" else [v[0], v[2]]))
+                    for k, v in opts.items()}
         key = segment_key(clip, m, W, H, fps, quality, track, key_opts)
         seg = cache / f"seg_{key}.mp4"
         if not seg.exists():
@@ -468,8 +583,13 @@ def _join(plan, media, media_dir, segs, workdir, out_path, W, H, fps, quality, e
         cur_v, cur_a = ov, oa
     total = round(cur_len, 3)
 
-    # Emphasis punch-ins, beat effects, then all text in one ASS pass
-    vf = emphasis_filters(extras.get("emphasis"), W, H)
+    # Look (LUT), emphasis punch-ins, beat effects, then all text in one ASS pass
+    vf = []
+    if extras.get("lut") and Path(extras["lut"]).exists():
+        lut_name = f"look_{Path(extras['lut']).stem}.cube"
+        shutil.copy(extras["lut"], workdir / lut_name)
+        vf.append(f"lut3d=file={lut_name}:interp=tetrahedral")
+    vf += emphasis_filters(extras.get("emphasis"), W, H)
     vf += beat_filters(plan.beat_fx, extras.get("beat"), plan.beat_fx_every, W, H, total)
     ass_name = f"{out_path.stem}.ass"
     if subs.write(plan, W, H, workdir / ass_name, extras.get("words"), extras.get("key_words") or ()):

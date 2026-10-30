@@ -143,6 +143,26 @@ def person_masks(plan: EditPlan, media: dict, media_dir: Path, workdir: Path, st
     return masks, []
 
 
+def skin_masks(plan: EditPlan, media: dict, media_dir: Path, workdir: Path, step=None):
+    """Facial-skin masks for clips with the beauty filter on."""
+    from . import people
+    from .render import mask_key
+    need = [c for c in plan.clips if c.beauty > 0.01]
+    if not need:
+        return {}, []
+    if not people.available():
+        return {}, ["Filtrul beauty are nevoie de MediaPipe (pip install mediapipe)."]
+    out = {}
+    for i, clip in enumerate(need):
+        m = media[clip.media_id]
+        if step:
+            step(f"Filtru beauty: găsesc fața în {m['name']} ({i + 1}/{len(need)})")
+        dest = workdir / "masks" / f"skin_{mask_key(clip).replace(':', '_')}.mkv"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        out[mask_key(clip)] = people.skin_mask_video(media_dir / m["file"], m, clip.start, clip.end - clip.start, dest)
+    return out, []
+
+
 def prepare(plan: EditPlan, analysis: dict, workdir: Path, eleven_key=None, voice=None, step=None,
             media: dict | None = None, media_dir: Path | None = None):
     """Build the render extras dict; returns (extras, issues)."""
@@ -158,9 +178,13 @@ def prepare(plan: EditPlan, analysis: dict, workdir: Path, eleven_key=None, voic
     extras["key_words"] = stressed_words(plan, analysis)
     if plan.sfx:
         extras["sfx"] = sfx_cues(plan)
+    extras["faces_all"] = {mid: (info or {}).get("faces") or [] for mid, info in analysis.items()}
     if media is not None and media_dir is not None:
         masks, more = person_masks(plan, media, media_dir, workdir, step)
         extras["masks"] = masks
+        issues += more
+        skins, more = skin_masks(plan, media, media_dir, workdir, step)
+        extras["skins"] = skins
         issues += more
     if plan.caption_style != "none" and not words:
         if not speech.available():
