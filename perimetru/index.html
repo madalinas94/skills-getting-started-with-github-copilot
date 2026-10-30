@@ -584,6 +584,10 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
   const opCode = (e) => { const d = parseD(e.start); return `OP-${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, "0")}-${(e.cc || "XX")}`; };
   const matchesQ = (...parts) => { const q = S.f.q.trim().toLowerCase(); if (!q) return true; return parts.join(" ").toLowerCase().includes(q); };
   const li = (kw, type = "content") => `https://www.linkedin.com/search/results/${type}/?keywords=${encodeURIComponent(kw)}`;
+  // WhatsApp click-to-chat: needs an international number; works only if that number uses WhatsApp
+  const waNum = (ph) => { let d = String(ph || "").split(/[·,;/]| or /)[0].replace(/[^\d+]/g, ""); if (d.startsWith("00")) d = "+" + d.slice(2); return d.startsWith("+") && d.length >= 9 ? d.slice(1) : ""; };
+  const waText = (name) => `Hello${name ? " " + name.split(" ")[0] : ""}, this is ${S.config?.sender && S.config.sender !== "The Platinum CPO Team" ? S.config.sender + " from " : ""}${S.config?.company || "our company"}. We provide discreet close protection plus yachts, luxury cars, exclusive venues and private travel through one point of contact. Would you be open to a short call this week?`;
+  const waBtn = (ph, name, cls = "copy") => waNum(ph) ? `<a class="${cls}" href="https://wa.me/${waNum(ph)}?text=${encodeURIComponent(waText(name))}" target="_blank" rel="noopener" title="Deschide WhatsApp cu mesajul pregătit">WhatsApp</a>` : "";
   const salesNav = (kw) => `https://www.linkedin.com/sales/search/people?keywords=${encodeURIComponent(kw)}`;
   // LinkedIn connection notes stay under the 300-character limit
   const CONNECT_NOTES = {
@@ -787,7 +791,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
       <div style="min-width:0"><div class="nm">${esc(c.name || c.role)}</div><div class="rl">${esc(c.name ? c.role : ROLE_CATS[c.roleCat] || "")}${o ? ` · <button class="tag" data-act="open-org" data-id="${esc(o.id)}">${esc(o.name)}</button>` : ""}</div></div>
       <div class="ch">
         ${c.email ? `<span class="mono">${esc(c.email)}<button class="copy" data-act="copy-text" data-v="${esc(c.email)}">copiază</button></span>` : `<span class="note">fără e-mail public</span>`}
-        ${c.phone ? `<span class="mono">${esc(c.phone)}<button class="copy" data-act="copy-text" data-v="${esc(c.phone)}">copiază</button></span>` : ""}
+        ${c.phone ? `<span class="mono">${esc(c.phone)}<button class="copy" data-act="copy-text" data-v="${esc(c.phone)}">copiază</button>${waBtn(c.phone, c.name)}</span>` : ""}
       </div>
       <div class="ch"><div class="row">${status}<span class="tag">${esc(ROLE_CATS[c.roleCat] || "Contact")}</span></div>${c.source ? `<a class="note" href="${esc(c.source)}" target="_blank" rel="noopener" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">↗ sursa (${esc(fmtD(c.verified))})</a>` : ""}</div>
       <div class="row">${c.email && o && !o.dnc ? `<button class="btn primary sm" data-act="draft-contact" data-id="${esc(c.id)}">Scrie e-mail</button>` : ""}${c.name ? `<a class="btn ghost sm" href="${li(`${c.name} ${o?.name || ""}`, "people")}" target="_blank" rel="noopener">LinkedIn</a>` : ""}<button class="btn danger sm" data-act="gdpr-del" data-id="${esc(c.id)}">Șterge (GDPR)</button></div>
@@ -906,6 +910,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
       <a class="btn primary" href="${gmailUrl(d)}" target="_blank" rel="noopener">Deschide în Gmail</a>
       <a class="btn" href="${outlookUrl(d)}" target="_blank" rel="noopener">Deschide în Outlook</a>
       <button class="btn" data-act="copy" data-id="${d.id}">Copiază textul</button>
+      ${(() => { const ph = S.contacts.find(x => x.id === d.contactId)?.phone || orgById(d.orgId)?.phone; return waBtn(ph, S.contacts.find(x => x.id === d.contactId)?.name, "btn"); })()}
       <span class="spacer"></span><button class="btn primary" data-act="mark-sent" data-id="${d.id}">Am trimis</button>`;
     else if (d.status === "trimis") foot = `
       <span class="note">Trimis ${esc(fmtD(d.sentAt))}${d.followUpAt ? ` · follow-up ${esc(fmtD(d.followUpAt))}` : ""}${d.repliedAt ? ` · răspuns ${esc(fmtD(d.repliedAt))}` : ""}</span>
@@ -1314,7 +1319,7 @@ Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, 
   }
 
   // ---------- Oportunități: joburi, licitații, colaborări temporare ----------
-  const OPP_KINDS = { job: "Joburi CP", yacht: "Yachturi", tender: "Licitații", subcontract: "Colaborări temporare", network: "Târguri & rețele" };
+  const OPP_KINDS = { job: "Joburi CP", yacht: "Yachturi", tender: "Licitații", subcontract: "Colaborări temporare", network: "Târguri & rețele", award: "Premii", press: "Presă" };
   const OPP_STAGES = [["nou", "Nou"], ["aplicat", "Am aplicat / ofertat"], ["discutie", "În discuție"], ["castigat", "Câștigat"], ["ignorat", "Ignorat"], ["expirat", "Expirat"]];
   // live searches on the job boards and tender portals themselves: each opens the current results, not a stored copy
   const OPP_SOURCES = [
@@ -1342,7 +1347,7 @@ Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, 
           ${o.contactEmail ? `<p class="mono" style="margin:0 0 6px">${esc(o.contactEmail)}</p>` : ""}
           <div class="row"><select class="select" data-act="opp-stage" data-id="${id}" aria-label="Stadiu">${OPP_STAGES.map(([k, v]) => `<option value="${k}" ${(o.stage || "nou") === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
         </div>
-        <div class="draft-foot">${o.url ? `<a class="btn" href="${esc(o.url)}" target="_blank" rel="noopener">Deschide sursa${o.sourceLabel ? " · " + esc(o.sourceLabel) : ""}</a>` : ""}<span class="spacer"></span><button class="btn primary" data-act="opp-draft" data-id="${id}">${o.kind === "tender" ? "Pregătește manifestarea de interes" : "Pregătește răspunsul"}</button></div></article>`;
+        <div class="draft-foot">${o.url ? `<a class="btn" href="${esc(o.url)}" target="_blank" rel="noopener">Deschide sursa${o.sourceLabel ? " · " + esc(o.sourceLabel) : ""}</a>` : ""}<span class="spacer"></span><button class="btn primary" data-act="opp-draft" data-id="${id}">${{ tender: "Pregătește manifestarea de interes", award: "Pregătește textul de înscriere", press: "Pregătește pitch-ul" }[o.kind] || "Pregătește răspunsul"}</button></div></article>`;
     };
     return `
       <div class="view-head"><div class="grow"><div class="eyebrow">Oportunități</div><h1>Unde cineva plătește deja pentru protecție</h1>
@@ -1354,9 +1359,21 @@ Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, 
       ${!S.ready ? emptyLoading() : list.length ? `<div class="drafts">${list.map(card).join("")}</div>` : `<div class="empty"><h3>Nimic aici încă</h3><p>Scanerul rulează din două în două zile. Poți apăsa „Caută acum” sau poți căuta direct în sursele de mai jos.</p></div>`}
       <div class="panel" style="margin-top:20px"><h3>Căutare live: sute de anunțuri, actualizate de site-uri</h3><p class="muted" style="margin:0 0 8px">Fiecare link deschide rezultatele de azi direct pe site. Ce vă interesează, adăugați cu „+ Adaugă” ca să-l urmăriți aici.</p>${OPP_SOURCES.map(([g, l]) => `<p style="margin:6px 0"><b>${g}:</b> ${l.map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join(" · ")}</p>`).join("")}</div>`;
   }
+  async function awardPressDraft(o) {
+    const c = S.config || {}, award = o.kind === "award";
+    const subject = award ? `Award entry: ${o.title}` : `Story idea for ${o.org || o.title}: protecting the people at the world's most exclusive events`;
+    const body = award
+      ? `[Text de înscriere: copiați-l în formularul premiului și ajustați-l la categorie. Nu trimiteți acest e-mail.]\n\nSUMMARY (about 100 words)\n${c.company || "Our company"} is a UK-headquartered close protection company operating across Europe, the Middle East and worldwide. Our officers trained in Israel, Poland and the USA and work in English, Arabic, French, Russian and Romanian. We protect royal families, UHNW families, global executives and Hollywood talent, and have delivered security at the Cannes and Venice film festivals and at the amfAR, Better World Fund, Global Gift and iSuccess galas, combining close protection with secure transport and luxury logistics through one point of contact.\n\nWHY WE DESERVE THIS AWARD (about 300 words)\n- Results: [numbers you can share: missions, events, countries, zero incidents]\n- Innovation: [e.g. integrated protection plus luxury logistics; multilingual teams]\n- Client feedback: Better World Fund thanked the team in writing after the Social Impact Gala at the 78th Festival de Cannes (May 2025).\n\nCASE STUDY (about 300 words)\n[One mission described without naming the client: context, risks, plan, outcome.]`
+      : `Dear ${o.org ? o.org + " editorial team" : "Editor"},\n\nI lead ${"{{company}}"}, a UK-headquartered close protection company whose teams have worked the Cannes and Venice film festivals and the amfAR, Better World Fund and Global Gift galas.\n\nI would like to offer your readers an expert piece or interview on a subject we see every season: how the most exclusive events, from red carpets to yacht parties and private weddings, are quietly protected, and what families and their offices should plan before travelling to Cannes, Monaco, St. Moritz or the Gulf. We can share practical advice without naming clients, and photographs from our work at public events.\n\nWould this be of interest for an upcoming issue?\n\nKind regards,\n{{signature}}`;
+    if (await put("drafts", newId("dr"), { oppId: o.id, orgId: "", to: o.contactEmail || "", subject, body, lang: "en", status: "de_aprobat", step: 1, kind: award ? "premiu" : "presă", rationale: `${award ? "Premiu" : "Presă"}: ${o.title}${o.deadline ? " · termen " + fmtD(o.deadline) : ""}. ${award ? "Textul se copiază în formularul de înscriere de pe site." : o.contactEmail ? "" : "Nu există e-mail public: trimiteți prin formularul publicației sau adăugați adresa."}`, createdAt: new Date().toISOString(), by: "app" })) {
+      if ((o.stage || "nou") === "nou") await patch("opps", o.id, { stage: "aplicat" });
+      S.f.sub = "de_aprobat"; location.hash = "#approvals"; toast(award ? "Textul de înscriere e în „De aprobat”" : "Pitch-ul e în „De aprobat”");
+    }
+  }
   async function oppDraft(o) {
     const c = S.config || {};
     const isTender = o.kind === "tender", isJob = ["job", "yacht"].includes(o.kind);
+    if (o.kind === "award" || o.kind === "press") return awardPressDraft(o);
     const body = isTender
       ? `Dear Sir or Madam,\n\nWe write regarding "${o.title}"${o.org ? ` published by ${o.org}` : ""}. {{company}} would like to register its interest and request the full tender documents and clarification timetable.\n\nWe are a UK-headquartered close protection company operating across Europe, the Middle East and worldwide, with internationally licensed officers, multilingual teams (English, Arabic, French, Russian, Romanian), risk assessment, event security management and secure transportation.\n\nPlease let us know the correct procedure and point of contact for submitting our bid.\n\nKind regards,\n{{signature}}`
       : isJob
@@ -1773,7 +1790,7 @@ ${note ? "Extra instruction from the owner: " + note : ""}`, { modelTier: "defau
     const row = (o) => { const c = ct(o); const email = o.email || c.find(x => x.email)?.email || ""; const phone = o.phone || c.find(x => x.phone)?.phone || ""; const person = o.contactName ? `${o.contactName}${o.contactRole ? ", " + o.contactRole : ""}` : (c.find(x => x.name) ? `${c.find(x => x.name).name}, ${c.find(x => x.name).role}` : "");
       return `<div class="ct" style="grid-template-columns:28px minmax(0,1.3fr) minmax(0,1.2fr) minmax(0,1fr) auto"><input type="checkbox" data-luxsel="${esc(o.id)}" ${sel.has(o.id) ? "checked" : ""} aria-label="Selectează ${esc(o.name)}" ${o.dnc || !email ? "disabled" : ""}>
         <div style="min-width:0"><div class="nm">${esc(o.name)}${o.tier ? ` <span class="tag">${esc(o.tier)}</span>` : ""}</div><div class="rl">${esc(ORG_TYPES[o.type] || "")} · ${esc([o.city, ccName(o.cc)].filter(Boolean).join(", "))}</div>${o.address ? `<div class="note" style="overflow-wrap:anywhere">${esc(o.address)}</div>` : ""}</div>
-        <div class="ch">${email ? `<span class="mono">${esc(email)}<button class="copy" data-act="copy-text" data-v="${esc(email)}">copiază</button></span>` : `<span class="note">fără e-mail public</span>`}${phone ? `<span class="mono">${esc(phone)}<button class="copy" data-act="copy-text" data-v="${esc(phone)}">copiază</button></span>` : ""}</div>
+        <div class="ch">${email ? `<span class="mono">${esc(email)}<button class="copy" data-act="copy-text" data-v="${esc(email)}">copiază</button></span>` : `<span class="note">fără e-mail public</span>`}${phone ? `<span class="mono">${esc(phone)}<button class="copy" data-act="copy-text" data-v="${esc(phone)}">copiază</button>${waBtn(phone, o.contactName)}</span>` : ""}</div>
         <div class="ch">${person ? `<span>${esc(person)}</span>` : `<span class="note">fără persoană publicată</span>`}${o.website ? `<a class="note" href="${esc(o.website)}" target="_blank" rel="noopener">↗ site</a>` : ""}${(o.sources || [])[0] ? `<a class="note" href="${esc(o.sources[0].url)}" target="_blank" rel="noopener">↗ sursa</a>` : ""}</div>
         <div class="row"><button class="btn sm" data-act="dossier" data-id="${esc(o.id)}">Dosar</button>${email && !o.dnc ? `<button class="btn primary sm" data-act="lux-one" data-id="${esc(o.id)}">Colaborare</button>` : ""}</div></div>`; };
     return `
