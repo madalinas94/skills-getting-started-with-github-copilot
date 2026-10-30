@@ -137,6 +137,7 @@ main { padding-block: 28px 110px; }
 .kpi .l { margin-top: 6px; color: var(--muted); font-size: 12.5px; }
 .kpi.hot .n { color: var(--claret); }
 .kpi.gold .n { color: var(--gold); }
+h2.sec { font-family: "Bodoni Moda", serif; font-weight: 500; font-size: 24px; margin: 28px 0 12px; }
 @media (max-width: 720px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi:nth-child(3) { border-left: 0; } .kpi:nth-child(n+3) { border-top: 1px solid var(--line); } }
 
 .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
@@ -436,6 +437,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
       <a href="#signals">Semnale <span class="count" id="c-signals"></span></a>
       <a href="#approvals">De aprobat <span class="count" id="c-approvals"></span></a>
       <a href="#pipeline">Pipeline <span class="count" id="c-pipeline"></span></a>
+      <a href="#content">Conținut <span class="count" id="c-content"></span></a>
       <a href="#stats">Statistici <span class="count" id="c-stats"></span></a>
       <a href="#services">Servicii <span class="count" id="c-services"></span></a>
       <a href="#alerts">Noutăți <span class="count" id="c-alerts"></span></a>
@@ -1004,6 +1006,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
       if (adv <= 7 && daysTo(e.start) > 0 && !S.drafts.some(d => d.eventId === e.id))
         acts.push({ w: 80 - Math.max(adv, 0) + (e.tier === 1 ? 10 : 0), t: `Fereastra de advance: ${e.title}`, x: `${fmtD(e.start)} · ${e.city}, ${evCountry(e)}. ${adv <= 0 ? "Fereastra e deschisă" : `Se deschide în ${adv} zile`} și nu e niciun e-mail pregătit.`, btn: ["draft-event", e.id, "Pregătește outreach"] });
     });
+    postsDue().slice(0, 1).forEach(p => acts.push({ w: 92, t: daysTo(p.scheduledFor) < 0 ? "Postare LinkedIn întârziată" : "Postarea LinkedIn de azi", x: `${p.topic || "Postare"} · ${CHANNEL[p.channel] || CHANNEL.personal}`, go: "content", label: "Publică" }));
     const newSig = S.signals.filter(s => s.found && daysTo(s.found) >= -3);
     if (newSig.length) acts.push({ w: 70, t: `${newSig.length} semnale noi de cerere`, x: newSig.slice(0, 2).map(s => s.title).join(" · "), go: "signals", label: "Vezi" });
     S.orgs.filter(o => (o.status || "nou") === "nou" && !o.dnc && (o.score || 0) >= 80 && S.contacts.some(c => c.orgId === o.id && c.email))
@@ -1188,26 +1191,78 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
   }
 
   // ---------- Conținut LinkedIn ----------
+  const PILLARS = { teren: "Din teren", expertiza: "Expertiză", lux: "Logistică de lux", sezon: "Calendarul sezonului", echipa: "Echipa & pregătire", valori: "Discreție & valori" };
+  const CHANNEL = { personal: "Profil personal", company: "Pagina companiei" };
+  const postsDue = () => S.posts.filter(p => p.status !== "publicat" && p.scheduledFor && daysTo(p.scheduledFor) <= 0);
+  const engagement = (p) => (+p.reactions || 0) + 3 * (+p.comments || 0);
+  // next Tuesday, Wednesday and Thursday (or this week's, if still ahead)
+  function nextSlots() {
+    const out = []; let d = addDays(today(), 1);
+    while (out.length < 3) { if ([2, 3, 4].includes(d.getDay())) out.push(iso(d)); d = addDays(d, 1); }
+    return out;
+  }
   function viewContent() {
-    const list = [...S.posts].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+    const planned = S.posts.filter(p => p.status !== "publicat").sort((a, b) => (a.scheduledFor || "9").localeCompare(b.scheduledFor || "9"));
+    const done = S.posts.filter(p => p.status === "publicat").sort((a, b) => (b.postedAt || "").localeCompare(a.postedAt || ""));
+    const last30 = done.filter(p => p.postedAt && daysTo(p.postedAt) >= -30);
+    const measured = done.filter(p => p.reactions || p.comments || p.impressions);
+    const byPillar = {}; measured.forEach(p => { const k = p.pillar || "—"; (byPillar[k] ??= []).push(engagement(p)); });
+    const pillarRows = Object.entries(byPillar).map(([k, v]) => [PILLARS[k] || k, Math.round(v.reduce((a, b) => a + b, 0) / v.length), v.length]).sort((a, b) => b[1] - a[1]);
+    const evs = S.events.filter(e => live(e) && daysTo(e.start) >= 0 && daysTo(e.start) <= 45).sort((a, b) => (a.tier || 3) - (b.tier || 3)).slice(0, 3);
+    const commentLinks = [...evs.map(e => [e.title, li(e.title)]), ["Close protection", li("close protection")], ["Family office", li("family office")], ["Superyacht", li("superyacht")]];
+    const peopleLinks = [["Chief of Staff · family office", li("chief of staff family office", "people")], ["Executive Assistant · UHNW", li("executive assistant private office", "people")], ["Event director · gala", li("event director luxury gala", "people")], ["Concierge · hotel 5*", li("chef concierge", "people")]];
+    const card = (p) => {
+      const pub = p.status === "publicat", id = esc(p.id);
+      return `<article class="draft"><div class="draft-head"><h3>${esc(p.topic || "Postare")}</h3>${p.pillar ? `<span class="pill info">${esc(PILLARS[p.pillar] || p.pillar)}</span>` : ""}<span class="pill ${pub ? "ok" : p.scheduledFor && daysTo(p.scheduledFor) <= 0 ? "warn" : ""}">${pub ? "publicat " + esc(fmtD(p.postedAt)) : p.scheduledFor ? esc(fmtD(p.scheduledFor)) : "neprogramat"}</span></div>
+        <div class="draft-body">
+          ${pub ? "" : `<div class="row"><div class="field" style="flex:1"><label for="po-d-${id}">Data</label><input id="po-d-${id}" type="date" value="${esc(p.scheduledFor || "")}"></div><div class="field" style="flex:1"><label for="po-c-${id}">Unde</label><select id="po-c-${id}" class="select">${Object.entries(CHANNEL).map(([k, v]) => `<option value="${k}" ${(p.channel || "personal") === k ? "selected" : ""}>${v}</option>`).join("")}</select></div></div>`}
+          <div class="field"><label for="po-${id}">Text</label><textarea id="po-${id}" rows="9">${esc(p.text)}</textarea></div>
+          ${p.firstComment || !pub ? `<div class="field"><label for="po-f-${id}">Primul comentariu (link-ul merge aici, nu în postare)</label><input id="po-f-${id}" value="${esc(p.firstComment || "")}"></div>` : ""}
+          ${p.imageIdea ? `<p class="note" style="margin:6px 0"><b>Foto:</b> ${esc(p.imageIdea)}</p>` : ""}
+          ${p.imageUrl ? `<p style="margin:6px 0"><a href="${esc(p.imageUrl)}" target="_blank" rel="noopener"><img src="${esc(p.imageUrl)}" alt="Foto atașată" style="max-height:160px;border-radius:8px"></a></p>` : ""}
+          ${!pub && assets ? `<label class="btn" style="display:inline-block">${p.imageUrl ? "Schimbă foto" : "Atașează foto"}<input type="file" accept="image/png,image/jpeg" data-act="post-photo" data-id="${id}" hidden></label>` : ""}
+          ${pub ? `<div class="row"><div class="field" style="flex:1"><label for="po-i-${id}">Afișări</label><input id="po-i-${id}" type="number" min="0" value="${esc(p.impressions || "")}"></div><div class="field" style="flex:1"><label for="po-r-${id}">Reacții</label><input id="po-r-${id}" type="number" min="0" value="${esc(p.reactions || "")}"></div><div class="field" style="flex:1"><label for="po-m-${id}">Comentarii</label><input id="po-m-${id}" type="number" min="0" value="${esc(p.comments || "")}"></div></div>${p.url ? `<p style="margin:4px 0"><a href="${esc(p.url)}" target="_blank" rel="noopener">Vezi postarea</a></p>` : ""}` : ""}
+        </div>
+        <div class="draft-foot"><button class="btn" data-act="copy-post" data-id="${id}">Copiază</button>${p.firstComment ? `<button class="btn" data-act="copy-fc" data-id="${id}">Copiază comentariul</button>` : ""}<a class="btn" href="https://www.linkedin.com/feed/?shareActive=true" target="_blank" rel="noopener">Deschide LinkedIn</a><button class="btn" data-act="save-post" data-id="${id}">Salvează</button><span class="spacer"></span>${pub ? "" : `<button class="btn primary" data-act="post-done" data-id="${id}">Am publicat</button>`}<button class="btn danger" data-act="del-post" data-id="${id}">Șterge</button></div></article>`;
+    };
     return `
-      <div class="view-head"><div class="grow"><div class="eyebrow">Conținut · LinkedIn</div><h1>Postări care aduc clienți singuri</h1>
-        <p>Drafturi pentru profilul fratelui tău, scrise pornind de la evenimentele din radar: expertiză, discreție, logistică de lux. Le copiați, le ajustați și le publicați pe LinkedIn.</p></div>
-        ${sample ? `<button class="btn primary" data-act="gen-posts">Generează 3 postări</button>` : ""}</div>
-      ${!S.ready ? emptyLoading() : list.length ? `<div class="drafts">${list.map(p => `<article class="draft"><div class="draft-head"><h3>${esc(p.topic || "Postare")}</h3><span class="pill ${p.status === "publicat" ? "ok" : "info"}">${esc(p.status || "draft")}</span><span class="mono muted" style="margin-left:auto">${esc(fmtD((p.createdAt || "").slice(0, 10)))}</span></div><div class="draft-body"><div class="field"><label for="po-${esc(p.id)}">Text</label><textarea id="po-${esc(p.id)}">${esc(p.text)}</textarea></div></div><div class="draft-foot"><button class="btn" data-act="copy-post" data-id="${esc(p.id)}">Copiază</button><a class="btn" href="https://www.linkedin.com/feed/?shareActive=true" target="_blank" rel="noopener">Deschide LinkedIn</a><button class="btn" data-act="save-post" data-id="${esc(p.id)}">Salvează</button><span class="spacer"></span>${p.status === "publicat" ? "" : `<button class="btn primary" data-act="post-done" data-id="${esc(p.id)}">Am publicat</button>`}<button class="btn danger" data-act="del-post" data-id="${esc(p.id)}">Șterge</button></div></article>`).join("")}</div>` : `<div class="empty"><h3>Nicio postare încă</h3><p>Apasă „Generează 3 postări”. Radarul propune și el postări noi la fiecare rulare.</p></div>`}`;
+      <div class="view-head"><div class="grow"><div class="eyebrow">Conținut · LinkedIn</div><h1>Creștem LinkedIn-ul, săptămână de săptămână</h1>
+        <p>În fiecare luni dimineață, AI-ul pregătește 3 postări pentru marți, miercuri și joi, pornind de la evenimentele din radar și de la ce faceți real. Voi le aprobați, atașați o fotografie și publicați. Ziua postării apare în „Azi”.</p></div>
+        ${sample ? `<button class="btn primary" data-act="gen-posts">Pregătește săptămâna</button>` : ""}</div>
+      <div class="kpis"><div class="kpi"><div class="n">${planned.length}</div><div class="l">programate</div></div><div class="kpi"><div class="n">${last30.length}</div><div class="l">publicate în 30 de zile</div></div><div class="kpi gold"><div class="n">${measured.length ? Math.round(measured.reduce((a, p) => a + (+p.reactions || 0), 0) / measured.length) : "—"}</div><div class="l">reacții / postare</div></div><div class="kpi"><div class="n">${pillarRows[0] ? esc(pillarRows[0][0]) : "—"}</div><div class="l">tema care merge cel mai bine</div></div></div>
+      <div class="panel"><h3>Rutina de 15 minute pe zi</h3>
+        <ol style="margin:0;padding-left:20px;line-height:1.8">
+          <li>${postsDue().length ? `<b>Publicați postarea de azi</b> (mai jos), apoi lăsați primul comentariu cu link-ul.` : "Nicio postare azi: zi de interacțiune."}</li>
+          <li>Comentați cu ceva util la 5 postări din nișă: ${commentLinks.map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join(" · ")}</li>
+          <li>Trimiteți 5 invitații de conectare, cu o notă scurtă: ${peopleLinks.map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join(" · ")}</li>
+          <li>Răspundeți în prima oră la fiecare comentariu de la postarea voastră.</li>
+        </ol></div>
+      ${!S.ready ? emptyLoading() : `
+        <h2 class="sec">Programate</h2>
+        ${planned.length ? `<div class="drafts">${planned.map(card).join("")}</div>` : `<div class="empty"><h3>Nicio postare programată</h3><p>Apasă „Pregătește săptămâna”. Lunea dimineață se pregătesc singure.</p></div>`}
+        ${done.length ? `<h2 class="sec">Publicate</h2><p class="muted">Treceți afișările, reacțiile și comentariile după 2–3 zile; așa aflăm ce teme aduc cei mai mulți oameni.</p><div class="drafts">${done.slice(0, 12).map(card).join("")}</div>` : ""}
+        ${pillarRows.length ? `<div class="panel"><h3>Ce merge</h3>${pillarRows.map(([k, v, n]) => `<div class="row" style="justify-content:space-between"><span>${esc(k)}</span><span class="mono">${v} interacțiuni medii · ${n} postări</span></div>`).join("")}</div>` : ""}`}`;
   }
   async function genPosts(btn) {
     if (!sample) return;
     btn.disabled = true; btn.textContent = "Scriu… (30–60 secunde)";
-    const evs = S.events.filter(e => live(e) && daysTo(e.start) <= 120).sort((a, b) => (a.tier || 3) - (b.tier || 3)).slice(0, 12).map(e => `- ${e.title}, ${range(e.start, e.end)}, ${e.city} (${evCountry(e)})`).join("\n");
-    const c = S.config || {};
+    const evs = S.events.filter(e => live(e) && daysTo(e.start) >= 0 && daysTo(e.start) <= 120).sort((a, b) => (a.tier || 3) - (b.tier || 3)).slice(0, 12).map(e => `- ${e.title}, ${range(e.start, e.end)}, ${e.city} (${evCountry(e)})`).join("\n");
+    const recent = [...S.posts].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")).slice(0, 12).map(p => `- ${p.topic} (${p.pillar || ""})`).join("\n");
+    const slots = nextSlots(), c = S.config || {};
     try {
-      const r = await sample.json(`Write 3 LinkedIn posts for the managing director of ${c.company || "a close protection company based in Romania"} that also arranges luxury logistics through partners (${services().filter(s => s.id !== "cp").map(s => s.name).join(", ")}). Language: ${S.lang === "en" ? "English" : "English (international audience)"}. Each post 90-160 words, first-person, calm and senior, practical insight (advance work, discretion, travel logistics, event security), no client names, no fear-mongering, no hashtag spam (max 3 hashtags), no emojis. Anchor each post on one of these public events:\n${evs}\n${c.pitch ? "Differentiators: " + c.pitch : ""}\nReturn JSON {"posts":[{"topic": short Romanian title, "text": post}]}.`, { modelTier: "default" });
+      const r = await sample.json(`You write LinkedIn posts for ${c.company || "a close protection company"}, to grow its audience among family offices, private offices (Chief of Staff, EA/PA), event organisers, luxury hotels and yacht/jet brokers.
+Verified facts you may use (do not add any other facts, numbers, clients or claims): ${c.pitch || "discreet close protection and luxury logistics"}
+Services: ${services().map(s => s.name).join(", ")}.
+Upcoming public events from our radar:\n${evs}
+Recent posts (do not repeat these topics):\n${recent || "none"}
+Write 3 posts, each on a different pillar from: teren (behind the scenes of an event type you have worked), expertiza (practical advice: advance work, venue arrivals, travel risk, digital privacy, vetting staff), lux (luxury logistics: fleet, jets, yachts, hotels, access), sezon (an upcoming public event and what principals should plan), echipa (training and team standards), valori (discretion, trust).
+Rules: English; 120-200 words; first line is a short hook that makes people click "see more"; short paragraphs; calm senior voice; no client names or identifiable clients; no fear-mongering; no emojis; end with a question or a soft invitation to message; at most 3 relevant hashtags at the end. Suggest a photo of the kind a close protection team would have (team at a red carpet, luxury car arrival, training) without naming people. firstComment: one line with ${c.website || "the company website"}.
+Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, "text": post, "imageIdea": Romanian photo suggestion, "firstComment": text}]}.`, { modelTier: "default" });
       const posts = (r?.posts || []).slice(0, 3);
-      for (const p of posts) await put("posts", newId("po"), { topic: p.topic || "", text: p.text || "", status: "draft", createdAt: new Date().toISOString(), by: "ai" });
-      toast(posts.length ? "Postări pregătite" : "Nu am primit postări.");
+      for (const [i, p] of posts.entries()) await put("posts", newId("po"), { topic: p.topic || "", pillar: PILLARS[p.pillar] ? p.pillar : "", text: p.text || "", imageIdea: p.imageIdea || "", firstComment: p.firstComment || "", channel: "personal", scheduledFor: slots[i], status: "draft", createdAt: new Date().toISOString(), by: "ai" });
+      toast(posts.length ? "Săptămâna e pregătită" : "Nu am primit postări.");
     } catch (err) { toast(err?.code === "rate_limited" ? "AI-ul e ocupat." : "Nu am putut genera acum."); }
-    btn.disabled = false; btn.textContent = "Generează 3 postări";
+    btn.disabled = false; btn.textContent = "Pregătește săptămâna";
   }
 
   // ---------- Statistici ----------
@@ -1795,8 +1850,14 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
       case "edit-deal": openDeal(S.deals.find(x => x.id === id)); break;
       case "gen-posts": genPosts(el); break;
       case "copy-post": { const t = $(`#po-${id}`)?.value || ""; try { await navigator.clipboard.writeText(t); toast("Copiat"); } catch (e) { $(`#po-${id}`)?.select(); toast("Selectat. Apasă Ctrl/Cmd+C."); } break; }
-      case "save-post": if (await patch("posts", id, { text: $(`#po-${id}`)?.value || "" })) toast("Salvat"); break;
-      case "post-done": if (await patch("posts", id, { status: "publicat", postedAt: iso(today()) })) toast("Marcat publicat"); break;
+      case "save-post": {
+        const v = (k) => $(`#po-${k}-${id}`)?.value, upd = { text: $(`#po-${id}`)?.value || "" };
+        if (v("d") !== undefined) upd.scheduledFor = v("d"); if (v("c") !== undefined) upd.channel = v("c"); if (v("f") !== undefined) upd.firstComment = v("f").trim();
+        for (const [k, f] of [["i", "impressions"], ["r", "reactions"], ["m", "comments"]]) if (v(k) !== undefined) upd[f] = +v(k) || 0;
+        if (await patch("posts", id, upd)) toast("Salvat"); break;
+      }
+      case "copy-fc": { const t = $(`#po-f-${id}`)?.value || S.posts.find(x => x.id === id)?.firstComment || ""; try { await navigator.clipboard.writeText(t); toast("Comentariu copiat"); } catch (e) { toast("Nu am putut copia."); } break; }
+      case "post-done": { const url = (prompt("Link-ul postării (opțional, ca să o găsiți mai târziu):") || "").trim(); if (await patch("posts", id, { status: "publicat", postedAt: iso(today()), text: $(`#po-${id}`)?.value || "", ...(url ? { url } : {}) })) toast("Marcat publicat. Treceți reacțiile peste 2–3 zile."); break; }
       case "del-post": try { await db.collection("posts").doc(id).delete(); toast("Șters"); } catch (e) { toast("Nu s-a șters."); } break;
       case "dossier": openDossier(id); break;
       case "proposal-org": openProposal({ orgId: id }); break;
@@ -1881,6 +1942,11 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
   document.addEventListener("change", async (ev) => {
     const el = ev.target;
     const map = { fRegion: "region", fHorizon: "horizon", fNeed: "need", fCc: "cc" };
+    if (el.dataset?.act === "post-photo" && el.files?.[0] && assets) {
+      const f = el.files[0]; if (f.size > 8e6) { toast("Fotografia trebuie să fie sub 8 MB."); return; }
+      try { const a = await assets.upload(f); if (await patch("posts", el.dataset.id, { imageUrl: a.url, imageId: a.id })) toast("Foto atașată"); } catch (e) { toast("Nu am putut încărca fotografia."); }
+      return;
+    }
     if (el.id === "uhCc") { S.uh.cc = el.value; render(); return; }
     if (el.id === "uhMin") { S.uh.min = +el.value; render(); return; }
     if (el.id === "pplCc") { S.pplCc = el.value; render(); return; }
@@ -1912,7 +1978,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
   $("#langBtn").addEventListener("click", () => { S.lang = S.lang === "en" ? "ro" : "en"; try { localStorage.setItem("perimetru.lang", S.lang); } catch (e) {} document.documentElement.lang = S.lang; render(); translateDom(document.querySelector("header.top")); translateDom($("#arrival")); });
 
   // ---------- render ----------
-  const VIEWS = { uhnwi: viewUhnwi, luxury: viewLuxury, today: viewToday, stats: viewStats, radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
+  const VIEWS = { content: viewContent, uhnwi: viewUhnwi, luxury: viewLuxury, today: viewToday, stats: viewStats, radar: viewRadar, countries: viewCountries, contacts: viewContacts, targets: viewTargets, signals: viewSignals, approvals: viewApprovals, pipeline: viewPipeline, services: viewServices, alerts: viewAlerts, setup: viewSetup };
   const current = () => { const h = location.hash.slice(1); return VIEWS[h] ? h : "today"; };
   function render() {
     const v = current();
@@ -1932,6 +1998,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     $("#c-signals").textContent = S.signals.length || "";
     $("#c-approvals").textContent = S.drafts.filter(d => d.status === "de_aprobat").length || "";
     $("#c-pipeline").textContent = dueFollowUps().length || "";
+    $("#c-content").textContent = postsDue().length || "";
     $("#c-alerts").textContent = unread || "";
     $("#c-today").textContent = S.ready ? (todayActions().length || "") : "";
     $("#langBtn").textContent = S.lang === "en" ? "RO" : "EN";
