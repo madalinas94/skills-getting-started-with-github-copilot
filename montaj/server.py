@@ -20,8 +20,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from engine import (agent, analyze, autoplan, dub, export, ff, presets, render, shorts, speech, styles, textedit,
-                    thumb, timing, validate)
+from engine import (agent, analyze, autoplan, dub, export, ff, multicam, presets, render, shorts, speech, styles,
+                    textedit, thumb, timing, validate)
 from engine.plan import ASPECT_SIZE, EditPlan, timeline, total_length
 
 try:
@@ -108,7 +108,7 @@ DEFAULT_SETTINGS = {"preset": presets.DEFAULT, "style_id": "", "aspect": "", "du
                     "title": "", "outro": "", "caption_style": "", "beat_fx": "", "auto_color": True,
                     "music_align": True, "self_review": True, "voiceover": False, "voiceover_text": "",
                     "tighten": False, "voice_enhance": False, "emphasis_zoom": False, "sfx": False,
-                    "auto_broll": False, "background": ""}
+                    "auto_broll": False, "background": "", "lut_file": ""}
 
 
 def new_project(name: str) -> dict:
@@ -230,6 +230,11 @@ def render_plan(project: dict, plan: EditPlan, out: Path, quality: str, step, lo
     d = pdir(project["id"])
     extras, issues = timing.prepare(plan, project["analysis"], d / "work", eleven_key(), voice_id(),
                                     lambda msg: step(lo, msg), media_map(project), d / "media")
+    mc = project.get("multicam") or {}
+    if mc.get("aligned") and any(c.media_id in mc["aligned"] for c in plan.clips):
+        extras["bg_audio"] = {mid: p for mid, p in mc["aligned"].items() if Path(p).exists()}
+    if project["settings"].get("lut_file"):
+        extras["lut"] = str(d / "luts" / project["settings"]["lut_file"])
     extras.update(override or {})
     info = render.render(plan, media_map(project), d / "media", d / "work", out, quality,
                          lambda p, msg="": step(lo + (hi - lo) * p, msg or None), extras)
@@ -499,6 +504,7 @@ class ProjectSettings(BaseModel):
     sfx: bool = False
     auto_broll: bool = False
     background: str = ""
+    lut_file: str = ""
 
 
 @app.put("/api/projects/{pid}/settings")
@@ -758,6 +764,9 @@ def export_final(pid: str, body: ExportIn):
         (out / f"{base}.edl").write_text(export.edl(plan, media), encoding="utf-8")
         (out / f"{base}.srt").write_text(export.srt(plan), encoding="utf-8")
         (out / f"{base}_plan.json").write_text(plan.model_dump_json(indent=1), encoding="utf-8")
+        lut = project["settings"].get("lut_file")
+        if lut and (d / "luts" / lut).exists():  # the look, ready for DaVinci Resolve
+            shutil.copy(d / "luts" / lut, out / f"{base}_look.cube")
         step(0.92, "Scriu textele pentru postare (descriere, hashtag-uri, hook-uri)")
         copy = None
         if api_key():
@@ -1002,6 +1011,103 @@ def text_cut(pid: str, body: TextCutIn):
     plan, issues = validate.validate(plan, media_map(project), project["analysis"])
     set_plan(pid, plan, issues, f"Editare prin text ({n} cuvinte tăiate)")
     return {"job": start_job(pid, "preview", lambda step: render_preview(pid, step, 0.0))}
+
+
+# ----------------------------------------------------------------- API: multicam podcast
+
+class MulticamIn(BaseModel):
+    cams: list[str]
+    master: str = ""
+    layout: str = "switch"  # "switch" or "split"
+    aspect: str = ""
+
+
+@app.post("/api/projects/{pid}/multicam")
+def make_multicam(pid: str, body: MulticamIn):
+    project = load(pid)
+    cams = [next((m for m in project["media"] if m["id"] == c and m["kind"] == "video" and m.get("has_audio")), None)
+            for c in body.cams]
+    if len(cams) < 2 or None in cams:
+        raise HTTPException(400, "Alege 2 sau 3 camere (video-uri cu sunet) din același podcast.")
+    cams = cams[:3]
+
+    def work(step):
+        nonlocal project
+        project = ensure_analysis(pid, step, 0.0, 0.3)
+        d = pdir(pid)
+        paths = [d / "media" / m["file"] for m in cams]
+        step(0.32, "Sincronizez camerele după sunet")
+        offs = multicam.offsets(paths)
+        common = min(m["duration"] - o for m, o in zip(cams, offs)) - max(0.0, -min(offs))
+        start = max(0.0, -min(offs))
+        step(0.45, "Ascult cine vorbește pe fiecare cameră")
+        seq = multicam.speakers(paths, offs, start + common)
+        seq = seq[int(start / 0.5):]
+        master = next((i for i, m in enumerate(cams) if m["id"] == body.master), 0)
+        wide = 2 if len(cams) == 3 else None
+        aspect = body.aspect or project["settings"].get("aspect") or "9:16"
+        plan = multicam.build_plan(cams, [o + start for o in offs], common, seq, 0.5, body.layout, aspect,
+                                   project["settings"].get("title") or "Podcast", wide)
+        for k in ("tighten", "emphasis_zoom", "sfx"):
+            if project["settings"].get(k):
+                setattr(plan, k, True)
+        step(0.55, "Pun sunetul microfonului principal pe toate camerele")
+        aligned = {}
+        for m, o in zip(cams, offs):
+            aligned[m["id"]] = str(multicam.aligned_master(paths[master], offs[master], o,
+                                                           d / "work" / f"master_{m['id']}.wav"))
+        update(pid, lambda p: p.__setitem__("multicam", {"cams": [m["id"] for m in cams], "offsets": offs,
+                                                         "master": cams[master]["id"], "aligned": aligned}))
+        plan, issues = validate.validate(plan, media_map(load(pid)), project["analysis"])
+        set_plan(pid, plan, [f"Camere sincronizate: decalaje {', '.join(f'{o:+.2f}s' for o in offs)}."] + issues,
+                 "Podcast multicam")
+        render_preview(pid, step, 0.6)
+
+    return start_job(pid, "multicam", work)
+
+
+# ----------------------------------------------------------------- API: colour match
+
+class MatchIn(BaseModel):
+    reference: str  # media id of an image/video with the look to copy
+    strength: float = 0.8
+
+
+@app.post("/api/projects/{pid}/colormatch")
+def color_match(pid: str, body: MatchIn):
+    from PIL import Image
+
+    from engine import colormatch
+    project = load(pid)
+    d = pdir(pid)
+    ref = next((m for m in project["media"] if m["id"] == body.reference), None)
+    if not ref or ref["kind"] not in ("image", "video"):
+        raise HTTPException(400, "Alege o poză sau un clip cu culorile pe care le vrei.")
+    ref_img = thumb.grab_frame(d / "media" / ref["file"], ref["duration"] / 2 if ref["kind"] == "video" else 0,
+                               ref["kind"])
+    footage = []
+    for m in project["media"]:
+        info = project["analysis"].get(m["id"]) or {}
+        if m["id"] != ref["id"] and m["role"] == "material":
+            for f in (info.get("frames") or [])[:2]:
+                path = d / "frames" / f["file"]
+                if path.exists():
+                    footage.append(Image.open(path))
+    (d / "luts").mkdir(exist_ok=True)
+    name = f"look_{ref['id']}_{int(body.strength * 100)}.cube"
+    colormatch.write_cube(colormatch.make_lut(ref_img, footage, max(0.1, min(1.0, body.strength))),
+                          d / "luts" / name, f"Montaj: {ref['name']}")
+    update(pid, lambda p: p["settings"].__setitem__("lut_file", name))
+    if project["plan"]:
+        return {"lut": name, "job": start_job(pid, "preview", lambda step: render_preview(pid, step, 0.0))}
+    return {"lut": name, "job": None}
+
+
+@app.delete("/api/projects/{pid}/colormatch")
+def color_match_off(pid: str):
+    update(pid, lambda p: p["settings"].__setitem__("lut_file", ""))
+    project = load(pid)
+    return {"job": start_job(pid, "preview", lambda step: render_preview(pid, step, 0.0)) if project["plan"] else None}
 
 
 @app.get("/api/jobs/{jid}")
