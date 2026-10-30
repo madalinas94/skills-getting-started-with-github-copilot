@@ -2,41 +2,44 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..700;1,6..96,400..600&family=Manrope:wght@400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,500&family=Lato:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: a private operations room behind a Riviera arrival. The intro is a helicopter crossing Monaco at dusk; inside, a dark briefing table: radar by date, a country atlas, the contact book, the approval desk, the pipeline and a concierge AI at the side. Champagne marks what needs a decision; claret marks urgency. */
+/* Platinum CPO look: black rooms, platinum-silver type, gold only where a decision is waiting. Layout: a private operations room behind a Riviera arrival. The intro is a helicopter crossing Monaco at dusk; inside, a dark briefing table: radar by date, a country atlas, the contact book, the approval desk, the pipeline and a concierge AI at the side. Champagne marks what needs a decision; claret marks urgency. */
 :root {
-  --bg: #0E1113;
-  --bg-2: #13171A;
-  --surface: #181D21;
-  --surface-2: #20262B;
-  --line: #2C343A;
-  --ink: #ECE6DA;
-  --muted: #9AA19F;
-  --faint: #6C7472;
-  --gold: #D6BE91;
-  --gold-ink: #17130C;
-  --gold-soft: rgb(214 190 145 / .12);
-  --claret: #D0606E;
-  --claret-soft: rgb(208 96 110 / .14);
-  --amber: #D9A44A;
-  --amber-soft: rgb(217 164 74 / .14);
-  --sage: #7FB59A;
-  --sage-soft: rgb(127 181 154 / .14);
-  --steel: #8FA6C2;
-  --steel-soft: rgb(143 166 194 / .14);
+  --bg: #050506;
+  --bg-2: #0C0C0E;
+  --surface: #121214;
+  --surface-2: #1B1B1E;
+  --line: #2B2B30;
+  --ink: #F4F4F2;
+  --muted: #AEB1B5;
+  --faint: #74777C;
+  --gold: #F0C23A;
+  --gold-ink: #0A0A0A;
+  --gold-soft: rgb(240 194 58 / .12);
+  --claret: #E0566A;
+  --claret-soft: rgb(224 86 106 / .14);
+  --amber: #E8A93A;
+  --amber-soft: rgb(232 169 58 / .14);
+  --sage: #7FC4A0;
+  --sage-soft: rgb(127 196 160 / .14);
+  --steel: #A9B7C8;
+  --steel-soft: rgb(169 183 200 / .14);
+  --title-fill: linear-gradient(180deg, #FFFFFF 0%, #D9DCDF 52%, #9EA2A7 100%);
   --shadow: 0 1px 0 rgb(255 255 255 / .03) inset, 0 18px 40px rgb(0 0 0 / .35);
-  --f-display: "Bodoni Moda", "Didot", "Bodoni 72", Georgia, serif;
-  --f-body: "Manrope", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-display: "Poppins", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Lato", "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --r: 10px;
+  --r: 14px;
   color-scheme: dark;
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --bg: #F3EFE7; --bg-2: #ECE6DB; --surface: #FBF8F2; --surface-2: #EFE9DE; --line: #DDD4C4;
-    --ink: #1B1D1E; --muted: #5F625E; --faint: #8A8C86;
-    --gold: #8A6A2F; --gold-ink: #FFFDF8; --gold-soft: rgb(138 106 47 / .1);
+    --bg: #F4F4F2; --bg-2: #EBEBE8; --surface: #FFFFFF; --surface-2: #F0F0EE; --line: #DCDCD8;
+    --ink: #0B0B0C; --muted: #55585C; --faint: #85888C;
+    --gold: #9A7200; --gold-ink: #FFFFFF; --gold-soft: rgb(154 114 0 / .1);
+    --title-fill: linear-gradient(180deg, #0B0B0C, #0B0B0C);
+    --mark-filter: brightness(.42) contrast(1.6);
     --claret: #A2283A; --claret-soft: rgb(162 40 58 / .09);
     --amber: #9A6510; --amber-soft: rgb(154 101 16 / .1);
     --sage: #2E7A57; --sage-soft: rgb(46 122 87 / .1);
@@ -46,9 +49,11 @@
   }
 }
 :root[data-theme="light"] {
-  --bg: #F3EFE7; --bg-2: #ECE6DB; --surface: #FBF8F2; --surface-2: #EFE9DE; --line: #DDD4C4;
-  --ink: #1B1D1E; --muted: #5F625E; --faint: #8A8C86;
-  --gold: #8A6A2F; --gold-ink: #FFFDF8; --gold-soft: rgb(138 106 47 / .1);
+  --bg: #F4F4F2; --bg-2: #EBEBE8; --surface: #FFFFFF; --surface-2: #F0F0EE; --line: #DCDCD8;
+  --ink: #0B0B0C; --muted: #55585C; --faint: #85888C;
+  --gold: #9A7200; --gold-ink: #FFFFFF; --gold-soft: rgb(154 114 0 / .1);
+  --title-fill: linear-gradient(180deg, #0B0B0C, #0B0B0C);
+  --mark-filter: brightness(.42) contrast(1.6);
   --claret: #A2283A; --claret-soft: rgb(162 40 58 / .09);
   --amber: #9A6510; --amber-soft: rgb(154 101 16 / .1);
   --sage: #2E7A57; --sage-soft: rgb(46 122 87 / .1);
@@ -74,14 +79,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .arrival svg.scene { position: absolute; inset: 0; width: 100%; height: 100%; }
 .arrival .veil { position: absolute; inset: 0; background: linear-gradient(90deg, rgb(8 12 22 / .7) 0%, rgb(8 12 22 / .3) 50%, rgb(8 12 22 / 0) 75%), linear-gradient(0deg, rgb(8 12 22 / .85) 0%, rgb(8 12 22 / .4) 30%, rgb(8 12 22 / 0) 50%); }
 .arrival .copy { position: relative; align-self: end; padding-block: 0 calc(56px + env(safe-area-inset-bottom, 0px)); padding-left: max(28px, env(safe-area-inset-left, 0px)); padding-right: max(28px, env(safe-area-inset-right, 0px)); max-width: 760px; display: grid; gap: 14px; }
-.arrival .coords { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .18em; text-transform: uppercase; color: #D9C39A; }
-.arrival h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(46px, 9vw, 104px); letter-spacing: .14em; line-height: .95; margin: 0; }
-.arrival h1 em { font-style: italic; letter-spacing: 0; font-size: .42em; display: block; color: #E9D6B0; margin-top: 10px; }
-.arrival p { margin: 0; font-size: 15.5px; color: #D7D0C4; max-width: 52ch; }
+.arrival .coords { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: .18em; text-transform: uppercase; color: #C9CCD0; }
+.arrival h1 { font-family: var(--f-display); font-weight: 600; font-size: clamp(40px, 8.5vw, 96px); letter-spacing: .16em; background: linear-gradient(180deg, #FFFFFF 0%, #DADDE0 55%, #A3A7AC 100%); -webkit-background-clip: text; background-clip: text; color: transparent; line-height: .95; margin: 0; }
+.arrival h1 em { font-family: var(--f-body); font-style: italic; font-weight: 400; letter-spacing: .02em; font-size: .36em; display: block; color: #F0C23A; -webkit-text-fill-color: #F0C23A; margin-top: 12px; }
+.arrival p { margin: 0; font-size: 15.5px; color: #D6D8DB; max-width: 52ch; }
 .arrival .row { margin-top: 8px; }
-.enter { background: #E2C892; color: #17130C; border: 0; border-radius: 999px; padding: 14px 30px; font-weight: 700; font-size: 14.5px; letter-spacing: .06em; cursor: pointer; box-shadow: 0 10px 40px rgb(226 200 146 / .25); }
+.enter { background: #F0C23A; color: #0A0A0A; border: 0; border-radius: 999px; padding: 14px 30px; font-weight: 700; font-size: 14.5px; letter-spacing: .06em; cursor: pointer; box-shadow: 0 10px 40px rgb(240 194 58 / .25); }
 .enter:hover { filter: brightness(1.06); }
-.arrival .fine { font-size: 12px; color: #A9A397; }
+.arrival .fine { font-size: 12px; color: #A3A7AC; }
 .arrival.leaving { animation: leave .7s ease forwards; }
 @keyframes leave { to { opacity: 0; transform: scale(1.03); visibility: hidden; } }
 .heli { animation: fly 16s linear infinite; }
@@ -106,8 +111,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
 .top-row { display: flex; align-items: center; gap: 18px; padding-block: 14px; }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.brand svg { flex: none; }
-.brand-name { display: block; font-family: var(--f-display); font-size: 22px; letter-spacing: .28em; font-weight: 500; line-height: 1; color: var(--ink); }
+.brand svg { flex: none; filter: var(--mark-filter, none); }
+.brand-name { display: block; font-family: var(--f-display); font-size: 20px; letter-spacing: .24em; font-weight: 600; line-height: 1; background: var(--title-fill); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .brand-sub { display: block; font-family: var(--f-mono); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--faint); margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .top-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .icon-btn { position: relative; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; cursor: pointer; }
@@ -128,7 +133,7 @@ nav.subnav a[aria-current="page"] { color: var(--ink); background: var(--surface
 
 main { padding-block: 28px 110px; }
 .view-head { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 24px; margin-bottom: 22px; }
-.view-head h1 { font-family: var(--f-display); font-weight: 500; font-size: clamp(28px, 4vw, 42px); line-height: 1.05; margin: 6px 0 0; text-wrap: balance; letter-spacing: -.01em; }
+.view-head h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(26px, 3.6vw, 40px); line-height: 1.1; background: var(--title-fill); -webkit-background-clip: text; background-clip: text; color: transparent; margin: 6px 0 0; text-wrap: balance; letter-spacing: -.01em; }
 .view-head p { margin: 8px 0 0; color: var(--muted); max-width: 66ch; }
 .view-head .grow { flex: 1 1 380px; min-width: 0; }
 
@@ -140,7 +145,7 @@ main { padding-block: 28px 110px; }
 .kpi .l { margin-top: 6px; color: var(--muted); font-size: 12.5px; }
 .kpi.hot .n { color: var(--claret); }
 .kpi.gold .n { color: var(--gold); }
-h2.sec { font-family: "Bodoni Moda", serif; font-weight: 500; font-size: 24px; margin: 28px 0 12px; }
+h2.sec { font-family: var(--f-display); font-weight: 600; letter-spacing: -.01em; font-size: 24px; margin: 28px 0 12px; }
 @media (max-width: 720px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi:nth-child(3) { border-left: 0; } .kpi:nth-child(n+3) { border-top: 1px solid var(--line); } }
 
 .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
@@ -153,7 +158,7 @@ h2.sec { font-family: "Bodoni Moda", serif; font-weight: 500; font-size: 24px; m
 /* Timeline */
 .month { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 0 24px; margin-bottom: 8px; margin-top: 12px; }
 .month-label { position: sticky; top: 130px; align-self: start; padding-top: 18px; }
-.month-label .m { font-family: var(--f-display); font-size: 26px; font-style: italic; line-height: 1; }
+.month-label .m { font-family: var(--f-display); font-size: 24px; font-weight: 600; line-height: 1; }
 .month-label .y { font-family: var(--f-mono); font-size: 11px; color: var(--faint); letter-spacing: .14em; margin-top: 4px; }
 .month-items { border-left: 1px solid var(--line); padding-left: 24px; display: grid; gap: 14px; padding-block: 14px; }
 @media (max-width: 720px) { .month { grid-template-columns: minmax(0, 1fr); } .month-label { position: static; padding: 8px 0 0; } .month-items { border-left: 0; padding-left: 0; } }
@@ -217,7 +222,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
 .score { width: 52px; height: 52px; position: relative; }
 .score svg { display: block; }
 .score span { position: absolute; inset: 0; display: grid; place-items: center; font: 500 14px var(--f-mono); }
-.lead h3 { font-family: var(--f-display); font-weight: 500; font-size: 20px; margin: 2px 0 2px; line-height: 1.2; }
+.lead h3 { font-family: var(--f-display); font-weight: 600; font-size: 20px; margin: 2px 0 2px; line-height: 1.2; }
 .lead .why { margin: 8px 0 0; font-size: 13.5px; }
 .lead .meta { font-size: 12.5px; color: var(--muted); display: grid; gap: 8px; min-width: 0; }
 .lbl { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
@@ -249,7 +254,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
 .drafts { display: grid; gap: 16px; }
 .draft { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
 .draft-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--bg-2); }
-.draft-head h3 { margin: 0; font-family: var(--f-display); font-weight: 500; font-size: 18px; }
+.draft-head h3 { margin: 0; font-family: var(--f-display); font-weight: 600; font-size: 18px; }
 .draft-body { padding: 16px 18px; display: grid; gap: 10px; }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field label { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
@@ -276,7 +281,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
 /* Services */
 .services { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .svc { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: grid; gap: 8px; align-content: start; }
-.svc h3 { margin: 0; font-family: var(--f-display); font-weight: 500; font-size: 20px; }
+.svc h3 { margin: 0; font-family: var(--f-display); font-weight: 600; font-size: 20px; }
 .svc .k { font: 500 10.5px var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
 .svc p { margin: 0; font-size: 13.5px; color: var(--muted); }
 .svc .partners { font-size: 12.5px; }
@@ -295,16 +300,16 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
 .settings .full { grid-column: 1 / -1; }
 @media (max-width: 640px) { .settings { grid-template-columns: minmax(0, 1fr); } }
 .panel { border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); padding: 18px; max-width: 860px; margin-top: 22px; }
-.panel h3 { margin: 0 0 8px; font-family: var(--f-display); font-weight: 500; font-size: 19px; }
+.panel h3 { margin: 0 0 8px; font-family: var(--f-display); font-weight: 600; font-size: 19px; }
 .panel ul { margin: 0; padding-left: 18px; color: var(--muted); }
 .panel li { margin: 4px 0; }
 
 .empty { border: 1px dashed var(--line); border-radius: var(--r); padding: 36px 24px; text-align: center; color: var(--muted); }
-.empty h3 { font-family: var(--f-display); font-weight: 500; font-size: 22px; color: var(--ink); margin: 0 0 6px; }
+.empty h3 { font-family: var(--f-display); font-weight: 600; font-size: 22px; color: var(--ink); margin: 0 0 6px; }
 .toast { position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-weight: 600; font-size: 13px; z-index: 90; box-shadow: var(--shadow); max-width: calc(100vw - 32px); }
 .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / .55); z-index: 60; display: grid; place-items: center; padding: 16px; }
 .modal { width: min(640px, 100%); max-height: 90vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px; box-shadow: var(--shadow); }
-.modal h2 { font-family: var(--f-display); font-weight: 500; margin: 0 0 4px; font-size: 24px; }
+.modal h2 { font-family: var(--f-display); font-weight: 600; margin: 0 0 4px; font-size: 24px; }
 .modal .grid { display: grid; gap: 12px; margin-top: 16px; }
 
 /* Concierge AI */
@@ -312,7 +317,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
 .ai-fab:hover { filter: brightness(1.05); }
 .ai-panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100vw); z-index: 70; background: var(--bg-2); border-left: 1px solid var(--line); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; box-shadow: -20px 0 60px rgb(0 0 0 / .35); padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); padding-right: env(safe-area-inset-right, 0px); }
 .ai-head { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
-.ai-head h2 { margin: 0; font-family: var(--f-display); font-weight: 500; font-size: 21px; }
+.ai-head h2 { margin: 0; font-family: var(--f-display); font-weight: 600; font-size: 21px; }
 .ai-head .x { margin-left: auto; }
 .ai-log { overflow-y: auto; padding: 16px 18px; display: grid; gap: 12px; align-content: start; }
 .msg { max-width: 92%; padding: 10px 13px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; overflow-wrap: anywhere; }
@@ -410,7 +415,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
     <img id="arrLogo" class="logo-img" alt="" hidden style="max-height:52px;max-width:180px">
     <div class="coords" id="arrCoords">Monaco · 43.7384° N · 7.4246° E</div>
     <h1>PERIMETRU<em id="arrGreet">Bun venit.</em></h1>
-    <p>Radarul global al protecției private: evenimente, oameni, acces. De pe Riviera, pentru orice colț al lumii.</p>
+    <p>Platinum CPO · There… Always. Radarul global al protecției private: evenimente, oameni, acces, pentru orice colț al lumii.</p>
     <div class="row"><button class="enter" id="enterBtn">Intră</button><span class="fine" id="arrFine">Accesul vine din contul tău claude.ai.</span></div>
   </div>
 </section>
@@ -420,8 +425,8 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
     <div class="top-row">
       <a class="brand" href="#today" aria-label="Perimetru, acasă">
         <img id="brandLogo" class="logo-img" alt="" hidden>
-        <svg id="brandMark" width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><circle cx="17" cy="17" r="15.5" fill="none" stroke="var(--gold)" stroke-width="1"/><circle cx="17" cy="17" r="10" fill="none" stroke="var(--gold)" stroke-width="1" stroke-dasharray="2 3"/><circle cx="17" cy="17" r="2.6" fill="var(--gold)"/><path d="M17 1.5v5M17 27.5v5M1.5 17h5M27.5 17h5" stroke="var(--gold)" stroke-width="1"/></svg>
-        <span style="min-width:0"><span class="brand-name">PERIMETRU</span><span class="brand-sub" id="brandSub">Intelligence · protecție · acces privat</span></span>
+        <svg id="brandMark" width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><defs><linearGradient id="plat" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".5" stop-color="#C7CBCF"/><stop offset="1" stop-color="#7E8287"/></linearGradient></defs><path d="M17 1.8 30.2 9.4v15.2L17 32.2 3.8 24.6V9.4Z" fill="none" stroke="url(#plat)" stroke-width="1.4"/><path d="M17 8.5c3 1.6 5.6 2.2 8 2.3v5.6c0 5-3.4 8.6-8 10.4-4.6-1.8-8-5.4-8-10.4v-5.6c2.4-.1 5-.7 8-2.3Z" fill="url(#plat)"/><path d="M17 8.5v18.3c4.6-1.8 8-5.4 8-10.4v-5.6c-2.4-.1-5-.7-8-2.3Z" fill="#000" opacity=".22"/><circle cx="27.6" cy="6" r="1.6" fill="var(--gold)"/></svg>
+        <span style="min-width:0"><span class="brand-name">PERIMETRU</span><span class="brand-sub" id="brandSub">Platinum CPO · There… Always</span></span>
       </a>
       <label class="search" for="q"><svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="var(--muted)" stroke-width="1.5"/><path d="M11 11l3.5 3.5" stroke="var(--muted)" stroke-width="1.5"/></svg><input id="q" type="search" placeholder="Caută eveniment, țară, companie, persoană…" autocomplete="off"></label>
       <div class="top-actions">
@@ -984,7 +989,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
       <div class="panel"><h3>Brand</h3>
         <div class="row">${S.brand?.logoUrl ? `<img src="${esc(S.brand.logoUrl)}" alt="Logo" class="logo-img" style="max-height:48px">` : `<span class="note">Niciun logo încă.</span>`}
           ${assets ? `<label class="btn sm" for="brandFile">Încarcă logo (PNG sau JPG)</label><input id="brandFile" type="file" accept="image/png,image/jpeg" hidden>` : `<span class="note">Încărcarea e disponibilă doar pentru editori.</span>`}
-          <label class="row note" for="brandColor">Culoare accent <input id="brandColor" type="color" value="${esc(S.brand?.accent || "#D6BE91")}"></label>
+          <label class="row note" for="brandColor">Culoare accent <input id="brandColor" type="color" value="${esc(S.brand?.accent || "#F0C23A")}"></label>
           ${S.brand?.accent ? `<button class="btn ghost sm" data-act="brand-reset">Culoarea implicită</button>` : ""}</div>
         <p class="note" style="margin:8px 0 0">Logo-ul apare în antet, pe ecranul de intrare și în ofertele PDF.</p></div>
       <div class="panel"><h3>Echipa</h3>
@@ -1458,12 +1463,12 @@ Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, 
     };
     return `
       <div class="view-head"><div class="grow"><div class="eyebrow">Oportunități</div><h1>Unde cineva plătește deja pentru protecție</h1>
-        <p>Joburi de close protection, posturi pe yachturi, licitații publice, colaborări temporare pe sezon și târguri unde vă întâlniți cumpărătorii. Scanerul caută din două în două zile, doar anunțuri deschise și cu sursă. Voi decideți unde aplicați.</p></div>
+        <p>Joburi de close protection, posturi pe yachturi, licitații publice, colaborări temporare pe sezon și târguri unde vă întâlniți cumpărătorii. Scanerul caută în fiecare dimineață, doar anunțuri deschise și cu sursă. Voi decideți unde aplicați.</p></div>
         <div class="row"><button class="btn" data-act="export-ics">Termene în calendar</button><button class="btn" data-act="opp-new">+ Adaugă</button>${mcp ? `<button class="btn primary" data-act="opp-scan">Caută acum</button>` : ""}</div></div>
       <div class="kpis"><div class="kpi"><div class="n">${S.opps.filter(o => (o.stage || "nou") === "nou").length}</div><div class="l">noi, neevaluate</div></div><div class="kpi gold"><div class="n">${soon}</div><div class="l">expiră în 7 zile</div></div><div class="kpi"><div class="n">${S.opps.filter(o => ["aplicat", "discutie"].includes(o.stage)).length}</div><div class="l">în lucru</div></div><div class="kpi"><div class="n">${S.opps.filter(o => o.stage === "castigat").length}</div><div class="l">câștigate</div></div></div>
       <div class="subtabs" role="group" aria-label="Tip">${chips}</div>
       ${ccs.length > 1 ? `<div class="row" style="margin:10px 0"><select class="select" id="oppCc" aria-label="Țara"><option value="all">Toate țările</option>${ccs.map(c => `<option value="${c}" ${f.occ === c ? "selected" : ""}>${esc(ccName(c))}</option>`).join("")}</select></div>` : ""}
-      ${!S.ready ? emptyLoading() : list.length ? `<div class="drafts">${list.map(card).join("")}</div>` : `<div class="empty"><h3>Nimic aici încă</h3><p>Scanerul rulează din două în două zile. Poți apăsa „Caută acum” sau poți căuta direct în sursele de mai jos.</p></div>`}
+      ${!S.ready ? emptyLoading() : list.length ? `<div class="drafts">${list.map(card).join("")}</div>` : `<div class="empty"><h3>Nimic aici încă</h3><p>Scanerul rulează în fiecare dimineață. Poți apăsa „Caută acum” sau poți căuta direct în sursele de mai jos.</p></div>`}
       <div class="panel" style="margin-top:20px"><h3>Căutare live: sute de anunțuri, actualizate de site-uri</h3><p class="muted" style="margin:0 0 8px">Fiecare link deschide rezultatele de azi direct pe site. Ce vă interesează, adăugați cu „+ Adaugă” ca să-l urmăriți aici.</p>${OPP_SOURCES.map(([g, l]) => `<p style="margin:6px 0"><b>${g}:</b> ${l.map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join(" · ")}</p>`).join("")}</div>`;
   }
   async function awardPressDraft(o) {
@@ -1599,8 +1604,8 @@ Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, 
     if (!downloads) { toast("Descărcarea nu e disponibilă în această vizualizare."); return false; }
     const L = PL[spec.lang] || PL.en, c = S.config || {}, b = S.brand || {};
     const tr = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[„”“]/g, '"').replace(/[’‘]/g, "'").replace(/[–—]/g, "-").replace(/·/g, "-").replace(/€/g, "EUR");
-    const hex = (h) => { const m = /^#?([0-9a-f]{6})$/i.exec(h || ""); const n = parseInt(m ? m[1] : "D6BE91", 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
-    const acc = hex(b.accent || "#D6BE91");
+    const hex = (h) => { const m = /^#?([0-9a-f]{6})$/i.exec(h || ""); const n = parseInt(m ? m[1] : "F0C23A", 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+    const acc = hex(b.accent || "#F0C23A");
     const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4" }); const W = 595, M = 56; let y;
     doc.setFillColor(14, 17, 19); doc.rect(0, 0, W, 132, "F");
     let tx = M; const logo = b.logoUrl ? await imgData(b.logoUrl) : null;
@@ -2286,7 +2291,7 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
     $("#langBtn").textContent = S.lang === "en" ? "RO" : "EN";
     applyBrand();
     translateDom($("#main"));
-    if (S.config?.company) $("#brandSub").textContent = `${S.config.company} · intelligence & acces privat`;
+    if (S.config?.company) $("#brandSub").textContent = `${S.config.company} · There… Always`;
     if (AI.pending.length) {
       const done = AI.pending.map(id => S.requests.find(r => r.id === id)).filter(r => r && r.status === "rezolvat" && r.answer);
       if (done.length) { done.forEach(r => AI.turns.push({ role: "assistant", content: `**Rezultat cercetare:** ${r.question}\n\n${r.answer}` })); AI.pending = AI.pending.filter(id => !done.some(r => r.id === id)); saveAI(); if (!AI.busy) renderAI(); toast("Concierge AI: a sosit rezultatul cercetării"); }
