@@ -1274,10 +1274,14 @@ Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, 
   // ---------- Oportunități: joburi, licitații, colaborări temporare ----------
   const OPP_KINDS = { job: "Joburi CP", yacht: "Yachturi", tender: "Licitații", subcontract: "Colaborări temporare", network: "Târguri & rețele" };
   const OPP_STAGES = [["nou", "Nou"], ["aplicat", "Am aplicat / ofertat"], ["discutie", "În discuție"], ["castigat", "Câștigat"], ["ignorat", "Ignorat"], ["expirat", "Expirat"]];
+  // live searches on the job boards and tender portals themselves: each opens the current results, not a stored copy
   const OPP_SOURCES = [
-    ["Joburi", [["Tiger Recruitment · CP", "https://tiger-recruitment.com/looking-for-a-job/close-protection-jobs/"], ["Silent Professionals", "https://silentprofessionals.org/"], ["Close Protection World", "https://www.closeprotectionworld.com/"], ["LinkedIn Jobs · close protection", liJobs("close protection officer")], ["LinkedIn Jobs · executive protection", liJobs("executive protection family office")], ["GulfTalent", "https://www.gulftalent.com/"], ["Bayt", "https://www.bayt.com/"]]],
-    ["Yachturi", [["Yotspot", "https://www.yotspot.com/"]]],
-    ["Licitații", [["TED (UE)", "https://ted.europa.eu/"], ["Find a Tender (UK)", "https://www.find-tender.service.gov.uk/Search"], ["Contracts Finder (UK)", "https://www.contractsfinder.service.gov.uk/Search"], ["UNGM (ONU)", "https://www.ungm.org/Public/Notice"], ["SEAP / SICAP (RO)", "https://www.e-licitatie.ro/"]]]
+    ["Regatul Unit", [["Indeed UK · CPO", "https://uk.indeed.com/q-close-protection-officer-jobs.html"], ["CV-Library · Londra", "https://www.cv-library.co.uk/close-protection-officer-jobs-in-london"], ["Reed · Londra", "https://www.reed.co.uk/jobs/close-protection-officer-jobs-in-london?q=close+protection+officer&keywords=close+protection+officer&locationName=London"], ["Adzuna · Londra", "https://www.adzuna.co.uk/jobs/london/close-protection"], ["Glassdoor · Londra", "https://www.glassdoor.co.uk/Job/close-protection-officer-Greater-London-SRCH_KO0,24_IL.25,39_IS7412.htm"], ["Jobijoba · Londra", "https://www.jobijoba.co.uk/jobs/close-protection-officer-jobs-in-london"], ["Tiger Recruitment · CP", "https://tiger-recruitment.com/looking-for-a-job/close-protection-jobs/"]]],
+    ["Golf", [["Bayt · CPO Orientul Mijlociu", "https://www.bayt.com/en/international/jobs/close-protection-officer-jobs/"], ["Bayt · Executive protection", "https://www.bayt.com/en/international/jobs/executive-protection-jobs/"], ["Bayt · VIP protection", "https://www.bayt.com/en/international/jobs/vip-protection-jobs/"], ["Bayt · Riyad", "https://www.bayt.com/en/saudi-arabia/jobs/executive-protection-jobs-in-riyadh/"], ["Glassdoor · Arabia Saudită", "https://www.glassdoor.com/Job/saudi-arabia-executive-protection-jobs-SRCH_IL.0,12_IN207_KO13,33.htm"], ["Glassdoor · Qatar", "https://www.glassdoor.com/Job/Executive-Protection-Qatar-SRCH_KO0,20_IL.21,26_IN199.htm"]]],
+    ["SUA", [["ZipRecruiter · CP UHNW", "https://www.ziprecruiter.com/Jobs/Close-Protection-Uhnw"], ["ZipRecruiter · Florida", "https://www.ziprecruiter.com/Jobs/Executive-Protection/--in-Florida"], ["MyStaffHQ · family office", "https://www.mystaffhq.com/jobs/family-office"]]],
+    ["Monaco, Elveția, Europa", [["MyStaffHQ · Monaco", "https://www.mystaffhq.com/jobs/in-monaco-monaco"], ["LinkedIn · close protection", liJobs("close protection officer")], ["LinkedIn · executive protection family office", liJobs("executive protection family office")], ["LinkedIn · residential security", liJobs("residential security manager private family")]]],
+    ["Yachturi", [["Yotspot · deckhand / security", "https://www.yotspot.com/job-search/deck/deckhand-security.html"], ["YaCrew · security", "https://www.yacrew.com/search/Security/8/"], ["Viking Crew · superyacht", "https://www.vikingcrew.com/superyacht/"]]],
+    ["Licitații", [["TED (UE)", "https://ted.europa.eu/"], ["Find a Tender (UK)", "https://www.find-tender.service.gov.uk/Search"], ["Contracts Finder (UK)", "https://www.contractsfinder.service.gov.uk/Search"], ["UNGM (ONU)", "https://www.ungm.org/Public/Notice"], ["SAM.gov (SUA)", "https://sam.gov/"], ["eTenders (Africa de Sud)", "https://www.etenders.gov.za/"], ["Tender Bulletins · VIP protection", "https://tenderbulletins.co.za/tender-category/close-and-vip-protection-services/"], ["SEAP / SICAP (RO)", "https://www.e-licitatie.ro/"]]]
   ];
   function viewOpps() {
     const f = S.f, open = (o) => !["ignorat", "expirat"].includes(o.stage || "nou");
@@ -1301,12 +1305,12 @@ Return JSON {"posts":[{"topic": short Romanian title, "pillar": one pillar key, 
     return `
       <div class="view-head"><div class="grow"><div class="eyebrow">Oportunități</div><h1>Unde cineva plătește deja pentru protecție</h1>
         <p>Joburi de close protection, posturi pe yachturi, licitații publice, colaborări temporare pe sezon și târguri unde vă întâlniți cumpărătorii. Scanerul caută din două în două zile, doar anunțuri deschise și cu sursă. Voi decideți unde aplicați.</p></div>
-        <div class="row">${mcp ? `<button class="btn primary" data-act="opp-scan">Caută acum</button>` : ""}</div></div>
+        <div class="row"><button class="btn" data-act="opp-new">+ Adaugă</button>${mcp ? `<button class="btn primary" data-act="opp-scan">Caută acum</button>` : ""}</div></div>
       <div class="kpis"><div class="kpi"><div class="n">${S.opps.filter(o => (o.stage || "nou") === "nou").length}</div><div class="l">noi, neevaluate</div></div><div class="kpi gold"><div class="n">${soon}</div><div class="l">expiră în 7 zile</div></div><div class="kpi"><div class="n">${S.opps.filter(o => ["aplicat", "discutie"].includes(o.stage)).length}</div><div class="l">în lucru</div></div><div class="kpi"><div class="n">${S.opps.filter(o => o.stage === "castigat").length}</div><div class="l">câștigate</div></div></div>
       <div class="subtabs" role="group" aria-label="Tip">${chips}</div>
       ${ccs.length > 1 ? `<div class="row" style="margin:10px 0"><select class="select" id="oppCc" aria-label="Țara"><option value="all">Toate țările</option>${ccs.map(c => `<option value="${c}" ${f.occ === c ? "selected" : ""}>${esc(ccName(c))}</option>`).join("")}</select></div>` : ""}
       ${!S.ready ? emptyLoading() : list.length ? `<div class="drafts">${list.map(card).join("")}</div>` : `<div class="empty"><h3>Nimic aici încă</h3><p>Scanerul rulează din două în două zile. Poți apăsa „Caută acum” sau poți căuta direct în sursele de mai jos.</p></div>`}
-      <div class="panel" style="margin-top:20px"><h3>Sursele urmărite</h3>${OPP_SOURCES.map(([g, l]) => `<p style="margin:6px 0"><b>${g}:</b> ${l.map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join(" · ")}</p>`).join("")}</div>`;
+      <div class="panel" style="margin-top:20px"><h3>Căutare live: sute de anunțuri, actualizate de site-uri</h3><p class="muted" style="margin:0 0 8px">Fiecare link deschide rezultatele de azi direct pe site. Ce vă interesează, adăugați cu „+ Adaugă” ca să-l urmăriți aici.</p>${OPP_SOURCES.map(([g, l]) => `<p style="margin:6px 0"><b>${g}:</b> ${l.map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join(" · ")}</p>`).join("")}</div>`;
   }
   async function oppDraft(o) {
     const c = S.config || {};
@@ -1924,6 +1928,14 @@ Servicii oferite: ${services().map(s => s.name + (s.partners ? ` (${s.partners})
         if (await patch("posts", id, upd)) toast("Salvat"); break;
       }
       case "okind": S.f.okind = id; render(); break;
+      case "opp-new": {
+        const url = (prompt("Link-ul anunțului:") || "").trim(); if (!url) break;
+        const title = (prompt("Titlul (ex. Close Protection Officer, Dubai):") || "").trim() || url;
+        const kind = (prompt("Tip: job, yacht, tender, subcontract sau network", "job") || "job").trim();
+        const cc = (prompt("Țara (cod de 2 litere, ex. AE, GB, FR):", "") || "").trim().toUpperCase();
+        if (await put("opps", newId("op"), { kind: OPP_KINDS[kind] ? kind : "job", title, org: "", cc, city: "", url, sourceLabel: "adăugat manual", summary: "", contactEmail: "", deadline: "", confidence: "verificat", stage: "nou", found: iso(today()), by: S.me?.name || "manual" })) toast("Adăugat");
+        break;
+      }
       case "opp-draft": { const o = S.opps.find(x => x.id === id); if (o) oppDraft(o); break; }
       case "opp-scan": { if (!mcp) break; el.disabled = true; try { await mcp.callTool("Claude Code Remote", "fire_trigger", { trigger_id: OPPS_TRIGGER, text: "Run requested from the app." }); toast("Scanerul a pornit. Rezultatele apar aici în 10–20 de minute."); } catch (e) { toast("Nu am putut porni scanerul acum."); } el.disabled = false; break; }
       case "copy-fc": { const t = $(`#po-f-${id}`)?.value || S.posts.find(x => x.id === id)?.firstComment || ""; try { await navigator.clipboard.writeText(t); toast("Comentariu copiat"); } catch (e) { toast("Nu am putut copia."); } break; }
