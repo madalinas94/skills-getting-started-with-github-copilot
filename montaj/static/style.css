@@ -324,3 +324,27 @@ dialog::backdrop { background: #000a; backdrop-filter: blur(3px); }
 .dub-item a { font-size: 13px; color: var(--text); text-decoration: none; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel2); }
 .clone-box { border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin: 6px 0 12px; }
 .broll-item { display: grid; grid-template-columns: 1fr 70px 70px auto; gap: 6px; align-items: end; margin-bottom: 6px; }
+
+/* ---------- v4: text editing, tools, publishing ---------- */
+.transcript { max-height: 320px; overflow-y: auto; line-height: 2; font-size: 15px; background: var(--bg2); border-radius: 12px; padding: 12px 14px; border: 1px solid var(--line); }
+.transcript .tclip { margin-bottom: 10px; }
+.transcript .tclip b { font-size: 11px; color: var(--muted); display: block; line-height: 1.4; }
+.transcript span.w { cursor: pointer; padding: 1px 2px; border-radius: 4px; }
+.transcript span.w:hover { background: #7c5cff33; }
+.transcript span.w.cut { text-decoration: line-through; color: #ff8fa3; background: #ff5c8a1f; }
+.tools { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.tool { background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.tool h3 { font-size: 15px; }
+.tool p { margin: 0; }
+.cam-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn-like { display: inline-flex; align-items: center; border: 1px solid #4b4b70; border-radius: 10px; padding: 8px 14px; cursor: pointer; }
+.insights { font-size: 13px; }
+.insights ul { margin: 4px 0; padding-left: 18px; color: var(--muted); }
+.publish-box { margin-top: 14px; padding: 12px; border-radius: 12px; border: 1px solid #5c2a35; background: #ff5c8a0a; }
+.more-settings { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; }
+.more-settings summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.more-settings[open] summary { margin-bottom: 8px; }
+.qr svg { width: 180px; height: 180px; background: white; border-radius: 10px; padding: 6px; margin-top: 8px; }
+.batch-item { font-size: 13px; margin-top: 6px; }
+.batch-item a { color: var(--text); }
+@media (max-width: 1000px) { .tools { grid-template-columns: 1fr; } }

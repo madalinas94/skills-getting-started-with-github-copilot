@@ -69,7 +69,8 @@
         <label class="field inline"><span>Subtitrări din vorbire</span>
           <select id="captionStyle"><option value="">Din stil</option><option value="none">Fără</option>
             <option value="karaoke">Karaoke (cuvânt cu cuvânt)</option><option value="bold">Mari, bold</option>
-            <option value="clean">Simple</option></select></label>
+            <option value="clean">Simple</option><option value="hormozi">🔥 Hormozi (cuvinte-cheie colorate)</option>
+            <option value="mrbeast">💥 MrBeast (uriașe, înclinate)</option><option value="aliabdaal">✨ Ali Abdaal (calm, elegant)</option></select></label>
         <label class="field inline"><span>Efecte pe beat</span>
           <select id="beatFx"><option value="">Din stil</option><option value="none">Fără</option>
             <option value="flash">Flash</option><option value="zoom">Zoom pulse</option>
@@ -89,6 +90,8 @@
         <label class="toggle" title="Whoosh la tranziții, pop/boom la texte"><input type="checkbox" id="sfx"><span></span>💥 Efecte sonore</label>
         <label class="toggle" title="Când vorbești despre ceva, apare clipul cu acel lucru"><input type="checkbox" id="autoBroll"><span></span>🎞 B-roll automat</label>
         <label class="toggle" title="Fundal blurat în spatele persoanei, ca mod portret"><input type="checkbox" id="portraitBg"><span></span>👤 Fundal portret</label>
+        <label class="toggle" title="Emoji animate deasupra subtitrărilor, pe cuvintele-cheie"><input type="checkbox" id="emoji"><span></span>😀 Emoji animate</label>
+        <label class="toggle" title="B-roll gratuit de pe Pexels/Pixabay când n-ai filmat ce spui (cheie gratuită în Setări)"><input type="checkbox" id="stockBroll"><span></span>🌐 B-roll de pe internet</label>
       </div>
       <label class="field" id="voiceBox" hidden>
         <span>Textul vocii off <span class="muted">(gol = îl scrie agentul; necesită cheie ElevenLabs)</span></span>
@@ -163,6 +166,59 @@
       </div>
     </section>
 
+    <!-- TEXT EDITING -->
+    <section class="panel text-panel" id="textPanel" hidden>
+      <div class="panel-head"><h2>📝 Editare prin text</h2>
+        <span class="muted small">apasă pe cuvinte ca să le tai (Shift+clic = interval) · dublu-clic = sari la el în video</span></div>
+      <div class="transcript" id="transcript"></div>
+      <div class="row wrap" style="margin-top:10px">
+        <button class="primary" id="textCutBtn">✂ Taie cuvintele marcate</button>
+        <button class="ghost" id="textClear">Deselectează</button>
+        <span class="small muted" id="textCount"></span>
+      </div>
+    </section>
+
+    <!-- TOOLS -->
+    <section class="panel tools" id="toolsPanel">
+      <div class="tool">
+        <h3>🎙 Podcast cu mai multe camere</h3>
+        <p class="small muted">Bifează 2–3 camere din același podcast. Le sincronizez după sunet și schimb automat pe cine vorbește.</p>
+        <div class="cam-list" id="camList"></div>
+        <div class="row wrap">
+          <div class="segmented" id="mcLayout"><button data-v="switch" class="on">Schimbă pe vorbitor</button><button data-v="split">Split-screen</button></div>
+          <button class="primary" id="mcBtn">🎬 Montează podcastul</button>
+        </div>
+      </div>
+      <div class="tool">
+        <h3>🎨 Copiază culorile</h3>
+        <p class="small muted">Alege o poză sau un clip cu look-ul dorit (un cadru din film, de la un creator). Fac un LUT pentru tot video-ul și ți-l dau și pentru DaVinci.</p>
+        <div class="row wrap">
+          <select id="lutRef"></select>
+          <label class="slider" style="min-width:220px"><span>Intensitate</span><input type="range" id="lutStrength" min="0.2" max="1" step="0.05" value="0.75"><output>0.75</output></label>
+          <button class="primary" id="lutBtn">Aplică look-ul</button>
+          <button class="ghost" id="lutOff">Scoate</button>
+        </div>
+        <div class="small muted" id="lutState"></div>
+      </div>
+      <div class="tool">
+        <h3>📦 Mai multe video-uri dintr-o dată</h3>
+        <p class="small muted">Fiecare video bifat devine un montaj separat, cu stilul și setările de mai sus.</p>
+        <div class="cam-list" id="batchList"></div>
+        <button class="primary" id="batchBtn">📦 Montează-le pe toate</button>
+        <div id="batchResults"></div>
+      </div>
+      <div class="tool">
+        <h3>📈 Ce merge la publicul tău</h3>
+        <p class="small muted">Conectează YouTube sau încarcă CSV-ul din YouTube Studio (Analytics → Mod avansat → Export). Agentul învață ce funcționează și montează după asta.</p>
+        <div class="row wrap">
+          <button class="secondary" id="ytInsightsBtn">Citește statisticile YouTube</button>
+          <label class="secondary btn-like">⬆ Încarcă CSV<input type="file" id="csvInput" accept=".csv" hidden></label>
+          <button class="ghost" id="insightsOff">Uită</button>
+        </div>
+        <div class="insights" id="insights"></div>
+      </div>
+    </section>
+
     <!-- SHORTS -->
     <section class="panel shorts-panel" id="shortsPanel">
       <div class="panel-head"><h2>✂ Video lung → Shorts</h2>
@@ -208,6 +264,23 @@
         <div id="dubs"></div>
       </div>
       <div class="social" id="social" hidden></div>
+      <div class="publish-box" id="publishBox" hidden>
+        <h3>🚀 Publică</h3>
+        <div class="grid2">
+          <label class="field"><span>Video</span><select id="pubFile"></select></label>
+          <label class="field"><span>Programează (gol = acum)</span><input type="datetime-local" id="pubWhen"></label>
+          <label class="field"><span>Titlu YouTube</span><input id="pubTitle" maxlength="100"></label>
+          <label class="field"><span>Vizibilitate</span><select id="pubPrivacy"><option value="public">Public</option><option value="unlisted">Nelistat</option><option value="private">Privat</option></select></label>
+        </div>
+        <label class="field"><span>Descriere</span><textarea id="pubDesc" rows="3"></textarea></label>
+        <div class="row wrap">
+          <button class="primary" id="ytUploadBtn">▶ Încarcă pe YouTube</button>
+          <button class="secondary" data-open="https://www.tiktok.com/upload">TikTok: copiază textul + deschide</button>
+          <button class="secondary" data-open="https://www.instagram.com/">Instagram: copiază textul + deschide</button>
+        </div>
+        <p class="small muted">TikTok și Instagram nu permit încărcarea automată din aplicații personale fără aprobare. Copiez textul și deschid pagina de încărcare, iar tu tragi MP4-ul acolo.</p>
+        <div id="published"></div>
+      </div>
       <div id="exports"></div>
     </section>
 
@@ -252,6 +325,25 @@
         <option value="small">small — recomandat pentru română</option><option value="medium">medium — precis, lent</option>
         <option value="large-v3">large-v3 — cel mai precis, foarte lent</option></select></label>
     <ul class="features small" id="features"></ul>
+    <details class="more-settings"><summary>🌐 B-roll de pe internet (gratuit)</summary>
+      <label class="field"><span>Cheie Pexels <a href="https://www.pexels.com/api/" target="_blank" rel="noopener">obține</a></span><input id="pexelsKey" type="password" placeholder="opțional"></label>
+      <label class="field"><span>Cheie Pixabay <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener">obține</a></span><input id="pixabayKey" type="password" placeholder="opțional"></label>
+    </details>
+    <details class="more-settings"><summary>⚡ Placa video</summary>
+      <label class="field"><span>Randare <span class="muted" id="encoderLabel"></span></span>
+        <select id="gpuMode"><option value="auto">Automat (placa video dacă există)</option><option value="off">Doar procesorul</option></select></label>
+    </details>
+    <details class="more-settings"><summary>📱 Telefon</summary>
+      <label class="toggle"><input type="checkbox" id="phoneAccess"><span></span>Deschide Montaj de pe telefon (aceeași rețea Wi-Fi)</label>
+      <div id="phoneInfo" class="small muted"></div>
+    </details>
+    <details class="more-settings"><summary>▶ YouTube</summary>
+      <p class="small muted">Creează în Google Cloud Console un „OAuth client ID” de tip <b>Desktop app</b> (cu YouTube Data API v3 și YouTube Analytics API activate). Datele rămân doar pe calculatorul tău.</p>
+      <label class="field"><span>Client ID</span><input id="ytClientId"></label>
+      <label class="field"><span>Client secret</span><input id="ytSecret" type="password"></label>
+      <div class="row"><button type="button" class="secondary" id="ytConnect">Conectează YouTube</button>
+        <button type="button" class="ghost" id="ytDisconnect">Deconectează</button><span class="small" id="ytState"></span></div>
+    </details>
     <div class="clone-box small">
       <b>🎙 Vocea mea clonată</b> <span id="cloneState" class="muted"></span>
       <label class="toggle" style="margin-top:6px"><input type="checkbox" id="cloneConsent"><span></span>E vocea mea (sau am acordul persoanei)</label>

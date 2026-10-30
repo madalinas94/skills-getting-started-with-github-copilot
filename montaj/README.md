@@ -76,6 +76,28 @@ direct în aplicație.
 
 Toate rulează local, cu excepția AI-ului (Claude) și a vocii (ElevenLabs). Modelele de decupare și de fețe (MediaPipe, ~0,5 MB) sunt deja în `assets/models`.
 
+## Unelte pro (v4)
+
+| Funcție | Ce face |
+|---------|---------|
+| 📝 **Editare prin text** | Vezi transcrierea montajului. Apeși pe cuvinte (Shift+clic pentru un interval) și „Taie”: dispar din video, tăiate curat între cuvinte. Dublu-clic pe un cuvânt sare la el în previzualizare. |
+| 🔥 **Subtitrări virale** | Stilurile Hormozi (cuvinte-cheie colorate), MrBeast (uriașe, înclinate) și Ali Abdaal (calm, elegant), plus **emoji animate** pe cuvintele-cheie (Twemoji, 45 de emoji cu cuvinte în română și engleză). |
+| 🌐 **B-roll de pe internet** | Când vorbești despre ceva ce n-ai filmat, agentul caută și descarcă un clip gratuit de pe Pexels sau Pixabay (cheie gratuită). Creditele ajung automat în `credite_b-roll.txt`. |
+| 🎙 **Podcast cu 2–3 camere** | Sincronizează camerele după sunet, schimbă pe cine vorbește (fiecare cameră își aude cel mai tare vorbitorul), pune un plan larg din când în când și folosește microfonul principal pe toate. Are și layout split-screen pentru Shorts. |
+| 🚀 **Publicare** | Încărcare pe YouTube cu titlu, descriere, thumbnail și **programare** (contul tău, prin OAuth). Pentru TikTok și Instagram copiază textul și deschide pagina de încărcare, pentru că aceste platforme nu permit încărcarea automată din aplicații personale. |
+| 🎨 **Copiază culorile** | Din orice poză sau cadru de film: LUT 3D aplicat pe tot video-ul și exportat ca `.cube` pentru DaVinci. |
+| 🌙 **Calitate** | Pe fiecare clip: fără zgomot (filmări de noapte), mai clar, **stabilizare** (vid.stab, ca un gimbal). |
+| ✨ **Beauty** | Piele netezită și o lumină caldă, doar pe pielea feței (față detectată × culoarea pielii). |
+| 🖥 **Facecam** | Webcam-ul într-un cerc cu contur alb peste screen recording, încadrat pe față. |
+| 📈 **Ce merge la publicul tău** | Statistici din YouTube Analytics sau din CSV-ul exportat din YouTube Studio. AI-ul trage concluzii (hook-uri, lungime, subiecte) și le folosește la fiecare montaj. |
+| 📦 **În lot** | Bifezi mai multe video-uri și fiecare devine un montaj gata exportat, cu thumbnail. |
+| ⚡ **Placa video** | Randare pe NVIDIA (NVENC), Intel (Quick Sync), AMD (AMF) sau Apple, detectată automat. |
+| 📱 **Telefon** | Setări → Telefon → scanezi codul QR și folosești Montaj de pe telefon, în aceeași rețea Wi-Fi (protejat cu cod de acces). |
+
+## Montaj.exe pentru Windows
+
+La fiecare modificare, GitHub Actions construiește automat varianta portabilă: Python, ffmpeg (cu NVENC/QSV/AMF și vid.stab), toate bibliotecile și `Montaj.exe`. Pe GitHub: **Actions → Montaj Windows → ultima rulare → Artifacts → Montaj-Windows**. Dezarhivezi și dai dublu-clic pe **Montaj.exe**; nu mai trebuie instalat nimic. Proiectele se salvează în `%USERPROFILE%\Montaj`.
+
 ## Instalare (Windows)
 
 1. Instalează **Python 3.10+** de pe python.org (bifează „Add Python to PATH”).

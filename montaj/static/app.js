@@ -78,6 +78,15 @@ async function loadStatus() {
     feat(s.demucs, "Demucs — vocea originală separată curat la dublaj", "Demucs lipsește (opțional) — <code>pip install demucs</code>"),
   ].join("");
   $("#cloneState").textContent = s.my_voice ? `— activă: „${s.my_voice}”` : "— încă nu e creată";
+  $("#gpuMode").value = s.gpu || "auto";
+  $("#encoderLabel").textContent = `(acum: ${s.encoder})`;
+  $("#phoneAccess").checked = !!(s.phone && s.phone.enabled);
+  $("#phoneInfo").innerHTML = s.phone && s.phone.enabled
+    ? (s.phone.active ? `Scanează cu telefonul (aceeași rețea Wi-Fi):<div class="qr">${s.phone.qr}</div><code>${esc(s.phone.url)}</code>`
+       : "Activat. <b>Repornește Montaj</b> ca să pornească accesul de pe telefon, apoi revino aici pentru codul QR.")
+    : "Oprit: Montaj merge doar pe acest calculator.";
+  $("#ytState").innerHTML = s.youtube.connected ? "<b style='color:var(--ok)'>conectat ✓</b>" : (s.youtube.client ? "neconectat" : "");
+  renderInsights();
   renderLangs();
   $("#keyHint").innerHTML = s.key_from_env
     ? "Folosesc cheia din variabila <code>ANTHROPIC_API_KEY</code>. Poți pune alta aici."
@@ -87,10 +96,23 @@ async function loadStatus() {
 
 $("#openSettings").onclick = () => { $("#apiKey").value = ""; $("#elevenKey").value = ""; $("#settings").showModal(); };
 $("#pillAi").onclick = () => $("#openSettings").click();
+$("#ytConnect").onclick = async () => {
+  if ($("#ytClientId").value.trim() && $("#ytSecret").value.trim())
+    await api("/api/youtube/client", { method: "POST", body: { client_id: $("#ytClientId").value.trim(), client_secret: $("#ytSecret").value.trim() } });
+  window.open("/api/youtube/connect", "_blank");
+  toast("Autorizează în fereastra Google, apoi revino aici.");
+  setTimeout(loadStatus, 15000);
+};
+$("#ytDisconnect").onclick = async () => { state.status = { ...state.status, ...(await api("/api/youtube/connect", { method: "DELETE" })) }; loadStatus(); };
 $("#settings").addEventListener("close", async () => {
   if ($("#settings").returnValue !== "save") return;
   const body = { model: $("#model").value, effort: $("#effort").value,
-    eleven_voice: $("#elevenVoice").value, whisper_model: $("#whisperModel").value };
+    eleven_voice: $("#elevenVoice").value, whisper_model: $("#whisperModel").value,
+    gpu: $("#gpuMode").value, phone_access: $("#phoneAccess").checked };
+  if ($("#pexelsKey").value.trim()) body.pexels_key = $("#pexelsKey").value.trim();
+  if ($("#pixabayKey").value.trim()) body.pixabay_key = $("#pixabayKey").value.trim();
+  if ($("#ytClientId").value.trim() && $("#ytSecret").value.trim())
+    await api("/api/youtube/client", { method: "POST", body: { client_id: $("#ytClientId").value.trim(), client_secret: $("#ytSecret").value.trim() } });
   if ($("#apiKey").value.trim()) body.api_key = $("#apiKey").value.trim();
   if ($("#elevenKey").value.trim()) body.eleven_key = $("#elevenKey").value.trim();
   try { await api("/api/settings", { method: "POST", body }); await loadStatus(); toast("Setări salvate"); }
@@ -144,6 +166,9 @@ function renderAll() {
   renderExports();
   renderShorts();
   renderDubs();
+  renderTools();
+  renderPublish();
+  loadTranscript();
 }
 
 // ------------------------------------------------------------------ media bin
@@ -293,6 +318,8 @@ function renderBrief() {
   $("#sfx").checked = !!s.sfx;
   $("#autoBroll").checked = !!s.auto_broll;
   $("#portraitBg").checked = s.background === "portrait";
+  $("#emoji").checked = !!s.emoji;
+  $("#stockBroll").checked = !!s.stock_broll;
   $$("#aspect button").forEach((b) => b.classList.toggle("on", b.dataset.v === (s.aspect || "")));
 }
 
@@ -306,6 +333,7 @@ function readBrief() {
     self_review: $("#selfReview").checked, voiceover: $("#voiceover").checked, voiceover_text: $("#voiceText").value,
     tighten: $("#tighten").checked, voice_enhance: $("#voiceEnhance").checked, emphasis_zoom: $("#emphasisZoom").checked,
     sfx: $("#sfx").checked, auto_broll: $("#autoBroll").checked, background: $("#portraitBg").checked ? "portrait" : "",
+    emoji: $("#emoji").checked, stock_broll: $("#stockBroll").checked, lut_file: s.lut_file || "",
   };
 }
 
@@ -339,7 +367,11 @@ $("#aspect").onclick = (e) => {
 $("#duration").oninput = () => { $("#durationLabel").textContent = `${$("#duration").value}s`; saveBrief(); };
 ["#rules", "#title", "#outro", "#voiceText"].forEach((s) => $(s).addEventListener("input", () => saveBrief()));
 ["#captionStyle", "#beatFx", "#autoColor", "#musicAlign", "#selfReview", "#tighten", "#voiceEnhance", "#emphasisZoom",
-  "#sfx", "#autoBroll", "#portraitBg"].forEach((s) => $(s).addEventListener("change", () => saveBrief()));
+  "#sfx", "#autoBroll", "#portraitBg", "#emoji", "#stockBroll"].forEach((s) => $(s).addEventListener("change", () => saveBrief()));
+$("#stockBroll").addEventListener("change", () => {
+  if ($("#stockBroll").checked && !(state.status.has_pexels || state.status.has_pixabay)) toast("Pune o cheie gratuită Pexels sau Pixabay în ⚙ Setări.", true);
+  if ($("#stockBroll").checked && !$("#autoBroll").checked) { $("#autoBroll").checked = true; saveBrief(); }
+});
 $("#voiceover").addEventListener("change", () => {
   $("#voiceBox").hidden = !$("#voiceover").checked;
   if ($("#voiceover").checked && !state.status.has_eleven) toast("Pentru voce off pune cheia ElevenLabs în Setări ⚙", true);
@@ -364,7 +396,8 @@ $("#generateVariants").onclick = () => generate(state.status.has_key ? "ai" : "a
 
 const JOB_KIND = { generate: "Montaj nou", revise: "Revizie", preview: "Previzualizare", export: "Export final",
   analyze: "Analiza materialului", variants: "3 variante", review: "Auto-verificare", shorts: "Shorts din video lung",
-  dub: "Dublaj", clone: "Clonarea vocii" };
+  dub: "Dublaj", clone: "Clonarea vocii", multicam: "Podcast multicam", batch: "Montaje în lot",
+  publish: "Publicare", insights: "Analiza canalului" };
 
 function watchJob(job, quiet = false) {
   state.job = job;
@@ -382,7 +415,9 @@ function watchJob(job, quiet = false) {
       const kind = state.job.kind;
       const DONE = { export: "Export gata! Fișierele sunt mai jos.", analyze: "Am analizat materialul.",
         variants: "Cele 3 variante sunt gata — alege una.", review: "Verificare terminată.",
-        shorts: "Shorts-urile sunt gata!", dub: "Dublajul e gata!", clone: "Vocea ta e clonată!" };
+        shorts: "Shorts-urile sunt gata!", dub: "Dublajul e gata!", clone: "Vocea ta e clonată!",
+        multicam: "Podcastul e montat!", batch: "Toate montajele sunt gata!", publish: "Încărcat pe YouTube!",
+        insights: "Am învățat ce merge la publicul tău." };
       if (state.job.status === "error") toast(state.job.error, true);
       else toast(DONE[kind] || "Gata! Uită-te la previzualizare.");
       await refresh();
@@ -391,7 +426,7 @@ function watchJob(job, quiet = false) {
       else if (kind === "variants") $("#variantsPanel").scrollIntoView({ behavior: "smooth" });
       else if (kind === "shorts") $("#shortsPanel").scrollIntoView({ behavior: "smooth" });
       else if (kind === "dub") $("#dubs").scrollIntoView({ behavior: "smooth" });
-      else if (kind === "clone") { await loadStatus(); }
+      else if (kind === "clone" || kind === "insights") { await loadStatus(); }
       else $("#stage").scrollIntoView({ behavior: "smooth" });
       if (state.job.status === "done") setTimeout(() => ($("#jobPanel").hidden = true), 2500);
     }
@@ -412,7 +447,7 @@ function renderJob() {
 
 function setBusy(busy) {
   ["#generateAi", "#generateAuto", "#generateVariants", "#exportBtn", "#undo", "#inspApply", "#reviewBtn", "#saveStyle",
-    "#shortsBtn", "#dubBtn"]
+    "#shortsBtn", "#dubBtn", "#textCutBtn", "#mcBtn", "#lutBtn", "#batchBtn", "#ytUploadBtn"]
     .forEach((s) => ($(s).disabled = busy));
   $("#chatForm button").disabled = busy;
 }
@@ -641,6 +676,8 @@ function overlayHtml(o, k) {
 }
 
 const BG = { none: "Original", portrait: "Portret (blurat)", replace: "Înlocuit cu alt fișier" };
+const ENH = { denoise: "🌙 Fără zgomot", sharpen: "🔎 Mai clar", stabilize: "🤳 Stabilizare" };
+const PIPPOS = { bottom_right: "Jos dreapta", bottom_left: "Jos stânga", top_right: "Sus dreapta", top_left: "Sus stânga" };
 const mediaOpts = (cur, exclude) => state.project.media.filter((m) => (m.kind === "video" || m.kind === "image") && m.id !== exclude)
   .map((m) => `<option value="${m.id}" ${m.id === cur ? "selected" : ""}>${esc(m.name)}</option>`).join("");
 const brollHtml = (b) => `<div class="broll-item">
@@ -677,6 +714,18 @@ function openInspector(i) {
     <div class="grid2">
       <label class="field"><span>Fundalul din spatele persoanei</span><select name="background">${opts(BG, c.background || "none")}</select></label>
       <label class="field"><span>Fundal nou (la „înlocuit”)</span><select name="background_media"><option value="">—</option>${mediaOpts(c.background_media, c.media_id)}</select></label>
+    </div>
+    <h4>Calitate și față</h4>
+    <div class="row wrap">
+      ${["denoise", "sharpen", "stabilize"].map((k) => `<label class="toggle"><input type="checkbox" data-enh="${k}" ${(c.enhance || []).includes(k) ? "checked" : ""}><span></span>${ENH[k]}</label>`).join("")}
+    </div>
+    ${slider("beauty", "Beauty", 0, 1, 0.05, c.beauty || 0)}
+    <h4>Facecam / a doua cameră</h4>
+    <div class="grid2">
+      <label class="field"><span>Facecam în cerc</span><select data-pip="media_id"><option value="">—</option>${mediaOpts(c.pip && c.pip.media_id, c.media_id)}</select></label>
+      <label class="field"><span>Colț</span><select data-pip="position">${opts(PIPPOS, (c.pip && c.pip.position) || (state.project.plan.aspect === "9:16" ? "top_right" : "bottom_right"))}</select></label>
+      <label class="field"><span>Split-screen cu</span><select name="split_with"><option value="">—</option>${mediaOpts(c.split_with, c.media_id)}</select></label>
+      <label class="field"><span>Decalaj (s)</span><input type="number" step="0.05" name="split_offset" value="${c.split_offset || 0}"></label>
     </div>
     <h4>B-roll peste clip <span class="muted">(sunetul clipului continuă)</span></h4>
     <div id="brolls">${(c.broll || []).map(brollHtml).join("")}</div>
@@ -726,6 +775,10 @@ $("#inspBody").addEventListener("click", (e) => {
 
 function readInspector() {
   const c = state.editing;
+  c.enhance = $$("#inspBody [data-enh]").filter((el) => el.checked).map((el) => el.dataset.enh);
+  const pipMedia = $("[data-pip=media_id]").value;
+  c.pip = pipMedia ? { media_id: pipMedia, offset: (c.pip && c.pip.offset) || 0, position: $("[data-pip=position]").value,
+    size: (c.pip && c.pip.size) || 0.3, shape: "circle" } : null;
   $$("#inspBody [name]").forEach((el) => {
     if (el.closest(".ovl") || el.closest(".broll-item")) return;
     const val = el.type === "checkbox" ? el.checked : el.type === "number" || el.type === "range" ? +el.value : el.value;
@@ -733,6 +786,7 @@ function readInspector() {
     if (b) c[a][b] = val; else c[a] = val;
   });
   c.background_media = c.background_media || null;
+  c.split_with = c.split_with || null;
   c.broll = $$("#brolls .broll-item").map((box) => ({
     media_id: $("[data-b=media_id]", box).value, at: +$("[data-b=at]", box).value,
     duration: +$("[data-b=duration]", box).value, source_start: 0 }));
@@ -901,6 +955,166 @@ $("#forgetVoice").onclick = async () => {
   renderLangs();
   toast("Am uitat vocea clonată (din aplicație).");
 };
+
+// ------------------------------------------------------------------ edit by text
+
+const cutSel = new Map(); // "clip|s|e" → {clip, s, e}
+let lastWord = null;
+async function loadTranscript() {
+  if (!state.project.plan) { $("#textPanel").hidden = true; return; }
+  const t = await api(`/api/projects/${pid()}/transcript`);
+  $("#textPanel").hidden = !t.clips.length;
+  cutSel.clear();
+  $("#transcript").innerHTML = t.clips.map((c) => `<div class="tclip"><b>Clipul ${c.clip + 1} · ${esc((mediaById(c.media_id) || {}).name || "")}</b>${
+    c.words.map((w) => `<span class="w" data-clip="${c.clip}" data-s="${w[0]}" data-e="${w[1]}" data-t="${w[3]}">${esc(w[2])}</span>`).join(" ")}</div>`).join("");
+  $("#textCount").textContent = "";
+}
+function toggleWord(el, on) {
+  const key = `${el.dataset.clip}|${el.dataset.s}|${el.dataset.e}`;
+  if (on === undefined) on = !cutSel.has(key);
+  if (on) cutSel.set(key, { clip: +el.dataset.clip, s: +el.dataset.s, e: +el.dataset.e }); else cutSel.delete(key);
+  el.classList.toggle("cut", on);
+}
+$("#transcript").addEventListener("click", (e) => {
+  const w = e.target.closest("span.w");
+  if (!w) return;
+  if (e.shiftKey && lastWord) {
+    const all = $$("#transcript span.w");
+    const [a, b] = [all.indexOf(lastWord), all.indexOf(w)].sort((x, y) => x - y);
+    const on = !cutSel.has(`${w.dataset.clip}|${w.dataset.s}|${w.dataset.e}`);
+    all.slice(a, b + 1).forEach((el) => toggleWord(el, on));
+  } else toggleWord(w);
+  lastWord = w;
+  $("#textCount").textContent = cutSel.size ? `${cutSel.size} cuvinte marcate` : "";
+});
+$("#transcript").addEventListener("dblclick", (e) => {
+  const w = e.target.closest("span.w");
+  if (w) { $("#video").currentTime = +w.dataset.t; $("#video").play(); }
+});
+$("#textClear").onclick = () => { cutSel.clear(); $$("#transcript .cut").forEach((x) => x.classList.remove("cut")); $("#textCount").textContent = ""; };
+$("#textCutBtn").onclick = async () => {
+  try { const r = await api(`/api/projects/${pid()}/textcut`, { method: "POST", body: { cuts: [...cutSel.values()] } }); await refresh(); watchJob(r.job); }
+  catch (e) { toast(e.message, true); }
+};
+
+// ------------------------------------------------------------------ tools: multicam, colour, batch, insights
+
+function renderTools() {
+  const vids = state.project.media.filter((m) => m.kind === "video");
+  const mc = state.project.multicam || {};
+  $("#camList").innerHTML = vids.filter((m) => m.has_audio).map((m) =>
+    `<label class="chip"><input type="checkbox" value="${m.id}" ${(mc.cams || []).includes(m.id) ? "checked" : ""}><span>${esc(m.name)} · ${fmt(m.duration)}</span></label>`).join("")
+    || `<span class="small muted">Încarcă video-urile camerelor (cu sunet).</span>`;
+  $("#lutRef").innerHTML = state.project.media.filter((m) => m.kind !== "audio")
+    .map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join("") || `<option value="">(încarcă o poză de referință)</option>`;
+  const lut = state.project.settings.lut_file;
+  $("#lutState").textContent = lut ? `Look activ: ${lut}` : "";
+  $("#batchList").innerHTML = vids.filter((m) => m.role === "material").map((m) =>
+    `<label class="chip"><input type="checkbox" value="${m.id}"><span>${esc(m.name)}</span></label>`).join("");
+  const b = state.project.batch;
+  $("#batchResults").innerHTML = b && b.items ? b.items.map((x) => `<div class="batch-item">${x.ok
+    ? `✅ ${esc(x.name)} — <a href="${file(x.file)}?download=true" download>⬇ MP4</a> · <a href="${file(x.file)}" target="_blank" rel="noopener">▶</a>`
+    : `⚠ ${esc(x.name)}: ${esc(x.error)}`}</div>`).join("") : "";
+}
+$("#lutStrength").oninput = (e) => (e.target.nextElementSibling.textContent = (+e.target.value).toFixed(2));
+let mcLayout = "switch";
+$("#mcLayout").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; mcLayout = b.dataset.v; $$("#mcLayout button").forEach((x) => x.classList.toggle("on", x === b)); };
+$("#mcBtn").onclick = async () => {
+  const cams = $$("#camList input:checked").map((i) => i.value);
+  try { await saveBrief(true); watchJob(await api(`/api/projects/${pid()}/multicam`, { method: "POST", body: { cams, layout: mcLayout } })); }
+  catch (e) { toast(e.message, true); }
+};
+$("#lutBtn").onclick = async () => {
+  try {
+    const r = await api(`/api/projects/${pid()}/colormatch`, { method: "POST", body: { reference: $("#lutRef").value, strength: +$("#lutStrength").value } });
+    state.project.settings.lut_file = r.lut;
+    renderTools();
+    toast("Look creat! Îl găsești și ca .cube la export.");
+    if (r.job) watchJob(r.job);
+  } catch (e) { toast(e.message, true); }
+};
+$("#lutOff").onclick = async () => {
+  const r = await api(`/api/projects/${pid()}/colormatch`, { method: "DELETE" });
+  state.project.settings.lut_file = "";
+  renderTools();
+  if (r.job) watchJob(r.job);
+};
+$("#batchBtn").onclick = async () => {
+  const media_ids = $$("#batchList input:checked").map((i) => i.value);
+  try { await saveBrief(true); watchJob(await api(`/api/projects/${pid()}/batch`, { method: "POST",
+    body: { media_ids, mode: state.status.has_key ? "ai" : "auto", quality: state.quality } })); }
+  catch (e) { toast(e.message, true); }
+};
+
+function renderInsights() {
+  const i = state.status && state.status.insights;
+  if (!i || !i.summary) { $("#insights").innerHTML = ""; return; }
+  $("#insights").innerHTML = `<p><b>Din ${i.videos || "?"} video-uri (${esc(i.source || "")}):</b> ${esc(i.summary)}</p>
+    ${i.do && i.do.length ? `<b>✅ Continuă</b><ul>${i.do.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    ${i.dont && i.dont.length ? `<b>⛔ Evită</b><ul>${i.dont.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    ${i.best_length ? `<p>⏱ Lungime ideală: <b>${esc(i.best_length)}</b></p>` : ""}
+    <p class="muted">Agentul folosește automat aceste concluzii la montajele cu AI.</p>`;
+}
+$("#ytInsightsBtn").onclick = async () => {
+  try { watchJob(await api(`/api/insights/youtube?project_id=${pid()}`, { method: "POST" })); }
+  catch (e) { toast(e.message, true); if (/Setări/.test(e.message)) $("#openSettings").click(); }
+};
+$("#csvInput").onchange = async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const form = new FormData();
+  form.append("file", f);
+  const res = await fetch("/api/insights/csv", { method: "POST", body: form });
+  const data = await res.json();
+  e.target.value = "";
+  if (!res.ok) return toast(data.detail || "Nu am putut citi CSV-ul", true);
+  await loadStatus();
+  toast("Am învățat din statisticile tale!");
+};
+$("#insightsOff").onclick = async () => { state.status = { ...state.status, ...(await api("/api/insights", { method: "DELETE" })) }; renderInsights(); };
+
+// ------------------------------------------------------------------ publishing
+
+function renderPublish() {
+  const ex = state.project.exports || [];
+  const vids = ex.flatMap((e) => e.files.filter((f) => f.endsWith(".mp4")));
+  const sh = (state.project.shorts && state.project.shorts.items) || [];
+  const all = [...vids, ...sh.map((x) => x.file)];
+  $("#publishBox").hidden = !all.length;
+  if (!all.length) return;
+  const cur = $("#pubFile").value;
+  $("#pubFile").innerHTML = all.map((f) => `<option value="${f}">${esc(f.split("/").slice(-2).join(" / "))}</option>`).join("");
+  if (all.includes(cur)) $("#pubFile").value = cur;
+  const c = state.project.social;
+  if (!$("#pubTitle").value) $("#pubTitle").value = (c && c.youtube_title) || state.project.plan.title;
+  if (!$("#pubDesc").value && c) {
+    const p = c.posts.find((x) => /youtube/i.test(x.platform)) || c.posts[0];
+    if (p) $("#pubDesc").value = `${p.caption}\n\n${p.hashtags.map((t) => "#" + t.replace(/^#/, "")).join(" ")}`;
+  }
+  const pub = state.project.published || [];
+  $("#published").innerHTML = pub.map((x) => `<div class="batch-item">✅ ${esc(x.platform)}: <a href="${x.url}" target="_blank" rel="noopener">${esc(x.title)}</a>${x.scheduled ? ` · programat ${esc(x.scheduled.replace("T", " "))}` : ""}</div>`).join("");
+}
+$("#ytUploadBtn").onclick = async () => {
+  const f = $("#pubFile").value;
+  const thumbFile = ((state.project.exports || []).find((e) => f.startsWith(`exports/${e.folder}/`)) || { files: [] })
+    .files.find((x) => x.endsWith("_thumbnail_youtube.jpg")) || "";
+  const tags = (($("#pubDesc").value.match(/#[\p{L}\p{N}_]+/gu)) || []).map((t) => t.slice(1));
+  try {
+    watchJob(await api(`/api/projects/${pid()}/publish/youtube`, { method: "POST", body: {
+      file: f, title: $("#pubTitle").value, description: $("#pubDesc").value, tags, publish_at: $("#pubWhen").value,
+      privacy: $("#pubPrivacy").value, thumbnail: thumbFile } }));
+  } catch (e) { toast(e.message, true); if (/Setări/.test(e.message)) $("#openSettings").click(); }
+};
+$("#publishBox").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-open]");
+  if (!b) return;
+  try { await navigator.clipboard.writeText($("#pubDesc").value); toast("Text copiat! Lipește-l la descriere."); } catch { /* ignore */ }
+  window.open(b.dataset.open, "_blank", "noopener");
+  const a = document.createElement("a");
+  a.href = file($("#pubFile").value) + "?download=true";
+  a.download = "";
+  a.click();
+});
 
 // ------------------------------------------------------------------ boot
 

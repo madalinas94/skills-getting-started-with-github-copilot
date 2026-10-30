@@ -342,3 +342,87 @@ def test_creator_render_portrait_broll_sfx_emphasis(library, tmp_path):
     out = tmp_path / "creator.mp4"
     render.render(plan, by_id, d, tmp_path / "work", out, "preview", extras=extras)
     assert ff.probe(out)["duration"] == pytest.approx(total_length(plan), abs=0.15)
+
+
+# ----------------------------------------------------------------- v4: pro tools
+
+from engine import colormatch, gpu, multicam, publish, stock, textedit  # noqa: E402
+
+
+def test_text_cut_removes_words_cleanly():
+    plan = EditPlan.model_validate({"title": "t", "summary": "s", "clips": [
+        {"media_id": "m1", "start": 0, "end": 6, "keep_audio": True}]})
+    an = {"m1": {"speech": {"words": [[0.2, 0.6, "Azi"], [0.7, 1.1, "vorbim"], [1.2, 1.6, "despre"],
+                                      [1.7, 2.4, "ceva"], [3.0, 3.6, "important."]]}}}
+    t = textedit.transcript(plan, an)
+    assert [w[2] for w in t[0]["words"]][:2] == ["Azi", "vorbim"]
+    out, n = textedit.cut(plan, an, [{"clip": 0, "s": 1.2, "e": 1.6}, {"clip": 0, "s": 1.7, "e": 2.4}])
+    assert n == 2 and [(c.start, c.end) for c in out.clips] == [(0.0, 1.15), (2.7, 6.0)]
+    with pytest.raises(ValueError):
+        textedit.cut(plan, an, [{"clip": 0, "s": w[0], "e": w[1]} for w in an["m1"]["speech"]["words"]] +
+                     [{"clip": 0, "s": 0, "e": 0.2}])
+
+
+def test_viral_captions_and_emoji():
+    plan = EditPlan.model_validate({"title": "t", "summary": "s", "caption_style": "hormozi", "emoji": True,
+                                    "clips": [{"media_id": "m1", "start": 0, "end": 4}]})
+    words = [[0.1, 0.5, "Am"], [0.5, 1.0, "făcut"], [1.0, 1.6, "bani"], [1.8, 2.6, "incredibil!"]]
+    doc = subs.build(plan, 1080, 1920, words)
+    assert "hormozi,," in doc and "INCREDIBIL!" in doc and subs.YELLOW in doc
+    cues = subs.emoji_cues(words, "hormozi", 1080, 1920)
+    assert cues and cues[0]["file"].endswith("1f4b0.png")  # 💰 for "bani"
+
+
+def test_color_match_lut(tmp_path):
+    from PIL import Image
+    warm = Image.new("RGB", (64, 64), (230, 140, 60))
+    grey = Image.new("RGB", (64, 64), (128, 128, 128))
+    table = colormatch.make_lut(warm, [grey], strength=1.0)
+    assert table.shape == (33 ** 3, 3)
+    mid = table[len(table) // 2]  # around mid-grey input
+    assert mid[0] > mid[2]  # pushed towards warm
+    cube = colormatch.write_cube(table, tmp_path / "look.cube")
+    assert cube.read_text().startswith('TITLE "Montaj look"')
+
+
+def test_multicam_sync_and_speaker(tmp_path):
+    import numpy as np
+    sr, T = 8000, 20
+    rng = np.random.default_rng(1)
+    t = np.arange(T * sr) / sr
+    s1, s2, x = np.zeros_like(t), np.zeros_like(t), 0.0
+    turns = []
+    while x < T:
+        d = rng.uniform(2, 4.5)
+        turns.append((x, x + d, len(turns) % 2))
+        x += d
+    for a, b, who in turns:
+        m = (t >= a) & (t < b)
+        (s1 if who == 0 else s2)[m] += np.sin(2 * np.pi * (220 if who == 0 else 340) * t[m]) * (
+            0.5 + 0.5 * np.sign(np.sin(2 * np.pi * rng.uniform(2.5, 5.5) * t[m])))  # speech isn't periodic
+    paths = []
+    for name, sig, cut in (("a", 0.6 * s1 + 0.15 * s2, 0), ("b", 0.15 * s1 + 0.6 * s2, int(0.9 * sr))):
+        raw = tmp_path / f"{name}.raw"
+        (np.clip(sig[cut:] + 0.003 * rng.standard_normal(len(sig) - cut), -1, 1) * 32767).astype(np.int16).tofile(raw)
+        wav = tmp_path / f"{name}.wav"
+        ff.run(["-f", "s16le", "-ar", str(sr), "-ac", "1", "-i", raw, wav])
+        paths.append(wav)
+    offs = multicam.offsets(paths)
+    assert offs[1] == pytest.approx(-0.9, abs=0.05)
+    seq = multicam.speakers(paths, offs, 17)
+    a0, b0, who = turns[1]
+    assert seq[int((a0 + b0) / 2 / 0.5)] == who
+
+
+def test_stock_queries_and_studio_csv():
+    words = [[0, 1, "Astăzi"], [1, 2, "mergem"], [2, 3, "la"], [3, 4, "munte"], [4, 5, "cu"], [5, 6, "bicicleta"]]
+    q = stock.queries_from_words(words, 2)
+    assert q[0] == "bicicleta" and q[1] in ("astăzi", "mergem") and "la" not in q
+    csv_data = ("Content,Video title,Views,Average view duration,Average percentage viewed (%)\n"
+                "Total,,1000,0:00:30,40\nabc,Cum am slăbit 10 kg,800,0:00:41,62.5\ndef,Vlog plictisitor,200,0:00:09,12\n").encode()
+    vids = publish.parse_studio_csv(csv_data)
+    assert [v["title"] for v in vids] == ["Cum am slăbit 10 kg", "Vlog plictisitor"]
+    assert vids[0]["avg_view_seconds"] == 41 and vids[0]["avg_percent"] == 62.5
+    assert "Cum am slăbit" in publish.basic_insights(vids)["do"][0]
+    assert gpu.args("h264_nvenc", "medium", 19)[:2] == ["-c:v", "h264_nvenc"]
+    assert gpu.args("libx264", "medium", 19) == ["-c:v", "libx264", "-preset", "medium", "-crf", "19"]

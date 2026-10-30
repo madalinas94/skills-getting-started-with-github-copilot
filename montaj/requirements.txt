@@ -5,6 +5,7 @@ anthropic>=2.3
 pydantic>=2.7
 numpy>=1.26
 pillow>=10
+segno>=1.5
 # decupare persoană, fețe, thumbnail (aduce și OpenCV); modelele sunt în assets/models
 mediapipe>=0.10.14
 # subtitrări din vorbire, Shorts, dublaj; la prima folosire descarcă modelul Whisper (~0,5 GB pentru „small”)

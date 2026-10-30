@@ -21,7 +21,10 @@ jobs:
           Expand-Archive py.zip -DestinationPath dist/Montaj/python
           # enable site-packages in the embeddable distribution
           $pth = Get-ChildItem dist/Montaj/python -Filter "python*._pth" | Select-Object -First 1
-          (Get-Content $pth.FullName) -replace "#import site", "import site" | Set-Content $pth.FullName
+          # enable site-packages and let the bundled app folder be imported (embeddable Python
+          # ignores the script's own directory)
+          $lines = (Get-Content $pth.FullName) -replace "#import site", "import site"
+          $lines + "../app" | Set-Content $pth.FullName
           Invoke-WebRequest "https://bootstrap.pypa.io/get-pip.py" -OutFile get-pip.py
           dist/Montaj/python/python.exe get-pip.py --no-warn-script-location
           dist/Montaj/python/python.exe -m pip install --no-warn-script-location -r montaj/requirements.txt segno
@@ -48,9 +51,15 @@ jobs:
           $env:MONTAJ_FFMPEG_DIR = "$PWD/dist/Montaj/ffmpeg"
           $env:MONTAJ_NO_BROWSER = "1"
           $env:MONTAJ_WORKSPACE = "$PWD/ws"
-          $p = Start-Process dist/Montaj/python/python.exe -ArgumentList "server.py" -WorkingDirectory dist/Montaj/app -PassThru
-          Start-Sleep -Seconds 25
-          $s = Invoke-RestMethod http://127.0.0.1:8765/api/status
+          $p = Start-Process dist/Montaj/python/python.exe -ArgumentList "server.py" -WorkingDirectory dist/Montaj/app -PassThru `
+                 -RedirectStandardOutput out.log -RedirectStandardError err.log
+          $s = $null
+          for ($i = 0; $i -lt 60 -and -not $s; $i++) {
+            Start-Sleep -Seconds 3
+            if ($p.HasExited) { break }
+            try { $s = Invoke-RestMethod http://127.0.0.1:8765/api/status } catch {}
+          }
+          if (-not $s) { Get-Content out.log, err.log -Tail 60; throw "server did not start" }
           Write-Host "ffmpeg: $($s.ffmpeg)  whisper: $($s.whisper)  people: $($s.people)  encoder: $($s.encoder)"
           Stop-Process -Id $p.Id -Force
           if (-not $s.ffmpeg) { throw "ffmpeg not found" }
