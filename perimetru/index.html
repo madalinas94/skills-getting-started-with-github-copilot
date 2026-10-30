@@ -580,6 +580,16 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
   const waNum = (ph) => { let d = String(ph || "").split(/[·,;/]| or /)[0].replace(/[^\d+]/g, ""); if (d.startsWith("00")) d = "+" + d.slice(2); return d.startsWith("+") && d.length >= 9 ? d.slice(1) : ""; };
   const waText = (name) => `Hello${name ? " " + name.split(" ")[0] : ""}, this is ${S.config?.sender && S.config.sender !== "The Platinum CPO Team" ? S.config.sender + " from " : ""}${S.config?.company || "our company"}. We provide discreet close protection plus yachts, luxury cars, exclusive venues and private travel through one point of contact. Would you be open to a short call this week?`;
   const waBtn = (ph, name, cls = "copy") => waNum(ph) ? `<a class="${cls}" href="https://wa.me/${waNum(ph)}?text=${encodeURIComponent(waText(name))}" target="_blank" rel="noopener" title="Deschide WhatsApp cu mesajul pregătit">WhatsApp</a>` : "";
+  const X_SEARCHES = [
+    ["Fondatori crypto", '"crypto founder" OR "co-founder" (raised OR raise) -giveaway'],
+    ["Fondatori Web3", '"web3 founder" OR "founder of" web3 (launch OR raised)'],
+    ["Lansări de token", '"token launch" OR TGE OR "token generation event" -airdrop'],
+    ["Exituri și achiziții", '"acquired by" OR "startup exit" (crypto OR web3 OR fintech)'],
+    ["Fondatori DeFi", '"DeFi founder" OR "founder" DeFi (raised OR mainnet)'],
+    ["Runde de finanțare", '"we raised" OR "announcing our" (seed OR "series a" OR "series b") (crypto OR web3)'],
+    ["Evenimente crypto", 'Token2049 OR "Bitcoin 2027" OR Consensus OR "Paris Blockchain Week" (side event OR dinner OR party)']
+  ];
+  const xUrl = (h) => !h ? "" : /^https?:/.test(h) ? h : `https://x.com/${String(h).replace(/^@/, "")}`;
   const salesNav = (kw) => `https://www.linkedin.com/sales/search/people?keywords=${encodeURIComponent(kw)}`;
   // LinkedIn connection notes stay under the 300-character limit
   const CONNECT_NOTES = {
@@ -786,7 +796,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
         ${c.phone ? `<span class="mono">${esc(c.phone)}<button class="copy" data-act="copy-text" data-v="${esc(c.phone)}">copiază</button>${waBtn(c.phone, c.name)}</span>` : ""}
       </div>
       <div class="ch"><div class="row">${status}<span class="tag">${esc(ROLE_CATS[c.roleCat] || "Contact")}</span></div>${c.source ? `<a class="note" href="${esc(c.source)}" target="_blank" rel="noopener" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">↗ sursa (${esc(fmtD(c.verified))})</a>` : ""}</div>
-      <div class="row">${c.email && o && !o.dnc ? `<button class="btn primary sm" data-act="draft-contact" data-id="${esc(c.id)}">Scrie e-mail</button>` : ""}${c.name ? `<a class="btn ghost sm" href="${li(`${c.name} ${o?.name || ""}`, "people")}" target="_blank" rel="noopener">LinkedIn</a>` : ""}${c.name && !c.email ? `<a class="btn ghost sm" href="https://app.apollo.io/#/people?qKeywords=${encodeURIComponent(`${c.name} ${o?.name || ""}`)}" target="_blank" rel="noopener">Apollo</a>` : ""}<button class="btn danger sm" data-act="gdpr-del" data-id="${esc(c.id)}">Șterge (GDPR)</button></div>
+      <div class="row">${c.email && o && !o.dnc ? `<button class="btn primary sm" data-act="draft-contact" data-id="${esc(c.id)}">Scrie e-mail</button>` : ""}${c.name ? `<a class="btn ghost sm" href="${li(`${c.name} ${o?.name || ""}`, "people")}" target="_blank" rel="noopener">LinkedIn</a>` : ""}${c.x ? `<a class="btn ghost sm" href="${esc(xUrl(c.x))}" target="_blank" rel="noopener">X</a>` : ""}${c.name && !c.email ? `<a class="btn ghost sm" href="https://app.apollo.io/#/people?qKeywords=${encodeURIComponent(`${c.name} ${o?.name || ""}`)}" target="_blank" rel="noopener">Apollo</a>` : ""}<button class="btn danger sm" data-act="gdpr-del" data-id="${esc(c.id)}">Șterge (GDPR)</button></div>
     </div>`;
   }
 
@@ -864,6 +874,7 @@ button.tag:hover { border-color: var(--gold); color: var(--ink); }
         <p>Oameni și companii care cer public close protection: postări LinkedIn, joburi (o firmă care angajează executive protection e un cumpărător), licitații și știri. Radarul salvează aici ce găsește public; căutările LinkedIn se deschid în contul vostru, pentru că LinkedIn nu permite citirea lor din afară.</p>
       </div></div>
       <div class="eyebrow" style="margin-bottom:10px">LinkedIn</div><div class="find">${searches}</div>
+      <div class="eyebrow" style="margin-bottom:10px">X (Twitter) · crypto și Web3</div><div class="find">${X_SEARCHES.map(([t, q]) => `<a href="https://x.com/search?q=${encodeURIComponent(q)}&f=live" target="_blank" rel="noopener"><b>${esc(t)} ↗</b><span>X, cele mai noi</span></a>`).join("")}</div>
       <div class="eyebrow" style="margin-bottom:10px">Licitații & știri</div><div class="find">${tenders}</div>
       <div class="eyebrow" style="margin:6px 0 10px">Semnale găsite de radar · ${list.length}</div>
       ${!S.ready ? emptyLoading() : list.length === 0 ? `<div class="empty"><h3>Niciun semnal salvat încă</h3><p>Radarul caută la fiecare două zile postări publice, joburi și licitații și le adaugă aici.</p></div>` :
