@@ -39,27 +39,32 @@ SELECT ?p ?pLabel ?amount ?date ?cc ?article WHERE {
   SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
 }
 """
-# Query 2: companies (employer, owner of, founder)
+# Query 2 / 3 run in batches over VALUES lists of candidate people (keeps each query light)
 Q2 = """
 SELECT ?p ?co ?coLabel ?site ?ccc WHERE {
-  { SELECT DISTINCT ?p WHERE { ?p wdt:P31 wd:Q5 ; p:P2218/psv:P2218 ?val .
-      ?val wikibase:quantityAmount ?a ; wikibase:quantityUnit wd:Q4917 . FILTER(?a >= 1000000000)
-      FILTER NOT EXISTS { ?p wdt:P570 ?d } } }
+  VALUES ?p { %s }
   { ?p wdt:P108 ?co } UNION { ?p wdt:P1830 ?co } UNION { ?co wdt:P112 ?p }
   OPTIONAL { ?co wdt:P856 ?site }
   OPTIONAL { ?co wdt:P17 ?c . ?c wdt:P297 ?ccc }
   SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
 }
 """
-# Query 3: sanction markers (P1344 participant in / P1344 value labelled sanction*, or sanctions-list membership)
+# sanction markers: P1344 (participant in) / P463 / P1535 values whose English label mentions "sanction"
 Q3 = """
 SELECT DISTINCT ?p WHERE {
-  ?p wdt:P31 wd:Q5 ; p:P2218/psv:P2218 ?val .
-  ?val wikibase:quantityAmount ?a ; wikibase:quantityUnit wd:Q4917 . FILTER(?a >= 1000000000)
+  VALUES ?p { %s }
   { ?p wdt:P1344 ?e } UNION { ?p wdt:P463 ?e } UNION { ?p wdt:P1535 ?e }
   ?e rdfs:label ?l . FILTER(LANG(?l)="en" && CONTAINS(LCASE(?l),"sanction"))
 }
 """
+def batched(q, qids, n=80):
+    out = []
+    for i in range(0, len(qids), n):
+        vals = " ".join("wd:" + x for x in qids[i:i+n])
+        out += sparql(q % vals)
+        print("batch", i, flush=True)
+        time.sleep(1)
+    return out
 HIGH_RISK = set("IQ LY MZ NG CD AF YE SD SS SO ML SY HT VE RU BY KP IR".split())
 
 def main():
@@ -80,11 +85,11 @@ def main():
     print("people raw", len(people), flush=True)
     for k in [k for k, p in people.items() if p["date"] < "2023-01-01"]:
         del people[k]; stats["old_or_undated"] += 1
-    sanc = {qid(v(b, "p")) for b in sparql(Q3)}
+    sanc = {qid(v(b, "p")) for b in batched(Q3, list(people))}
     for k in [k for k in people if k in sanc]:
         del people[k]; stats["sanctioned"] += 1
     seen = {}; unresolved = set()
-    for b in sparql(Q2):
+    for b in batched(Q2, list(people)):
         q = qid(v(b, "p"))
         if q not in people: continue
         name = v(b, "coLabel")
