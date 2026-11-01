@@ -16,9 +16,9 @@ EXISTING_ORG = {
  "microsoft":"org-microsoft-us","netflix":"org-netflix-us","nvidia":"org-nvidia-us",
  "oracle":"org-oracle-us","palantir technologies":"org-palantir-us","procter gamble":"org-procter-gamble-us",
  "robinhood":"org-robinhood-us","rocket companies":"org-rocket-companies-us","salesforce":"org-salesforce-us",
- "strategy":"org-strategy-inc-us","home depot":"org-home-depot-us","tpg":"org-tpg-us","zoom":"org-zoom-us",
+ "strategy":"org-strategy-inc-us","paypal":"org-paypal-us","home depot":"org-home-depot-us","tpg":"org-tpg-us","zoom":"org-zoom-us",
 }
-BAD = re.compile(r"universit|institut|foundation|fund\b|academy|museum|campaign|school|college|pledge|philanthrop|^the broad|^time$|bell labs|mckinsey|drexel|^skat$|dharavi|benefits supervisor|^eclipse$|^amadea$|bain & company|laboratories|hospital|church|endowment|center for|association of|alliance for|national entrepreneurship|winery|steakhouse|ranch", re.I)
+BAD = re.compile(r"universit|institut|foundation|fund\b|academy|museum|campaign|school|college|pledge|philanthrop|^the broad|^time$|bell labs|mckinsey|drexel|^skat$|dharavi|benefits supervisor|^eclipse$|^amadea$|bain & company|laboratories|hospital|church|endowment|center for|association of|alliance for|national entrepreneurship|winery|steakhouse|ranch|madonna|party|nadace|castletown|^dunes$|^millennium management$|^united rentals$|^phaidon press$", re.I)
 
 def norm(s):
     s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower()
