@@ -41,9 +41,9 @@ SELECT ?p ?pLabel ?amount ?date ?cc ?article WHERE {
 """
 # Query 2 / 3 run in batches over VALUES lists of candidate people (keeps each query light)
 Q2 = """
-SELECT ?p ?co ?coLabel ?site ?ccc WHERE {
+SELECT ?p ?co ?coLabel ?site ?ccc ?rel WHERE {
   VALUES ?p { %s }
-  { ?p wdt:P108 ?co } UNION { ?p wdt:P1830 ?co } UNION { ?co wdt:P112 ?p }
+  { ?p wdt:P108 ?co . BIND("P108" AS ?rel) } UNION { ?p wdt:P1830 ?co . BIND("P1830" AS ?rel) } UNION { ?co wdt:P112 ?p . BIND("P112" AS ?rel) }
   OPTIONAL { ?co wdt:P856 ?site }
   OPTIONAL { ?co wdt:P17 ?c . ?c wdt:P297 ?ccc }
   SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
@@ -95,10 +95,11 @@ def main():
         name = v(b, "coLabel")
         if not name or re.fullmatch(r"Q\d+", name):
             unresolved.add(q); continue
-        co = seen.setdefault((q, qid(v(b, "co"))), {"qid": qid(v(b, "co")), "name": name, "website": None, "cc": None})
+        co = seen.setdefault((q, qid(v(b, "co"))), {"qid": qid(v(b, "co")), "name": name, "website": None, "cc": None, "rels": []})
+        if v(b, "rel") and v(b, "rel") not in co["rels"]: co["rels"].append(v(b, "rel"))
         co["website"] = co["website"] or v(b, "site")
         co["cc"] = co["cc"] or v(b, "ccc")
-    for (q, _), co in seen.items():
+    for (q, _), co in sorted(seen.items(), key=lambda kv: ("P108" in kv[1]["rels"] and len(kv[1]["rels"]) == 1)):
         if len(people[q]["companies"]) < 3:
             people[q]["companies"].append(co)
     for q in unresolved:

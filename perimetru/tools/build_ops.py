@@ -62,6 +62,7 @@ def main():
         routes = []; names = []
         for c in p["companies"]:
             if BAD.search(c["name"]) or not c["cc"]: continue
+            if c.get("rels") == ["P108"]: continue  # employer-only is not a wealth source
             key = norm(c["name"])
             if key in EXISTING_ORG: oid = EXISTING_ORG[key]; linked.add(oid)
             else:
